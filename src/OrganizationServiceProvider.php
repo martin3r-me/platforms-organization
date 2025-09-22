@@ -6,6 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Platform\Organization\Console\Commands\SeedOrganizationData;
 use Platform\Core\PlatformCore;
 use Platform\Core\Routing\ModuleRouter;
 use RecursiveDirectoryIterator;
@@ -16,7 +17,11 @@ class OrganizationServiceProvider extends ServiceProvider
     public function register(): void
     {
         // Falls in Zukunft Artisan Commands o.ä. nötig sind, hier rein
-        
+        if ($this->app->runningInConsole()) {
+            $this->commands([
+                SeedOrganizationData::class,
+            ]);
+        }
         // Keine Services in Drip vorhanden
     }
 

@@ -16,7 +16,6 @@ class Index extends Component
     public $selectedGroup = '';
     public $showInactive = false;
     public $modalShow = false;
-    public $createModalShow = false;
     public $newEntity = [
         'name' => '',
         'description' => '',
@@ -145,13 +144,11 @@ class Index extends Component
     public function openCreateModal()
     {
         $this->modalShow = true;
-        $this->createModalShow = true;
     }
 
     public function closeCreateModal()
     {
         $this->modalShow = false;
-        $this->createModalShow = false;
         $this->reset('newEntity');
     }
 

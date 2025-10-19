@@ -212,5 +212,4 @@
                 </div>
             </x-slot>
         </x-ui-modal>
-    </div>
-</div>
+</x-ui-page>

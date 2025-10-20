@@ -75,7 +75,9 @@
                                 @svg('heroicon-o-' . str_replace('heroicons.', '', $entity->type->icon), 'w-5 h-5 text-[var(--ui-muted)] mr-3')
                             @endif
                             <div>
-                                <div class="font-medium">{{ $entity->name }}</div>
+                                <div class="font-medium">
+                                    <a href="{{ route('organization.entities.show', $entity) }}" class="link">{{ $entity->name }}</a>
+                                </div>
                                 @if($entity->description)
                                     <div class="text-xs text-[var(--ui-muted)]">{{ Str::limit($entity->description, 50) }}</div>
                                 @endif

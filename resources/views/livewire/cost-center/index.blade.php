@@ -1,19 +1,30 @@
 <x-ui-page>
-    <x-slot name="title">Kostenstellen</x-slot>
-
-    <x-slot name="actions">
-        <x-ui-button wire:click="create">
-            @svg('heroicon-o-plus', 'w-4 h-4 mr-2')
-            Neu
-        </x-ui-button>
+    <x-slot name="navbar">
+        <x-ui-page-navbar title="Kostenstellen" />
     </x-slot>
 
     <x-slot name="sidebar">
-        <x-ui-page-sidebar>
-            <x-ui-input-text name="search" wire:model.live="search" placeholder="Suchen..." />
-            <div class="flex items-center">
-                <input type="checkbox" wire:model.live="showInactive" id="showInactive" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                <label for="showInactive" class="ml-2 text-sm text-[var(--ui-secondary)]">Inaktive anzeigen</label>
+        <x-ui-page-sidebar title="Filter" width="w-80" :defaultOpen="true" side="left">
+            <div class="p-6 space-y-6">
+                <div>
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Aktionen</h3>
+                    <div class="space-y-2">
+                        <x-ui-input-text name="search" wire:model.live="search" placeholder="Suche Kostenstellen..." class="w-full" size="sm" />
+                        <x-ui-button variant="secondary" size="sm" wire:click="create" class="w-full justify-start">
+                            @svg('heroicon-o-plus','w-4 h-4')
+                            <span class="ml-2">Neue Kostenstelle</span>
+                        </x-ui-button>
+                    </div>
+                </div>
+                <div>
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>
+                    <div class="space-y-3">
+                        <div class="flex items-center">
+                            <input type="checkbox" wire:model.live="showInactive" id="showInactive" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                            <label for="showInactive" class="ml-2 text-sm text-[var(--ui-secondary)]">Inaktive anzeigen</label>
+                        </div>
+                    </div>
+                </div>
             </div>
         </x-ui-page-sidebar>
     </x-slot>

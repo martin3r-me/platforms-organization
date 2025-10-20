@@ -1,5 +1,7 @@
 <x-ui-page>
-    <x-slot name="title">VSM System</x-slot>
+    <x-slot name="navbar">
+        <x-ui-page-navbar title="VSM System" />
+    </x-slot>
 
     <x-slot name="actions">
         <x-ui-button wire:click="save">

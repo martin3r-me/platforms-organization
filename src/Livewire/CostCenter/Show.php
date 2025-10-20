@@ -49,6 +49,7 @@ class Show extends Component
 
     public function render()
     {
-        return view('livewire.cost-center.show');
+        return view('organization::livewire.cost-center.show')
+            ->layout('platform::layouts.app');
     }
 }

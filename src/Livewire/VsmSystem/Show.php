@@ -51,6 +51,7 @@ class Show extends Component
 
     public function render()
     {
-        return view('livewire.vsm-system.show');
+        return view('organization::livewire.vsm-system.show')
+            ->layout('platform::layouts.app');
     }
 }

@@ -45,7 +45,7 @@
     <x-ui-modal wire:model.live="modalShow">
         <x-slot name="title">Kostenstelle anlegen</x-slot>
         <x-slot name="body">
-            <x-ui-form>
+            <div class="space-y-4">
                 <x-ui-input-text label="Code" wire:model.defer="form.code" />
                 <x-ui-input-text label="Name" wire:model.defer="form.name" required />
                 <x-ui-input-textarea label="Beschreibung" wire:model.defer="form.description" />
@@ -53,7 +53,7 @@
                     <input type="checkbox" wire:model.defer="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
                     <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
                 </div>
-            </x-ui-form>
+            </div>
         </x-slot>
         <x-slot name="footer">
             <x-ui-button variant="muted" wire:click="$set('modalShow', false)">Abbrechen</x-ui-button>

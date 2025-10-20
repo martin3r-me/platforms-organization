@@ -10,9 +10,9 @@
 
     <x-ui-page-container>
         <div class="space-y-4">
-            <x-ui-input-text label="Code" wire:model.defer="form.code" />
-            <x-ui-input-text label="Name" wire:model.defer="form.name" required />
-            <x-ui-input-textarea label="Beschreibung" wire:model.defer="form.description" />
+            <x-ui-input-text name="code" label="Code" wire:model.defer="form.code" />
+            <x-ui-input-text name="name" label="Name" wire:model.defer="form.name" required />
+            <x-ui-input-textarea name="description" label="Beschreibung" wire:model.defer="form.description" />
             <div class="flex items-center">
                 <input type="checkbox" wire:model.defer="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
                 <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>

@@ -16,7 +16,6 @@ class Index extends Component
         'code' => '',
         'name' => '',
         'description' => '',
-        'sort_order' => 0,
         'is_active' => true,
     ];
 
@@ -58,7 +57,6 @@ class Index extends Component
             'form.code' => ['required', 'string', 'max:10'],
             'form.name' => ['required', 'string', 'max:255'],
             'form.description' => ['nullable', 'string'],
-            'form.sort_order' => ['integer'],
             'form.is_active' => ['boolean'],
         ])['form'];
 

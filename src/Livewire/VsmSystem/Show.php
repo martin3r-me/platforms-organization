@@ -23,7 +23,6 @@ class Show extends Component
             'code' => $this->vsmSystem->code,
             'name' => $this->vsmSystem->name,
             'description' => $this->vsmSystem->description,
-            'sort_order' => $this->vsmSystem->sort_order,
             'is_active' => $this->vsmSystem->is_active,
         ];
     }
@@ -39,7 +38,6 @@ class Show extends Component
             'form.name' => 'required|string|max:255',
             'form.code' => 'nullable|string|max:50',
             'form.description' => 'nullable|string',
-            'form.sort_order' => 'nullable|integer|min:0',
             'form.is_active' => 'boolean',
         ]);
 

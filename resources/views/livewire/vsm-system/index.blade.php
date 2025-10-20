@@ -40,7 +40,6 @@
             <x-ui-table-header>
                 <x-ui-table-header-cell compact="true">Code</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Reihenfolge</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
             </x-ui-table-header>
 
@@ -51,7 +50,6 @@
                             <a href="{{ route('organization.vsm-systems.show', $sys) }}" class="link">{{ $sys->code }}</a>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">{{ $sys->name }}</x-ui-table-cell>
-                        <x-ui-table-cell compact="true">{{ $sys->sort_order }}</x-ui-table-cell>
                         <x-ui-table-cell compact="true">
                             <x-ui-badge variant="{{ $sys->is_active ? 'success' : 'muted' }}">{{ $sys->is_active ? 'Aktiv' : 'Inaktiv' }}</x-ui-badge>
                         </x-ui-table-cell>
@@ -61,23 +59,70 @@
         </x-ui-table>
     </x-ui-page-container>
 
-    <x-ui-modal wire:model.live="modalShow">
-        <x-slot name="title">VSM System anlegen</x-slot>
-        <x-slot name="body">
-            <div class="space-y-4">
-                <x-ui-input-text name="code" label="Code" wire:model.defer="form.code" required />
-                <x-ui-input-text name="name" label="Name" wire:model.defer="form.name" required />
-                <x-ui-input-textarea name="description" label="Beschreibung" wire:model.defer="form.description" />
-                <x-ui-input-text name="sort_order" type="number" label="Reihenfolge" wire:model.defer="form.sort_order" />
-                <div class="flex items-center">
-                    <input type="checkbox" wire:model.defer="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                    <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
-                </div>
-            </div>
+    <!-- Create VSM System Modal -->
+    <x-ui-modal
+        wire:model="modalShow"
+        size="lg"
+    >
+        <x-slot name="header">
+            Neues VSM System erstellen
         </x-slot>
+
+        <div class="space-y-4">
+            <form wire:submit.prevent="store" class="space-y-4">
+                <div class="grid grid-cols-1 gap-4">
+                    <x-ui-input-text
+                        name="code"
+                        label="Code"
+                        wire:model.live="form.code"
+                        required
+                        placeholder="Code des VSM Systems"
+                    />
+                    
+                    <x-ui-input-text
+                        name="name"
+                        label="Name"
+                        wire:model.live="form.name"
+                        required
+                        placeholder="Name des VSM Systems"
+                    />
+                    
+                    <x-ui-input-textarea
+                        name="description"
+                        label="Beschreibung"
+                        wire:model.live="form.description"
+                        placeholder="Optionale Beschreibung"
+                        rows="3"
+                    />
+                    
+                </div>
+
+                <div class="flex items-center">
+                    <input 
+                        type="checkbox" 
+                        wire:model.live="form.is_active" 
+                        id="is_active"
+                        class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
+                    />
+                    <label for="is_active" class="ml-2 text-sm text-gray-700">Aktiv</label>
+                </div>
+            </form>
+        </div>
+
         <x-slot name="footer">
-            <x-ui-button variant="muted" wire:click="$set('modalShow', false)">Abbrechen</x-ui-button>
-            <x-ui-button wire:click="store">Speichern</x-ui-button>
+            <div class="d-flex justify-end gap-2">
+                <x-ui-button 
+                    type="button" 
+                    variant="secondary-outline" 
+                    wire:click="$set('modalShow', false)"
+                >
+                    Abbrechen
+                </x-ui-button>
+                <x-ui-button type="button" variant="primary" wire:click="store">
+                    @svg('heroicon-o-plus', 'w-4 h-4 mr-2')
+                    Erstellen
+                </x-ui-button>
+            </div>
         </x-slot>
     </x-ui-modal>
 </x-ui-page>

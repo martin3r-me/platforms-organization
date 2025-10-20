@@ -11,7 +11,10 @@
     <x-slot name="sidebar">
         <x-ui-page-sidebar>
             <x-ui-input-text wire:model.live="search" placeholder="Suchen..." />
-            <x-ui-switch wire:click="toggleInactive" :checked="$showInactive">Inaktive anzeigen</x-ui-switch>
+            <div class="flex items-center">
+                <input type="checkbox" wire:model.live="showInactive" id="showInactive" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                <label for="showInactive" class="ml-2 text-sm text-[var(--ui-secondary)]">Inaktive anzeigen</label>
+            </div>
         </x-ui-page-sidebar>
     </x-slot>
 
@@ -46,7 +49,10 @@
                 <x-ui-input-text label="Code" wire:model.defer="form.code" />
                 <x-ui-input-text label="Name" wire:model.defer="form.name" required />
                 <x-ui-input-textarea label="Beschreibung" wire:model.defer="form.description" />
-                <x-ui-switch label="Aktiv" wire:model.defer="form.is_active" />
+                <div class="flex items-center">
+                    <input type="checkbox" wire:model.defer="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                    <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
+                </div>
             </x-ui-form>
         </x-slot>
         <x-slot name="footer">

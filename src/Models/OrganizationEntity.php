@@ -21,6 +21,7 @@ class OrganizationEntity extends Model
         'description',
         'entity_type_id',
         'vsm_system_id',
+        'cost_center_id',
         'parent_entity_id',
         'is_active',
         'metadata',
@@ -93,6 +94,14 @@ class OrganizationEntity extends Model
     public function vsmSystem()
     {
         return $this->belongsTo(OrganizationVsmSystem::class, 'vsm_system_id');
+    }
+
+    /**
+     * Beziehung zu Cost Center
+     */
+    public function costCenter()
+    {
+        return $this->belongsTo(OrganizationCostCenter::class, 'cost_center_id');
     }
 
     /**

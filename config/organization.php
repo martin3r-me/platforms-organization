@@ -27,6 +27,22 @@ return [
             'title' => 'Organization',
             'icon' => 'heroicon-o-building-office',
             'items' => [
+                'dimensions' => [
+                    'title' => 'Dimensionen',
+                    'icon' => 'heroicon-o-adjustments-horizontal',
+                    'items' => [
+                        'cost-centers' => [
+                            'title' => 'Kostenstellen',
+                            'route' => 'organization.cost-centers.index',
+                            'icon' => 'heroicon-o-currency-dollar',
+                        ],
+                        'vsm-systems' => [
+                            'title' => 'VSM Systeme',
+                            'route' => 'organization.vsm-systems.index',
+                            'icon' => 'heroicon-o-rectangle-group',
+                        ],
+                    ],
+                ],
                 'dashboard' => [
                     'title' => 'Dashboard',
                     'route' => 'organization.dashboard',

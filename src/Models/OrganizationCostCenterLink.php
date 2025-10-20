@@ -13,7 +13,7 @@ class OrganizationCostCenterLink extends Model
 
     protected $fillable = [
         'uuid',
-        'entity_id',
+        'cost_center_id',
         'linkable_type',
         'linkable_id',
         'start_date',
@@ -50,9 +50,9 @@ class OrganizationCostCenterLink extends Model
         });
     }
 
-    public function entity(): BelongsTo
+    public function costCenter(): BelongsTo
     {
-        return $this->belongsTo(OrganizationEntity::class, 'entity_id');
+        return $this->belongsTo(OrganizationCostCenter::class, 'cost_center_id');
     }
 
     public function linkable(): MorphTo

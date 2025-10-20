@@ -55,15 +55,6 @@ class OrganizationEntityTypeSeeder extends Seeder
                 'group_name' => 'Organisationseinheiten',
             ],
             [
-                'code' => 'cost_center',
-                'name' => 'Kostenstelle',
-                'description' => 'Kostenstelle für Budgetverwaltung und Kostenkontrolle',
-                'icon' => 'calculator',
-                'sort_order' => 5,
-                'is_active' => true,
-                'group_name' => 'Organisationseinheiten',
-            ],
-            [
                 'code' => 'team',
                 'name' => 'Team',
                 'description' => 'Arbeitsgruppe oder Team',

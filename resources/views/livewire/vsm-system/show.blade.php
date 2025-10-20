@@ -77,7 +77,7 @@
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                 <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Zugeordnete Organisationseinheiten</h2>
                 <div class="text-sm text-[var(--ui-muted)]">
-                    @if($vsmSystem->entities->count() > 0)
+                    @if($vsmSystem->entities && $vsmSystem->entities->count() > 0)
                         <div class="space-y-2">
                             @foreach($vsmSystem->entities as $entity)
                                 <div class="flex items-center justify-between py-2 px-3 bg-[var(--ui-muted-5)] rounded">

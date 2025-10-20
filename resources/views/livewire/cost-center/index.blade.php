@@ -3,7 +3,7 @@
 
     <x-slot name="actions">
         <x-ui-button wire:click="create">
-            @svg('heroicons.plus', 'w-4 h-4 mr-2')
+            @svg('heroicon-o-plus', 'w-4 h-4 mr-2')
             Neu
         </x-ui-button>
     </x-slot>

@@ -3,7 +3,7 @@
 
     <x-slot name="actions">
         <x-ui-button wire:click="save">
-            @svg('heroicons.check', 'w-4 h-4 mr-2')
+            @svg('heroicon-o-check', 'w-4 h-4 mr-2')
             Speichern
         </x-ui-button>
     </x-slot>

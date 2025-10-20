@@ -10,7 +10,7 @@
 
     <x-slot name="sidebar">
         <x-ui-page-sidebar>
-            <x-ui-input wire:model.live="search" placeholder="Suchen..." />
+            <x-ui-input-text wire:model.live="search" placeholder="Suchen..." />
             <x-ui-switch wire:click="toggleInactive" :checked="$showInactive">Inaktive anzeigen</x-ui-switch>
         </x-ui-page-sidebar>
     </x-slot>

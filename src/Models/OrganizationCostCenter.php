@@ -50,6 +50,14 @@ class OrganizationCostCenter extends Model
     {
         return $this->belongsTo(\Platform\Core\Models\User::class);
     }
+
+    /**
+     * Organisationseinheiten, die dieser Kostenstelle zugeordnet sind
+     */
+    public function entities()
+    {
+        return $this->hasMany(OrganizationEntity::class, 'cost_center_id');
+    }
 }
 
 

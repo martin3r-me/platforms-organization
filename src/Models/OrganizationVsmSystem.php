@@ -55,4 +55,12 @@ class OrganizationVsmSystem extends Model
     {
         return static::active()->ordered()->get();
     }
+
+    /**
+     * Organisationseinheiten, die diesem VSM-System zugeordnet sind
+     */
+    public function entities()
+    {
+        return $this->hasMany(OrganizationEntity::class, 'vsm_system_id');
+    }
 }

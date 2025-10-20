@@ -10,8 +10,8 @@
 
     <x-ui-page-container>
         <x-ui-form>
-            <x-ui-input label="Code" wire:model.defer="form.code" />
-            <x-ui-input label="Name" wire:model.defer="form.name" required />
+        <x-ui-input-text label="Code" wire:model.defer="form.code" />
+        <x-ui-input-text label="Name" wire:model.defer="form.name" required />
             <x-ui-textarea label="Beschreibung" wire:model.defer="form.description" />
             <x-ui-switch label="Aktiv" wire:model.defer="form.is_active" />
         </x-ui-form>

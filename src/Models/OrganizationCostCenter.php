@@ -52,6 +52,14 @@ class OrganizationCostCenter extends Model
     }
 
     /**
+     * Scope für aktive Kostenstellen
+     */
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
+    }
+
+    /**
      * Organisationseinheiten, die dieser Kostenstelle zugeordnet sind
      */
     public function entities()

@@ -47,7 +47,7 @@
             <x-ui-form>
                 <x-ui-input-text label="Code" wire:model.defer="form.code" required />
                 <x-ui-input-text label="Name" wire:model.defer="form.name" required />
-                <x-ui-textarea label="Beschreibung" wire:model.defer="form.description" />
+                <x-ui-input-textarea label="Beschreibung" wire:model.defer="form.description" />
                 <x-ui-input-text type="number" label="Reihenfolge" wire:model.defer="form.sort_order" />
                 <x-ui-switch label="Aktiv" wire:model.defer="form.is_active" />
             </x-ui-form>

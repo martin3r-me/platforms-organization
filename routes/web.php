@@ -17,4 +17,4 @@ Route::get('/cost-centers/{costCenter}', CostCenterShow::class)->name('organizat
 
 // Dimensionen: VSM Systeme
 Route::get('/vsm-systems', VsmSystemIndex::class)->name('organization.vsm-systems.index');
-Route::get('/vsm-systems/{system}', VsmSystemShow::class)->name('organization.vsm-systems.show');
+Route::get('/vsm-systems/{vsmSystem}', VsmSystemShow::class)->name('organization.vsm-systems.show');

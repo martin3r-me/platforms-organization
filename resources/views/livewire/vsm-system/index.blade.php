@@ -29,6 +29,12 @@
         </x-ui-page-sidebar>
     </x-slot>
 
+    <x-slot name="activity">
+        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
+            <div class="p-6 text-sm text-[var(--ui-muted)]">Keine Aktivitäten verfügbar</div>
+        </x-ui-page-sidebar>
+    </x-slot>
+
     <x-ui-page-container>
         <x-ui-table compact="true">
             <x-ui-table-header>

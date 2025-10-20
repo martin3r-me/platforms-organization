@@ -41,6 +41,43 @@
         </a>
     </div>
 
+    {{-- Abschnitt: Dimensionen --}}
+    <div>
+        <h4 x-show="!collapsed" class="px-4 py-3 text-xs tracking-wide font-semibold text-[color:var(--ui-muted)] uppercase">Dimensionen</h4>
+
+        {{-- Kostenstellen --}}
+        <a href="{{ route('organization.cost-centers.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/cost-centers') ||
+               window.location.pathname.endsWith('/cost-centers') ||
+               window.location.pathname.endsWith('/cost-centers/')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-currency-dollar class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Kostenstellen</span>
+        </a>
+
+        {{-- VSM Systeme --}}
+        <a href="{{ route('organization.vsm-systems.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/vsm-systems') ||
+               window.location.pathname.endsWith('/vsm-systems') ||
+               window.location.pathname.endsWith('/vsm-systems/')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-rectangle-group class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">VSM Systeme</span>
+        </a>
+    </div>
+
     {{-- Abschnitt: Schnellzugriff --}}
     <div x-show="!collapsed">
         <h4 class="px-4 py-3 text-xs tracking-wide font-semibold text-[color:var(--ui-muted)] uppercase">Schnellzugriff</h4>

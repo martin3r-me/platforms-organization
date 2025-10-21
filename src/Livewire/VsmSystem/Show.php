@@ -47,6 +47,7 @@ class Show extends Component
         session()->flash('message', 'VSM System erfolgreich aktualisiert.');
     }
 
+    #[Computed]
     public function isDirty()
     {
         return $this->form['name'] !== $this->vsmSystem->name ||

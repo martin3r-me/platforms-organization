@@ -51,6 +51,7 @@ class Show extends Component
         session()->flash('message', 'Kostenstelle erfolgreich aktualisiert.');
     }
 
+    #[Computed]
     public function isDirty()
     {
         return $this->form['name'] !== $this->costCenter->name ||

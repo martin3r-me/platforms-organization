@@ -94,7 +94,6 @@
                         placeholder="Optionale Beschreibung"
                         rows="3"
                     />
-                    
                 </div>
 
                 <div class="flex items-center">

@@ -88,15 +88,15 @@
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                 <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Grunddaten</h2>
                 <div class="space-y-4">
-                    <x-ui-input-text name="code" label="Code" wire:model.defer="form.code" />
-                    <x-ui-input-text name="name" label="Name" wire:model.defer="form.name" required />
-                    <x-ui-input-textarea name="description" label="Beschreibung" wire:model.defer="form.description" />
+                    <x-ui-input-text name="code" label="Code" wire:model.live="form.code" />
+                    <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required />
+                    <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" />
                     
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Entität (Parent)</label>
                         <select 
                             name="root_entity_id"
-                            wire:model.defer="form.root_entity_id"
+                            wire:model.live="form.root_entity_id"
                             class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
                         >
                             <option value="">Global (für alle Entitäten)</option>
@@ -108,7 +108,7 @@
                     
                     
                     <div class="flex items-center">
-                        <input type="checkbox" wire:model.defer="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                        <input type="checkbox" wire:model.live="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
                         <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
                     </div>
                 </div>

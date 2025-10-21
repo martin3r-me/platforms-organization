@@ -101,10 +101,11 @@ class OrganizationCostCenter extends Model
             $current = $current->parent;
         }
 
-        // Search in hierarchy order
+        // Search in hierarchy order - only get the FIRST match for each code
         $costCenters = collect();
         $foundCodes = [];
 
+        // First: Check entity-specific cost centers
         foreach ($hierarchy as $entityIdInPath) {
             $entitySpecific = self::where('team_id', $teamId)
                 ->where('is_active', true)
@@ -119,7 +120,7 @@ class OrganizationCostCenter extends Model
             }
         }
 
-        // Add global cost centers for codes not found in hierarchy
+        // Second: Add global cost centers for codes not found in hierarchy
         $globalCostCenters = self::where('team_id', $teamId)
             ->where('is_active', true)
             ->whereNull('root_entity_id')

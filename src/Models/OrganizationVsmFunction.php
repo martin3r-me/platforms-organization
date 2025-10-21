@@ -125,7 +125,8 @@ class OrganizationVsmFunction extends Model
             }
         }
 
-        return $vsmFunctions->sortBy('name');
+        // Convert to Eloquent Collection
+        return new \Illuminate\Database\Eloquent\Collection($vsmFunctions->sortBy('name')->values());
     }
 
     /**

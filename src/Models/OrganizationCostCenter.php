@@ -132,7 +132,8 @@ class OrganizationCostCenter extends Model
             }
         }
 
-        return $costCenters->sortBy('name');
+        // Convert to Eloquent Collection
+        return new \Illuminate\Database\Eloquent\Collection($costCenters->sortBy('name')->values());
     }
 
     /**

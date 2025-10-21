@@ -61,6 +61,7 @@
             <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">VSM System</x-ui-table-header-cell>
+            <x-ui-table-header-cell compact="true">Kostenstelle</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Übergeordnet</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Erstellt</x-ui-table-header-cell>
@@ -91,6 +92,13 @@
                     <x-ui-table-cell compact="true">
                         @if($entity->vsmSystem)
                             <x-ui-badge variant="secondary" size="sm">{{ $entity->vsmSystem->name }}</x-ui-badge>
+                        @else
+                            <span class="text-xs text-[var(--ui-muted)]">–</span>
+                        @endif
+                    </x-ui-table-cell>
+                    <x-ui-table-cell compact="true">
+                        @if($entity->costCenter)
+                            <x-ui-badge variant="primary" size="sm">{{ $entity->costCenter->name }}</x-ui-badge>
                         @else
                             <span class="text-xs text-[var(--ui-muted)]">–</span>
                         @endif

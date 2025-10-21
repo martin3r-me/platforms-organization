@@ -4,6 +4,7 @@
     </x-slot>
 
     <x-slot name="actions">
+        <!-- Debug: isDirty = {{ $this->isDirty() ? 'true' : 'false' }} -->
         @if($this->isDirty())
             <x-ui-button variant="secondary-outline" wire:click="loadForm">
                 @svg('heroicon-o-x-mark', 'w-4 h-4 mr-2')

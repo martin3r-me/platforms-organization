@@ -55,16 +55,6 @@ class Index extends Component
             ->orderBy('name')
             ->get();
             
-        // Debug: Log the count and check if root_entity_id column exists
-        \Log::info('Entities count: ' . $entities->count());
-        
-        // Check if root_entity_id column exists in cost_centers table
-        $hasColumn = \Schema::hasColumn('organization_cost_centers', 'root_entity_id');
-        \Log::info('root_entity_id column exists: ' . ($hasColumn ? 'yes' : 'no'));
-        
-        // Check total entities in database
-        $totalEntities = OrganizationEntity::count();
-        \Log::info('Total entities in database: ' . $totalEntities);
         
         return $entities;
     }

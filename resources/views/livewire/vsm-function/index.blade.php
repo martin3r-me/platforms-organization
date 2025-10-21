@@ -1,6 +1,6 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="Kostenstellen" />
+        <x-ui-page-navbar title="VSM Funktionen" />
     </x-slot>
 
     <x-slot name="sidebar">
@@ -9,10 +9,10 @@
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Aktionen</h3>
                     <div class="space-y-2">
-                        <x-ui-input-text name="search" wire:model.live="search" placeholder="Suche Kostenstellen..." class="w-full" size="sm" />
+                        <x-ui-input-text name="search" wire:model.live="search" placeholder="Suche VSM Funktionen..." class="w-full" size="sm" />
                         <x-ui-button variant="secondary" size="sm" wire:click="create" class="w-full justify-start">
                             @svg('heroicon-o-plus','w-4 h-4')
-                            <span class="ml-2">Neue Kostenstelle</span>
+                            <span class="ml-2">Neue VSM Funktion</span>
                         </x-ui-button>
                     </div>
                 </div>
@@ -45,21 +45,21 @@
             </x-ui-table-header>
 
             <x-ui-table-body>
-                @foreach($this->costCenters as $cc)
+                @foreach($this->vsmFunctions as $vsm)
                     <x-ui-table-row compact="true">
                         <x-ui-table-cell compact="true">
-                            <a href="{{ route('organization.cost-centers.show', $cc) }}" class="link">{{ $cc->code }}</a>
+                            <a href="{{ route('organization.vsm-functions.show', $vsm) }}" class="link">{{ $vsm->code }}</a>
                         </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">{{ $cc->name }}</x-ui-table-cell>
+                        <x-ui-table-cell compact="true">{{ $vsm->name }}</x-ui-table-cell>
                         <x-ui-table-cell compact="true">
-                            @if($cc->root_entity_id)
+                            @if($vsm->root_entity_id)
                                 <x-ui-badge variant="info">Entitätsspezifisch</x-ui-badge>
                             @else
                                 <x-ui-badge variant="secondary">Global</x-ui-badge>
                             @endif
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="{{ $cc->is_active ? 'success' : 'muted' }}">{{ $cc->is_active ? 'Aktiv' : 'Inaktiv' }}</x-ui-badge>
+                            <x-ui-badge variant="{{ $vsm->is_active ? 'success' : 'muted' }}">{{ $vsm->is_active ? 'Aktiv' : 'Inaktiv' }}</x-ui-badge>
                         </x-ui-table-cell>
                     </x-ui-table-row>
                 @endforeach
@@ -67,13 +67,13 @@
         </x-ui-table>
     </x-ui-page-container>
 
-    <!-- Create Cost Center Modal -->
+    <!-- Create VSM Function Modal -->
     <x-ui-modal
         wire:model="modalShow"
         size="lg"
     >
         <x-slot name="header">
-            Neue Kostenstelle erstellen
+            Neue VSM Funktion erstellen
         </x-slot>
 
         <div class="space-y-4">
@@ -91,7 +91,7 @@
                         label="Name"
                         wire:model.live="form.name"
                         required
-                        placeholder="Name der Kostenstelle"
+                        placeholder="Name der VSM Funktion"
                     />
                     
                     <x-ui-input-textarea
@@ -115,7 +115,6 @@
                             @endforeach
                         </select>
                     </div>
-                    
                 </div>
 
                 <div class="flex items-center">
@@ -147,5 +146,3 @@
         </x-slot>
     </x-ui-modal>
 </x-ui-page>
-
-

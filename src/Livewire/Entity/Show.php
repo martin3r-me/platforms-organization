@@ -13,7 +13,6 @@ class Show extends Component
 {
     public OrganizationEntity $entity;
     public array $form = [];
-    public bool $isEditing = false;
 
     public function mount(OrganizationEntity $entity)
     {
@@ -34,11 +33,6 @@ class Show extends Component
         ];
     }
 
-    public function edit()
-    {
-        $this->isEditing = true;
-    }
-
     public function save()
     {
         $this->validate([
@@ -51,10 +45,26 @@ class Show extends Component
             'form.is_active' => 'boolean',
         ]);
 
-        $this->entity->update($this->form);
-        $this->isEditing = false;
-        
-        session()->flash('message', 'Organisationseinheit erfolgreich aktualisiert.');
+        try {
+            $this->entity->update($this->form);
+            $this->loadForm(); // Reload form to reset dirty state
+            
+            session()->flash('message', 'Organisationseinheit erfolgreich aktualisiert.');
+        } catch (\Exception $e) {
+            session()->flash('error', 'Fehler beim Speichern: ' . $e->getMessage());
+        }
+    }
+
+    #[Computed]
+    public function isDirty()
+    {
+        return $this->form['name'] !== $this->entity->name ||
+               $this->form['description'] !== $this->entity->description ||
+               $this->form['entity_type_id'] != $this->entity->entity_type_id ||
+               $this->form['vsm_system_id'] != $this->entity->vsm_system_id ||
+               $this->form['cost_center_id'] != $this->entity->cost_center_id ||
+               $this->form['parent_entity_id'] != $this->entity->parent_entity_id ||
+               $this->form['is_active'] !== $this->entity->is_active;
     }
 
     public function getEntityTypesProperty()

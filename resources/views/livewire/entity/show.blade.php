@@ -4,14 +4,21 @@
     </x-slot>
 
     <x-slot name="actions">
-        <x-ui-button variant="secondary-outline" wire:click="edit">
-            @svg('heroicon-o-pencil', 'w-4 h-4 mr-2')
-            Bearbeiten
-        </x-ui-button>
-        <x-ui-button wire:click="save">
-            @svg('heroicon-o-check', 'w-4 h-4 mr-2')
-            Speichern
-        </x-ui-button>
+        @if($this->isDirty())
+            <x-ui-button variant="secondary-outline" wire:click="loadForm">
+                @svg('heroicon-o-x-mark', 'w-4 h-4 mr-2')
+                Abbrechen
+            </x-ui-button>
+            <x-ui-button variant="primary" wire:click="save">
+                @svg('heroicon-o-check', 'w-4 h-4 mr-2')
+                Speichern
+            </x-ui-button>
+        @else
+            <x-ui-button variant="secondary-outline" wire:click="edit">
+                @svg('heroicon-o-pencil', 'w-4 h-4 mr-2')
+                Bearbeiten
+            </x-ui-button>
+        @endif
     </x-slot>
 
     <x-slot name="sidebar">
@@ -75,12 +82,24 @@
     </x-slot>
 
     <x-ui-page-container>
+        @if (session()->has('message'))
+            <div class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+                {{ session('message') }}
+            </div>
+        @endif
+
+        @if (session()->has('error'))
+            <div class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                {{ session('error') }}
+            </div>
+        @endif
+
         <div class="space-y-6">
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                 <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Grunddaten</h2>
                 <div class="space-y-4">
-                    <x-ui-input-text name="name" label="Name" wire:model.defer="form.name" required />
-                    <x-ui-input-textarea name="description" label="Beschreibung" wire:model.defer="form.description" />
+                    <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required />
+                    <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" />
                     <x-ui-input-select
                         name="entity_type_id"
                         label="Typ"
@@ -88,7 +107,7 @@
                         optionValue="id"
                         optionLabel="name"
                         :nullable="false"
-                        wire:model.defer="form.entity_type_id"
+                        wire:model.live="form.entity_type_id"
                         required
                     />
                     <x-ui-input-select
@@ -99,7 +118,7 @@
                         optionLabel="name"
                         :nullable="true"
                         nullLabel="Kein VSM System"
-                        wire:model.defer="form.vsm_system_id"
+                        wire:model.live="form.vsm_system_id"
                     />
                     <x-ui-input-select
                         name="cost_center_id"
@@ -109,7 +128,7 @@
                         optionLabel="name"
                         :nullable="true"
                         nullLabel="Keine Kostenstelle"
-                        wire:model.defer="form.cost_center_id"
+                        wire:model.live="form.cost_center_id"
                     />
                     <x-ui-input-select
                         name="parent_entity_id"
@@ -119,10 +138,10 @@
                         optionLabel="name"
                         :nullable="true"
                         nullLabel="Keine übergeordnete Einheit"
-                        wire:model.defer="form.parent_entity_id"
+                        wire:model.live="form.parent_entity_id"
                     />
                     <div class="flex items-center">
-                        <input type="checkbox" wire:model.defer="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                        <input type="checkbox" wire:model.live="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
                         <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
                     </div>
                 </div>

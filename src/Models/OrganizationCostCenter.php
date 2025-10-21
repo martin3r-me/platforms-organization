@@ -83,6 +83,59 @@ class OrganizationCostCenter extends Model
     }
 
     /**
+     * Get cost centers for an entity with hierarchy fallback
+     * Searches: entity → parent → grandparent → ... → global
+     */
+    public static function getForEntityWithHierarchy(int $teamId, int $entityId): \Illuminate\Database\Eloquent\Collection
+    {
+        $entity = OrganizationEntity::find($entityId);
+        if (!$entity) {
+            return self::getForTeam($teamId, null); // Fallback to global
+        }
+
+        // Build hierarchy path: [entity, parent, grandparent, ...]
+        $hierarchy = [];
+        $current = $entity;
+        while ($current) {
+            $hierarchy[] = $current->id;
+            $current = $current->parent;
+        }
+
+        // Search in hierarchy order
+        $costCenters = collect();
+        $foundCodes = [];
+
+        foreach ($hierarchy as $entityIdInPath) {
+            $entitySpecific = self::where('team_id', $teamId)
+                ->where('is_active', true)
+                ->where('root_entity_id', $entityIdInPath)
+                ->get();
+
+            foreach ($entitySpecific as $costCenter) {
+                if (!in_array($costCenter->code, $foundCodes)) {
+                    $costCenters->push($costCenter);
+                    $foundCodes[] = $costCenter->code;
+                }
+            }
+        }
+
+        // Add global cost centers for codes not found in hierarchy
+        $globalCostCenters = self::where('team_id', $teamId)
+            ->where('is_active', true)
+            ->whereNull('root_entity_id')
+            ->get();
+
+        foreach ($globalCostCenters as $costCenter) {
+            if (!in_array($costCenter->code, $foundCodes)) {
+                $costCenters->push($costCenter);
+                $foundCodes[] = $costCenter->code;
+            }
+        }
+
+        return $costCenters->sortBy('name');
+    }
+
+    /**
      * Check if this is a global cost center
      */
     public function isGlobal(): bool

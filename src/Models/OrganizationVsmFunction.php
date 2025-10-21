@@ -76,6 +76,59 @@ class OrganizationVsmFunction extends Model
     }
 
     /**
+     * Get VSM functions for an entity with hierarchy fallback
+     * Searches: entity → parent → grandparent → ... → global
+     */
+    public static function getForEntityWithHierarchy(int $teamId, int $entityId): \Illuminate\Database\Eloquent\Collection
+    {
+        $entity = OrganizationEntity::find($entityId);
+        if (!$entity) {
+            return self::getForTeam($teamId, null); // Fallback to global
+        }
+
+        // Build hierarchy path: [entity, parent, grandparent, ...]
+        $hierarchy = [];
+        $current = $entity;
+        while ($current) {
+            $hierarchy[] = $current->id;
+            $current = $current->parent;
+        }
+
+        // Search in hierarchy order
+        $vsmFunctions = collect();
+        $foundCodes = [];
+
+        foreach ($hierarchy as $entityIdInPath) {
+            $entitySpecific = self::where('team_id', $teamId)
+                ->where('is_active', true)
+                ->where('root_entity_id', $entityIdInPath)
+                ->get();
+
+            foreach ($entitySpecific as $vsmFunction) {
+                if (!in_array($vsmFunction->code, $foundCodes)) {
+                    $vsmFunctions->push($vsmFunction);
+                    $foundCodes[] = $vsmFunction->code;
+                }
+            }
+        }
+
+        // Add global VSM functions for codes not found in hierarchy
+        $globalVsmFunctions = self::where('team_id', $teamId)
+            ->where('is_active', true)
+            ->whereNull('root_entity_id')
+            ->get();
+
+        foreach ($globalVsmFunctions as $vsmFunction) {
+            if (!in_array($vsmFunction->code, $foundCodes)) {
+                $vsmFunctions->push($vsmFunction);
+                $foundCodes[] = $vsmFunction->code;
+            }
+        }
+
+        return $vsmFunctions->sortBy('name');
+    }
+
+    /**
      * Check if this is a global function
      */
     public function isGlobal(): bool

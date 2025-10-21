@@ -7,6 +7,7 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationVsmSystem;
 use Platform\Organization\Models\OrganizationCostCenter;
+use Platform\Organization\Models\OrganizationVsmFunction;
 
 class Show extends Component
 {
@@ -78,6 +79,22 @@ class Show extends Component
             ->where('team_id', auth()->user()->currentTeam->id)
             ->orderBy('name')
             ->get();
+    }
+
+    public function getAvailableCostCentersProperty()
+    {
+        return OrganizationCostCenter::getForEntityWithHierarchy(
+            auth()->user()->currentTeam->id,
+            $this->entity->id
+        );
+    }
+
+    public function getAvailableVsmFunctionsProperty()
+    {
+        return OrganizationVsmFunction::getForEntityWithHierarchy(
+            auth()->user()->currentTeam->id,
+            $this->entity->id
+        );
     }
 
     public function getParentEntitiesProperty()

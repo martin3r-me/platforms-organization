@@ -4,14 +4,21 @@
     </x-slot>
 
     <x-slot name="actions">
-        <x-ui-button variant="secondary-outline" wire:click="edit">
-            @svg('heroicon-o-pencil', 'w-4 h-4 mr-2')
-            Bearbeiten
-        </x-ui-button>
-        <x-ui-button wire:click="save">
-            @svg('heroicon-o-check', 'w-4 h-4 mr-2')
-            Speichern
-        </x-ui-button>
+        @if($isEditing)
+            <x-ui-button variant="secondary-outline" wire:click="$set('isEditing', false)">
+                @svg('heroicon-o-x-mark', 'w-4 h-4 mr-2')
+                Abbrechen
+            </x-ui-button>
+            <x-ui-button variant="primary" wire:click="save">
+                @svg('heroicon-o-check', 'w-4 h-4 mr-2')
+                Speichern
+            </x-ui-button>
+        @else
+            <x-ui-button variant="secondary-outline" wire:click="edit">
+                @svg('heroicon-o-pencil', 'w-4 h-4 mr-2')
+                Bearbeiten
+            </x-ui-button>
+        @endif
     </x-slot>
 
     <x-slot name="sidebar">
@@ -59,6 +66,18 @@
     </x-slot>
 
     <x-ui-page-container>
+        @if (session()->has('message'))
+            <div class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
+                {{ session('message') }}
+            </div>
+        @endif
+
+        @if (session()->has('error'))
+            <div class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
+                {{ session('error') }}
+            </div>
+        @endif
+
         <div class="space-y-6">
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                 <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Grunddaten</h2>

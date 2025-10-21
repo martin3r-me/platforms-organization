@@ -46,9 +46,18 @@ class Show extends Component
         ]);
 
         $this->costCenter->update($this->form);
-        $this->isEditing = false;
+        $this->loadForm(); // Reload form to reset dirty state
         
         session()->flash('message', 'Kostenstelle erfolgreich aktualisiert.');
+    }
+
+    public function isDirty()
+    {
+        return $this->form['name'] !== $this->costCenter->name ||
+               $this->form['code'] !== $this->costCenter->code ||
+               $this->form['description'] !== $this->costCenter->description ||
+               $this->form['root_entity_id'] != $this->costCenter->root_entity_id ||
+               $this->form['is_active'] !== $this->costCenter->is_active;
     }
 
     #[Computed]

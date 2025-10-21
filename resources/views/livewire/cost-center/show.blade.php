@@ -4,8 +4,8 @@
     </x-slot>
 
     <x-slot name="actions">
-        @if($isEditing)
-            <x-ui-button variant="secondary-outline" wire:click="$set('isEditing', false)">
+        @if($this->isDirty())
+            <x-ui-button variant="secondary-outline" wire:click="loadForm">
                 @svg('heroicon-o-x-mark', 'w-4 h-4 mr-2')
                 Abbrechen
             </x-ui-button>

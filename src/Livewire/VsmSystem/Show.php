@@ -42,9 +42,17 @@ class Show extends Component
         ]);
 
         $this->vsmSystem->update($this->form);
-        $this->isEditing = false;
+        $this->loadForm(); // Reload form to reset dirty state
         
         session()->flash('message', 'VSM System erfolgreich aktualisiert.');
+    }
+
+    public function isDirty()
+    {
+        return $this->form['name'] !== $this->vsmSystem->name ||
+               $this->form['code'] !== $this->vsmSystem->code ||
+               $this->form['description'] !== $this->vsmSystem->description ||
+               $this->form['is_active'] !== $this->vsmSystem->is_active;
     }
 
     public function render()

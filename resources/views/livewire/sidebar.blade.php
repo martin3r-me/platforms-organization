@@ -61,21 +61,6 @@
             <span x-show="!collapsed" class="truncate">Kostenstellen</span>
         </a>
 
-        {{-- VSM Funktionen --}}
-        <a href="{{ route('organization.vsm-functions.index') }}"
-           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
-           :class="[
-               window.location.pathname.includes('/vsm-functions') ||
-               window.location.pathname.endsWith('/vsm-functions') ||
-               window.location.pathname.endsWith('/vsm-functions/')
-                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
-                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
-               collapsed ? 'justify-center' : 'gap-3'
-           ]"
-           wire:navigate>
-            <x-heroicon-o-cog-6-tooth class="w-6 h-6 flex-shrink-0"/>
-            <span x-show="!collapsed" class="truncate">VSM Funktionen</span>
-        </a>
 
         {{-- VSM Systeme --}}
         <a href="{{ route('organization.vsm-systems.index') }}"

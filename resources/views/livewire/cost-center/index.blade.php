@@ -102,17 +102,24 @@
                         rows="3"
                     />
                     
-                    <x-ui-input-select
-                        name="root_entity_id"
-                        label="Entität (Parent)"
-                        wire:model.live="form.root_entity_id"
-                        placeholder="Wählen Sie eine Entität (optional)"
-                    >
-                        <option value="">Global (für alle Entitäten)</option>
-                        @foreach($this->entities as $entity)
-                            <option value="{{ $entity->id }}">{{ $entity->name }}</option>
-                        @endforeach
-                    </x-ui-input-select>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Entität (Parent)</label>
+                        <select 
+                            name="root_entity_id"
+                            wire:model.live="form.root_entity_id"
+                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
+                        >
+                            <option value="">Global (für alle Entitäten)</option>
+                            @foreach($this->entities as $entity)
+                                <option value="{{ $entity->id }}">{{ $entity->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    
+                    <!-- Debug: Show entities count -->
+                    <div class="text-xs text-gray-500">
+                        Debug: {{ $this->entities->count() }} Entitäten gefunden
+                    </div>
                 </div>
 
                 <div class="flex items-center">

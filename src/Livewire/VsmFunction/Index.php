@@ -1,10 +1,10 @@
 <?php
 
-namespace Platform\Organization\Livewire\CostCenter;
+namespace Platform\Organization\Livewire\VsmFunction;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
-use Platform\Organization\Models\OrganizationCostCenter;
+use Platform\Organization\Models\OrganizationVsmFunction;
 use Platform\Organization\Models\OrganizationEntity;
 
 class Index extends Component
@@ -27,9 +27,9 @@ class Index extends Component
     ];
 
     #[Computed]
-    public function costCenters()
+    public function vsmFunctions()
     {
-        $query = OrganizationCostCenter::query()
+        $query = OrganizationVsmFunction::query()
             ->where('team_id', auth()->user()->currentTeam->id);
 
         if ($this->search) {
@@ -50,23 +50,10 @@ class Index extends Component
     #[Computed]
     public function entities()
     {
-        $entities = OrganizationEntity::where('team_id', auth()->user()->currentTeam->id)
+        return OrganizationEntity::where('team_id', auth()->user()->currentTeam->id)
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
-            
-        // Debug: Log the count and check if root_entity_id column exists
-        \Log::info('Entities count: ' . $entities->count());
-        
-        // Check if root_entity_id column exists in cost_centers table
-        $hasColumn = \Schema::hasColumn('organization_cost_centers', 'root_entity_id');
-        \Log::info('root_entity_id column exists: ' . ($hasColumn ? 'yes' : 'no'));
-        
-        // Check total entities in database
-        $totalEntities = OrganizationEntity::count();
-        \Log::info('Total entities in database: ' . $totalEntities);
-        
-        return $entities;
     }
 
     public function create()
@@ -86,7 +73,7 @@ class Index extends Component
             'form.is_active' => ['boolean'],
         ])['form'];
 
-        OrganizationCostCenter::create([
+        OrganizationVsmFunction::create([
             'code' => $data['code'] ?? null,
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
@@ -97,7 +84,7 @@ class Index extends Component
         ]);
 
         $this->modalShow = false;
-        $this->dispatch('toast', message: 'Kostenstelle erstellt');
+        $this->dispatch('toast', message: 'VSM Funktion erstellt');
     }
 
     public function toggleInactive()
@@ -107,9 +94,7 @@ class Index extends Component
 
     public function render()
     {
-        return view('organization::livewire.cost-center.index')
+        return view('organization::livewire.vsm-function.index')
             ->layout('platform::layouts.app');
     }
 }
-
-

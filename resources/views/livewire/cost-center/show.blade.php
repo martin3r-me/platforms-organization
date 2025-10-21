@@ -73,17 +73,24 @@
                     <x-ui-input-text name="name" label="Name" wire:model.defer="form.name" required />
                     <x-ui-input-textarea name="description" label="Beschreibung" wire:model.defer="form.description" />
                     
-                    <x-ui-input-select
-                        name="root_entity_id"
-                        label="Entität (Parent)"
-                        wire:model.defer="form.root_entity_id"
-                        placeholder="Wählen Sie eine Entität (optional)"
-                    >
-                        <option value="">Global (für alle Entitäten)</option>
-                        @foreach($this->entities as $entity)
-                            <option value="{{ $entity->id }}">{{ $entity->name }}</option>
-                        @endforeach
-                    </x-ui-input-select>
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Entität (Parent)</label>
+                        <select 
+                            name="root_entity_id"
+                            wire:model.defer="form.root_entity_id"
+                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
+                        >
+                            <option value="">Global (für alle Entitäten)</option>
+                            @foreach($this->entities as $entity)
+                                <option value="{{ $entity->id }}">{{ $entity->name }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    
+                    <!-- Debug: Show entities count -->
+                    <div class="text-xs text-gray-500">
+                        Debug: {{ $this->entities->count() }} Entitäten gefunden
+                    </div>
                     
                     <div class="flex items-center">
                         <input type="checkbox" wire:model.defer="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />

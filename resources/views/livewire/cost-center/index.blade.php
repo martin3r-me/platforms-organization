@@ -40,6 +40,7 @@
             <x-ui-table-header>
                 <x-ui-table-header-cell compact="true">Code</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
+                <x-ui-table-header-cell compact="true">Entität</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
             </x-ui-table-header>
 
@@ -50,6 +51,13 @@
                             <a href="{{ route('organization.cost-centers.show', $cc) }}" class="link">{{ $cc->code }}</a>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">{{ $cc->name }}</x-ui-table-cell>
+                        <x-ui-table-cell compact="true">
+                            @if($cc->root_entity_id)
+                                <x-ui-badge variant="info">Entitätsspezifisch</x-ui-badge>
+                            @else
+                                <x-ui-badge variant="secondary">Global</x-ui-badge>
+                            @endif
+                        </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
                             <x-ui-badge variant="{{ $cc->is_active ? 'success' : 'muted' }}">{{ $cc->is_active ? 'Aktiv' : 'Inaktiv' }}</x-ui-badge>
                         </x-ui-table-cell>
@@ -93,6 +101,18 @@
                         placeholder="Optionale Beschreibung"
                         rows="3"
                     />
+                    
+                    <x-ui-input-select
+                        name="root_entity_id"
+                        label="Entität (Parent)"
+                        wire:model.live="form.root_entity_id"
+                        placeholder="Wählen Sie eine Entität (optional)"
+                    >
+                        <option value="">Global (für alle Entitäten)</option>
+                        @foreach($this->entities as $entity)
+                            <option value="{{ $entity->id }}">{{ $entity->name }}</option>
+                        @endforeach
+                    </x-ui-input-select>
                 </div>
 
                 <div class="flex items-center">

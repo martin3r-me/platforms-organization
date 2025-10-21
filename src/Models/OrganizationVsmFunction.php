@@ -2,16 +2,16 @@
 
 namespace Platform\Organization\Models;
 
-use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Symfony\Component\Uid\UuidV7;
 
-class OrganizationCostCenter extends Model
+class OrganizationVsmFunction extends Model
 {
-    use HasFactory, SoftDeletes;
+    use SoftDeletes;
 
-    protected $table = 'organization_cost_centers';
+    protected $table = 'organization_vsm_functions';
 
     protected $fillable = [
         'uuid',
@@ -28,6 +28,7 @@ class OrganizationCostCenter extends Model
     protected $casts = [
         'is_active' => 'boolean',
         'metadata' => 'array',
+        'deleted_at' => 'datetime',
     ];
 
     protected static function booted(): void
@@ -42,26 +43,18 @@ class OrganizationCostCenter extends Model
         });
     }
 
-    public function team()
+    public function team(): BelongsTo
     {
         return $this->belongsTo(\Platform\Core\Models\Team::class);
     }
 
-    public function user()
+    public function user(): BelongsTo
     {
         return $this->belongsTo(\Platform\Core\Models\User::class);
     }
 
     /**
-     * Scope für aktive Kostenstellen
-     */
-    public function scopeActive($query)
-    {
-        return $query->where('is_active', true);
-    }
-
-    /**
-     * Get all cost centers for a team (global + entity-specific)
+     * Get all VSM functions for a team (global + entity-specific)
      */
     public static function getForTeam(int $teamId, ?int $rootEntityId = null): \Illuminate\Database\Eloquent\Collection
     {
@@ -75,7 +68,7 @@ class OrganizationCostCenter extends Model
                   ->orWhere('root_entity_id', $rootEntityId);
             });
         } else {
-            // Only global cost centers
+            // Only global functions
             $query->whereNull('root_entity_id');
         }
 
@@ -83,7 +76,7 @@ class OrganizationCostCenter extends Model
     }
 
     /**
-     * Check if this is a global cost center
+     * Check if this is a global function
      */
     public function isGlobal(): bool
     {
@@ -97,14 +90,4 @@ class OrganizationCostCenter extends Model
     {
         return !is_null($this->root_entity_id);
     }
-
-    /**
-     * Organisationseinheiten, die dieser Kostenstelle zugeordnet sind
-     */
-    public function entities()
-    {
-        return $this->hasMany(OrganizationEntity::class, 'cost_center_id');
-    }
 }
-
-

@@ -5,6 +5,7 @@ namespace Platform\Organization\Livewire\CostCenter;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Platform\Organization\Models\OrganizationCostCenter;
+use Platform\Organization\Models\OrganizationEntity;
 
 class Index extends Component
 {
@@ -16,6 +17,7 @@ class Index extends Component
         'code' => '',
         'name' => '',
         'description' => '',
+        'root_entity_id' => null,
         'is_active' => true,
     ];
 
@@ -45,6 +47,15 @@ class Index extends Component
         return $query->orderBy('name')->get();
     }
 
+    #[Computed]
+    public function entities()
+    {
+        return OrganizationEntity::where('team_id', auth()->user()->currentTeam->id)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
+    }
+
     public function create()
     {
         $this->reset('form');
@@ -58,6 +69,7 @@ class Index extends Component
             'form.code' => ['nullable', 'string', 'max:255'],
             'form.name' => ['required', 'string', 'max:255'],
             'form.description' => ['nullable', 'string'],
+            'form.root_entity_id' => ['nullable', 'exists:organization_entities,id'],
             'form.is_active' => ['boolean'],
         ])['form'];
 
@@ -65,6 +77,7 @@ class Index extends Component
             'code' => $data['code'] ?? null,
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
+            'root_entity_id' => $data['root_entity_id'] ?? null,
             'is_active' => (bool) ($data['is_active'] ?? true),
             'team_id' => auth()->user()->currentTeam->id,
             'user_id' => auth()->id(),

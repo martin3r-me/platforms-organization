@@ -35,6 +35,16 @@
                             <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $costCenter->code }}</div>
                         </div>
                         <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                            <span class="text-xs text-[var(--ui-muted)]">Entität</span>
+                            <div class="text-sm font-medium text-[var(--ui-secondary)]">
+                                @if($costCenter->root_entity_id)
+                                    <x-ui-badge variant="info" size="sm">Entitätsspezifisch</x-ui-badge>
+                                @else
+                                    <x-ui-badge variant="secondary" size="sm">Global</x-ui-badge>
+                                @endif
+                            </div>
+                        </div>
+                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                             <span class="text-xs text-[var(--ui-muted)]">Erstellt</span>
                             <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $costCenter->created_at->format('d.m.Y H:i') }}</div>
                         </div>
@@ -62,6 +72,19 @@
                     <x-ui-input-text name="code" label="Code" wire:model.defer="form.code" />
                     <x-ui-input-text name="name" label="Name" wire:model.defer="form.name" required />
                     <x-ui-input-textarea name="description" label="Beschreibung" wire:model.defer="form.description" />
+                    
+                    <x-ui-input-select
+                        name="root_entity_id"
+                        label="Entität (Parent)"
+                        wire:model.defer="form.root_entity_id"
+                        placeholder="Wählen Sie eine Entität (optional)"
+                    >
+                        <option value="">Global (für alle Entitäten)</option>
+                        @foreach($this->entities as $entity)
+                            <option value="{{ $entity->id }}">{{ $entity->name }}</option>
+                        @endforeach
+                    </x-ui-input-select>
+                    
                     <div class="flex items-center">
                         <input type="checkbox" wire:model.defer="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
                         <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>

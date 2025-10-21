@@ -1,24 +1,24 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="Kostenstelle Details" />
-    </x-slot>
-
-    <x-slot name="actions">
-        @if($this->isDirty())
-            <x-ui-button variant="secondary-outline" wire:click="loadForm">
-                @svg('heroicon-o-x-mark', 'w-4 h-4 mr-2')
-                Abbrechen
-            </x-ui-button>
-            <x-ui-button variant="primary" wire:click="save">
-                @svg('heroicon-o-check', 'w-4 h-4 mr-2')
-                Speichern
-            </x-ui-button>
-        @else
-            <x-ui-button variant="secondary-outline" wire:click="edit">
-                @svg('heroicon-o-pencil', 'w-4 h-4 mr-2')
-                Bearbeiten
-            </x-ui-button>
-        @endif
+        <x-ui-page-navbar title="Kostenstelle Details">
+            <x-slot name="actions">
+                @if($this->isDirty())
+                    <x-ui-button variant="secondary-outline" wire:click="loadForm">
+                        @svg('heroicon-o-x-mark', 'w-4 h-4 mr-2')
+                        Abbrechen
+                    </x-ui-button>
+                    <x-ui-button variant="primary" wire:click="save">
+                        @svg('heroicon-o-check', 'w-4 h-4 mr-2')
+                        Speichern
+                    </x-ui-button>
+                @else
+                    <x-ui-button variant="secondary-outline" wire:click="edit">
+                        @svg('heroicon-o-pencil', 'w-4 h-4 mr-2')
+                        Bearbeiten
+                    </x-ui-button>
+                @endif
+            </x-slot>
+        </x-ui-page-navbar>
     </x-slot>
 
     <x-slot name="sidebar">

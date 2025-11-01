@@ -11,6 +11,10 @@ return new class extends Migration
      */
     public function up(): void
     {
+        if (Schema::hasTable('organization_cost_center_links')) {
+            return;
+        }
+
         Schema::create('organization_cost_center_links', function (Blueprint $table) {
             $table->id();
             $table->uuid('uuid')->unique();

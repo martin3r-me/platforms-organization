@@ -160,6 +160,15 @@ class OrganizationCostCenter extends Model
     {
         return $this->hasMany(OrganizationEntity::class, 'cost_center_id');
     }
+
+    /**
+     * Alle Links zu dieser Cost Center (polymorph zu verschiedenen Modellen)
+     * Über diese können dann alle verlinkten Objekte abgefragt werden
+     */
+    public function links()
+    {
+        return $this->hasMany(OrganizationCostCenterLink::class, 'cost_center_id');
+    }
 }
 
 

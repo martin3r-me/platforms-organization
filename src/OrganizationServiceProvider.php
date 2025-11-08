@@ -68,6 +68,9 @@ class OrganizationServiceProvider extends ServiceProvider
         // Schritt 6: Views & Livewire
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'organization');
         $this->registerLivewireComponents();
+        
+        // Entity-Komponenten manuell registrieren (für Sicherheit)
+        Livewire::component('organization.entity.modal-relations', \Platform\Organization\Livewire\Entity\ModalRelations::class);
     }
 
     protected function registerLivewireComponents(): void
@@ -89,11 +92,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 continue;
             }
 
-            $filePath = $file->getPathname();
-            $basePathNormalized = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $basePath), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
-            $filePathNormalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath);
-            
-            $relativePath = str_replace($basePathNormalized, '', $filePathNormalized);
+            $relativePath = str_replace($basePath . DIRECTORY_SEPARATOR, '', $file->getPathname());
             $classPath = str_replace(['/', '.php'], ['\\', ''], $relativePath);
             $class = $baseNamespace . '\\' . $classPath;
 
@@ -101,12 +100,9 @@ class OrganizationServiceProvider extends ServiceProvider
                 continue;
             }
 
-            // organization.dashboard aus organization + dashboard.php
+            // organization.entity.modal-relations aus organization + Entity/ModalRelations.php
             $aliasPath = str_replace(['\\', '/'], '.', Str::kebab(str_replace('.php', '', $relativePath)));
             $alias = $prefix . '.' . $aliasPath;
-
-            // Debug: Ausgabe der registrierten Komponente
-            \Log::info("Registering Livewire component: {$alias} -> {$class}");
 
             Livewire::component($alias, $class);
         }

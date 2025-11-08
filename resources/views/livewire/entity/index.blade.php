@@ -63,6 +63,7 @@
             <x-ui-table-header-cell compact="true">VSM System</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Kostenstelle</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Übergeordnet</x-ui-table-header-cell>
+            <x-ui-table-header-cell compact="true">Relationen</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Erstellt</x-ui-table-header-cell>
         </x-ui-table-header>
@@ -120,6 +121,31 @@
                         @if($entity->parent)
                             <div class="text-sm">{{ $entity->parent->name }}</div>
                             <div class="text-xs text-[var(--ui-muted)]">{{ $entity->parent->type->name }}</div>
+                        @else
+                            <span class="text-xs text-[var(--ui-muted)]">–</span>
+                        @endif
+                    </x-ui-table-cell>
+                    <x-ui-table-cell compact="true">
+                        @php
+                            $relationsFromCount = $entity->relationsFrom->count();
+                            $relationsToCount = $entity->relationsTo->count();
+                            $totalRelations = $relationsFromCount + $relationsToCount;
+                        @endphp
+                        @if($totalRelations > 0)
+                            <div class="flex items-center gap-2 flex-wrap">
+                                @if($relationsFromCount > 0)
+                                    <div class="flex items-center gap-1" title="{{ $relationsFromCount }} ausgehende Relation{{ $relationsFromCount !== 1 ? 'en' : '' }}">
+                                        @svg('heroicon-o-arrow-right', 'w-3.5 h-3.5 text-[var(--ui-primary)]')
+                                        <span class="text-xs font-medium text-[var(--ui-primary)]">{{ $relationsFromCount }}</span>
+                                    </div>
+                                @endif
+                                @if($relationsToCount > 0)
+                                    <div class="flex items-center gap-1" title="{{ $relationsToCount }} eingehende Relation{{ $relationsToCount !== 1 ? 'en' : '' }}">
+                                        @svg('heroicon-o-link', 'w-3.5 h-3.5 text-[var(--ui-secondary)]')
+                                        <span class="text-xs font-medium text-[var(--ui-secondary)]">{{ $relationsToCount }}</span>
+                                    </div>
+                                @endif
+                            </div>
                         @else
                             <span class="text-xs text-[var(--ui-muted)]">–</span>
                         @endif

@@ -127,22 +127,48 @@
                     </x-ui-table-cell>
                     <x-ui-table-cell compact="true">
                         @php
+                            $relationsFrom = $entity->relationsFrom->take(3);
+                            $relationsTo = $entity->relationsTo->take(3);
                             $relationsFromCount = $entity->relationsFrom->count();
                             $relationsToCount = $entity->relationsTo->count();
                             $totalRelations = $relationsFromCount + $relationsToCount;
                         @endphp
                         @if($totalRelations > 0)
-                            <div class="flex items-center gap-2 flex-wrap">
+                            <div class="space-y-1.5">
                                 @if($relationsFromCount > 0)
-                                    <div class="flex items-center gap-1" title="{{ $relationsFromCount }} ausgehende Relation{{ $relationsFromCount !== 1 ? 'en' : '' }}">
-                                        @svg('heroicon-o-arrow-right', 'w-3.5 h-3.5 text-[var(--ui-primary)]')
-                                        <span class="text-xs font-medium text-[var(--ui-primary)]">{{ $relationsFromCount }}</span>
+                                    <div class="flex items-start gap-1.5">
+                                        <span class="text-[0.65rem] text-[var(--ui-muted)] mt-0.5 flex-shrink-0">→</span>
+                                        <div class="flex-1 min-w-0">
+                                            @foreach($relationsFrom as $rel)
+                                                <div class="text-[0.7rem] leading-tight truncate" title="{{ $rel->toEntity->name }} ({{ $rel->relationType->name ?? 'Unbekannt' }})">
+                                                    <span class="text-[var(--ui-secondary)]">{{ Str::limit($rel->toEntity->name, 20) }}</span>
+                                                    @if($rel->relationType)
+                                                        <span class="text-[var(--ui-muted)]"> · {{ Str::limit($rel->relationType->name, 12) }}</span>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                            @if($relationsFromCount > 3)
+                                                <div class="text-[0.65rem] text-[var(--ui-muted)] mt-0.5">+{{ $relationsFromCount - 3 }} weitere</div>
+                                            @endif
+                                        </div>
                                     </div>
                                 @endif
                                 @if($relationsToCount > 0)
-                                    <div class="flex items-center gap-1" title="{{ $relationsToCount }} eingehende Relation{{ $relationsToCount !== 1 ? 'en' : '' }}">
-                                        @svg('heroicon-o-link', 'w-3.5 h-3.5 text-[var(--ui-secondary)]')
-                                        <span class="text-xs font-medium text-[var(--ui-secondary)]">{{ $relationsToCount }}</span>
+                                    <div class="flex items-start gap-1.5">
+                                        <span class="text-[0.65rem] text-[var(--ui-muted)] mt-0.5 flex-shrink-0">←</span>
+                                        <div class="flex-1 min-w-0">
+                                            @foreach($relationsTo as $rel)
+                                                <div class="text-[0.7rem] leading-tight truncate" title="{{ $rel->fromEntity->name }} ({{ $rel->relationType->name ?? 'Unbekannt' }})">
+                                                    <span class="text-[var(--ui-secondary)]">{{ Str::limit($rel->fromEntity->name, 20) }}</span>
+                                                    @if($rel->relationType)
+                                                        <span class="text-[var(--ui-muted)]"> · {{ Str::limit($rel->relationType->name, 12) }}</span>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                            @if($relationsToCount > 3)
+                                                <div class="text-[0.65rem] text-[var(--ui-muted)] mt-0.5">+{{ $relationsToCount - 3 }} weitere</div>
+                                            @endif
+                                        </div>
                                     </div>
                                 @endif
                             </div>

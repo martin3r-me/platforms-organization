@@ -56,7 +56,18 @@ class Index extends Component
     public function entities()
     {
         $query = OrganizationEntity::query()
-            ->with(['type.group', 'vsmSystem', 'costCenter', 'parent', 'team', 'user', 'relationsFrom.relationType', 'relationsTo.relationType'])
+            ->with([
+                'type.group', 
+                'vsmSystem', 
+                'costCenter', 
+                'parent', 
+                'team', 
+                'user', 
+                'relationsFrom.relationType',
+                'relationsFrom.toEntity.type',
+                'relationsTo.relationType',
+                'relationsTo.fromEntity.type'
+            ])
             ->forTeam(auth()->user()->currentTeam->id);
 
         // Suche

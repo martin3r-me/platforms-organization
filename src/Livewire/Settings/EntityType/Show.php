@@ -77,9 +77,16 @@ class Show extends Component
             return $userAllowed || $teamAllowed;
         });
 
-        return $accessibleModules->mapWithKeys(function ($module) {
+        $modulesArray = $accessibleModules->mapWithKeys(function ($module) {
             return [$module['key'] => $module['title'] ?? ucfirst($module['key'])];
         })->toArray();
+
+        // Core-Modul explizit hinzufügen (für User und Team Models)
+        if (!isset($modulesArray['core'])) {
+            $modulesArray['core'] = 'Core';
+        }
+
+        return $modulesArray;
     }
 
     #[Computed]

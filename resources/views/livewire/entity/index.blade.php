@@ -78,6 +78,11 @@
                                     // Map non-existent icons to valid alternatives
                                     $iconMap = [
                                         'user-check' => 'user',
+                                        'folder-kanban' => 'folder',
+                                        'briefcase-globe' => 'briefcase',
+                                        'server-cog' => 'server',
+                                        'package-check' => 'package',
+                                        'badge-check' => 'badge',
                                     ];
                                     $iconName = $iconMap[$iconName] ?? $iconName;
                                 @endphp

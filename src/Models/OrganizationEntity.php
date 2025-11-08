@@ -169,6 +169,49 @@ class OrganizationEntity extends Model
     }
 
     /**
+     * Relations, die von dieser Entity ausgehen
+     */
+    public function relationsFrom()
+    {
+        return $this->hasMany(OrganizationEntityRelationship::class, 'from_entity_id');
+    }
+
+    /**
+     * Relations, die zu dieser Entity führen
+     */
+    public function relationsTo()
+    {
+        return $this->hasMany(OrganizationEntityRelationship::class, 'to_entity_id');
+    }
+
+    /**
+     * Alle Relations (sowohl from als auch to)
+     */
+    public function allRelations()
+    {
+        return OrganizationEntityRelationship::where(function ($query) {
+            $query->where('from_entity_id', $this->id)
+                  ->orWhere('to_entity_id', $this->id);
+        });
+    }
+
+    /**
+     * Aktive Relations, die von dieser Entity ausgehen
+     */
+    public function activeRelationsFrom()
+    {
+        return $this->relationsFrom()->active();
+    }
+
+    /**
+     * Aktive Relations, die zu dieser Entity führen
+     */
+    public function activeRelationsTo()
+    {
+        return $this->relationsTo()->active();
+    }
+
+    /**
      * Prüfe ob Entity ein Child hat
      */
     public function hasChildren(): bool

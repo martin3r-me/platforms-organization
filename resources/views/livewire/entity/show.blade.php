@@ -203,6 +203,79 @@
                 </div>
             </div>
 
+            <!-- Relations -->
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Relations</h2>
+                    <x-ui-button 
+                        variant="primary-outline" 
+                        size="sm"
+                        wire:click="$dispatch('open-relations-modal', { entityId: {{ $entity->id }} })"
+                    >
+                        @svg('heroicon-o-plus', 'w-4 h-4 mr-2')
+                        Relation hinzufügen
+                    </x-ui-button>
+                </div>
+                <div class="space-y-4">
+                    @php
+                        $relationsFrom = $entity->relationsFrom->whereNull('deleted_at');
+                        $relationsTo = $entity->relationsTo->whereNull('deleted_at');
+                    @endphp
+                    
+                    @if($relationsFrom->count() > 0 || $relationsTo->count() > 0)
+                        @if($relationsFrom->count() > 0)
+                            <div>
+                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
+                                    @svg('heroicon-o-arrow-right', 'w-4 h-4')
+                                    Von dieser Entity ({{ $relationsFrom->count() }})
+                                </h3>
+                                <div class="space-y-2">
+                                    @foreach($relationsFrom as $relation)
+                                        <div class="flex items-center justify-between p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity->name }}</span>
+                                                <span class="text-sm text-[var(--ui-muted)]">{{ $relation->relationType->name }}</span>
+                                                <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $relation->toEntity->name }}</span>
+                                                <x-ui-badge variant="secondary" size="xs">{{ $relation->toEntity->type->name }}</x-ui-badge>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+                        
+                        @if($relationsTo->count() > 0)
+                            <div>
+                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
+                                    @svg('heroicon-o-arrow-left', 'w-4 h-4')
+                                    Zu dieser Entity ({{ $relationsTo->count() }})
+                                </h3>
+                                <div class="space-y-2">
+                                    @foreach($relationsTo as $relation)
+                                        <div class="flex items-center justify-between p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                            <div class="flex items-center gap-2">
+                                                <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $relation->fromEntity->name }}</span>
+                                                <span class="text-sm text-[var(--ui-muted)]">{{ $relation->relationType->name }}</span>
+                                                <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity->name }}</span>
+                                                <x-ui-badge variant="secondary" size="xs">{{ $relation->fromEntity->type->name }}</x-ui-badge>
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+                    @else
+                        <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
+                                @svg('heroicon-o-link', 'w-8 h-8 text-[var(--ui-muted)]')
+                            </div>
+                            <p class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Keine Relations vorhanden</p>
+                            <p class="text-xs text-[var(--ui-muted)]">Erstellen Sie eine Relation zu einer anderen Entity</p>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
             @if($entity->children && $entity->children->count() > 0)
                 <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                     <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Untergeordnete Einheiten</h2>
@@ -236,4 +309,8 @@
             @endif
         </div>
     </x-ui-page-container>
+
+    <!-- Relations Modal -->
+    @livewire('organization.entity.modal-relations')
 </x-ui-page>
+

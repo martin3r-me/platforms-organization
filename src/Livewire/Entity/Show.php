@@ -16,7 +16,19 @@ class Show extends Component
 
     public function mount(OrganizationEntity $entity)
     {
-        $this->entity = $entity->load(['type.group', 'vsmSystem', 'costCenter', 'parent', 'children.type', 'team', 'user']);
+        $this->entity = $entity->load([
+            'type.group', 
+            'vsmSystem', 
+            'costCenter', 
+            'parent', 
+            'children.type', 
+            'team', 
+            'user',
+            'relationsFrom.toEntity.type',
+            'relationsFrom.relationType',
+            'relationsTo.fromEntity.type',
+            'relationsTo.relationType'
+        ]);
         $this->loadForm();
     }
 

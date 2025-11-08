@@ -40,10 +40,10 @@ return new class extends Migration
             $table->unique(['entity_type_id', 'module_key', 'model_class'], 
                    'org_entity_type_model_mappings_unique');
             
-            // Indizes
-            $table->index(['entity_type_id', 'is_active']);
-            $table->index(['module_key', 'is_active']);
-            $table->index(['is_active', 'sort_order']);
+            // Indizes mit expliziten, kurzen Namen (MySQL max 64 Zeichen)
+            $table->index(['entity_type_id', 'is_active'], 'org_etm_entity_active_idx');
+            $table->index(['module_key', 'is_active'], 'org_etm_module_active_idx');
+            $table->index(['is_active', 'sort_order'], 'org_etm_active_sort_idx');
         });
     }
 

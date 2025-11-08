@@ -221,16 +221,16 @@
                                                 {{ class_basename($modelClass) }}
                                             </div>
                                             <div class="space-y-2">
-                                                @foreach($entities as $entity)
+                                                @foreach($entities as $linkedEntity)
                                                     <div class="flex items-center justify-between p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
                                                         <div class="flex items-center gap-2">
-                                                            <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity['name'] }}</span>
-                                                            <x-ui-badge variant="info" size="xs">{{ $entity['model_name'] }}</x-ui-badge>
+                                                            <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $linkedEntity['name'] }}</span>
+                                                            <x-ui-badge variant="info" size="xs">{{ $linkedEntity['model_name'] }}</x-ui-badge>
                                                         </div>
                                                         <x-ui-confirm-button 
                                                             variant="danger-outline" 
                                                             size="sm"
-                                                            wire:click="unlinkModuleEntity({{ $entity['context_id'] }})"
+                                                            wire:click="unlinkModuleEntity({{ $linkedEntity['context_id'] }})"
                                                             confirm-text="Verlinkung wirklich entfernen?"
                                                         >
                                                             @svg('heroicon-o-x-mark', 'w-4 h-4')
@@ -255,16 +255,16 @@
                                                 {{ class_basename($modelClass) }}
                                             </div>
                                             <div class="space-y-2">
-                                                @foreach($entities as $entity)
+                                                @foreach($entities as $availableEntity)
                                                     <div class="flex items-center justify-between p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
                                                         <div class="flex items-center gap-2">
-                                                            <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity['name'] }}</span>
-                                                            <x-ui-badge variant="secondary" size="xs">{{ $entity['model_name'] }}</x-ui-badge>
+                                                            <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $availableEntity['name'] }}</span>
+                                                            <x-ui-badge variant="secondary" size="xs">{{ $availableEntity['model_name'] }}</x-ui-badge>
                                                         </div>
                                                         <x-ui-button 
                                                             variant="primary-outline" 
                                                             size="sm"
-                                                            wire:click="linkModuleEntity('{{ $modelClass }}', {{ $entity['id'] }})"
+                                                            wire:click="linkModuleEntity('{{ $modelClass }}', {{ $availableEntity['id'] }})"
                                                         >
                                                             @svg('heroicon-o-link', 'w-4 h-4 mr-1')
                                                             Verlinken

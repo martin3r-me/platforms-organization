@@ -39,7 +39,17 @@ class StoreTimeEntry
                 'root_context_id' => null,
             ]);
 
-            // 2. Primärkontext anlegen (depth=0, is_primary=true)
+            // 2. Vorfahren-Kontexte auflösen (vor dem Primärkontext, um zu wissen ob dieser Root ist)
+            $ancestors = $this->resolver->resolveAncestors($data['context_type'], $data['context_id']);
+            $firstRoot = null;
+            
+            // Prüfe ob Ancestors vorhanden sind
+            $hasAncestors = !empty($ancestors);
+            
+            // Wenn keine Ancestors vorhanden sind, ist der primäre Kontext selbst der Root (z.B. Project)
+            $isPrimaryRoot = !$hasAncestors;
+
+            // 3. Primärkontext anlegen (depth=0, is_primary=true)
             $primaryLabel = $this->resolver->resolveLabel($data['context_type'], $data['context_id']);
             OrganizationTimeEntryContext::updateOrCreate(
                 [
@@ -50,14 +60,12 @@ class StoreTimeEntry
                 [
                     'depth' => 0,
                     'is_primary' => true,
-                    'is_root' => false,
+                    'is_root' => $isPrimaryRoot, // Primärer Kontext ist Root, wenn keine Ancestors vorhanden sind
                     'context_label' => $primaryLabel,
                 ]
             );
 
-            // 3. Vorfahren-Kontexte auflösen und anlegen
-            $ancestors = $this->resolver->resolveAncestors($data['context_type'], $data['context_id']);
-            $firstRoot = null;
+            // 4. Vorfahren-Kontexte auflösen und anlegen
 
             foreach ($ancestors as $depth => $ancestor) {
                 $ancestorDepth = $depth + 1;
@@ -87,8 +95,9 @@ class StoreTimeEntry
                 );
             }
 
-            // 4. Root-Kontext am Entry setzen
-            // Wenn keine Ancestors vorhanden sind (z.B. bei Projects), ist der primäre Kontext selbst der Root
+            // 5. Root-Kontext am Entry setzen
+            // Wenn Ancestors vorhanden sind: Erster Root-Kontext aus Ancestors
+            // Wenn keine Ancestors vorhanden sind: Primärer Kontext ist selbst der Root (z.B. Project)
             if ($firstRoot) {
                 $entry->update([
                     'root_context_type' => $firstRoot['type'],
@@ -96,6 +105,7 @@ class StoreTimeEntry
                 ]);
             } else {
                 // Keine Ancestors = primärer Kontext ist selbst der Root (z.B. Project)
+                // Bei Projects: context_type/context_id UND root_context_type/root_context_id beide = Project
                 $entry->update([
                     'root_context_type' => $data['context_type'],
                     'root_context_id' => $data['context_id'],

@@ -870,6 +870,7 @@
                                     Organization Entity
                                 </label>
                                 <x-ui-input-select
+                                    name="selectedOrganizationEntityId"
                                     wire:model="selectedOrganizationEntityId"
                                     :options="is_array($availableOrganizationEntities) ? collect($availableOrganizationEntities)->pluck('name', 'id')->toArray() : $availableOrganizationEntities->pluck('name', 'id')->toArray()"
                                     placeholder="Organization Entity auswählen..."

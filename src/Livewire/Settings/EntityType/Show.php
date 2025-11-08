@@ -88,6 +88,20 @@ class Show extends Component
         $models = [];
         $accessibleModuleKeys = array_keys($this->modules);
 
+        // Basis-Pfad: Von der aktuellen Datei aus zum platform-Verzeichnis
+        // __DIR__ ist: .../platform/modules/organization/src/Livewire/Settings/EntityType
+        // Wir wollen: .../platform/modules/{moduleKey}/src/Models
+        // 5x dirname: organization/src/Livewire/Settings/EntityType -> organization/src/Livewire/Settings -> organization/src/Livewire -> organization/src -> organization -> modules -> platform
+        $baseDir = dirname(dirname(dirname(dirname(dirname(__DIR__))))); // platform/
+        
+        // Fallback: Versuche auch über base_path
+        if (!is_dir($baseDir . '/modules')) {
+            $baseDir = base_path('platform');
+            if (!is_dir($baseDir . '/modules')) {
+                $baseDir = base_path();
+            }
+        }
+        
         foreach ($accessibleModuleKeys as $moduleKey) {
             // Versuche Models-Verzeichnis zu finden
             $moduleConfig = PlatformCore::getModule($moduleKey);
@@ -98,47 +112,59 @@ class Show extends Component
             
             // Versuche verschiedene Pfade
             $possiblePaths = [
+                $baseDir . "/modules/{$moduleKey}/src/Models",
                 base_path("platform/modules/{$moduleKey}/src/Models"),
                 base_path("modules/{$moduleKey}/src/Models"),
-                __DIR__ . "/../../../../{$moduleKey}/src/Models",
             ];
 
             // Spezialfall: core module
             if ($moduleKey === 'core') {
                 $moduleNamespace = 'Platform\\Core\\Models';
                 $possiblePaths = [
+                    $baseDir . "/core/src/Models",
                     base_path("platform/core/src/Models"),
                     base_path("core/src/Models"),
-                    __DIR__ . "/../../../../core/src/Models",
                 ];
             }
 
             $modulePath = null;
             foreach ($possiblePaths as $path) {
-                if (is_dir($path)) {
-                    $modulePath = $path;
+                $realPath = realpath($path);
+                if ($realPath && is_dir($realPath)) {
+                    $modulePath = $realPath;
                     break;
                 }
             }
 
-            if (!$modulePath || !is_dir($modulePath)) continue;
+            if (!$modulePath || !is_dir($modulePath)) {
+                \Log::debug("EntityType Show: Kein Models-Verzeichnis gefunden für Modul '{$moduleKey}'. Geprüfte Pfade: " . implode(', ', $possiblePaths));
+                continue;
+            }
 
             // Scanne Models-Verzeichnis
+            \Log::debug("EntityType Show: Scanne Models-Verzeichnis: {$modulePath}");
+            $foundFiles = 0;
             foreach (scandir($modulePath) as $file) {
                 if (!str_ends_with($file, '.php') || $file === '.' || $file === '..') continue;
+                $foundFiles++;
 
                 $className = $moduleNamespace . '\\' . pathinfo($file, PATHINFO_FILENAME);
-                if (!class_exists($className)) continue;
+                if (!class_exists($className)) {
+                    \Log::debug("EntityType Show: Klasse existiert nicht: {$className}");
+                    continue;
+                }
 
                 // Prüfe ob es ein Eloquent Model ist
                 try {
                     if (!is_subclass_of($className, \Illuminate\Database\Eloquent\Model::class)) {
+                        \Log::debug("EntityType Show: {$className} ist kein Eloquent Model");
                         continue;
                     }
 
                     // Versuche Instanz zu erstellen (ohne DB-Zugriff)
                     $reflection = new \ReflectionClass($className);
                     if ($reflection->isAbstract() || $reflection->isInterface()) {
+                        \Log::debug("EntityType Show: {$className} ist abstrakt oder Interface");
                         continue;
                     }
 
@@ -147,11 +173,14 @@ class Show extends Component
                         'class' => $className,
                         'name' => class_basename($className),
                     ];
+                    \Log::debug("EntityType Show: Model gefunden: {$className}");
                 } catch (\Throwable $e) {
                     // Überspringe Models, die nicht geladen werden können
+                    \Log::debug("EntityType Show: Fehler beim Laden von {$className}: " . $e->getMessage());
                     continue;
                 }
             }
+            \Log::debug("EntityType Show: Modul '{$moduleKey}': {$foundFiles} PHP-Dateien gefunden, " . count(array_filter($models, fn($m) => $m['module_key'] === $moduleKey)) . " Models hinzugefügt");
         }
 
         // Sortiere nach Modul und dann nach Model-Name

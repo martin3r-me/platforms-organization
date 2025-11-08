@@ -87,11 +87,18 @@ class StoreTimeEntry
                 );
             }
 
-            // 4. Root-Kontext am Entry setzen (optional, für schnelle Abfragen)
+            // 4. Root-Kontext am Entry setzen
+            // Wenn keine Ancestors vorhanden sind (z.B. bei Projects), ist der primäre Kontext selbst der Root
             if ($firstRoot) {
                 $entry->update([
                     'root_context_type' => $firstRoot['type'],
                     'root_context_id' => $firstRoot['id'],
+                ]);
+            } else {
+                // Keine Ancestors = primärer Kontext ist selbst der Root (z.B. Project)
+                $entry->update([
+                    'root_context_type' => $data['context_type'],
+                    'root_context_id' => $data['context_id'],
                 ]);
             }
 

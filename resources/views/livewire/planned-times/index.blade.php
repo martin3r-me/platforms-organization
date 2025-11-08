@@ -60,7 +60,9 @@
                     <x-ui-table-row compact="true">
                         <x-ui-table-cell compact="true">
                             <div class="flex items-center gap-2">
-                                <x-ui-avatar :name="$planned->user->name ?? 'Unbekannt'" size="sm" />
+                                <div class="w-8 h-8 rounded-full bg-[var(--ui-primary-5)] flex items-center justify-center text-xs font-medium text-[var(--ui-primary)]">
+                                    {{ strtoupper(substr($planned->user->name ?? 'U', 0, 1)) }}
+                                </div>
                                 <div>
                                     <div class="text-sm font-medium text-[var(--ui-secondary)]">
                                         {{ $planned->user->name ?? 'Unbekannt' }}

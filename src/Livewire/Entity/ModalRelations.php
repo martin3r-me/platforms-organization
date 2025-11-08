@@ -26,12 +26,14 @@ class ModalRelations extends Component
     public $relationsTo = [];
     
     // Verfügbare Entities und Relation Types
-    public $availableEntities = [];
-    public $availableRelationTypes = [];
+    public $availableEntities;
+    public $availableRelationTypes;
 
     public function mount(?int $entityId = null)
     {
         $this->entityId = $entityId;
+        $this->availableEntities = collect();
+        $this->availableRelationTypes = collect();
         if ($entityId) {
             $this->loadEntity();
         }
@@ -60,6 +62,8 @@ class ModalRelations extends Component
     {
         $this->open = false;
         $this->resetForm();
+        $this->availableEntities = collect();
+        $this->availableRelationTypes = collect();
         $this->reset('entityId', 'entity', 'relationsFrom', 'relationsTo');
     }
 

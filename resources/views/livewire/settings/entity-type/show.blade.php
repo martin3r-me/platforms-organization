@@ -122,7 +122,7 @@
                         @foreach($this->modelMappings as $moduleKey => $mappings)
                             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                                 <h3 class="text-md font-semibold text-[var(--ui-secondary)] mb-4">
-                                    {{ $modules[$moduleKey] ?? ucfirst($moduleKey) }}
+                                    {{ $this->modules[$moduleKey] ?? ucfirst($moduleKey) }}
                                 </h3>
                                 <div class="space-y-3">
                                     @foreach($mappings as $mapping)
@@ -192,7 +192,7 @@
                     name="module_key"
                     label="Modul"
                     wire:model.live="modelMappingForm.module_key"
-                    :options="$modules"
+                    :options="$this->modules"
                     required
                 />
 

@@ -89,7 +89,11 @@ class OrganizationServiceProvider extends ServiceProvider
                 continue;
             }
 
-            $relativePath = str_replace($basePath . DIRECTORY_SEPARATOR, '', $file->getPathname());
+            $filePath = $file->getPathname();
+            $basePathNormalized = rtrim(str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $basePath), DIRECTORY_SEPARATOR) . DIRECTORY_SEPARATOR;
+            $filePathNormalized = str_replace(['/', '\\'], DIRECTORY_SEPARATOR, $filePath);
+            
+            $relativePath = str_replace($basePathNormalized, '', $filePathNormalized);
             $classPath = str_replace(['/', '.php'], ['\\', ''], $relativePath);
             $class = $baseNamespace . '\\' . $classPath;
 

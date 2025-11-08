@@ -196,13 +196,29 @@
                     required
                 />
 
-                <x-ui-input-text
-                    name="model_class"
-                    label="Model Class (vollständiger Namespace)"
-                    wire:model.live="modelMappingForm.model_class"
-                    placeholder="z.B. Platform\Planner\Models\PlannerProject"
-                    required
-                />
+                <div>
+                    <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">
+                        Model Class <span class="text-red-500">*</span>
+                    </label>
+                    <select 
+                        name="model_class"
+                        wire:model.live="modelMappingForm.model_class"
+                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
+                        required
+                    >
+                        <option value="">Bitte wählen...</option>
+                        @foreach($this->availableModels as $model)
+                            @if($model['module_key'] === $modelMappingForm['module_key'])
+                                <option value="{{ $model['class'] }}">
+                                    {{ $model['name'] }} ({{ $model['class'] }})
+                                </option>
+                            @endif
+                        @endforeach
+                    </select>
+                    @if($modelMappingForm['module_key'] && collect($this->availableModels)->where('module_key', $modelMappingForm['module_key'])->isEmpty())
+                        <p class="mt-1 text-sm text-[var(--ui-muted)]">Keine Models für dieses Modul gefunden.</p>
+                    @endif
+                </div>
 
                 <div class="flex items-center">
                     <input 

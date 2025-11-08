@@ -4,9 +4,12 @@ namespace Platform\Organization\Livewire\Settings\EntityType;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
+use Illuminate\Support\Facades\Auth;
+use Illuminate\Support\Facades\Schema;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntityTypeModelMapping;
 use Platform\Core\PlatformCore;
+use Platform\Core\Models\Module;
 
 class Show extends Component
 {
@@ -32,11 +35,134 @@ class Show extends Component
     #[Computed]
     public function modules()
     {
-        return collect(PlatformCore::getModules())
-            ->mapWithKeys(function ($module) {
-                return [$module['key'] => $module['title'] ?? ucfirst($module['key'])];
-            })
-            ->toArray();
+        $user = Auth::user();
+        $baseTeam = $user->currentTeamRelation;
+        if (!$baseTeam) {
+            return [];
+        }
+
+        $rootTeam = $baseTeam->getRootTeam();
+        $rootTeamId = $rootTeam->id;
+        $baseTeamId = $baseTeam->id;
+
+        $allModules = PlatformCore::getVisibleModules();
+
+        // Filtere Module nach Berechtigung (nur Module, auf die der User Zugriff hat)
+        $accessibleModules = collect($allModules)->filter(function($module) use ($user, $baseTeam, $baseTeamId, $rootTeam, $rootTeamId) {
+            $moduleModel = Module::where('key', $module['key'])->first();
+            if (!$moduleModel) return false;
+
+            if ($moduleModel->isRootScoped()) {
+                $userAllowed = $user->modules()
+                    ->where('module_id', $moduleModel->id)
+                    ->wherePivot('team_id', $rootTeamId)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+                $teamAllowed = $rootTeam->modules()
+                    ->where('module_id', $moduleModel->id)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+            } else {
+                $userAllowed = $user->modules()
+                    ->where('module_id', $moduleModel->id)
+                    ->wherePivot('team_id', $baseTeamId)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+                $teamAllowed = $baseTeam->modules()
+                    ->where('module_id', $moduleModel->id)
+                    ->wherePivot('enabled', true)
+                    ->exists();
+            }
+
+            return $userAllowed || $teamAllowed;
+        });
+
+        return $accessibleModules->mapWithKeys(function ($module) {
+            return [$module['key'] => $module['title'] ?? ucfirst($module['key'])];
+        })->toArray();
+    }
+
+    #[Computed]
+    public function availableModels()
+    {
+        $models = [];
+        $accessibleModuleKeys = array_keys($this->modules);
+
+        foreach ($accessibleModuleKeys as $moduleKey) {
+            // Versuche Models-Verzeichnis zu finden
+            $moduleConfig = PlatformCore::getModule($moduleKey);
+            if (!$moduleConfig) continue;
+
+            // Standard-Namespace für Models: Platform\{Module}\Models
+            $moduleNamespace = 'Platform\\' . ucfirst($moduleKey) . '\\Models';
+            
+            // Versuche verschiedene Pfade
+            $possiblePaths = [
+                base_path("platform/modules/{$moduleKey}/src/Models"),
+                base_path("modules/{$moduleKey}/src/Models"),
+                __DIR__ . "/../../../../{$moduleKey}/src/Models",
+            ];
+
+            // Spezialfall: core module
+            if ($moduleKey === 'core') {
+                $moduleNamespace = 'Platform\\Core\\Models';
+                $possiblePaths = [
+                    base_path("platform/core/src/Models"),
+                    base_path("core/src/Models"),
+                    __DIR__ . "/../../../../core/src/Models",
+                ];
+            }
+
+            $modulePath = null;
+            foreach ($possiblePaths as $path) {
+                if (is_dir($path)) {
+                    $modulePath = $path;
+                    break;
+                }
+            }
+
+            if (!$modulePath || !is_dir($modulePath)) continue;
+
+            // Scanne Models-Verzeichnis
+            foreach (scandir($modulePath) as $file) {
+                if (!str_ends_with($file, '.php') || $file === '.' || $file === '..') continue;
+
+                $className = $moduleNamespace . '\\' . pathinfo($file, PATHINFO_FILENAME);
+                if (!class_exists($className)) continue;
+
+                // Prüfe ob es ein Eloquent Model ist
+                try {
+                    if (!is_subclass_of($className, \Illuminate\Database\Eloquent\Model::class)) {
+                        continue;
+                    }
+
+                    // Versuche Instanz zu erstellen (ohne DB-Zugriff)
+                    $reflection = new \ReflectionClass($className);
+                    if ($reflection->isAbstract() || $reflection->isInterface()) {
+                        continue;
+                    }
+
+                    $models[] = [
+                        'module_key' => $moduleKey,
+                        'class' => $className,
+                        'name' => class_basename($className),
+                    ];
+                } catch (\Throwable $e) {
+                    // Überspringe Models, die nicht geladen werden können
+                    continue;
+                }
+            }
+        }
+
+        // Sortiere nach Modul und dann nach Model-Name
+        usort($models, function($a, $b) {
+            if ($a['module_key'] !== $b['module_key']) {
+                return strcmp($a['module_key'], $b['module_key']);
+            }
+            return strcmp($a['name'], $b['name']);
+        });
+
+        return $models;
     }
 
     #[Computed]
@@ -67,6 +193,12 @@ class Show extends Component
             $this->modelMappingForm['is_active'] = true;
         }
         $this->modelMappingModalOpen = true;
+    }
+
+    public function updatedModelMappingFormModuleKey()
+    {
+        // Reset model_class wenn Modul geändert wird
+        $this->modelMappingForm['model_class'] = '';
     }
 
     public function closeModelMappingModal()

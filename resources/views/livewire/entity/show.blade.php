@@ -211,7 +211,15 @@
                             <div class="flex items-center justify-between py-2 px-3 bg-[var(--ui-muted-5)] rounded">
                                 <div class="flex items-center">
                                     @if($child->type->icon)
-                                        @svg('heroicon-o-' . str_replace('heroicons.', '', $child->type->icon), 'w-4 h-4 text-[var(--ui-muted)] mr-2')
+                                        @php
+                                            $iconName = str_replace('heroicons.', '', $child->type->icon);
+                                            // Map non-existent icons to valid alternatives
+                                            $iconMap = [
+                                                'user-check' => 'user',
+                                            ];
+                                            $iconName = $iconMap[$iconName] ?? $iconName;
+                                        @endphp
+                                        @svg('heroicon-o-' . $iconName, 'w-4 h-4 text-[var(--ui-muted)] mr-2')
                                     @endif
                                     <span class="text-sm font-medium">{{ $child->name }}</span>
                                 </div>

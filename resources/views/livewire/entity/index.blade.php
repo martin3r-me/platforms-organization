@@ -73,7 +73,15 @@
                     <x-ui-table-cell compact="true">
                         <div class="flex items-center">
                             @if($entity->type->icon)
-                                @svg('heroicon-o-' . str_replace('heroicons.', '', $entity->type->icon), 'w-5 h-5 text-[var(--ui-muted)] mr-3')
+                                @php
+                                    $iconName = str_replace('heroicons.', '', $entity->type->icon);
+                                    // Map non-existent icons to valid alternatives
+                                    $iconMap = [
+                                        'user-check' => 'user',
+                                    ];
+                                    $iconName = $iconMap[$iconName] ?? $iconName;
+                                @endphp
+                                @svg('heroicon-o-' . $iconName, 'w-5 h-5 text-[var(--ui-muted)] mr-3')
                             @endif
                             <div>
                                 <div class="font-medium">

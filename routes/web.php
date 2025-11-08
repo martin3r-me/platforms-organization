@@ -9,6 +9,8 @@ use Platform\Organization\Livewire\VsmSystem\Index as VsmSystemIndex;
 use Platform\Organization\Livewire\VsmSystem\Show as VsmSystemShow;
 use Platform\Organization\Livewire\Settings\EntityType\Index as EntityTypeIndex;
 use Platform\Organization\Livewire\Settings\EntityType\Show as EntityTypeShow;
+use Platform\Organization\Livewire\TimeEntries\Index as TimeEntriesIndex;
+use Platform\Organization\Livewire\PlannedTimes\Index as PlannedTimesIndex;
 
 Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organization.dashboard');
 
@@ -26,3 +28,7 @@ Route::get('/vsm-systems/{vsmSystem}', VsmSystemShow::class)->name('organization
 // Settings: Entity Types
 Route::get('/settings/entity-types', EntityTypeIndex::class)->name('organization.settings.entity-types.index');
 Route::get('/settings/entity-types/{entityType}', EntityTypeShow::class)->name('organization.settings.entity-types.show');
+
+// Zeiten: Ist-Zeiten und Geplante Zeiten
+Route::get('/time-entries', TimeEntriesIndex::class)->name('organization.time-entries.index');
+Route::get('/planned-times', PlannedTimesIndex::class)->name('organization.planned-times.index');

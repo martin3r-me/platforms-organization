@@ -183,8 +183,14 @@ class Show extends Component
                     }
 
                     $instances = $query->get();
+                    $user = auth()->user();
 
                     foreach ($instances as $instance) {
+                        // Prüfe ob der User Zugriff auf diese Entity hat
+                        if (!$this->userCanAccessEntity($user, $instance)) {
+                            continue;
+                        }
+
                         $contextKey = $modelClass . ':' . $instance->id;
                         
                         // Überspringe bereits verlinkte Entities
@@ -231,13 +237,20 @@ class Show extends Component
     #[Computed]
     public function linkedModuleEntities()
     {
+        $user = auth()->user();
+        
         return OrganizationContext::where('organization_entity_id', $this->entity->id)
             ->where('is_active', true)
             ->with('contextable')
             ->get()
-            ->map(function($context) {
+            ->map(function($context) use ($user) {
                 $contextable = $context->contextable;
                 if (!$contextable) {
+                    return null;
+                }
+
+                // Prüfe ob der User Zugriff auf diese Entity hat
+                if (!$this->userCanAccessEntity($user, $contextable)) {
                     return null;
                 }
 
@@ -271,6 +284,13 @@ class Show extends Component
 
         try {
             $moduleEntity = $modelClass::findOrFail($moduleEntityId);
+            $user = auth()->user();
+            
+            // Prüfe ob der User Zugriff auf diese Entity hat
+            if (!$this->userCanAccessEntity($user, $moduleEntity)) {
+                session()->flash('error', 'Sie haben keinen Zugriff auf diese Entity.');
+                return;
+            }
             
             // Prüfe ob das Model das HasOrganizationContexts Trait verwendet
             if (!in_array(\Platform\Organization\Traits\HasOrganizationContexts::class, class_uses_recursive($moduleEntity))) {
@@ -305,6 +325,106 @@ class Show extends Component
         } catch (\Throwable $e) {
             session()->flash('error', 'Fehler beim Entfernen: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Prüft ob der User Zugriff auf eine Module Entity hat
+     */
+    protected function userCanAccessEntity($user, $instance): bool
+    {
+        // 1. Prüfe über Policy (falls vorhanden)
+        $policyClass = $this->getPolicyClass(get_class($instance));
+        if ($policyClass && class_exists($policyClass)) {
+            try {
+                $policy = app($policyClass);
+                if (method_exists($policy, 'view')) {
+                    return $policy->view($user, $instance);
+                }
+            } catch (\Throwable $e) {
+                // Policy-Check fehlgeschlagen, weiter mit anderen Checks
+            }
+        }
+
+        // 2. Owner-Check: Prüfe ob user_id existiert und der User der Owner ist
+        if (isset($instance->user_id) && $instance->user_id === $user->id) {
+            return true;
+        }
+
+        // 3. Team-Mitgliedschaft: Prüfe ob das Model team-basiert ist und User im Team ist
+        if (isset($instance->team_id)) {
+            $userTeams = $user->teams()->pluck('teams.id')->toArray();
+            if (in_array($instance->team_id, $userTeams)) {
+                return true;
+            }
+        }
+
+        // 4. Spezifische Checks für bekannte Models
+        $modelClass = get_class($instance);
+        
+        // PlannerProject: Prüfe Projekt-Mitgliedschaft
+        if ($modelClass === \Platform\Planner\Models\PlannerProject::class) {
+            return $instance->projectUsers()
+                ->where('user_id', $user->id)
+                ->exists();
+        }
+
+        // PlannerTask: Prüfe über Projekt oder Owner
+        if ($modelClass === \Platform\Planner\Models\PlannerTask::class) {
+            // Owner hat Zugriff
+            if (isset($instance->user_id) && $instance->user_id === $user->id) {
+                return true;
+            }
+            // Zugewiesener User hat Zugriff
+            if (isset($instance->user_in_charge_id) && $instance->user_in_charge_id === $user->id) {
+                return true;
+            }
+            // Prüfe Projekt-Mitgliedschaft
+            if ($instance->project_id) {
+                $project = $instance->project;
+                if ($project) {
+                    return $project->projectUsers()
+                        ->where('user_id', $user->id)
+                        ->exists();
+                }
+            }
+        }
+
+        // User Model: Nur der User selbst
+        if ($modelClass === \Platform\Core\Models\User::class) {
+            return $instance->id === $user->id;
+        }
+
+        // Team Model: Prüfe Team-Mitgliedschaft
+        if ($modelClass === \Platform\Core\Models\Team::class) {
+            return $user->teams()->where('teams.id', $instance->id)->exists();
+        }
+
+        // Standard: Wenn team-basiert und User im Team, dann Zugriff
+        // Ansonsten: Kein Zugriff (sicherer Default)
+        return false;
+    }
+
+    /**
+     * Versucht die Policy-Klasse für ein Model zu finden
+     */
+    protected function getPolicyClass(string $modelClass): ?string
+    {
+        // Standard Laravel Policy-Naming: ModelPolicy
+        $policyClass = $modelClass . 'Policy';
+        if (class_exists($policyClass)) {
+            return $policyClass;
+        }
+
+        // Alternative: Namespace-basiert
+        $namespace = substr($modelClass, 0, strrpos($modelClass, '\\'));
+        $modelName = class_basename($modelClass);
+        $policyClass = $namespace . '\\Policies\\' . $modelName . 'Policy';
+        
+        if (class_exists($policyClass)) {
+            return $policyClass;
+        }
+
+        return null;
     }
 
     public function render()

@@ -79,6 +79,43 @@
         </a>
     </div>
 
+    {{-- Abschnitt: Zeiten --}}
+    <div>
+        <h4 x-show="!collapsed" class="px-4 py-3 text-xs tracking-wide font-semibold text-[color:var(--ui-muted)] uppercase">Zeiten</h4>
+
+        {{-- Ist-Zeiten --}}
+        <a href="{{ route('organization.time-entries.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/time-entries') ||
+               window.location.pathname.endsWith('/time-entries') ||
+               window.location.pathname.endsWith('/time-entries/')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-clock class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Ist-Zeiten</span>
+        </a>
+
+        {{-- Geplante Zeiten --}}
+        <a href="{{ route('organization.planned-times.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/planned-times') ||
+               window.location.pathname.endsWith('/planned-times') ||
+               window.location.pathname.endsWith('/planned-times/')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-calendar class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Geplante Zeiten</span>
+        </a>
+    </div>
+
     {{-- Abschnitt: Schnellzugriff --}}
     <div x-show="!collapsed">
         <h4 class="px-4 py-3 text-xs tracking-wide font-semibold text-[color:var(--ui-muted)] uppercase">Schnellzugriff</h4>

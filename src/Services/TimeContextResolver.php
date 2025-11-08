@@ -59,7 +59,12 @@ class TimeContextResolver
             return null;
         }
 
-        // Versuche verschiedene Label-Felder
+        // Prüfe ob Model HasDisplayName Interface implementiert (loose coupling)
+        if ($model instanceof \Platform\Core\Contracts\HasDisplayName) {
+            return $model->getDisplayName();
+        }
+
+        // Fallback: Versuche verschiedene Label-Felder
         if (isset($model->name)) {
             return $model->name;
         }
@@ -73,6 +78,22 @@ class TimeContextResolver
         }
 
         return null;
+    }
+
+    /**
+     * Gibt den Namen/Titel eines Root-Kontexts zurück.
+     * 
+     * @param string|null $type Model-Klasse
+     * @param int|null $id Model-ID
+     * @return string|null
+     */
+    public function resolveRootName(?string $type, ?int $id): ?string
+    {
+        if (!$type || !$id) {
+            return null;
+        }
+
+        return $this->resolveLabel($type, $id);
     }
 }
 

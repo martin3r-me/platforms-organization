@@ -75,6 +75,11 @@ class OrganizationTimeEntry extends Model
         return $this->morphTo();
     }
 
+    public function rootContext(): MorphTo
+    {
+        return $this->morphTo('rootContext', 'root_context_type', 'root_context_id');
+    }
+
     public function additionalContexts(): HasMany
     {
         return $this->hasMany(OrganizationTimeEntryContext::class, 'time_entry_id');

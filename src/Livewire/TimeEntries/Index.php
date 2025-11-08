@@ -76,7 +76,7 @@ class Index extends Component
 
         $query = OrganizationTimeEntry::query()
             ->whereIn('team_id', $teamIds)
-            ->with(['user', 'team', 'context'])
+            ->with(['user', 'team', 'context', 'rootContext'])
             ->orderBy('work_date', 'desc')
             ->orderBy('created_at', 'desc');
 
@@ -119,6 +119,50 @@ class Index extends Component
         }
 
         return $query->get();
+    }
+
+    #[Computed]
+    public function timeEntriesGroupedByRoot()
+    {
+        return $this->timeEntries
+            ->groupBy(function($entry) {
+                // Gruppiere nach root_context_type und root_context_id
+                if ($entry->root_context_type && $entry->root_context_id) {
+                    return $entry->root_context_type . ':' . $entry->root_context_id;
+                }
+                // Fallback: Wenn kein Root vorhanden, nach primärem Kontext gruppieren
+                return ($entry->context_type ?? 'unknown') . ':' . ($entry->context_id ?? 0);
+            })
+            ->map(function($entries, $key) {
+                $parts = explode(':', $key);
+                $rootType = $parts[0] ?? null;
+                $rootId = $parts[1] ?? null;
+                
+                $rootModel = null;
+                $rootName = 'Unbekannt';
+                
+                if ($rootType && $rootId && class_exists($rootType)) {
+                    $rootModel = $rootType::find($rootId);
+                    if ($rootModel) {
+                        if ($rootModel instanceof \Platform\Core\Contracts\HasDisplayName) {
+                            $rootName = $rootModel->getDisplayName() ?? 'Unbekannt';
+                        } else {
+                            $rootName = $rootModel->name ?? $rootModel->title ?? 'Unbekannt';
+                        }
+                    }
+                }
+                
+                return [
+                    'root_type' => $rootType,
+                    'root_id' => $rootId,
+                    'root_name' => $rootName,
+                    'root_model' => $rootModel,
+                    'entries' => $entries,
+                    'total_minutes' => $entries->sum('minutes'),
+                    'total_amount_cents' => $entries->sum('amount_cents'),
+                ];
+            })
+            ->sortBy('root_name');
     }
 
     #[Computed]

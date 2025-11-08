@@ -152,12 +152,16 @@ class Index extends Component
                     }
                 }
                 
+                // Eindeutige Teams aus den Einträgen sammeln
+                $teams = $entries->pluck('team')->filter()->unique('id')->values();
+                
                 return [
                     'root_type' => $rootType,
                     'root_id' => $rootId,
                     'root_name' => $rootName,
                     'root_model' => $rootModel,
                     'entries' => $entries,
+                    'teams' => $teams,
                     'total_minutes' => $entries->sum('minutes'),
                     'total_amount_cents' => $entries->sum('amount_cents'),
                 ];

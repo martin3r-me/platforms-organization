@@ -64,13 +64,26 @@
                 {{-- Root Header --}}
                 <div class="mb-4 p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
                     <div class="flex items-center justify-between">
-                        <div>
+                        <div class="flex-1">
                             <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">
                                 {{ $group['root_name'] }}
                             </h3>
                             <div class="text-xs text-[var(--ui-muted)] mt-1">
                                 {{ class_basename($group['root_type']) }}
                             </div>
+                            @if($group['teams']->isNotEmpty())
+                                <div class="mt-2 flex items-center gap-2 flex-wrap">
+                                    <span class="text-xs text-[var(--ui-muted)]">Teams:</span>
+                                    @foreach($group['teams'] as $team)
+                                        <span class="text-xs font-medium text-[var(--ui-secondary)]">
+                                            {{ $team->name }}
+                                        </span>
+                                        @if(!$loop->last)
+                                            <span class="text-xs text-[var(--ui-muted)]">·</span>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
                         <div class="text-right">
                             <div class="text-sm font-medium text-[var(--ui-secondary)]">
@@ -114,9 +127,13 @@
                                 </x-ui-table-cell>
                                 <x-ui-table-cell compact="true">
                                     <div class="flex items-center gap-2">
-                                        <div class="w-8 h-8 rounded-full bg-[var(--ui-primary-5)] flex items-center justify-center text-xs font-medium text-[var(--ui-primary)]">
-                                            {{ strtoupper(substr($entry->user->name ?? 'U', 0, 1)) }}
-                                        </div>
+                                        @if($entry->user && $entry->user->avatar)
+                                            <img src="{{ $entry->user->avatar }}" alt="{{ $entry->user->name ?? 'User' }}" class="w-8 h-8 rounded-full object-cover" />
+                                        @else
+                                            <div class="w-8 h-8 rounded-full bg-[var(--ui-primary-5)] flex items-center justify-center text-xs font-medium text-[var(--ui-primary)]">
+                                                {{ strtoupper(substr($entry->user->name ?? 'U', 0, 1)) }}
+                                            </div>
+                                        @endif
                                         <div>
                                             <div class="text-sm font-medium text-[var(--ui-secondary)]">
                                                 {{ $entry->user->name ?? 'Unbekannt' }}

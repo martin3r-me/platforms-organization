@@ -140,12 +140,12 @@
                                         <span class="text-[0.55rem] text-[var(--ui-muted)] mt-0.5 flex-shrink-0">←</span>
                                         <div class="flex-1 min-w-0">
                                             @foreach($relationsTo as $rel)
-                                                <div class="text-[0.55rem] leading-tight truncate" title="{{ $rel->relationType->name ?? 'Unbekannt' }}: {{ $rel->fromEntity->name }}">
-                                                    @if($rel->relationType)
-                                                        <span class="text-[var(--ui-muted)]">{{ $rel->relationType->name }}</span>
-                                                        <span class="text-[var(--ui-muted)]"> · </span>
-                                                    @endif
+                                                <div class="text-[0.55rem] leading-tight truncate" title="{{ $rel->fromEntity->name }} ({{ $rel->relationType->name ?? 'Unbekannt' }})">
                                                     <span class="text-[var(--ui-secondary)]">{{ $rel->fromEntity->name }}</span>
+                                                    @if($rel->relationType)
+                                                        <span class="text-[var(--ui-muted)]"> · </span>
+                                                        <span class="text-[var(--ui-muted)]">{{ $rel->relationType->name }}</span>
+                                                    @endif
                                                 </div>
                                             @endforeach
                                             @if($relationsToCount > 2)
@@ -159,12 +159,12 @@
                                         <span class="text-[0.55rem] text-[var(--ui-muted)] mt-0.5 flex-shrink-0">→</span>
                                         <div class="flex-1 min-w-0">
                                             @foreach($relationsFrom as $rel)
-                                                <div class="text-[0.55rem] leading-tight truncate" title="{{ $rel->toEntity->name }} ({{ $rel->relationType->name ?? 'Unbekannt' }})">
-                                                    <span class="text-[var(--ui-secondary)]">{{ $rel->toEntity->name }}</span>
+                                                <div class="text-[0.55rem] leading-tight truncate" title="{{ $rel->relationType->name ?? 'Unbekannt' }}: {{ $rel->toEntity->name }}">
                                                     @if($rel->relationType)
-                                                        <span class="text-[var(--ui-muted)]"> · </span>
                                                         <span class="text-[var(--ui-muted)]">{{ $rel->relationType->name }}</span>
+                                                        <span class="text-[var(--ui-muted)]"> · </span>
                                                     @endif
+                                                    <span class="text-[var(--ui-secondary)]">{{ $rel->toEntity->name }}</span>
                                                 </div>
                                             @endforeach
                                             @if($relationsFromCount > 2)

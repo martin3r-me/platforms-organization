@@ -46,8 +46,8 @@ class ModalOrganization extends Component
     public $teamEntries = [];
     
     // Organization Context Management
-    public $organizationContexts = [];
-    public $availableOrganizationEntities = [];
+    public $organizationContexts;
+    public $availableOrganizationEntities;
     public $selectedOrganizationEntityId = null;
     public array $selectedChildRelations = [];
 
@@ -106,6 +106,10 @@ class ModalOrganization extends Component
 
     public function mount(): void
     {
+        // Initialisiere Collections für Organization Context Management
+        $this->organizationContexts = collect();
+        $this->availableOrganizationEntities = collect();
+        
         \Log::info('ModalOrganization: mount() called', [
             'component_id' => $this->getId(),
         ]);
@@ -190,7 +194,11 @@ class ModalOrganization extends Component
     public function close(): void
     {
         $this->resetValidation();
-        $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote', 'allowTimeEntry', 'allowContextManagement', 'canLinkToEntity', 'availableChildRelations', 'organizationContexts', 'availableOrganizationEntities', 'selectedOrganizationEntityId', 'selectedChildRelations');
+        $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote', 'allowTimeEntry', 'allowContextManagement', 'canLinkToEntity', 'availableChildRelations', 'selectedOrganizationEntityId', 'selectedChildRelations');
+        
+        // Collections zurücksetzen
+        $this->organizationContexts = collect();
+        $this->availableOrganizationEntities = collect();
     }
 
     protected function loadEntries(): void
@@ -636,12 +644,15 @@ class ModalOrganization extends Component
             return;
         }
 
-        $this->organizationContexts = \Platform\Organization\Models\OrganizationContext::query()
+        $contexts = \Platform\Organization\Models\OrganizationContext::query()
             ->where('contextable_type', $this->contextType)
             ->where('contextable_id', $this->contextId)
             ->where('is_active', true)
             ->with('organizationEntity.type')
             ->get();
+        
+        // Livewire serialisiert Collections, daher müssen wir sicherstellen, dass es eine Collection bleibt
+        $this->organizationContexts = $contexts;
     }
 
     protected function loadAvailableOrganizationEntities(): void

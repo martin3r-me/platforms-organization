@@ -871,7 +871,7 @@
                                 </label>
                                 <x-ui-input-select
                                     wire:model="selectedOrganizationEntityId"
-                                    :options="$availableOrganizationEntities->pluck('name', 'id')->toArray()"
+                                    :options="is_array($availableOrganizationEntities) ? collect($availableOrganizationEntities)->pluck('name', 'id')->toArray() : $availableOrganizationEntities->pluck('name', 'id')->toArray()"
                                     placeholder="Organization Entity auswählen..."
                                 />
                             </div>

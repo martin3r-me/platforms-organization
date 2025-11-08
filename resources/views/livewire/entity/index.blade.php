@@ -112,7 +112,7 @@
                     </x-ui-table-cell>
                     <x-ui-table-cell compact="true">
                         @if($entity->costCenter)
-                            <x-ui-badge variant="primary" size="sm">{{ $entity->costCenter->name }}</x-ui-badge>
+                            <x-ui-badge variant="primary" size="sm" title="{{ $entity->costCenter->name }}">{{ $entity->costCenter->code }}</x-ui-badge>
                         @else
                             <span class="text-xs text-[var(--ui-muted)]">–</span>
                         @endif
@@ -159,12 +159,12 @@
                                         <span class="text-[0.55rem] text-[var(--ui-muted)] mt-0.5 flex-shrink-0">→</span>
                                         <div class="flex-1 min-w-0">
                                             @foreach($relationsFrom as $rel)
-                                                <div class="text-[0.55rem] leading-tight truncate" title="{{ $rel->relationType->name ?? 'Unbekannt' }}: {{ $rel->toEntity->name }}">
-                                                    @if($rel->relationType)
-                                                        <span class="text-[var(--ui-muted)]">{{ $rel->relationType->name }}</span>
-                                                        <span class="text-[var(--ui-muted)]"> · </span>
-                                                    @endif
+                                                <div class="text-[0.55rem] leading-tight truncate" title="{{ $rel->toEntity->name }} ({{ $rel->relationType->name ?? 'Unbekannt' }})">
                                                     <span class="text-[var(--ui-secondary)]">{{ $rel->toEntity->name }}</span>
+                                                    @if($rel->relationType)
+                                                        <span class="text-[var(--ui-muted)]"> · </span>
+                                                        <span class="text-[var(--ui-muted)]">{{ $rel->relationType->name }}</span>
+                                                    @endif
                                                 </div>
                                             @endforeach
                                             @if($relationsFromCount > 2)

@@ -15,7 +15,7 @@ use Platform\Organization\Services\StorePlannedTime;
 use Platform\Organization\Services\TimeContextResolver;
 use Platform\Organization\Traits\HasTimeEntries;
 
-class ModalTimeEntry extends Component
+class ModalOrganization extends Component
 {
 
     public bool $open = false;
@@ -24,6 +24,14 @@ class ModalTimeEntry extends Component
     public ?int $contextId = null;
 
     public array $linkedContexts = [];
+    
+    // Verfügbare Relations für Children-Cascade (aus Dispatch)
+    public array $availableChildRelations = [];
+
+    // Flags für erlaubte Aktionen
+    public bool $allowTimeEntry = true;
+    public bool $allowContextManagement = true;
+    public bool $canLinkToEntity = true;
 
     public string $workDate;
     public int $minutes = 60;
@@ -92,15 +100,15 @@ class ModalTimeEntry extends Component
 
     public function mount(): void
     {
-        \Log::info('ModalTimeEntry: mount() called', [
+        \Log::info('ModalOrganization: mount() called', [
             'component_id' => $this->getId(),
         ]);
     }
 
-    #[On('time-entry')]
+    #[On('organization')]
     public function setContext(array $payload = []): void
     {
-        \Log::info('ModalTimeEntry: time-entry event received!', [
+        \Log::info('ModalOrganization: organization event received!', [
             'component_id' => $this->getId(),
             'payload' => $payload,
             'timestamp' => now(),
@@ -109,10 +117,18 @@ class ModalTimeEntry extends Component
         $this->contextType = $payload['context_type'] ?? null;
         $this->contextId = isset($payload['context_id']) ? (int) $payload['context_id'] : null;
         $this->linkedContexts = $payload['linked_contexts'] ?? [];
+        
+        // Verfügbare Relations für Children-Cascade (z.B. ['tasks', 'projectSlots.tasks'])
+        $this->availableChildRelations = $payload['include_children_relations'] ?? [];
+
+        // Flags setzen (defaults: alle true für Rückwärtskompatibilität)
+        $this->allowTimeEntry = $payload['allow_time_entry'] ?? true;
+        $this->allowContextManagement = $payload['allow_context_management'] ?? true;
+        $this->canLinkToEntity = $payload['can_link_to_entity'] ?? true;
 
         // Wenn Modal bereits offen ist, Daten neu laden
         if ($this->open && $this->contextType && $this->contextId) {
-            if (class_exists($this->contextType) && $this->contextSupportsTimeEntries($this->contextType)) {
+            if ($this->allowTimeEntry && class_exists($this->contextType) && $this->contextSupportsTimeEntries($this->contextType)) {
                 $this->loadEntries();
                 $this->loadPlannedEntries();
                 $this->loadCurrentPlanned();
@@ -120,7 +136,7 @@ class ModalTimeEntry extends Component
         }
     }
 
-    #[On('time-entry:open')]
+    #[On('organization:open')]
     public function open(): void
     {
         if (! Auth::check() || ! Auth::user()->currentTeamRelation) {
@@ -132,10 +148,18 @@ class ModalTimeEntry extends Component
         $this->minutes = 60;
         $this->rate = null;
         $this->note = null;
-        $this->activeTab = 'entry';
+        
+        // Tab basierend auf erlaubten Aktionen setzen
+        if ($this->allowTimeEntry) {
+            $this->activeTab = 'entry';
+        } elseif ($this->allowContextManagement) {
+            $this->activeTab = 'organization';
+        } else {
+            $this->activeTab = 'overview';
+        }
 
-        // Wenn Kontext vorhanden, Daten laden
-        if ($this->contextType && $this->contextId) {
+        // Wenn Kontext vorhanden und TimeEntry erlaubt, Daten laden
+        if ($this->allowTimeEntry && $this->contextType && $this->contextId) {
             if (class_exists($this->contextType) && $this->contextSupportsTimeEntries($this->contextType)) {
                 $this->loadEntries();
                 $this->loadPlannedEntries();
@@ -143,8 +167,10 @@ class ModalTimeEntry extends Component
             }
         }
         
-        // Team-Übersicht immer laden
-        $this->loadTeamEntries();
+        // Team-Übersicht nur laden wenn TimeEntry erlaubt
+        if ($this->allowTimeEntry) {
+            $this->loadTeamEntries();
+        }
 
         $this->open = true;
     }
@@ -152,7 +178,7 @@ class ModalTimeEntry extends Component
     public function close(): void
     {
         $this->resetValidation();
-        $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote');
+        $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote', 'allowTimeEntry', 'allowContextManagement', 'canLinkToEntity', 'availableChildRelations');
     }
 
     protected function loadEntries(): void
@@ -553,7 +579,7 @@ class ModalTimeEntry extends Component
         $this->workDate = now()->toDateString();
         $this->minutes = 60;
 
-        $this->dispatch('time-entry:saved', id: $entry->id);
+        $this->dispatch('organization:time-entry:saved', id: $entry->id);
 
         $this->dispatch('notify', [
             'type' => 'success',
@@ -593,7 +619,7 @@ class ModalTimeEntry extends Component
 
     public function render()
     {
-        return view('organization::livewire.modal-time-entry');
+        return view('organization::livewire.modal-organization');
     }
 }
 

@@ -153,6 +153,22 @@ class OrganizationEntity extends Model
     }
 
     /**
+     * Beziehung zu Organization Contexts (Module Entities, die an diese Entity gehängt sind)
+     */
+    public function contexts()
+    {
+        return $this->hasMany(OrganizationContext::class, 'organization_entity_id');
+    }
+
+    /**
+     * Aktive Contexts
+     */
+    public function activeContexts()
+    {
+        return $this->contexts()->where('is_active', true);
+    }
+
+    /**
      * Prüfe ob Entity ein Child hat
      */
     public function hasChildren(): bool

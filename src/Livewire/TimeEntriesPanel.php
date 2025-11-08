@@ -31,7 +31,7 @@ class TimeEntriesPanel extends Component
         $this->loadEntries();
     }
 
-    #[On('time-entry:saved')]
+    #[On('organization:time-entry:saved')]
     public function reload(): void
     {
         $this->loadEntries();
@@ -79,7 +79,7 @@ class TimeEntriesPanel extends Component
             'linked_contexts' => $this->linkedContexts,
         ];
 
-        $this->dispatch('time-entry:open', $payload);
+        $this->dispatch('organization:open', $payload);
     }
 
     public function toggleBilled(int $entryId): void

@@ -161,6 +161,7 @@
         @else
             <!-- Tabs -->
             <div class="flex gap-1 border-b border-[var(--ui-border)]/60 mb-8">
+                @if($allowTimeEntry)
                 <button
                     @click="activeTab = 'entry'"
                     :class="activeTab === 'entry' 
@@ -202,6 +203,8 @@
                         Soll-Zeit
                     </span>
                 </button>
+                @endif
+                @if($allowTimeEntry)
                 <button
                     @click="activeTab = 'team'"
                     :class="activeTab === 'team' 
@@ -219,9 +222,30 @@
                         @endif
                     </span>
                 </button>
+                @endif
+                @if($allowContextManagement && $canLinkToEntity)
+                <button
+                    @click="activeTab = 'organization'"
+                    :class="activeTab === 'organization' 
+                        ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] font-semibold bg-[var(--ui-primary-5)]/30' 
+                        : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
+                    class="px-5 py-3 text-sm transition-all duration-200 rounded-t-lg"
+                >
+                    <span class="inline-flex items-center gap-2">
+                        @svg('heroicon-o-building-office', 'w-4 h-4')
+                        Organisation
+                        @if($organizationContexts && $organizationContexts->count() > 0)
+                            <span class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)]">
+                                {{ $organizationContexts->count() }}
+                            </span>
+                        @endif
+                    </span>
+                </button>
+                @endif
             </div>
 
             <!-- Tab Content: Entry -->
+            @if($allowTimeEntry)
             <div x-show="activeTab === 'entry'" x-cloak>
                 <div class="space-y-6">
                     <!-- Quick Time Buttons -->
@@ -302,8 +326,10 @@
                     @endif
                 </div>
             </div>
+            @endif
 
             <!-- Tab Content: Overview -->
+            @if($allowTimeEntry)
             <div x-show="activeTab === 'overview'" x-cloak>
                 <div class="space-y-6">
                     <!-- Statistics -->
@@ -447,8 +473,10 @@
                     </div>
                 </div>
             </div>
+            @endif
 
             <!-- Tab Content: Planned -->
+            @if($allowTimeEntry)
             <div x-show="activeTab === 'planned'" x-cloak>
                 <div class="space-y-6">
                     <!-- Current Planned Time -->
@@ -579,8 +607,10 @@
                     </div>
                 </div>
             </div>
+            @endif
 
             <!-- Tab Content: Team -->
+            @if($allowTimeEntry)
             <div x-show="activeTab === 'team'" x-cloak>
                 <div class="space-y-6">
                     <!-- Zeitraum-Filter -->
@@ -771,6 +801,129 @@
                     </div>
                 </div>
             </div>
+            @endif
+
+            <!-- Tab Content: Organisation -->
+            @if($allowContextManagement && $canLinkToEntity)
+            <div x-show="activeTab === 'organization'" x-cloak>
+                <div class="space-y-6">
+                    <!-- Bestehende Verknüpfungen -->
+                    <div>
+                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">Verknüpfte Organization Entities</h4>
+                        <div class="space-y-2">
+                            @forelse($organizationContexts ?? [] as $context)
+                                <div class="flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)]">
+                                    <div class="flex-1">
+                                        <div class="flex items-center gap-3">
+                                            <div class="flex-shrink-0">
+                                                <div class="w-10 h-10 rounded-lg bg-[var(--ui-primary-5)] flex items-center justify-center">
+                                                    @svg('heroicon-o-building-office', 'w-5 h-5 text-[var(--ui-primary)]')
+                                                </div>
+                                            </div>
+                                            <div class="flex-1 min-w-0">
+                                                <div class="font-semibold text-[var(--ui-secondary)]">{{ $context->organizationEntity->name }}</div>
+                                                <div class="text-xs text-[var(--ui-muted)] mt-0.5">
+                                                    {{ $context->organizationEntity->type->name ?? 'Unbekannt' }}
+                                                    @if($context->include_children_relations && count($context->include_children_relations) > 0)
+                                                        • Mit Relations: {{ implode(', ', $context->include_children_relations) }}
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                    <div class="flex-shrink-0 ml-4">
+                                        <x-ui-button 
+                                            variant="danger-outline" 
+                                            size="sm"
+                                            wire:click="detachOrganizationContext({{ $context->id }})"
+                                            wire:loading.attr="disabled"
+                                            wire:target="detachOrganizationContext({{ $context->id }})"
+                                        >
+                                            <span wire:loading.remove wire:target="detachOrganizationContext({{ $context->id }})">
+                                                @svg('heroicon-o-trash', 'w-4 h-4')
+                                            </span>
+                                            <span wire:loading wire:target="detachOrganizationContext({{ $context->id }})">
+                                                @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
+                                            </span>
+                                        </x-ui-button>
+                                    </div>
+                                </div>
+                            @empty
+                                <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
+                                        @svg('heroicon-o-building-office', 'w-8 h-8 text-[var(--ui-muted)]')
+                                    </div>
+                                    <p class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Noch keine Verknüpfungen</p>
+                                    <p class="text-xs text-[var(--ui-muted)]">Verknüpfen Sie dieses Element mit einer Organization Entity</p>
+                                </div>
+                            @endforelse
+                        </div>
+                    </div>
+
+                    <!-- Neue Verknüpfung erstellen -->
+                    <div class="pt-6 border-t border-[var(--ui-border)]/60">
+                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">Neue Verknüpfung erstellen</h4>
+                        <div class="space-y-4">
+                            <!-- Organization Entity Auswahl -->
+                            <div>
+                                <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">
+                                    Organization Entity
+                                </label>
+                                <x-ui-input-select
+                                    wire:model="selectedOrganizationEntityId"
+                                    :options="$availableOrganizationEntities->pluck('name', 'id')->toArray()"
+                                    placeholder="Organization Entity auswählen..."
+                                />
+                            </div>
+
+                            <!-- Child Relations Checkboxes (nur wenn verfügbar) -->
+                            @if(!empty($availableChildRelations))
+                            <div>
+                                <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">
+                                    Relations inkludieren (optional)
+                                </label>
+                                <div class="space-y-2">
+                                    @foreach($availableChildRelations as $relation)
+                                        <label class="flex items-center gap-2 p-2 rounded-lg border border-[var(--ui-border)]/60 hover:bg-[var(--ui-muted-5)] cursor-pointer">
+                                            <input 
+                                                type="checkbox" 
+                                                wire:model="selectedChildRelations"
+                                                value="{{ $relation }}"
+                                                class="rounded border-[var(--ui-border)]/60 text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]"
+                                            >
+                                            <span class="text-sm text-[var(--ui-secondary)]">{{ $relation }}</span>
+                                        </label>
+                                    @endforeach
+                                </div>
+                                <p class="mt-2 text-xs text-[var(--ui-muted)]">
+                                    Wenn ausgewählt, werden auch die Children über diese Relations mit der Organization Entity verknüpft.
+                                </p>
+                            </div>
+                            @endif
+
+                            <!-- Button -->
+                            <div>
+                                <x-ui-button 
+                                    variant="primary" 
+                                    wire:click="attachOrganizationContext"
+                                    wire:loading.attr="disabled"
+                                    :disabled="!$selectedOrganizationEntityId"
+                                    class="w-full"
+                                >
+                                    <span wire:loading.remove wire:target="attachOrganizationContext">
+                                        Verknüpfung erstellen
+                                    </span>
+                                    <span wire:loading wire:target="attachOrganizationContext" class="inline-flex items-center gap-2">
+                                        @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
+                                        Erstellen…
+                                    </span>
+                                </x-ui-button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            @endif
         @endif
     </div>
 

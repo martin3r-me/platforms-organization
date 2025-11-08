@@ -38,12 +38,18 @@ class ModalOrganization extends Component
     public ?string $rate = null;
     public ?string $note = null;
 
-    public string $activeTab = 'entry'; // 'entry', 'overview', 'planned', or 'team'
+    public string $activeTab = 'entry'; // 'entry', 'overview', 'planned', 'team', or 'organization'
     public string $timeRange = 'current_month'; // 'current_week', 'current_month', 'current_year', 'last_week', 'last_month'
 
     public $entries = [];
     public $plannedEntries = [];
     public $teamEntries = [];
+    
+    // Organization Context Management
+    public $organizationContexts = [];
+    public $availableOrganizationEntities = [];
+    public $selectedOrganizationEntityId = null;
+    public array $selectedChildRelations = [];
 
     public ?int $plannedMinutes = null;
     public ?string $plannedNote = null;
@@ -171,6 +177,12 @@ class ModalOrganization extends Component
         if ($this->allowTimeEntry) {
             $this->loadTeamEntries();
         }
+        
+        // Organization Contexts laden wenn Context Management erlaubt
+        if ($this->allowContextManagement && $this->contextType && $this->contextId) {
+            $this->loadOrganizationContexts();
+            $this->loadAvailableOrganizationEntities();
+        }
 
         $this->open = true;
     }
@@ -178,7 +190,7 @@ class ModalOrganization extends Component
     public function close(): void
     {
         $this->resetValidation();
-        $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote', 'allowTimeEntry', 'allowContextManagement', 'canLinkToEntity', 'availableChildRelations');
+        $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote', 'allowTimeEntry', 'allowContextManagement', 'canLinkToEntity', 'availableChildRelations', 'organizationContexts', 'availableOrganizationEntities', 'selectedOrganizationEntityId', 'selectedChildRelations');
     }
 
     protected function loadEntries(): void
@@ -615,6 +627,112 @@ class ModalOrganization extends Component
         }
 
         return (int) round($float * 100);
+    }
+
+    protected function loadOrganizationContexts(): void
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            $this->organizationContexts = collect();
+            return;
+        }
+
+        $this->organizationContexts = \Platform\Organization\Models\OrganizationContext::query()
+            ->where('contextable_type', $this->contextType)
+            ->where('contextable_id', $this->contextId)
+            ->where('is_active', true)
+            ->with('organizationEntity.type')
+            ->get();
+    }
+
+    protected function loadAvailableOrganizationEntities(): void
+    {
+        $user = Auth::user();
+        $team = $user?->currentTeamRelation;
+        
+        if (! $team) {
+            $this->availableOrganizationEntities = collect();
+            return;
+        }
+
+        $this->availableOrganizationEntities = \Platform\Organization\Models\OrganizationEntity::query()
+            ->where('team_id', $team->id)
+            ->where('is_active', true)
+            ->with('type')
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function attachOrganizationContext(): void
+    {
+        if (! $this->contextType || ! $this->contextId || ! $this->selectedOrganizationEntityId) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Bitte wählen Sie eine Organization Entity aus.',
+            ]);
+            return;
+        }
+
+        $entity = \Platform\Organization\Models\OrganizationEntity::find($this->selectedOrganizationEntityId);
+        if (! $entity) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Organization Entity nicht gefunden.',
+            ]);
+            return;
+        }
+
+        $contextClass = $this->contextType;
+        $contextModel = $contextClass::find($this->contextId);
+        if (! $contextModel) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Kontext nicht gefunden.',
+            ]);
+            return;
+        }
+
+        // Prüfe ob Trait vorhanden
+        if (! in_array(\Platform\Organization\Traits\HasOrganizationContexts::class, class_uses_recursive($contextClass))) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Dieser Kontext unterstützt keine Organization-Verknüpfungen.',
+            ]);
+            return;
+        }
+
+        // Verknüpfe mit ausgewählten Relations (falls vorhanden)
+        $includeRelations = !empty($this->selectedChildRelations) ? $this->selectedChildRelations : null;
+        
+        $contextModel->attachOrganizationContext($entity, $includeRelations);
+
+        $this->loadOrganizationContexts();
+        $this->selectedOrganizationEntityId = null;
+        $this->selectedChildRelations = [];
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => 'Verknüpfung erstellt.',
+        ]);
+    }
+
+    public function detachOrganizationContext(int $contextId): void
+    {
+        $context = \Platform\Organization\Models\OrganizationContext::find($contextId);
+        if (! $context) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Kontext nicht gefunden.',
+            ]);
+            return;
+        }
+
+        $context->delete();
+        $this->loadOrganizationContexts();
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => 'Verknüpfung entfernt.',
+        ]);
     }
 
     public function render()

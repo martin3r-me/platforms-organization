@@ -311,6 +311,6 @@
     </x-ui-page-container>
 
     <!-- Relations Modal -->
-    @livewire('organization.entity.modal-relations')
+    <livewire:organization.entity.modal-relations/>
 </x-ui-page>
 

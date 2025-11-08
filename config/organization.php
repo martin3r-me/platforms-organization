@@ -5,6 +5,9 @@ return [
     'description' => 'Organization Module',
     'version' => '1.0.0',
     
+    // Scope-Type: 'parent' = root-scoped (immer Root-Team-ID), 'single' = team-spezifisch
+    'scope_type' => 'parent',
+    
     'routing' => [
         'prefix' => 'organization',
         'middleware' => ['web', 'auth'],

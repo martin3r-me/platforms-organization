@@ -46,7 +46,7 @@ class ModalOrganization extends Component
     public $teamEntries = [];
     
     // Organization Context Management
-    public $organizationContexts;
+    public $organizationContext = null;
     public $availableOrganizationEntities;
     public $selectedOrganizationEntityId = null;
     public array $selectedChildRelations = [];
@@ -107,7 +107,7 @@ class ModalOrganization extends Component
     public function mount(): void
     {
         // Initialisiere Collections für Organization Context Management
-        $this->organizationContexts = collect();
+        $this->organizationContext = null;
         $this->availableOrganizationEntities = collect();
         
         \Log::info('ModalOrganization: mount() called', [
@@ -197,7 +197,7 @@ class ModalOrganization extends Component
         $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote', 'allowTimeEntry', 'allowContextManagement', 'canLinkToEntity', 'availableChildRelations', 'selectedOrganizationEntityId', 'selectedChildRelations');
         
         // Collections zurücksetzen
-        $this->organizationContexts = collect();
+        $this->organizationContext = null;
         $this->availableOrganizationEntities = collect();
     }
 
@@ -640,19 +640,16 @@ class ModalOrganization extends Component
     protected function loadOrganizationContexts(): void
     {
         if (! $this->contextType || ! $this->contextId) {
-            $this->organizationContexts = collect();
+            $this->organizationContext = null;
             return;
         }
 
-        $contexts = \Platform\Organization\Models\OrganizationContext::query()
+        $this->organizationContext = \Platform\Organization\Models\OrganizationContext::query()
             ->where('contextable_type', $this->contextType)
             ->where('contextable_id', $this->contextId)
             ->where('is_active', true)
             ->with('organizationEntity.type')
-            ->get();
-        
-        // Livewire serialisiert Collections, daher müssen wir sicherstellen, dass es eine Collection bleibt
-        $this->organizationContexts = $contexts;
+            ->first();
     }
 
     protected function loadAvailableOrganizationEntities(): void
@@ -665,12 +662,18 @@ class ModalOrganization extends Component
             return;
         }
 
-        $this->availableOrganizationEntities = \Platform\Organization\Models\OrganizationEntity::query()
+        $query = \Platform\Organization\Models\OrganizationEntity::query()
             ->where('team_id', $team->id)
             ->where('is_active', true)
             ->with('type')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        // Bereits gelinkte Entity ausschließen (falls vorhanden)
+        if ($this->organizationContext && $this->organizationContext->organization_entity_id) {
+            $query->where('id', '!=', $this->organizationContext->organization_entity_id);
+        }
+
+        $this->availableOrganizationEntities = $query->get();
     }
 
     public function attachOrganizationContext(): void
@@ -726,10 +729,9 @@ class ModalOrganization extends Component
         ]);
     }
 
-    public function detachOrganizationContext(int $contextId): void
+    public function detachOrganizationContext(): void
     {
-        $context = \Platform\Organization\Models\OrganizationContext::find($contextId);
-        if (! $context) {
+        if (! $this->contextType || ! $this->contextId) {
             $this->dispatch('notify', [
                 'type' => 'error',
                 'message' => 'Kontext nicht gefunden.',
@@ -737,8 +739,28 @@ class ModalOrganization extends Component
             return;
         }
 
-        $context->delete();
+        $contextClass = $this->contextType;
+        $contextModel = $contextClass::find($this->contextId);
+        if (! $contextModel) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Kontext nicht gefunden.',
+            ]);
+            return;
+        }
+
+        // Prüfe ob Trait vorhanden
+        if (! in_array(\Platform\Organization\Traits\HasOrganizationContexts::class, class_uses_recursive($contextClass))) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Dieser Kontext unterstützt keine Organization-Verknüpfungen.',
+            ]);
+            return;
+        }
+
+        $contextModel->detachOrganizationContext();
         $this->loadOrganizationContexts();
+        $this->loadAvailableOrganizationEntities();
 
         $this->dispatch('notify', [
             'type' => 'success',

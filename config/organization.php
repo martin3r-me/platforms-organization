@@ -71,6 +71,17 @@ return [
                     'route' => 'organization.locations.index',
                     'icon' => 'heroicon-o-map-pin',
                 ],
+                'settings' => [
+                    'title' => 'Einstellungen',
+                    'icon' => 'heroicon-o-cog-6-tooth',
+                    'items' => [
+                        'entity-types' => [
+                            'title' => 'Entity Types',
+                            'route' => 'organization.settings.entity-types.index',
+                            'icon' => 'heroicon-o-cube',
+                        ],
+                    ],
+                ],
             ],
         ],
     ],

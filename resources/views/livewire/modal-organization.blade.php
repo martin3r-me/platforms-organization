@@ -234,9 +234,9 @@
                     <span class="inline-flex items-center gap-2">
                         @svg('heroicon-o-building-office', 'w-4 h-4')
                         Organisation
-                        @if($organizationContexts && $organizationContexts->count() > 0)
+                        @if($organizationContext)
                             <span class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)]">
-                                {{ $organizationContexts->count() }}
+                                1
                             </span>
                         @endif
                     </span>
@@ -807,11 +807,11 @@
             @if($allowContextManagement && $canLinkToEntity)
             <div x-show="activeTab === 'organization'" x-cloak>
                 <div class="space-y-6">
-                    <!-- Bestehende Verknüpfungen -->
+                    <!-- Bestehende Verknüpfung -->
                     <div>
-                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">Verknüpfte Organization Entities</h4>
+                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">Verknüpfte Organization Entity</h4>
                         <div class="space-y-2">
-                            @forelse($organizationContexts ?? [] as $context)
+                            @if($organizationContext && $organizationContext->organizationEntity)
                                 <div class="flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)]">
                                     <div class="flex-1">
                                         <div class="flex items-center gap-3">
@@ -821,11 +821,11 @@
                                                 </div>
                                             </div>
                                             <div class="flex-1 min-w-0">
-                                                <div class="font-semibold text-[var(--ui-secondary)]">{{ $context->organizationEntity->name }}</div>
+                                                <div class="font-semibold text-[var(--ui-secondary)]">{{ $organizationContext->organizationEntity->name }}</div>
                                                 <div class="text-xs text-[var(--ui-muted)] mt-0.5">
-                                                    {{ $context->organizationEntity->type->name ?? 'Unbekannt' }}
-                                                    @if($context->include_children_relations && count($context->include_children_relations) > 0)
-                                                        • Mit Relations: {{ implode(', ', $context->include_children_relations) }}
+                                                    {{ $organizationContext->organizationEntity->type->name ?? 'Unbekannt' }}
+                                                    @if($organizationContext->include_children_relations && count($organizationContext->include_children_relations) > 0)
+                                                        • Mit Relations: {{ implode(', ', $organizationContext->include_children_relations) }}
                                                     @endif
                                                 </div>
                                             </div>
@@ -835,28 +835,28 @@
                                         <x-ui-button 
                                             variant="danger-outline" 
                                             size="sm"
-                                            wire:click="detachOrganizationContext({{ $context->id }})"
+                                            wire:click="detachOrganizationContext"
                                             wire:loading.attr="disabled"
-                                            wire:target="detachOrganizationContext({{ $context->id }})"
+                                            wire:target="detachOrganizationContext"
                                         >
-                                            <span wire:loading.remove wire:target="detachOrganizationContext({{ $context->id }})">
+                                            <span wire:loading.remove wire:target="detachOrganizationContext">
                                                 @svg('heroicon-o-trash', 'w-4 h-4')
                                             </span>
-                                            <span wire:loading wire:target="detachOrganizationContext({{ $context->id }})">
+                                            <span wire:loading wire:target="detachOrganizationContext">
                                                 @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
                                             </span>
                                         </x-ui-button>
                                     </div>
                                 </div>
-                            @empty
+                            @else
                                 <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
                                     <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
                                         @svg('heroicon-o-building-office', 'w-8 h-8 text-[var(--ui-muted)]')
                                     </div>
-                                    <p class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Noch keine Verknüpfungen</p>
+                                    <p class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Noch keine Verknüpfung</p>
                                     <p class="text-xs text-[var(--ui-muted)]">Verknüpfen Sie dieses Element mit einer Organization Entity</p>
                                 </div>
-                            @endforelse
+                            @endif
                         </div>
                     </div>
 

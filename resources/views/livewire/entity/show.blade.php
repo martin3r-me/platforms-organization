@@ -203,6 +203,92 @@
                 </div>
             </div>
 
+            <!-- Verlinkte Module Entities -->
+            @if($this->linkedModuleEntities->count() > 0 || $this->availableModuleEntities->count() > 0)
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Module Entities</h2>
+                    </div>
+                    <div class="space-y-6">
+                        <!-- Bereits verlinkte Entities -->
+                        @if($this->linkedModuleEntities->count() > 0)
+                            <div>
+                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">Verlinkt ({{ $this->linkedModuleEntities->flatten()->count() }})</h3>
+                                <div class="space-y-2">
+                                    @foreach($this->linkedModuleEntities as $modelClass => $entities)
+                                        <div class="mb-4">
+                                            <div class="text-xs font-medium text-[var(--ui-muted)] mb-2">
+                                                {{ class_basename($modelClass) }}
+                                            </div>
+                                            <div class="space-y-2">
+                                                @foreach($entities as $entity)
+                                                    <div class="flex items-center justify-between p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity['name'] }}</span>
+                                                            <x-ui-badge variant="info" size="xs">{{ $entity['model_name'] }}</x-ui-badge>
+                                                        </div>
+                                                        <x-ui-confirm-button 
+                                                            variant="danger-outline" 
+                                                            size="sm"
+                                                            wire:click="unlinkModuleEntity({{ $entity['context_id'] }})"
+                                                            confirm-text="Verlinkung wirklich entfernen?"
+                                                        >
+                                                            @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                                        </x-ui-confirm-button>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
+
+                        <!-- Verfügbare Entities zum Verlinken -->
+                        @if($this->availableModuleEntities->count() > 0)
+                            <div>
+                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">Verfügbar zum Verlinken</h3>
+                                <div class="space-y-2">
+                                    @foreach($this->availableModuleEntities as $modelClass => $entities)
+                                        <div class="mb-4">
+                                            <div class="text-xs font-medium text-[var(--ui-muted)] mb-2">
+                                                {{ class_basename($modelClass) }}
+                                            </div>
+                                            <div class="space-y-2">
+                                                @foreach($entities as $entity)
+                                                    <div class="flex items-center justify-between p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                                        <div class="flex items-center gap-2">
+                                                            <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity['name'] }}</span>
+                                                            <x-ui-badge variant="secondary" size="xs">{{ $entity['model_name'] }}</x-ui-badge>
+                                                        </div>
+                                                        <x-ui-button 
+                                                            variant="primary-outline" 
+                                                            size="sm"
+                                                            wire:click="linkModuleEntity('{{ $modelClass }}', {{ $entity['id'] }})"
+                                                        >
+                                                            @svg('heroicon-o-link', 'w-4 h-4 mr-1')
+                                                            Verlinken
+                                                        </x-ui-button>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @elseif($this->linkedModuleEntities->count() === 0)
+                            <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
+                                    @svg('heroicon-o-cube', 'w-8 h-8 text-[var(--ui-muted)]')
+                                </div>
+                                <p class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Keine Module Entities verfügbar</p>
+                                <p class="text-xs text-[var(--ui-muted)]">Konfigurieren Sie Model Mappings für diesen Entity-Type in den Einstellungen</p>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            @endif
+
             <!-- Relations -->
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                 <div class="flex items-center justify-between mb-4">

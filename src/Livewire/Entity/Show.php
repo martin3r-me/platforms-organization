@@ -3,11 +3,14 @@
 namespace Platform\Organization\Livewire\Entity;
 
 use Livewire\Component;
+use Livewire\Attributes\Computed;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationVsmSystem;
 use Platform\Organization\Models\OrganizationCostCenter;
 use Platform\Organization\Models\OrganizationVsmFunction;
+use Platform\Organization\Models\OrganizationEntityTypeModelMapping;
+use Platform\Organization\Models\OrganizationContext;
 
 class Show extends Component
 {
@@ -27,7 +30,8 @@ class Show extends Component
             'relationsFrom.toEntity.type',
             'relationsFrom.relationType',
             'relationsTo.fromEntity.type',
-            'relationsTo.relationType'
+            'relationsTo.relationType',
+            'contexts.contextable'
         ]);
         $this->loadForm();
     }
@@ -127,6 +131,180 @@ class Show extends Component
             ->with('type')
             ->orderBy('name')
             ->get();
+    }
+
+    #[Computed]
+    public function allowedModelMappings()
+    {
+        return OrganizationEntityTypeModelMapping::where('entity_type_id', $this->entity->entity_type_id)
+            ->active()
+            ->where('is_bidirectional', true) // Nur bidirektionale Mappings
+            ->ordered()
+            ->get()
+            ->groupBy('module_key');
+    }
+
+    #[Computed]
+    public function availableModuleEntities()
+    {
+        $entities = [];
+        $team = auth()->user()->currentTeamRelation;
+        if (!$team) {
+            return [];
+        }
+
+        // Hole alle bereits verlinkten Module-Entities
+        $linkedContexts = OrganizationContext::where('organization_entity_id', $this->entity->id)
+            ->where('is_active', true)
+            ->get()
+            ->map(function($context) {
+                return $context->contextable_type . ':' . $context->contextable_id;
+            })
+            ->toArray();
+
+        foreach ($this->allowedModelMappings as $moduleKey => $mappings) {
+            foreach ($mappings as $mapping) {
+                $modelClass = $mapping->model_class;
+                
+                if (!class_exists($modelClass)) {
+                    continue;
+                }
+
+                try {
+                    // Lade alle Instanzen dieses Models
+                    $query = $modelClass::query();
+                    
+                    // Prüfe ob das Model team-basiert ist
+                    if (method_exists($modelClass, 'scopeForTeam')) {
+                        $query->forTeam($team->id);
+                    } elseif (method_exists($query->getModel(), 'getTable') && 
+                              \Illuminate\Support\Facades\Schema::hasColumn($query->getModel()->getTable(), 'team_id')) {
+                        $query->where('team_id', $team->id);
+                    }
+
+                    $instances = $query->get();
+
+                    foreach ($instances as $instance) {
+                        $contextKey = $modelClass . ':' . $instance->id;
+                        
+                        // Überspringe bereits verlinkte Entities
+                        if (in_array($contextKey, $linkedContexts)) {
+                            continue;
+                        }
+
+                        // Versuche einen Namen zu extrahieren
+                        $name = $instance->name ?? $instance->title ?? $instance->email ?? 'Unbenannt';
+                        if (method_exists($instance, 'getName')) {
+                            $name = $instance->getName();
+                        }
+
+                        $entities[] = [
+                            'model_class' => $modelClass,
+                            'model_name' => class_basename($modelClass),
+                            'module_key' => $moduleKey,
+                            'id' => $instance->id,
+                            'name' => $name,
+                            'instance' => $instance,
+                        ];
+                    }
+                } catch (\Throwable $e) {
+                    // Überspringe Models, die nicht geladen werden können
+                    continue;
+                }
+            }
+        }
+
+        // Sortiere nach Modul, dann nach Model, dann nach Name
+        usort($entities, function($a, $b) {
+            if ($a['module_key'] !== $b['module_key']) {
+                return strcmp($a['module_key'], $b['module_key']);
+            }
+            if ($a['model_name'] !== $b['model_name']) {
+                return strcmp($a['model_name'], $b['model_name']);
+            }
+            return strcmp($a['name'], $b['name']);
+        });
+
+        return collect($entities)->groupBy('model_class');
+    }
+
+    #[Computed]
+    public function linkedModuleEntities()
+    {
+        return OrganizationContext::where('organization_entity_id', $this->entity->id)
+            ->where('is_active', true)
+            ->with('contextable')
+            ->get()
+            ->map(function($context) {
+                $contextable = $context->contextable;
+                if (!$contextable) {
+                    return null;
+                }
+
+                $name = $contextable->name ?? $contextable->title ?? $contextable->email ?? 'Unbenannt';
+                if (method_exists($contextable, 'getName')) {
+                    $name = $contextable->getName();
+                }
+
+                return [
+                    'context_id' => $context->id,
+                    'model_class' => $context->contextable_type,
+                    'model_name' => class_basename($context->contextable_type),
+                    'id' => $contextable->id,
+                    'name' => $name,
+                ];
+            })
+            ->filter()
+            ->groupBy('model_class');
+    }
+
+    public function linkModuleEntity($modelClass, $moduleEntityId)
+    {
+        if (!$modelClass || !$moduleEntityId) {
+            return;
+        }
+
+        if (!class_exists($modelClass)) {
+            session()->flash('error', 'Model-Klasse nicht gefunden.');
+            return;
+        }
+
+        try {
+            $moduleEntity = $modelClass::findOrFail($moduleEntityId);
+            
+            // Prüfe ob das Model das HasOrganizationContexts Trait verwendet
+            if (!in_array(\Platform\Organization\Traits\HasOrganizationContexts::class, class_uses_recursive($moduleEntity))) {
+                session()->flash('error', 'Dieses Model unterstützt keine Organization Contexts.');
+                return;
+            }
+
+            // Verlinke die Module Entity mit dieser Organization Entity
+            $moduleEntity->attachOrganizationContext($this->entity);
+
+            $this->entity->refresh();
+            session()->flash('message', 'Module Entity erfolgreich verlinkt.');
+        } catch (\Throwable $e) {
+            session()->flash('error', 'Fehler beim Verlinken: ' . $e->getMessage());
+        }
+    }
+
+    public function unlinkModuleEntity($contextId)
+    {
+        try {
+            $context = OrganizationContext::findOrFail($contextId);
+            $contextable = $context->contextable;
+            
+            if ($contextable && in_array(\Platform\Organization\Traits\HasOrganizationContexts::class, class_uses_recursive($contextable))) {
+                $contextable->detachOrganizationContext();
+            } else {
+                $context->delete();
+            }
+
+            $this->entity->refresh();
+            session()->flash('message', 'Verlinkung erfolgreich entfernt.');
+        } catch (\Throwable $e) {
+            session()->flash('error', 'Fehler beim Entfernen: ' . $e->getMessage());
+        }
     }
 
     public function render()

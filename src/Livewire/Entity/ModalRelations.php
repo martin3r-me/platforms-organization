@@ -40,10 +40,10 @@ class ModalRelations extends Component
     }
 
     #[On('open-relations-modal')]
-    public function handleOpenModal(array $data)
+    public function handleOpenModal($entityId)
     {
-        if (isset($data['entityId'])) {
-            $this->openModal($data['entityId']);
+        if ($entityId) {
+            $this->openModal($entityId);
         }
     }
 

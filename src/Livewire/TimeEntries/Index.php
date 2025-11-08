@@ -122,18 +122,25 @@ class Index extends Component
     }
 
     #[Computed]
-    public function timeEntriesGroupedByRoot()
+    public function timeEntriesGroupedByTeamAndRoot()
     {
-        return $this->timeEntries
-            ->groupBy(function($entry) {
+        // Zuerst nach Team gruppieren
+        $groupedByTeam = $this->timeEntries->groupBy('team_id');
+        
+        return $groupedByTeam->map(function($teamEntries, $teamId) {
+            $team = $teamEntries->first()->team ?? null;
+            
+            // Innerhalb des Teams nach Root gruppieren
+            $groupedByRoot = $teamEntries->groupBy(function($entry) {
                 // Gruppiere nach root_context_type und root_context_id
                 if ($entry->root_context_type && $entry->root_context_id) {
                     return $entry->root_context_type . ':' . $entry->root_context_id;
                 }
                 // Fallback: Wenn kein Root vorhanden, nach primärem Kontext gruppieren
                 return ($entry->context_type ?? 'unknown') . ':' . ($entry->context_id ?? 0);
-            })
-            ->map(function($entries, $key) {
+            });
+            
+            $rootGroups = $groupedByRoot->map(function($entries, $key) {
                 $parts = explode(':', $key);
                 $rootType = $parts[0] ?? null;
                 $rootId = $parts[1] ?? null;
@@ -152,21 +159,25 @@ class Index extends Component
                     }
                 }
                 
-                // Eindeutige Teams aus den Einträgen sammeln
-                $teams = $entries->pluck('team')->filter()->unique('id')->values();
-                
                 return [
                     'root_type' => $rootType,
                     'root_id' => $rootId,
                     'root_name' => $rootName,
                     'root_model' => $rootModel,
                     'entries' => $entries,
-                    'teams' => $teams,
                     'total_minutes' => $entries->sum('minutes'),
                     'total_amount_cents' => $entries->sum('amount_cents'),
                 ];
-            })
-            ->sortBy('root_name');
+            })->sortBy('root_name')->values();
+            
+            return [
+                'team' => $team,
+                'team_name' => $team->name ?? 'Unbekanntes Team',
+                'root_groups' => $rootGroups,
+                'total_minutes' => $teamEntries->sum('minutes'),
+                'total_amount_cents' => $teamEntries->sum('amount_cents'),
+            ];
+        })->sortBy('team_name');
     }
 
     #[Computed]

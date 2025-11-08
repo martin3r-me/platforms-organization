@@ -134,39 +134,41 @@
                             $totalRelations = $relationsFromCount + $relationsToCount;
                         @endphp
                         @if($totalRelations > 0)
-                            <div class="space-y-1">
+                            <div class="space-y-0.5">
                                 @if($relationsToCount > 0)
-                                    <div class="flex items-start gap-1">
-                                        <span class="text-[0.6rem] text-[var(--ui-muted)] mt-0.5 flex-shrink-0">←</span>
+                                    <div class="flex items-start gap-0.5">
+                                        <span class="text-[0.55rem] text-[var(--ui-muted)] mt-0.5 flex-shrink-0">←</span>
                                         <div class="flex-1 min-w-0">
                                             @foreach($relationsTo as $rel)
-                                                <div class="text-[0.6rem] leading-tight truncate" title="{{ $rel->fromEntity->name }} ({{ $rel->relationType->name ?? 'Unbekannt' }})">
-                                                    <span class="text-[var(--ui-secondary)]">{{ Str::limit($rel->fromEntity->name, 18) }}</span>
+                                                <div class="text-[0.55rem] leading-tight truncate" title="{{ $rel->relationType->name ?? 'Unbekannt' }}: {{ $rel->fromEntity->name }}">
                                                     @if($rel->relationType)
-                                                        <span class="text-[var(--ui-muted)]">·{{ Str::limit($rel->relationType->name, 10) }}</span>
+                                                        <span class="text-[var(--ui-muted)]">{{ $rel->relationType->name }}</span>
+                                                        <span class="text-[var(--ui-muted)]"> · </span>
                                                     @endif
+                                                    <span class="text-[var(--ui-secondary)]">{{ $rel->fromEntity->name }}</span>
                                                 </div>
                                             @endforeach
                                             @if($relationsToCount > 2)
-                                                <div class="text-[0.55rem] text-[var(--ui-muted)] mt-0.5">+{{ $relationsToCount - 2 }}</div>
+                                                <div class="text-[0.5rem] text-[var(--ui-muted)] mt-0.5">+{{ $relationsToCount - 2 }}</div>
                                             @endif
                                         </div>
                                     </div>
                                 @endif
                                 @if($relationsFromCount > 0)
-                                    <div class="flex items-start gap-1">
-                                        <span class="text-[0.6rem] text-[var(--ui-muted)] mt-0.5 flex-shrink-0">→</span>
+                                    <div class="flex items-start gap-0.5">
+                                        <span class="text-[0.55rem] text-[var(--ui-muted)] mt-0.5 flex-shrink-0">→</span>
                                         <div class="flex-1 min-w-0">
                                             @foreach($relationsFrom as $rel)
-                                                <div class="text-[0.6rem] leading-tight truncate" title="{{ $rel->toEntity->name }} ({{ $rel->relationType->name ?? 'Unbekannt' }})">
-                                                    <span class="text-[var(--ui-secondary)]">{{ Str::limit($rel->toEntity->name, 18) }}</span>
+                                                <div class="text-[0.55rem] leading-tight truncate" title="{{ $rel->relationType->name ?? 'Unbekannt' }}: {{ $rel->toEntity->name }}">
                                                     @if($rel->relationType)
-                                                        <span class="text-[var(--ui-muted)]">·{{ Str::limit($rel->relationType->name, 10) }}</span>
+                                                        <span class="text-[var(--ui-muted)]">{{ $rel->relationType->name }}</span>
+                                                        <span class="text-[var(--ui-muted)]"> · </span>
                                                     @endif
+                                                    <span class="text-[var(--ui-secondary)]">{{ $rel->toEntity->name }}</span>
                                                 </div>
                                             @endforeach
                                             @if($relationsFromCount > 2)
-                                                <div class="text-[0.55rem] text-[var(--ui-muted)] mt-0.5">+{{ $relationsFromCount - 2 }}</div>
+                                                <div class="text-[0.5rem] text-[var(--ui-muted)] mt-0.5">+{{ $relationsFromCount - 2 }}</div>
                                             @endif
                                         </div>
                                     </div>

@@ -94,10 +94,10 @@
                                     <a href="{{ route('organization.entities.show', $entity) }}" class="link">{{ $entity->name }}</a>
                                 </div>
                                 @if($entity->code)
-                                    <div class="text-xs text-[var(--ui-muted)]">Code: {{ $entity->code }}</div>
+                                    <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ $entity->code }}</div>
                                 @endif
                                 @if($entity->description)
-                                    <div class="text-xs text-[var(--ui-muted)]">{{ Str::limit($entity->description, 50) }}</div>
+                                    <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ Str::limit($entity->description, 50) }}</div>
                                 @endif
                             </div>
                         </div>

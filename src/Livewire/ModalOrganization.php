@@ -55,14 +55,24 @@ class ModalOrganization extends Component
     public ?string $plannedNote = null;
 
     // Minute-Optionen in 0,25-Stunden-Schritten (15 Minuten) bis 18 Stunden
-    protected function getMinuteOptionsProperty(): array
+    // Statisch generiert, da Computed Properties in rules() nicht verfügbar sind
+    protected function getMinuteOptions(): array
     {
-        $options = [];
-        // Generiere alle 0,25-Stunden-Schritte bis 18 Stunden (1080 Minuten)
-        for ($minutes = 15; $minutes <= 1080; $minutes += 15) {
-            $options[] = $minutes;
+        static $options = null;
+        if ($options === null) {
+            $options = [];
+            // Generiere alle 0,25-Stunden-Schritte bis 18 Stunden (1080 Minuten)
+            for ($minutes = 15; $minutes <= 1080; $minutes += 15) {
+                $options[] = $minutes;
+            }
         }
         return $options;
+    }
+    
+    // Computed Property für die View
+    public function getMinuteOptionsProperty(): array
+    {
+        return $this->getMinuteOptions();
     }
 
     public function getContextLabelProperty(): ?string
@@ -523,17 +533,11 @@ class ModalOrganization extends Component
 
     public function rules(): array
     {
-        // Generiere Minute-Optionen direkt hier, da Computed Properties in rules() nicht verfügbar sind
-        $minuteOptions = [];
-        for ($minutes = 15; $minutes <= 1080; $minutes += 15) {
-            $minuteOptions[] = $minutes;
-        }
-        
         return [
             'contextType' => ['required', 'string'],
             'contextId' => ['required', 'integer'],
             'workDate' => ['required', 'date'],
-            'minutes' => ['required', 'integer', Rule::in($minuteOptions)],
+            'minutes' => ['required', 'integer', Rule::in($this->getMinuteOptions())],
             'rate' => ['nullable', 'string'],
             'note' => ['nullable', 'string', 'max:500'],
         ];

@@ -484,9 +484,22 @@ class Show extends Component
             // Füge den User als Owner zum Team hinzu
             $user->teams()->attach($team->id, ['role' => TeamRole::OWNER->value]);
 
+            // Verlinke das Team direkt mit der Entität
+            OrganizationContext::updateOrCreate(
+                [
+                    'contextable_type' => Team::class,
+                    'contextable_id' => $team->id,
+                    'organization_entity_id' => $this->entity->id,
+                ],
+                [
+                    'team_id' => $user->currentTeamRelation?->id,
+                    'is_active' => true,
+                ]
+            );
+
             $this->closeCreateTeamModal();
             $this->entity->refresh();
-            session()->flash('message', 'Team erfolgreich erstellt.');
+            session()->flash('message', 'Team erfolgreich erstellt und mit der Entität verlinkt.');
         } catch (\Exception $e) {
             session()->flash('error', 'Fehler beim Erstellen des Teams: ' . $e->getMessage());
         }

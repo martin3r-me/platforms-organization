@@ -25,10 +25,12 @@
                             Bearbeiten
                         </x-ui-button>
                     @endif
-                    <x-ui-button variant="primary-outline" wire:click="openCreateTeamModal" size="sm" class="w-full">
-                        @svg('heroicon-o-user-group', 'w-4 h-4 mr-2')
-                        Team erstellen
-                    </x-ui-button>
+                    <div>
+                        <x-ui-button variant="primary-outline" wire:click="openCreateTeamModal" size="sm" class="w-full">
+                            @svg('heroicon-o-user-group', 'w-4 h-4 mr-2')
+                            Team erstellen
+                        </x-ui-button>
+                    </div>
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Status</h3>

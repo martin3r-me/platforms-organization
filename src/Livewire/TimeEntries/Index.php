@@ -251,6 +251,24 @@ class Index extends Component
         return $this->timeEntries->where('is_billed', true)->sum('amount_cents');
     }
 
+    #[Computed]
+    public function totalUnbilledMinutes()
+    {
+        return $this->totalMinutes - $this->totalBilledMinutes;
+    }
+
+    #[Computed]
+    public function totalUnbilledAmountCents()
+    {
+        return $this->totalAmountCents - $this->totalBilledAmountCents;
+    }
+
+    // Helper: Minuten zu Tagen (1 Tag = 8 Stunden = 480 Minuten)
+    protected function minutesToDays($minutes)
+    {
+        return $minutes / 480;
+    }
+
     public function updatedSearch()
     {
         // Trigger recomputation

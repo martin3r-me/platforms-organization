@@ -263,7 +263,7 @@
                         <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-3">
                             Dauer (in 0,25h-Schritten)
                         </label>
-                        <div class="grid grid-cols-8 gap-2">
+                        <div class="grid grid-cols-[10] gap-2">
                             @foreach($this->minuteOptions as $quickMinutes)
                                 <button
                                     type="button"

@@ -248,13 +248,23 @@
             @if($allowTimeEntry)
             <div x-show="activeTab === 'entry'" x-cloak>
                 <div class="space-y-6">
+                    <!-- Form Fields -->
+                    <div class="grid gap-5">
+                        <x-ui-input-date
+                            name="workDate"
+                            label="Datum"
+                            wire:model.live="workDate"
+                            :errorKey="'workDate'"
+                        />
+                    </div>
+
                     <!-- Quick Time Buttons -->
                     <div>
                         <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-3">
-                            Schnellauswahl
+                            Dauer (in 0,25h-Schritten)
                         </label>
-                        <div class="grid grid-cols-5 gap-2">
-                            @foreach([15, 30, 45, 60, 90, 120, 150, 180, 210, 240] as $quickMinutes)
+                        <div class="grid grid-cols-4 gap-2">
+                            @foreach($this->minuteOptions as $quickMinutes)
                                 <button
                                     type="button"
                                     wire:click="$set('minutes', {{ $quickMinutes }})"
@@ -267,25 +277,6 @@
                                 </button>
                             @endforeach
                         </div>
-                    </div>
-
-                    <!-- Form Fields -->
-                    <div class="grid gap-5 sm:grid-cols-2">
-                        <x-ui-input-date
-                            name="workDate"
-                            label="Datum"
-                            wire:model.live="workDate"
-                            :errorKey="'workDate'"
-                        />
-
-                        <x-ui-input-select
-                            name="minutes"
-                            label="Dauer"
-                            :options="collect($this->minuteOptions)->mapWithKeys(fn($m) => [$m => number_format($m / 60, 2, ',', '.') . ' h'])->toArray()"
-                            :nullable="false"
-                            wire:model.live="minutes"
-                            :errorKey="'minutes'"
-                        />
                     </div>
 
                     <div class="grid gap-5 sm:grid-cols-2">

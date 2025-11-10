@@ -59,59 +59,78 @@
     </x-slot>
 
     <x-ui-page-container>
-        {{-- Dashboard Tiles --}}
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-            <div class="p-6 bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 shadow-sm">
-                <div class="flex items-center justify-between mb-2">
-                    <div class="w-12 h-12 bg-[var(--ui-primary-10)] rounded-lg flex items-center justify-center">
-                        @svg('heroicon-o-clock', 'w-6 h-6 text-[var(--ui-primary)]')
-                    </div>
-                </div>
-                <div class="mt-4">
-                    <div class="text-xs font-semibold text-[var(--ui-muted)] uppercase tracking-wide mb-1">Gesamt Stunden</div>
-                    <div class="text-3xl font-bold text-[var(--ui-secondary)] mb-1">{{ number_format($this->totalMinutes / 60, 2, ',', '.') }}h</div>
-                    <div class="text-sm text-[var(--ui-muted)]">{{ number_format($this->totalMinutes / 480, 2, ',', '.') }} Tage</div>
+        {{-- Zeitraum Anzeige --}}
+        <div class="mb-6 p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+            <div class="flex items-center justify-between">
+                <div class="flex items-center gap-2">
+                    @svg('heroicon-o-calendar', 'w-5 h-5 text-[var(--ui-muted)]')
+                    <span class="text-sm font-semibold text-[var(--ui-secondary)]">Zeitraum:</span>
+                    <span class="text-sm text-[var(--ui-secondary)]">
+                        {{ \Carbon\Carbon::parse($dateFrom)->format('d.m.Y') }} – {{ \Carbon\Carbon::parse($dateTo)->format('d.m.Y') }}
+                    </span>
                 </div>
             </div>
-            
-            <div class="p-6 bg-gradient-to-br from-[var(--ui-success-5)] to-[var(--ui-success-10)] rounded-xl border border-[var(--ui-success)]/30 shadow-sm">
-                <div class="flex items-center justify-between mb-2">
-                    <div class="w-12 h-12 bg-[var(--ui-success)]/20 rounded-lg flex items-center justify-center">
-                        @svg('heroicon-o-check-circle', 'w-6 h-6 text-[var(--ui-success)]')
+        </div>
+
+        {{-- Team Dashboard Tiles --}}
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+            @foreach($this->timeEntriesGroupedByTeamAndRoot as $teamGroup)
+                @php
+                    $teamBilledMinutes = collect($teamGroup['root_groups'])->flatMap(function($rootGroup) {
+                        return $rootGroup['entries']->where('is_billed', true);
+                    })->sum('minutes');
+                    $teamUnbilledMinutes = $teamGroup['total_minutes'] - $teamBilledMinutes;
+                    $teamBilledAmountCents = collect($teamGroup['root_groups'])->flatMap(function($rootGroup) {
+                        return $rootGroup['entries']->where('is_billed', true);
+                    })->sum('amount_cents');
+                @endphp
+                <div class="p-6 bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 bg-[var(--ui-primary-10)] rounded-lg flex items-center justify-center">
+                                @svg('heroicon-o-user-group', 'w-5 h-5 text-[var(--ui-primary)]')
+                            </div>
+                            <h3 class="text-lg font-bold text-[var(--ui-secondary)]">{{ $teamGroup['team_name'] }}</h3>
+                        </div>
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs font-semibold text-[var(--ui-muted)] uppercase tracking-wide">Gesamt</span>
+                            <div class="text-right">
+                                <div class="text-xl font-bold text-[var(--ui-secondary)]">{{ number_format($teamGroup['total_minutes'] / 60, 2, ',', '.') }}h</div>
+                                <div class="text-xs text-[var(--ui-muted)]">{{ number_format($teamGroup['total_minutes'] / 480, 2, ',', '.') }} Tage</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between pt-2 border-t border-[var(--ui-border)]/40">
+                            <span class="text-xs font-semibold text-[var(--ui-success)] uppercase tracking-wide">Abgerechnet</span>
+                            <div class="text-right">
+                                <div class="text-lg font-bold text-[var(--ui-success)]">{{ number_format($teamBilledMinutes / 60, 2, ',', '.') }}h</div>
+                                <div class="text-xs text-[var(--ui-success)]/70">{{ number_format($teamBilledMinutes / 480, 2, ',', '.') }} Tage</div>
+                            </div>
+                        </div>
+                        
+                        <div class="flex items-center justify-between pt-2 border-t border-[var(--ui-border)]/40">
+                            <span class="text-xs font-semibold text-[var(--ui-warning)] uppercase tracking-wide">Offen</span>
+                            <div class="text-right">
+                                <div class="text-lg font-bold text-[var(--ui-warning)]">{{ number_format($teamUnbilledMinutes / 60, 2, ',', '.') }}h</div>
+                                <div class="text-xs text-[var(--ui-warning)]/70">{{ number_format($teamUnbilledMinutes / 480, 2, ',', '.') }} Tage</div>
+                            </div>
+                        </div>
+                        
+                        @if($teamGroup['total_amount_cents'] > 0)
+                            <div class="flex items-center justify-between pt-2 border-t border-[var(--ui-border)]/40">
+                                <span class="text-xs font-semibold text-[var(--ui-primary)] uppercase tracking-wide">Betrag</span>
+                                <div class="text-right">
+                                    <div class="text-lg font-bold text-[var(--ui-primary)]">{{ number_format($teamGroup['total_amount_cents'] / 100, 2, ',', '.') }} €</div>
+                                    <div class="text-xs text-[var(--ui-primary)]/70">{{ number_format($teamBilledAmountCents / 100, 2, ',', '.') }} € abgerechnet</div>
+                                </div>
+                            </div>
+                        @endif
                     </div>
                 </div>
-                <div class="mt-4">
-                    <div class="text-xs font-semibold text-[var(--ui-success)] uppercase tracking-wide mb-1">Abgerechnet</div>
-                    <div class="text-3xl font-bold text-[var(--ui-success)] mb-1">{{ number_format($this->totalBilledMinutes / 60, 2, ',', '.') }}h</div>
-                    <div class="text-sm text-[var(--ui-success)]/70">{{ number_format($this->totalBilledMinutes / 480, 2, ',', '.') }} Tage</div>
-                </div>
-            </div>
-            
-            <div class="p-6 bg-gradient-to-br from-[var(--ui-warning-5)] to-[var(--ui-warning-10)] rounded-xl border border-[var(--ui-warning)]/30 shadow-sm">
-                <div class="flex items-center justify-between mb-2">
-                    <div class="w-12 h-12 bg-[var(--ui-warning)]/20 rounded-lg flex items-center justify-center">
-                        @svg('heroicon-o-exclamation-circle', 'w-6 h-6 text-[var(--ui-warning)]')
-                    </div>
-                </div>
-                <div class="mt-4">
-                    <div class="text-xs font-semibold text-[var(--ui-warning)] uppercase tracking-wide mb-1">Offen</div>
-                    <div class="text-3xl font-bold text-[var(--ui-warning)] mb-1">{{ number_format($this->totalUnbilledMinutes / 60, 2, ',', '.') }}h</div>
-                    <div class="text-sm text-[var(--ui-warning)]/70">{{ number_format($this->totalUnbilledMinutes / 480, 2, ',', '.') }} Tage</div>
-                </div>
-            </div>
-            
-            <div class="p-6 bg-gradient-to-br from-[var(--ui-primary-5)] to-[var(--ui-primary-10)] rounded-xl border border-[var(--ui-primary)]/30 shadow-sm">
-                <div class="flex items-center justify-between mb-2">
-                    <div class="w-12 h-12 bg-[var(--ui-primary)]/20 rounded-lg flex items-center justify-center">
-                        @svg('heroicon-o-currency-euro', 'w-6 h-6 text-[var(--ui-primary)]')
-                    </div>
-                </div>
-                <div class="mt-4">
-                    <div class="text-xs font-semibold text-[var(--ui-primary)] uppercase tracking-wide mb-1">Gesamt Betrag</div>
-                    <div class="text-3xl font-bold text-[var(--ui-primary)] mb-1">{{ number_format($this->totalAmountCents / 100, 2, ',', '.') }} €</div>
-                    <div class="text-sm text-[var(--ui-primary)]/70">{{ number_format($this->totalBilledAmountCents / 100, 2, ',', '.') }} € abgerechnet</div>
-                </div>
-            </div>
+            @endforeach
         </div>
 
         @forelse($this->timeEntriesGroupedByTeamAndRoot as $teamGroup)

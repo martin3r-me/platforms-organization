@@ -7,7 +7,7 @@
         <x-ui-page-sidebar title="Informationen" width="w-80" :defaultOpen="true" side="left">
             <div class="p-6 space-y-6">
                 <!-- Action Buttons -->
-                <div class="pb-4 border-b border-[var(--ui-border)]/40">
+                <div class="pb-4 border-b border-[var(--ui-border)]/40 space-y-2">
                     @if($this->isDirty())
                         <div class="flex space-x-2">
                             <x-ui-button variant="secondary-outline" wire:click="loadForm" size="sm" class="flex-1">
@@ -25,6 +25,10 @@
                             Bearbeiten
                         </x-ui-button>
                     @endif
+                    <x-ui-button variant="primary-outline" wire:click="openCreateTeamModal" size="sm" class="w-full">
+                        @svg('heroicon-o-user-group', 'w-4 h-4 mr-2')
+                        Team erstellen
+                    </x-ui-button>
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Status</h3>
@@ -405,5 +409,54 @@
 
     <!-- Relations Modal -->
     <livewire:organization.entity.modal-relations/>
+
+    <!-- Create Team Modal -->
+    <x-ui-modal
+        wire:model="showCreateTeamModal"
+        size="md"
+    >
+        <x-slot name="header">
+            Team aus Entität erstellen
+        </x-slot>
+
+        <div class="space-y-4">
+            <div class="space-y-4">
+                <x-ui-input-text
+                    name="team_name"
+                    label="Team-Name"
+                    wire:model.live="newTeam.name"
+                    required
+                    placeholder="Name des Teams"
+                />
+                
+                <x-ui-input-select
+                    name="parent_team_id"
+                    label="Eltern-Team (optional)"
+                    :options="$this->availableTeams"
+                    optionValue="id"
+                    optionLabel="name"
+                    :nullable="true"
+                    nullLabel="Kein Eltern-Team"
+                    wire:model.live="newTeam.parent_team_id"
+                />
+            </div>
+        </div>
+
+        <x-slot name="footer">
+            <div class="d-flex justify-end gap-2">
+                <x-ui-button 
+                    type="button" 
+                    variant="secondary-outline" 
+                    wire:click="closeCreateTeamModal"
+                >
+                    Abbrechen
+                </x-ui-button>
+                <x-ui-button type="button" variant="primary" wire:click="createTeam">
+                    @svg('heroicon-o-user-group', 'w-4 h-4 mr-2')
+                    Team erstellen
+                </x-ui-button>
+            </div>
+        </x-slot>
+    </x-ui-modal>
 </x-ui-page>
 

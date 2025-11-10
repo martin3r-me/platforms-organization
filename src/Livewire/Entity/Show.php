@@ -11,11 +11,18 @@ use Platform\Organization\Models\OrganizationCostCenter;
 use Platform\Organization\Models\OrganizationVsmFunction;
 use Platform\Organization\Models\OrganizationEntityTypeModelMapping;
 use Platform\Organization\Models\OrganizationContext;
+use Platform\Core\Models\Team;
+use Platform\Core\Enums\TeamRole;
 
 class Show extends Component
 {
     public OrganizationEntity $entity;
     public array $form = [];
+    public bool $showCreateTeamModal = false;
+    public array $newTeam = [
+        'name' => '',
+        'parent_team_id' => null,
+    ];
 
     public function mount(OrganizationEntity $entity)
     {
@@ -428,6 +435,78 @@ class Show extends Component
         }
 
         return null;
+    }
+
+    public function openCreateTeamModal()
+    {
+        $this->showCreateTeamModal = true;
+        $this->newTeam = [
+            'name' => $this->entity->code ?? $this->entity->name,
+            'parent_team_id' => null,
+        ];
+    }
+
+    public function closeCreateTeamModal()
+    {
+        $this->showCreateTeamModal = false;
+        $this->newTeam = [
+            'name' => '',
+            'parent_team_id' => null,
+        ];
+    }
+
+    public function createTeam()
+    {
+        $this->validate([
+            'newTeam.name' => 'required|string|max:255',
+            'newTeam.parent_team_id' => 'nullable|exists:teams,id',
+        ]);
+
+        try {
+            $user = auth()->user();
+            
+            // Prüfe ob parent_team_id gesetzt ist und ob der User Zugriff darauf hat
+            if ($this->newTeam['parent_team_id']) {
+                $parentTeam = Team::find($this->newTeam['parent_team_id']);
+                if (!$parentTeam || !$user->teams()->where('teams.id', $parentTeam->id)->exists()) {
+                    session()->flash('error', 'Sie haben keinen Zugriff auf das ausgewählte Parent-Team.');
+                    return;
+                }
+            }
+
+            $team = Team::create([
+                'name' => $this->newTeam['name'],
+                'user_id' => $user->id,
+                'parent_team_id' => $this->newTeam['parent_team_id'] ?: null,
+                'personal_team' => false,
+            ]);
+
+            // Füge den User als Owner zum Team hinzu
+            $user->teams()->attach($team->id, ['role' => TeamRole::OWNER->value]);
+
+            $this->closeCreateTeamModal();
+            $this->entity->refresh();
+            session()->flash('message', 'Team erfolgreich erstellt.');
+        } catch (\Exception $e) {
+            session()->flash('error', 'Fehler beim Erstellen des Teams: ' . $e->getMessage());
+        }
+    }
+
+    #[Computed]
+    public function availableTeams()
+    {
+        $user = auth()->user();
+        if (!$user) {
+            return collect();
+        }
+
+        // Nur Root-Teams können als Parent-Teams verwendet werden
+        return Team::whereHas('users', function ($query) use ($user) {
+            $query->where('user_id', $user->id);
+        })
+        ->whereNull('parent_team_id')
+        ->orderBy('name')
+        ->get();
     }
 
     public function render()

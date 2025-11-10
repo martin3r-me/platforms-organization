@@ -73,59 +73,29 @@
         </div>
 
         {{-- Team Dashboard Tiles --}}
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
             @foreach($this->timeEntriesGroupedByTeamAndRoot as $teamGroup)
-                @php
-                    $teamBilledMinutes = collect($teamGroup['root_groups'])->flatMap(function($rootGroup) {
-                        return $rootGroup['entries']->where('is_billed', true);
-                    })->sum('minutes');
-                    $teamUnbilledMinutes = $teamGroup['total_minutes'] - $teamBilledMinutes;
-                    $teamBilledAmountCents = collect($teamGroup['root_groups'])->flatMap(function($rootGroup) {
-                        return $rootGroup['entries']->where('is_billed', true);
-                    })->sum('amount_cents');
-                @endphp
-                <div class="p-6 bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 shadow-sm hover:shadow-md transition-shadow">
-                    <div class="flex items-center justify-between mb-4">
-                        <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 bg-[var(--ui-primary-10)] rounded-lg flex items-center justify-center">
-                                @svg('heroicon-o-user-group', 'w-5 h-5 text-[var(--ui-primary)]')
-                            </div>
-                            <h3 class="text-lg font-bold text-[var(--ui-secondary)]">{{ $teamGroup['team_name'] }}</h3>
+                <div class="p-4 bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60 shadow-sm hover:shadow-md transition-shadow">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="w-8 h-8 bg-[var(--ui-primary-10)] rounded-lg flex items-center justify-center flex-shrink-0">
+                            @svg('heroicon-o-user-group', 'w-4 h-4 text-[var(--ui-primary)]')
                         </div>
+                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] truncate">{{ $teamGroup['team_name'] }}</h3>
                     </div>
                     
-                    <div class="space-y-3">
+                    <div class="space-y-2">
                         <div class="flex items-center justify-between">
-                            <span class="text-xs font-semibold text-[var(--ui-muted)] uppercase tracking-wide">Gesamt</span>
-                            <div class="text-right">
-                                <div class="text-xl font-bold text-[var(--ui-secondary)]">{{ number_format($teamGroup['total_minutes'] / 60, 2, ',', '.') }}h</div>
-                                <div class="text-xs text-[var(--ui-muted)]">{{ number_format($teamGroup['total_minutes'] / 480, 2, ',', '.') }} Tage</div>
-                            </div>
+                            <span class="text-xs text-[var(--ui-muted)]">Stunden</span>
+                            <div class="text-lg font-bold text-[var(--ui-secondary)]">{{ number_format($teamGroup['total_minutes'] / 60, 2, ',', '.') }}h</div>
                         </div>
-                        
-                        <div class="flex items-center justify-between pt-2 border-t border-[var(--ui-border)]/40">
-                            <span class="text-xs font-semibold text-[var(--ui-success)] uppercase tracking-wide">Abgerechnet</span>
-                            <div class="text-right">
-                                <div class="text-lg font-bold text-[var(--ui-success)]">{{ number_format($teamBilledMinutes / 60, 2, ',', '.') }}h</div>
-                                <div class="text-xs text-[var(--ui-success)]/70">{{ number_format($teamBilledMinutes / 480, 2, ',', '.') }} Tage</div>
-                            </div>
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-[var(--ui-muted)]">Tage</span>
+                            <div class="text-sm font-semibold text-[var(--ui-secondary)]">{{ number_format($teamGroup['total_minutes'] / 480, 2, ',', '.') }}</div>
                         </div>
-                        
-                        <div class="flex items-center justify-between pt-2 border-t border-[var(--ui-border)]/40">
-                            <span class="text-xs font-semibold text-[var(--ui-warning)] uppercase tracking-wide">Offen</span>
-                            <div class="text-right">
-                                <div class="text-lg font-bold text-[var(--ui-warning)]">{{ number_format($teamUnbilledMinutes / 60, 2, ',', '.') }}h</div>
-                                <div class="text-xs text-[var(--ui-warning)]/70">{{ number_format($teamUnbilledMinutes / 480, 2, ',', '.') }} Tage</div>
-                            </div>
-                        </div>
-                        
                         @if($teamGroup['total_amount_cents'] > 0)
                             <div class="flex items-center justify-between pt-2 border-t border-[var(--ui-border)]/40">
-                                <span class="text-xs font-semibold text-[var(--ui-primary)] uppercase tracking-wide">Betrag</span>
-                                <div class="text-right">
-                                    <div class="text-lg font-bold text-[var(--ui-primary)]">{{ number_format($teamGroup['total_amount_cents'] / 100, 2, ',', '.') }} €</div>
-                                    <div class="text-xs text-[var(--ui-primary)]/70">{{ number_format($teamBilledAmountCents / 100, 2, ',', '.') }} € abgerechnet</div>
-                                </div>
+                                <span class="text-xs text-[var(--ui-muted)]">Betrag</span>
+                                <div class="text-sm font-semibold text-[var(--ui-primary)]">{{ number_format($teamGroup['total_amount_cents'] / 100, 2, ',', '.') }} €</div>
                             </div>
                         @endif
                     </div>

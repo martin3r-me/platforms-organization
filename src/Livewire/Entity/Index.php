@@ -96,7 +96,21 @@ class Index extends Component
             $query->active();
         }
 
-        return $query->orderBy('name')->get();
+        $entities = $query->orderBy('name')->get();
+        
+        // Gruppiere: Zuerst Root-Entities (ohne parent), dann nach Entity-Typ
+        $rootEntities = $entities->whereNull('parent_entity_id')->sortBy('name');
+        $childEntities = $entities->whereNotNull('parent_entity_id')->sortBy('name');
+        
+        // Gruppiere Child-Entities nach Entity-Typ und sortiere nach Typ-Name
+        $groupedByType = $childEntities->groupBy('entity_type_id')->sortBy(function ($group) {
+            return $group->first()->type->name ?? '';
+        });
+        
+        return [
+            'root' => $rootEntities,
+            'byType' => $groupedByType,
+        ];
     }
 
     #[Computed]

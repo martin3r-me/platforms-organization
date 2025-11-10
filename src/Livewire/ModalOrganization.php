@@ -55,15 +55,14 @@ class ModalOrganization extends Component
     public ?string $plannedNote = null;
 
     // Minute-Optionen in 0,25-Stunden-Schritten (15 Minuten) bis 18 Stunden
-    protected array $minuteOptions = [];
-    
-    public function __construct()
+    protected function getMinuteOptionsProperty(): array
     {
-        parent::__construct();
+        $options = [];
         // Generiere alle 0,25-Stunden-Schritte bis 18 Stunden (1080 Minuten)
         for ($minutes = 15; $minutes <= 1080; $minutes += 15) {
-            $this->minuteOptions[] = $minutes;
+            $options[] = $minutes;
         }
+        return $options;
     }
 
     public function getContextLabelProperty(): ?string
@@ -520,11 +519,6 @@ class ModalOrganization extends Component
             'type' => 'success',
             'message' => 'Soll-Zeit aktualisiert.',
         ]);
-    }
-
-    public function getMinuteOptionsProperty(): array
-    {
-        return $this->minuteOptions;
     }
 
     public function rules(): array

@@ -523,7 +523,12 @@ class ModalOrganization extends Component
 
     public function rules(): array
     {
-        $minuteOptions = $this->minuteOptions; // Zugriff auf Computed Property
+        // Generiere Minute-Optionen direkt hier, da Computed Properties in rules() nicht verfügbar sind
+        $minuteOptions = [];
+        for ($minutes = 15; $minutes <= 1080; $minutes += 15) {
+            $minuteOptions[] = $minutes;
+        }
+        
         return [
             'contextType' => ['required', 'string'],
             'contextId' => ['required', 'integer'],

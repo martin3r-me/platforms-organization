@@ -523,11 +523,12 @@ class ModalOrganization extends Component
 
     public function rules(): array
     {
+        $minuteOptions = $this->minuteOptions; // Zugriff auf Computed Property
         return [
             'contextType' => ['required', 'string'],
             'contextId' => ['required', 'integer'],
             'workDate' => ['required', 'date'],
-            'minutes' => ['required', 'integer', Rule::in($this->minuteOptions)],
+            'minutes' => ['required', 'integer', Rule::in($minuteOptions)],
             'rate' => ['nullable', 'string'],
             'note' => ['nullable', 'string', 'max:500'],
         ];

@@ -112,5 +112,60 @@ class OrganizationTimeEntry extends Model
     {
         return round(($this->minutes ?? 0) / 60, 2);
     }
+
+    /**
+     * Gibt das Quellmodul basierend auf dem context_type zurück.
+     * Extrahiert den Modul-Namen aus dem Namespace (z.B. "Platform\Planner\Models\PlannerTask" → "planner").
+     * 
+     * @return string|null
+     */
+    public function getSourceModuleAttribute(): ?string
+    {
+        if (!$this->context_type) {
+            return null;
+        }
+
+        // Extrahiere Modul-Name aus Namespace
+        // Format: Platform\{Module}\Models\{Model}
+        if (preg_match('/Platform\\\\([^\\\\]+)\\\\/', $this->context_type, $matches)) {
+            $moduleName = strtolower($matches[1]);
+            
+            // Bekannte Module-Mappings
+            $moduleMappings = [
+                'planner' => 'planner',
+                'crm' => 'crm',
+                'organization' => 'organization',
+                'cms' => 'cms',
+                'core' => 'core',
+            ];
+            
+            return $moduleMappings[$moduleName] ?? $moduleName;
+        }
+
+        return null;
+    }
+
+    /**
+     * Gibt den anzeigbaren Modul-Titel zurück.
+     * 
+     * @return string|null
+     */
+    public function getSourceModuleTitleAttribute(): ?string
+    {
+        $moduleKey = $this->source_module;
+        
+        if (!$moduleKey) {
+            return null;
+        }
+
+        // Versuche Modul-Titel aus der Registry zu holen
+        $module = \Platform\Core\PlatformCore::getModule($moduleKey);
+        if ($module && isset($module['title'])) {
+            return $module['title'];
+        }
+
+        // Fallback: Erster Buchstabe groß
+        return ucfirst($moduleKey);
+    }
 }
 

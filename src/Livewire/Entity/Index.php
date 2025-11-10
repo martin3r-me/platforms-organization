@@ -18,6 +18,7 @@ class Index extends Component
     public $modalShow = false;
     public $newEntity = [
         'name' => '',
+        'code' => '',
         'description' => '',
         'entity_type_id' => '',
         'vsm_system_id' => '',
@@ -167,6 +168,7 @@ class Index extends Component
     {
         $this->validate([
             'newEntity.name' => 'required|string|max:255',
+            'newEntity.code' => 'nullable|string|max:255',
             'newEntity.description' => 'nullable|string',
             'newEntity.entity_type_id' => 'required|exists:organization_entity_types,id',
             'newEntity.vsm_system_id' => 'nullable|exists:organization_vsm_systems,id',
@@ -176,6 +178,7 @@ class Index extends Component
 
         $entity = OrganizationEntity::create([
             'name' => $this->newEntity['name'],
+            'code' => $this->newEntity['code'] ?: null,
             'description' => $this->newEntity['description'],
             'entity_type_id' => $this->newEntity['entity_type_id'],
             'vsm_system_id' => $this->newEntity['vsm_system_id'] ?: null,

@@ -95,10 +95,17 @@
                         <div class="mb-4 p-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60">
                             <div class="flex items-center justify-between">
                                 <div class="flex-1">
-                                    <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">
-                                        {{ $rootGroup['root_name'] }}
-                                    </h3>
-                                    <div class="text-xs text-[var(--ui-muted)] mt-1">
+                                    <div class="flex items-center gap-2 mb-1">
+                                        <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">
+                                            {{ $rootGroup['root_name'] }}
+                                        </h3>
+                                        @if($rootGroup['source_module_title'])
+                                            <x-ui-badge variant="secondary" size="xs">
+                                                {{ $rootGroup['source_module_title'] }}
+                                            </x-ui-badge>
+                                        @endif
+                                    </div>
+                                    <div class="text-xs text-[var(--ui-muted)]">
                                         {{ class_basename($rootGroup['root_type']) }}
                                     </div>
                                 </div>
@@ -166,8 +173,10 @@
                                                 {{ $entry->team->name ?? 'Unbekannt' }}
                                             </div>
                                         </x-ui-table-cell>
-                                        <x-ui-table-cell compact="true">
-                                            @if($entry->context)
+                                <x-ui-table-cell compact="true">
+                                    @if($entry->context)
+                                        <div class="flex items-center gap-2">
+                                            <div class="flex-1">
                                                 <div class="text-sm text-[var(--ui-secondary)]">
                                                     {{ class_basename($entry->context_type) }}
                                                 </div>
@@ -178,10 +187,17 @@
                                                         {{ $entry->context->name ?? $entry->context->title ?? 'Unbekannt' }}
                                                     @endif
                                                 </div>
-                                            @else
-                                                <span class="text-xs text-[var(--ui-muted)]">–</span>
+                                            </div>
+                                            @if($entry->source_module_title)
+                                                <x-ui-badge variant="secondary" size="xs" class="shrink-0">
+                                                    {{ $entry->source_module_title }}
+                                                </x-ui-badge>
                                             @endif
-                                        </x-ui-table-cell>
+                                        </div>
+                                    @else
+                                        <span class="text-xs text-[var(--ui-muted)]">–</span>
+                                    @endif
+                                </x-ui-table-cell>
                                         <x-ui-table-cell compact="true">
                                             <div class="text-sm font-medium text-[var(--ui-secondary)]">
                                                 {{ number_format($entry->minutes / 60, 2, ',', '.') }}h

@@ -159,12 +159,29 @@ class Index extends Component
                     }
                 }
                 
+                // Prüfe ob alle Einträge aus demselben Modul kommen
+                $sourceModules = $entries->map(function($entry) {
+                    return $entry->source_module;
+                })->filter()->unique()->values();
+                
+                $sourceModuleTitle = null;
+                if ($sourceModules->count() === 1) {
+                    $moduleKey = $sourceModules->first();
+                    $module = \Platform\Core\PlatformCore::getModule($moduleKey);
+                    if ($module && isset($module['title'])) {
+                        $sourceModuleTitle = $module['title'];
+                    } else {
+                        $sourceModuleTitle = ucfirst($moduleKey);
+                    }
+                }
+                
                 return [
                     'root_type' => $rootType,
                     'root_id' => $rootId,
                     'root_name' => $rootName,
                     'root_model' => $rootModel,
                     'entries' => $entries,
+                    'source_module_title' => $sourceModuleTitle,
                     'total_minutes' => $entries->sum('minutes'),
                     'total_amount_cents' => $entries->sum('amount_cents'),
                 ];

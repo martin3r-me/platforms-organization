@@ -16,6 +16,7 @@ class OrganizationEntity extends Model
     protected $fillable = [
         'uuid',
         'name',
+        'code',
         'team_id',
         'user_id',
         'description',

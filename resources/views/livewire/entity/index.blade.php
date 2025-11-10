@@ -93,6 +93,9 @@
                                 <div class="font-medium">
                                     <a href="{{ route('organization.entities.show', $entity) }}" class="link">{{ $entity->name }}</a>
                                 </div>
+                                @if($entity->code)
+                                    <div class="text-xs text-[var(--ui-muted)]">Code: {{ $entity->code }}</div>
+                                @endif
                                 @if($entity->description)
                                     <div class="text-xs text-[var(--ui-muted)]">{{ Str::limit($entity->description, 50) }}</div>
                                 @endif
@@ -212,6 +215,13 @@
                             wire:model.live="newEntity.name"
                             required
                             placeholder="Name der Organisationseinheit"
+                        />
+                        
+                        <x-ui-input-text
+                            name="code"
+                            label="Code (optional)"
+                            wire:model.live="newEntity.code"
+                            placeholder="Code oder Nummer"
                         />
                         
                         <x-ui-input-textarea

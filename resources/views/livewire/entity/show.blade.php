@@ -39,6 +39,12 @@
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Details</h3>
                     <div class="space-y-3">
+                        @if($entity->code)
+                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                                <span class="text-xs text-[var(--ui-muted)]">Code</span>
+                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity->code }}</div>
+                            </div>
+                        @endif
                         <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                             <span class="text-xs text-[var(--ui-muted)]">Typ</span>
                             <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity->type->name }}</div>
@@ -101,6 +107,7 @@
                 <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Grunddaten</h2>
                 <div class="space-y-4">
                     <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required />
+                    <x-ui-input-text name="code" label="Code" wire:model.live="form.code" placeholder="Optional: Code oder Nummer" />
                     <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" />
                     <x-ui-input-select
                         name="entity_type_id"

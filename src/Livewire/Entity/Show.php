@@ -40,6 +40,7 @@ class Show extends Component
     {
         $this->form = [
             'name' => $this->entity->name,
+            'code' => $this->entity->code,
             'description' => $this->entity->description,
             'entity_type_id' => $this->entity->entity_type_id,
             'vsm_system_id' => $this->entity->vsm_system_id,
@@ -53,6 +54,7 @@ class Show extends Component
     {
         $this->validate([
             'form.name' => 'required|string|max:255',
+            'form.code' => 'nullable|string|max:255',
             'form.description' => 'nullable|string',
             'form.entity_type_id' => 'required|exists:organization_entity_types,id',
             'form.vsm_system_id' => 'nullable|exists:organization_vsm_systems,id',
@@ -75,6 +77,7 @@ class Show extends Component
     public function isDirty()
     {
         return $this->form['name'] !== $this->entity->name ||
+               $this->form['code'] !== $this->entity->code ||
                $this->form['description'] !== $this->entity->description ||
                $this->form['entity_type_id'] != $this->entity->entity_type_id ||
                $this->form['vsm_system_id'] != $this->entity->vsm_system_id ||

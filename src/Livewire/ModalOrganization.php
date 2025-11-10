@@ -54,7 +54,8 @@ class ModalOrganization extends Component
     public ?int $plannedMinutes = null;
     public ?string $plannedNote = null;
 
-    protected array $minuteOptions = [15, 30, 45, 60, 90, 120, 180, 240, 300, 360, 420, 480];
+    // Minute-Optionen in 0,25-Stunden-Schritten (15 Minuten) bis 4 Stunden
+    protected array $minuteOptions = [15, 30, 45, 60, 75, 90, 105, 120, 135, 150, 165, 180, 195, 210, 225, 240];
 
     public function getContextLabelProperty(): ?string
     {

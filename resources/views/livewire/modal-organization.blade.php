@@ -253,17 +253,17 @@
                         <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-3">
                             Schnellauswahl
                         </label>
-                        <div class="grid grid-cols-4 gap-3">
-                            @foreach([15, 30, 60, 120] as $quickMinutes)
+                        <div class="grid grid-cols-5 gap-2">
+                            @foreach([15, 30, 45, 60, 90, 120, 150, 180, 210, 240] as $quickMinutes)
                                 <button
                                     type="button"
                                     wire:click="$set('minutes', {{ $quickMinutes }})"
                                     :class="$wire.minutes === {{ $quickMinutes }}
                                         ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md scale-105' 
                                         : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]'"
-                                    class="px-4 py-3.5 rounded-xl border-2 font-bold text-sm transition-all duration-200 hover:scale-105"
+                                    class="px-3 py-2.5 rounded-lg border-2 font-bold text-xs transition-all duration-200 hover:scale-105"
                                 >
-                                    {{ number_format($quickMinutes / 60, 1, ',', '.') }}h
+                                    {{ number_format($quickMinutes / 60, 2, ',', '.') }}h
                                 </button>
                             @endforeach
                         </div>

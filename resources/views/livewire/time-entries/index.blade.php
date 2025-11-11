@@ -160,14 +160,11 @@
                                                 <div class="flex items-center justify-between px-2">
                                                     <div class="flex-1">
                                                         <div class="flex items-center gap-2 mb-1">
-                                                            <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">
+                                                            <h3 class="text-xl font-semibold text-[var(--ui-secondary)]">
                                                                 {{ $rootGroup['source_module_title'] ?? class_basename($rootGroup['root_type']) }}
                                                             </h3>
                                                             <x-ui-badge variant="secondary" size="xs">
                                                                 {{ $rootGroup['root_name'] }}
-                                                            </x-ui-badge>
-                                                            <x-ui-badge variant="secondary" size="xs">
-                                                                {{ $teamGroup['team_name'] }}
                                                             </x-ui-badge>
                                                         </div>
                                                     </div>

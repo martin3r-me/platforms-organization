@@ -54,18 +54,21 @@ class ModalOrganization extends Component
     public ?int $plannedMinutes = null;
     public ?string $plannedNote = null;
 
-    // Minute-Optionen: 5, 10, dann alle 15 Minuten bis 18 Stunden
+    // Minute-Optionen: 5, 10, 15, 30, 45 Minuten, dann 1h bis 8h in 0.5h-Schritten
     // Statisch generiert, da Computed Properties in rules() nicht verfügbar sind
     protected function getMinuteOptions(): array
     {
         static $options = null;
         if ($options === null) {
             $options = [];
-            // 5 und 10 Minuten zuerst
+            // Kurze Zeiten: 5, 10, 15, 30, 45 Minuten
             $options[] = 5;
             $options[] = 10;
-            // Dann alle 15-Minuten-Schritte bis 18 Stunden (1080 Minuten)
-            for ($minutes = 15; $minutes <= 1080; $minutes += 15) {
+            $options[] = 15;
+            $options[] = 30;
+            $options[] = 45;
+            // Dann 1h bis 8h in 0.5h-Schritten (30 Minuten)
+            for ($minutes = 60; $minutes <= 480; $minutes += 30) {
                 $options[] = $minutes;
             }
         }

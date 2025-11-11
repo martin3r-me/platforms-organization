@@ -263,7 +263,7 @@
                         <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-3">
                             Dauer
                         </label>
-                        <div class="isolate grid gap-1.5 rounded-lg" style="grid-template-columns: repeat(auto-fill, minmax(3.5rem, 1fr));">
+                        <div class="isolate grid gap-2 rounded-lg" style="grid-template-columns: repeat(auto-fill, minmax(4.5rem, 1fr));">
                             @foreach($this->minuteOptions as $quickMinutes)
                                 @php
                                     $isSelected = $minutes === $quickMinutes;
@@ -272,14 +272,18 @@
                                         $display = $quickMinutes . 'm';
                                     } else {
                                         $hours = $quickMinutes / 60;
-                                        // Wenn ganze Stunden, dann "1h", sonst "1.5h"
-                                        $display = $hours == floor($hours) ? (int)$hours . 'h' : number_format($hours, 1, ',', '.') . 'h';
+                                        // Nur ganze Stunden oder .5 Stunden (keine .3 oder .8)
+                                        if ($hours == floor($hours)) {
+                                            $display = (int)$hours . 'h';
+                                        } else {
+                                            $display = number_format($hours, 1, ',', '.') . 'h';
+                                        }
                                     }
                                 @endphp
                                 <button
                                     type="button"
                                     wire:click="$set('minutes', {{ $quickMinutes }})"
-                                    class="aspect-square rounded-lg border-2 font-semibold text-xs transition-all duration-200 hover:scale-105 focus:z-10 {{ $isSelected ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md scale-105' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
+                                    class="aspect-square rounded-lg border-2 font-semibold text-sm transition-all duration-200 hover:scale-105 focus:z-10 {{ $isSelected ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md scale-105' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
                                 >
                                     {{ $display }}
                                 </button>

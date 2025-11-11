@@ -263,7 +263,7 @@
                         <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-3">
                             Dauer
                         </label>
-                        <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, 5rem);">
+                        <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));">
                             @foreach($this->minuteOptions as $quickMinutes)
                                 @php
                                     $isSelected = $minutes === $quickMinutes;
@@ -283,7 +283,7 @@
                                 <button
                                     type="button"
                                     wire:click="$set('minutes', {{ $quickMinutes }})"
-                                    class="w-20 h-20 rounded-lg border-2 font-semibold text-base transition-all duration-200 hover:scale-105 focus:z-10 flex items-center justify-center {{ $isSelected ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md scale-105' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
+                                    class="px-4 py-3 rounded-xl border-2 font-bold transition-all duration-200 hover:scale-105 text-sm {{ $isSelected ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md scale-105' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
                                 >
                                     {{ $display }}
                                 </button>

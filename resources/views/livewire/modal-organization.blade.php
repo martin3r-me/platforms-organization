@@ -263,7 +263,7 @@
                         <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-3">
                             Dauer
                         </label>
-                        <div class="isolate grid grid-cols-8 gap-px rounded-lg bg-[var(--ui-border)]/60 text-sm shadow-sm ring-1 ring-[var(--ui-border)]/60">
+                        <div class="isolate grid gap-px rounded-lg bg-[var(--ui-border)]/60 text-sm shadow-sm ring-1 ring-[var(--ui-border)]/60" style="grid-template-columns: repeat(8, minmax(0, 1fr));">
                             @foreach($this->minuteOptions as $quickMinutes)
                                 @php
                                     $hours = floor($quickMinutes / 60);

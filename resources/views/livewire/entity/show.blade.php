@@ -258,7 +258,7 @@
                         @endif
 
                         <!-- Verfügbare Entities zum Verlinken -->
-                        @if($this->availableModuleEntities->count() > 0)
+                        @if($this->availableModelClasses->count() > 0)
                             <div>
                                 <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">Neue Verknüpfung erstellen</h3>
                                 

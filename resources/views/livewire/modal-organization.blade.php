@@ -263,22 +263,22 @@
                         <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-3">
                             Dauer
                         </label>
-                        <div class="grid grid-cols-6 gap-2">
+                        <div class="isolate grid grid-cols-8 gap-px rounded-lg bg-[var(--ui-border)]/60 text-sm shadow-sm ring-1 ring-[var(--ui-border)]/60">
                             @foreach($this->minuteOptions as $quickMinutes)
                                 @php
                                     $hours = floor($quickMinutes / 60);
                                     $mins = $quickMinutes % 60;
                                     $display = sprintf('%d:%02d', $hours, $mins);
+                                    $isSelected = $minutes === $quickMinutes;
                                 @endphp
                                 <button
                                     type="button"
                                     wire:click="$set('minutes', {{ $quickMinutes }})"
-                                    :class="$wire.minutes === {{ $quickMinutes }}
-                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md scale-105' 
-                                        : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]'"
-                                    class="aspect-square rounded-lg border-2 font-bold text-xs transition-all duration-200 hover:scale-105 flex items-center justify-center"
+                                    class="py-1.5 hover:bg-[var(--ui-muted-5)] focus:z-10 {{ $isSelected ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] font-semibold' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)]' }} transition-colors"
                                 >
-                                    {{ $display }}h
+                                    <time class="mx-auto flex size-7 items-center justify-center rounded-full {{ $isSelected ? 'bg-[var(--ui-on-primary)]/20' : '' }}">
+                                        <span class="text-xs font-medium">{{ $display }}</span>
+                                    </time>
                                 </button>
                             @endforeach
                         </div>

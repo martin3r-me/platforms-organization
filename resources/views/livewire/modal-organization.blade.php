@@ -522,29 +522,14 @@
                                 <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-3">
                                     Geplante Stunden
                                 </label>
-                                <div class="grid gap-3 mb-3" style="grid-template-columns: repeat(auto-fill, 5rem);">
-                                    @foreach($this->minuteOptions as $quickMinutes)
-                                        @php
-                                            $isSelected = $plannedMinutes === $quickMinutes;
-                                            // Format: Minuten für < 1h, Stunden für >= 1h
-                                            if ($quickMinutes < 60) {
-                                                $display = $quickMinutes . 'm';
-                                            } else {
-                                                $hours = $quickMinutes / 60;
-                                                // Nur ganze Stunden oder .5 Stunden (keine .3 oder .8)
-                                                if ($hours == floor($hours)) {
-                                                    $display = (int)$hours . 'h';
-                                                } else {
-                                                    $display = number_format($hours, 1, ',', '.') . 'h';
-                                                }
-                                            }
-                                        @endphp
+                                <div class="grid gap-3 mb-3" style="grid-template-columns: repeat(8, minmax(0, 1fr));">
+                                    @foreach([1, 2, 3, 4, 5, 6, 7, 8] as $quickHours)
                                         <button
                                             type="button"
-                                            wire:click="$set('plannedMinutes', {{ $quickMinutes }})"
-                                            class="w-20 h-20 rounded-lg border-2 font-semibold text-base transition-all duration-200 hover:scale-105 focus:z-10 flex items-center justify-center {{ $isSelected ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md scale-105' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
+                                            wire:click="$set('plannedMinutes', {{ $quickHours * 60 }})"
+                                            class="px-4 py-3 rounded-xl border-2 font-bold transition-all duration-200 hover:scale-105 text-sm {{ $plannedMinutes === ($quickHours * 60) ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md scale-105' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
                                         >
-                                            {{ $display }}
+                                            {{ $quickHours }}h
                                         </button>
                                     @endforeach
                                 </div>

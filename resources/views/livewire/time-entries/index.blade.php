@@ -109,7 +109,7 @@
                 <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
                     <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
                         <table class="relative min-w-full divide-y divide-gray-300 dark:divide-white/15">
-                            <thead class="sticky top-0 z-20 bg-white dark:bg-gray-900">
+                            <thead>
                                 <tr>
                                     <th scope="col" class="py-3.5 pr-3 pl-4 text-left text-sm font-semibold text-gray-900 sm:pl-0 dark:text-white">Datum</th>
                                     <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Benutzer</th>
@@ -124,7 +124,7 @@
                             <tbody class="divide-y divide-gray-200 bg-white dark:divide-white/10 dark:bg-gray-900">
                                 @foreach($this->timeEntriesGroupedByTeamAndRoot as $teamGroup)
                                     {{-- Team Header Row --}}
-                                    <tr class="sticky top-[56px] z-10 bg-[var(--ui-primary-5)] border-t-2 border-[var(--ui-primary)]/60">
+                                    <tr class="bg-[var(--ui-primary-5)] border-t-2 border-[var(--ui-primary)]/60">
                                         <td colspan="8" class="py-4 pr-3 pl-4 sm:pl-0">
                                             <div class="flex items-center justify-between px-2">
                                                 <div class="flex-1">
@@ -161,16 +161,14 @@
                                                     <div class="flex-1">
                                                         <div class="flex items-center gap-2 mb-1">
                                                             <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">
-                                                                {{ $rootGroup['root_name'] }}
+                                                                {{ $rootGroup['source_module_title'] ?? class_basename($rootGroup['root_type']) }}
                                                             </h3>
-                                                            @if($rootGroup['source_module_title'])
-                                                                <x-ui-badge variant="secondary" size="xs">
-                                                                    {{ $rootGroup['source_module_title'] }}
-                                                                </x-ui-badge>
-                                                            @endif
-                                                        </div>
-                                                        <div class="text-xs text-[var(--ui-muted)]">
-                                                            {{ class_basename($rootGroup['root_type']) }}
+                                                            <x-ui-badge variant="secondary" size="xs">
+                                                                {{ $rootGroup['root_name'] }}
+                                                            </x-ui-badge>
+                                                            <x-ui-badge variant="secondary" size="xs">
+                                                                {{ $teamGroup['team_name'] }}
+                                                            </x-ui-badge>
                                                         </div>
                                                     </div>
                                                     <div class="text-right">

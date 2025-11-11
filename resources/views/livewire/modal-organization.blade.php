@@ -261,19 +261,24 @@
                     <!-- Quick Time Buttons -->
                     <div>
                         <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-3">
-                            Dauer (in 0,25h-Schritten)
+                            Dauer
                         </label>
-                        <div class="grid grid-cols-4 gap-2">
+                        <div class="grid grid-cols-6 gap-2">
                             @foreach($this->minuteOptions as $quickMinutes)
+                                @php
+                                    $hours = floor($quickMinutes / 60);
+                                    $mins = $quickMinutes % 60;
+                                    $display = sprintf('%d:%02d', $hours, $mins);
+                                @endphp
                                 <button
                                     type="button"
                                     wire:click="$set('minutes', {{ $quickMinutes }})"
                                     :class="$wire.minutes === {{ $quickMinutes }}
                                         ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md scale-105' 
                                         : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]'"
-                                    class="px-3 py-2.5 rounded-lg border-2 font-bold text-xs transition-all duration-200 hover:scale-105"
+                                    class="aspect-square rounded-lg border-2 font-bold text-xs transition-all duration-200 hover:scale-105 flex items-center justify-center"
                                 >
-                                    {{ number_format($quickMinutes / 60, 2, ',', '.') }}h
+                                    {{ $display }}h
                                 </button>
                             @endforeach
                         </div>

@@ -170,120 +170,125 @@
                         </div>
 
                         {{-- Entries Table --}}
-                        <x-ui-table compact="true">
-                            <x-ui-table-header>
-                                <x-ui-table-header-cell compact="true">Datum</x-ui-table-header-cell>
-                                <x-ui-table-header-cell compact="true">Benutzer</x-ui-table-header-cell>
-                                <x-ui-table-header-cell compact="true">Team</x-ui-table-header-cell>
-                                <x-ui-table-header-cell compact="true">Kontext</x-ui-table-header-cell>
-                                <x-ui-table-header-cell compact="true">Zeit</x-ui-table-header-cell>
-                                <x-ui-table-header-cell compact="true">Betrag</x-ui-table-header-cell>
-                                <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
-                                <x-ui-table-header-cell compact="true">Notiz</x-ui-table-header-cell>
-                            </x-ui-table-header>
-                            
-                            <x-ui-table-body>
-                                @foreach($rootGroup['entries'] as $entry)
-                                    <x-ui-table-row compact="true">
-                                        <x-ui-table-cell compact="true">
-                                            <div class="text-sm font-medium text-[var(--ui-secondary)]">
-                                                {{ $entry->work_date->format('d.m.Y') }}
-                                            </div>
-                                            <div class="text-xs text-[var(--ui-muted)]">
-                                                {{ $entry->work_date->format('D') }}
-                                            </div>
-                                        </x-ui-table-cell>
-                                        <x-ui-table-cell compact="true">
-                                            <div class="flex items-center gap-2">
-                                                @if($entry->user && $entry->user->avatar)
-                                                    <img src="{{ $entry->user->avatar }}" alt="{{ $entry->user->name ?? 'User' }}" class="w-8 h-8 rounded-full object-cover" />
-                                                @else
-                                                    <div class="w-8 h-8 rounded-full bg-[var(--ui-primary-5)] flex items-center justify-center text-xs font-medium text-[var(--ui-primary)]">
-                                                        {{ strtoupper(substr($entry->user->name ?? 'U', 0, 1)) }}
-                                                    </div>
-                                                @endif
-                                                <div>
-                                                    <div class="text-sm font-medium text-[var(--ui-secondary)]">
-                                                        {{ $entry->user->name ?? 'Unbekannt' }}
-                                                    </div>
-                                                    <div class="text-xs text-[var(--ui-muted)]">
-                                                        {{ $entry->user->email ?? '' }}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </x-ui-table-cell>
-                                        <x-ui-table-cell compact="true">
-                                            <div class="text-sm text-[var(--ui-secondary)]">
-                                                {{ $entry->team->name ?? 'Unbekannt' }}
-                                            </div>
-                                        </x-ui-table-cell>
-                                <x-ui-table-cell compact="true">
-                                    @if($entry->context)
-                                        <div class="flex items-center gap-2">
-                                            <div class="flex-1">
-                                                <div class="text-sm text-[var(--ui-secondary)]">
-                                                    {{ class_basename($entry->context_type) }}
-                                                </div>
-                                                <div class="text-xs text-[var(--ui-muted)]">
-                                                    @if($entry->context instanceof \Platform\Core\Contracts\HasDisplayName)
-                                                        {{ $entry->context->getDisplayName() ?? 'Unbekannt' }}
-                                                    @else
-                                                        {{ $entry->context->name ?? $entry->context->title ?? 'Unbekannt' }}
-                                                    @endif
-                                                </div>
-                                            </div>
-                                            @if($entry->source_module_title)
-                                                <x-ui-badge variant="secondary" size="xs" class="shrink-0">
-                                                    {{ $entry->source_module_title }}
-                                                </x-ui-badge>
-                                            @endif
-                                        </div>
-                                    @else
-                                        <span class="text-xs text-[var(--ui-muted)]">–</span>
-                                    @endif
-                                </x-ui-table-cell>
-                                        <x-ui-table-cell compact="true">
-                                            <div class="text-sm font-medium text-[var(--ui-secondary)]">
-                                                {{ number_format($entry->minutes / 60, 2, ',', '.') }}h
-                                            </div>
-                                            <div class="text-xs text-[var(--ui-muted)]">
-                                                {{ number_format($entry->minutes / 480, 2, ',', '.') }} Tage
-                                            </div>
-                                        </x-ui-table-cell>
-                                        <x-ui-table-cell compact="true">
-                                            @if($entry->amount_cents)
-                                                <div class="text-sm font-medium text-[var(--ui-secondary)]">
-                                                    {{ number_format($entry->amount_cents / 100, 2, ',', '.') }} €
-                                                </div>
-                                                @if($entry->rate_cents)
-                                                    <div class="text-xs text-[var(--ui-muted)]">
-                                                        {{ number_format($entry->rate_cents / 100, 2, ',', '.') }} €/h
-                                                    </div>
-                                                @endif
-                                            @else
-                                                <span class="text-xs text-[var(--ui-muted)]">–</span>
-                                            @endif
-                                        </x-ui-table-cell>
-                                        <x-ui-table-cell compact="true">
-                                            @if($entry->is_billed)
-                                                <x-ui-badge variant="success" size="xs">Abgerechnet</x-ui-badge>
-                                            @else
-                                                <x-ui-badge variant="warning" size="xs">Offen</x-ui-badge>
-                                            @endif
-                                        </x-ui-table-cell>
-                                        <x-ui-table-cell compact="true">
-                                            @if($entry->note)
-                                                <div class="text-sm text-[var(--ui-secondary)] max-w-xs truncate" title="{{ $entry->note }}">
-                                                    {{ Str::limit($entry->note, 50) }}
-                                                </div>
-                                            @else
-                                                <span class="text-xs text-[var(--ui-muted)]">–</span>
-                                            @endif
-                                        </x-ui-table-cell>
-                                    </x-ui-table-row>
-                                @endforeach
-                            </x-ui-table-body>
-                        </x-ui-table>
+                        <div class="flow-root">
+                            <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
+                                <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
+                                    <table class="relative min-w-full divide-y divide-gray-300 dark:divide-white/15">
+                                        <thead>
+                                            <tr>
+                                                <th scope="col" class="py-3.5 pr-3 pl-4 text-left text-sm font-semibold text-gray-900 sm:pl-0 dark:text-white">Datum</th>
+                                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Benutzer</th>
+                                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Team</th>
+                                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Kontext</th>
+                                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Zeit</th>
+                                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Betrag</th>
+                                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Status</th>
+                                                <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Notiz</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody class="divide-y divide-gray-200 bg-white dark:divide-white/10 dark:bg-gray-900">
+                                            @foreach($rootGroup['entries'] as $entry)
+                                                <tr>
+                                                    <td class="py-5 pr-3 pl-4 text-sm whitespace-nowrap sm:pl-0">
+                                                        <div class="text-gray-900 dark:text-white font-medium">
+                                                            {{ $entry->work_date->format('d.m.Y') }}
+                                                        </div>
+                                                        <div class="mt-1 text-gray-500 dark:text-gray-400">
+                                                            {{ $entry->work_date->format('D') }}
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-3 py-5 text-sm whitespace-nowrap">
+                                                        <div class="flex items-center">
+                                                            <div class="size-11 shrink-0">
+                                                                @if($entry->user && $entry->user->avatar)
+                                                                    <img src="{{ $entry->user->avatar }}" alt="{{ $entry->user->name ?? 'User' }}" class="size-11 rounded-full object-cover dark:outline dark:outline-white/10" />
+                                                                @else
+                                                                    <div class="size-11 rounded-full bg-[var(--ui-primary-5)] flex items-center justify-center text-xs font-medium text-[var(--ui-primary)] dark:outline dark:outline-white/10">
+                                                                        {{ strtoupper(substr($entry->user->name ?? 'U', 0, 1)) }}
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+                                                            <div class="ml-4">
+                                                                <div class="font-medium text-gray-900 dark:text-white">
+                                                                    {{ $entry->user->name ?? 'Unbekannt' }}
+                                                                </div>
+                                                                <div class="mt-1 text-gray-500 dark:text-gray-400">
+                                                                    {{ $entry->user->email ?? '' }}
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-3 py-5 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                                        {{ $entry->team->name ?? 'Unbekannt' }}
+                                                    </td>
+                                                    <td class="px-3 py-5 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                                        @if($entry->context)
+                                                            <div class="text-gray-900 dark:text-white">
+                                                                {{ class_basename($entry->context_type) }}
+                                                            </div>
+                                                            <div class="mt-1 text-gray-500 dark:text-gray-400">
+                                                                @if($entry->context instanceof \Platform\Core\Contracts\HasDisplayName)
+                                                                    {{ $entry->context->getDisplayName() ?? 'Unbekannt' }}
+                                                                @else
+                                                                    {{ $entry->context->name ?? $entry->context->title ?? 'Unbekannt' }}
+                                                                @endif
+                                                            </div>
+                                                            @if($entry->source_module_title)
+                                                                <div class="mt-1">
+                                                                    <x-ui-badge variant="secondary" size="xs">
+                                                                        {{ $entry->source_module_title }}
+                                                                    </x-ui-badge>
+                                                                </div>
+                                                            @endif
+                                                        @else
+                                                            <span class="text-gray-500 dark:text-gray-400">–</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="px-3 py-5 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                                        <div class="text-gray-900 dark:text-white font-medium">
+                                                            {{ number_format($entry->minutes / 60, 2, ',', '.') }}h
+                                                        </div>
+                                                        <div class="mt-1 text-gray-500 dark:text-gray-400">
+                                                            {{ number_format($entry->minutes / 480, 2, ',', '.') }} Tage
+                                                        </div>
+                                                    </td>
+                                                    <td class="px-3 py-5 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                                        @if($entry->amount_cents)
+                                                            <div class="text-gray-900 dark:text-white font-medium">
+                                                                {{ number_format($entry->amount_cents / 100, 2, ',', '.') }} €
+                                                            </div>
+                                                            @if($entry->rate_cents)
+                                                                <div class="mt-1 text-gray-500 dark:text-gray-400">
+                                                                    {{ number_format($entry->rate_cents / 100, 2, ',', '.') }} €/h
+                                                                </div>
+                                                            @endif
+                                                        @else
+                                                            <span class="text-gray-500 dark:text-gray-400">–</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="px-3 py-5 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
+                                                        @if($entry->is_billed)
+                                                            <x-ui-badge variant="success" size="xs">Abgerechnet</x-ui-badge>
+                                                        @else
+                                                            <x-ui-badge variant="warning" size="xs">Offen</x-ui-badge>
+                                                        @endif
+                                                    </td>
+                                                    <td class="px-3 py-5 text-sm text-gray-500 dark:text-gray-400">
+                                                        @if($entry->note)
+                                                            <div class="max-w-xs truncate" title="{{ $entry->note }}">
+                                                                {{ Str::limit($entry->note, 50) }}
+                                                            </div>
+                                                        @else
+                                                            <span class="text-gray-500 dark:text-gray-400">–</span>
+                                                        @endif
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 @endforeach
             </div>

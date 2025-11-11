@@ -23,6 +23,8 @@ class Show extends Component
         'name' => '',
         'parent_team_id' => null,
     ];
+    public ?string $selectedModelClass = null;
+    public string $modelSearch = '';
 
     public function mount(OrganizationEntity $entity)
     {
@@ -520,6 +522,46 @@ class Show extends Component
         ->whereNull('parent_team_id')
         ->orderBy('name')
         ->get();
+    }
+
+    #[Computed]
+    public function availableModelClasses()
+    {
+        // Alle Model-Klassen, die verfügbare Entities haben
+        return collect($this->availableModuleEntities->keys())
+            ->map(function($modelClass) {
+                return [
+                    'value' => $modelClass,
+                    'label' => class_basename($modelClass),
+                ];
+            })
+            ->sortBy('label')
+            ->values();
+    }
+
+    #[Computed]
+    public function filteredModuleEntities()
+    {
+        if (!$this->selectedModelClass) {
+            return collect();
+        }
+        
+        $entities = $this->availableModuleEntities->get($this->selectedModelClass, collect());
+        
+        // Suche anwenden
+        if ($this->modelSearch) {
+            $search = strtolower($this->modelSearch);
+            return $entities->filter(function($entity) use ($search) {
+                return str_contains(strtolower($entity['name'] ?? ''), $search);
+            });
+        }
+        
+        return $entities;
+    }
+
+    public function updatedSelectedModelClass($value)
+    {
+        $this->modelSearch = ''; // Reset search when model changes
     }
 
     public function render()

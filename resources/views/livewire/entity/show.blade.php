@@ -260,34 +260,69 @@
                         <!-- Verfügbare Entities zum Verlinken -->
                         @if($this->availableModuleEntities->count() > 0)
                             <div>
-                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">Verfügbar zum Verlinken</h3>
-                                <div class="space-y-2">
-                                    @foreach($this->availableModuleEntities as $modelClass => $entities)
-                                        <div class="mb-4">
-                                            <div class="text-xs font-medium text-[var(--ui-muted)] mb-2">
-                                                {{ class_basename($modelClass) }}
-                                            </div>
-                                            <div class="space-y-2">
-                                                @foreach($entities as $availableEntity)
-                                                    <div class="flex items-center justify-between p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                                                        <div class="flex items-center gap-2">
-                                                            <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $availableEntity['name'] }}</span>
-                                                            <x-ui-badge variant="secondary" size="xs">{{ $availableEntity['model_name'] }}</x-ui-badge>
-                                                        </div>
-                                                        <x-ui-button 
-                                                            variant="primary-outline" 
-                                                            size="sm"
-                                                            wire:click="linkModuleEntity('{{ $modelClass }}', {{ $availableEntity['id'] }})"
-                                                        >
-                                                            @svg('heroicon-o-link', 'w-4 h-4 mr-1')
-                                                            Verlinken
-                                                        </x-ui-button>
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        </div>
-                                    @endforeach
+                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">Neue Verknüpfung erstellen</h3>
+                                
+                                <!-- Dropdown: Modell auswählen -->
+                                <div class="mb-4 space-y-3">
+                                    <x-ui-input-select
+                                        name="selectedModelClass"
+                                        label="Modell auswählen"
+                                        wire:model.live="selectedModelClass"
+                                        :options="$this->availableModelClasses"
+                                        optionValue="value"
+                                        optionLabel="label"
+                                        :nullable="true"
+                                        nullLabel="– Modell auswählen –"
+                                        placeholder="Modell auswählen..."
+                                    />
+                                    
+                                    @if($selectedModelClass)
+                                        <!-- Suchfeld für ausgewähltes Modell -->
+                                        <x-ui-input-text
+                                            name="modelSearch"
+                                            label="Suchen"
+                                            wire:model.live.debounce.300ms="modelSearch"
+                                            placeholder="Nach Name suchen..."
+                                        />
+                                    @endif
                                 </div>
+                                
+                                <!-- Entities des ausgewählten Modells -->
+                                @if($selectedModelClass && $this->filteredModuleEntities->count() > 0)
+                                    <div class="space-y-2 max-h-96 overflow-y-auto">
+                                        @foreach($this->filteredModuleEntities as $availableEntity)
+                                            <div class="flex items-center justify-between p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)] hover:bg-[var(--ui-muted-10)] transition-colors">
+                                                <div class="flex items-center gap-2 flex-1 min-w-0">
+                                                    <span class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $availableEntity['name'] }}</span>
+                                                    <x-ui-badge variant="secondary" size="xs">{{ $availableEntity['model_name'] }}</x-ui-badge>
+                                                </div>
+                                                <x-ui-button 
+                                                    variant="primary-outline" 
+                                                    size="sm"
+                                                    wire:click="linkModuleEntity('{{ $selectedModelClass }}', {{ $availableEntity['id'] }})"
+                                                    class="flex-shrink-0"
+                                                >
+                                                    @svg('heroicon-o-link', 'w-4 h-4 mr-1')
+                                                    Verlinken
+                                                </x-ui-button>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @elseif($selectedModelClass && $this->filteredModuleEntities->count() === 0)
+                                    <div class="p-6 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                        <p class="text-sm text-[var(--ui-muted)]">
+                                            @if($modelSearch)
+                                                Keine Ergebnisse für "{{ $modelSearch }}"
+                                            @else
+                                                Keine Entities verfügbar für dieses Modell
+                                            @endif
+                                        </p>
+                                    </div>
+                                @elseif(!$selectedModelClass)
+                                    <div class="p-6 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                        <p class="text-sm text-[var(--ui-muted)]">Bitte wählen Sie ein Modell aus, um verfügbare Entities anzuzeigen</p>
+                                    </div>
+                                @endif
                             </div>
                         @elseif($this->linkedModuleEntities->count() === 0)
                             <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">

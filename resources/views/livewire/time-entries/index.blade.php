@@ -29,16 +29,20 @@
                         <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs text-[var(--ui-muted)]">Gesamt Stunden</span>
-                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ number_format($this->totalMinutes / 60, 2, ',', '.') }}h</span>
+                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($this->totalMinutes) }}</span>
                             </div>
-                            <div class="text-xs text-[var(--ui-muted)]">{{ number_format($this->totalMinutes / 480, 2, ',', '.') }} Tage</div>
+                            @if($this->totalMinutes >= 480)
+                                <div class="text-xs text-[var(--ui-muted)]">{{ number_format($this->totalMinutes / 480, 2, ',', '.') }} Tage</div>
+                            @endif
                         </div>
                         <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs text-[var(--ui-muted)]">Abgerechnet</span>
-                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ number_format($this->totalBilledMinutes / 60, 2, ',', '.') }}h</span>
+                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($this->totalBilledMinutes) }}</span>
                             </div>
-                            <div class="text-xs text-[var(--ui-muted)]">{{ number_format($this->totalBilledMinutes / 480, 2, ',', '.') }} Tage</div>
+                            @if($this->totalBilledMinutes >= 480)
+                                <div class="text-xs text-[var(--ui-muted)]">{{ number_format($this->totalBilledMinutes / 480, 2, ',', '.') }} Tage</div>
+                            @endif
                         </div>
                         <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                             <div class="flex items-center justify-between mb-2">
@@ -86,12 +90,14 @@
                     <div class="space-y-2">
                         <div class="flex items-center justify-between">
                             <span class="text-xs text-[var(--ui-muted)]">Stunden</span>
-                            <div class="text-lg font-bold text-[var(--ui-secondary)]">{{ number_format($teamGroup['total_minutes'] / 60, 2, ',', '.') }}h</div>
+                            <div class="text-lg font-bold text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($teamGroup['total_minutes']) }}</div>
                         </div>
-                        <div class="flex items-center justify-between">
-                            <span class="text-xs text-[var(--ui-muted)]">Tage</span>
-                            <div class="text-sm font-semibold text-[var(--ui-secondary)]">{{ number_format($teamGroup['total_minutes'] / 480, 2, ',', '.') }}</div>
-                        </div>
+                        @if($teamGroup['total_minutes'] >= 480)
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-[var(--ui-muted)]">Tage</span>
+                                <div class="text-sm font-semibold text-[var(--ui-secondary)]">{{ number_format($teamGroup['total_minutes'] / 480, 2, ',', '.') }}</div>
+                            </div>
+                        @endif
                         @if($teamGroup['total_amount_cents'] > 0)
                             <div class="flex items-center justify-between pt-2 border-t border-[var(--ui-border)]/40">
                                 <span class="text-xs text-[var(--ui-muted)]">Betrag</span>
@@ -137,11 +143,13 @@
                                                 </div>
                                                 <div class="text-right">
                                                     <div class="text-lg font-bold text-[var(--ui-primary)]">
-                                                        {{ number_format($teamGroup['total_minutes'] / 60, 2, ',', '.') }}h
+                                                        {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($teamGroup['total_minutes']) }}
                                                     </div>
-                                                    <div class="text-sm text-[var(--ui-muted)]">
-                                                        {{ number_format($teamGroup['total_minutes'] / 480, 2, ',', '.') }} Tage
-                                                    </div>
+                                                    @if($teamGroup['total_minutes'] >= 480)
+                                                        <div class="text-sm text-[var(--ui-muted)]">
+                                                            {{ number_format($teamGroup['total_minutes'] / 480, 2, ',', '.') }} Tage
+                                                        </div>
+                                                    @endif
                                                     @if($teamGroup['total_amount_cents'] > 0)
                                                         <div class="text-lg font-bold text-[var(--ui-primary)] mt-1">
                                                             {{ number_format($teamGroup['total_amount_cents'] / 100, 2, ',', '.') }} €
@@ -170,11 +178,13 @@
                                                     </div>
                                                     <div class="text-right">
                                                         <div class="text-sm font-medium text-[var(--ui-secondary)]">
-                                                            {{ number_format($rootGroup['total_minutes'] / 60, 2, ',', '.') }}h
+                                                            {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($rootGroup['total_minutes']) }}
                                                         </div>
-                                                        <div class="text-xs text-[var(--ui-muted)]">
-                                                            {{ number_format($rootGroup['total_minutes'] / 480, 2, ',', '.') }} Tage
-                                                        </div>
+                                                        @if($rootGroup['total_minutes'] >= 480)
+                                                            <div class="text-xs text-[var(--ui-muted)]">
+                                                                {{ number_format($rootGroup['total_minutes'] / 480, 2, ',', '.') }} Tage
+                                                            </div>
+                                                        @endif
                                                         @if($rootGroup['total_amount_cents'] > 0)
                                                             <div class="text-sm font-medium text-[var(--ui-secondary)] mt-1">
                                                                 {{ number_format($rootGroup['total_amount_cents'] / 100, 2, ',', '.') }} €
@@ -245,11 +255,13 @@
                                                 </td>
                                                 <td class="px-3 py-5 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
                                                     <div class="text-gray-900 dark:text-white font-medium">
-                                                        {{ number_format($entry->minutes / 60, 2, ',', '.') }}h
+                                                        {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($entry->minutes) }}
                                                     </div>
-                                                    <div class="mt-1 text-gray-500 dark:text-gray-400">
-                                                        {{ number_format($entry->minutes / 480, 2, ',', '.') }} Tage
-                                                    </div>
+                                                    @if($entry->minutes >= 480)
+                                                        <div class="mt-1 text-gray-500 dark:text-gray-400">
+                                                            {{ number_format($entry->minutes / 480, 2, ',', '.') }} Tage
+                                                        </div>
+                                                    @endif
                                                 </td>
                                                 <td class="px-3 py-5 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
                                                     @if($entry->amount_cents)

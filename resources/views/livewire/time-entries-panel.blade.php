@@ -3,14 +3,14 @@
         <div>
             <h3 class="text-sm font-semibold text-[var(--ui-secondary)]">Zeiterfassung</h3>
             <div class="text-xs text-[var(--ui-muted)] flex flex-wrap items-center gap-2">
-                <span>{{ number_format($this->totalMinutes / 60, 2, ',', '.') }} h gesamt</span>
-                <span>• Abgerechnet: {{ number_format($this->billedMinutes / 60, 2, ',', '.') }} h</span>
-                <span>• Offen: {{ number_format($this->unbilledMinutes / 60, 2, ',', '.') }} h</span>
+                <span>{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($this->totalMinutes) }} gesamt</span>
+                <span>• Abgerechnet: {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($this->billedMinutes) }}</span>
+                <span>• Offen: {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($this->unbilledMinutes) }}</span>
                 @if($this->unbilledAmountCents)
                     <span>• Offener Wert: {{ number_format($this->unbilledAmountCents / 100, 2, ',', '.') }} €</span>
                 @endif
                 @if($plannedMinutes ?? false)
-                    <span>• Plan: {{ number_format($plannedMinutes / 60, 2, ',', '.') }} h</span>
+                    <span>• Plan: {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($plannedMinutes) }}</span>
                 @endif
             </div>
         </div>
@@ -29,7 +29,7 @@
                     <div class="flex flex-col gap-1">
                         <span class="font-medium text-[var(--ui-secondary)]">{{ $entry->work_date?->format('d.m.Y') }}</span>
                         <div class="text-xs text-[var(--ui-muted)]">
-                            {{ number_format($entry->minutes / 60, 2, ',', '.') }} h
+                            {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($entry->minutes) }}
                             @if($entry->amount_cents)
                                 • {{ number_format($entry->amount_cents / 100, 2, ',', '.') }} €
                             @elseif($entry->rate_cents)

@@ -114,6 +114,42 @@ class OrganizationTimeEntry extends Model
     }
 
     /**
+     * Formatiert Minuten in ein lesbares Format.
+     * Wenn weniger als 1 Tag: "2h 30min"
+     * Wenn 1 Tag oder mehr: "1d 2h 30min"
+     * 
+     * @param int $minutes
+     * @return string
+     */
+    public static function formatMinutes(int $minutes): string
+    {
+        if ($minutes < 0) {
+            return '0min';
+        }
+
+        $days = intval($minutes / 480);
+        $remainingMinutes = $minutes % 480;
+        $hours = intval($remainingMinutes / 60);
+        $mins = $remainingMinutes % 60;
+
+        $parts = [];
+        
+        if ($days > 0) {
+            $parts[] = $days . 'd';
+        }
+        
+        if ($hours > 0) {
+            $parts[] = $hours . 'h';
+        }
+        
+        if ($mins > 0 || empty($parts)) {
+            $parts[] = $mins . 'min';
+        }
+
+        return implode(' ', $parts);
+    }
+
+    /**
      * Gibt das Quellmodul basierend auf dem context_type zurück.
      * Extrahiert den Modul-Namen aus dem Namespace (z.B. "Platform\Planner\Models\PlannerTask" → "planner").
      * 

@@ -97,7 +97,7 @@
                                                     @endif
                                                 </td>
                                                 <td class="whitespace-nowrap px-3 py-5 text-sm">
-                                                    <div class="font-medium text-[var(--ui-secondary)]">{{ number_format($entry->minutes / 60, 2, ',', '.') }} h</div>
+                                                    <div class="font-medium text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($entry->minutes) }}</div>
                                                     @if($entry->rate_cents)
                                                         <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ number_format($entry->rate_cents / 100, 2, ',', '.') }} €/h</div>
                                                     @endif
@@ -393,7 +393,7 @@
                                                         <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ $entry->work_date?->format('l') }}</div>
                                                     </td>
                                                     <td class="whitespace-nowrap px-3 py-5 text-sm">
-                                                        <div class="font-medium text-[var(--ui-secondary)]">{{ number_format($entry->minutes / 60, 2, ',', '.') }} h</div>
+                                                        <div class="font-medium text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($entry->minutes) }}</div>
                                                         @if($entry->rate_cents)
                                                             <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ number_format($entry->rate_cents / 100, 2, ',', '.') }} €/h</div>
                                                         @endif
@@ -742,7 +742,7 @@
                                                         @endif
                                                     </td>
                                                     <td class="whitespace-nowrap px-3 py-5 text-sm">
-                                                        <div class="font-medium text-[var(--ui-secondary)]">{{ number_format($entry->minutes / 60, 2, ',', '.') }} h</div>
+                                                        <div class="font-medium text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($entry->minutes) }}</div>
                                                         @if($entry->rate_cents)
                                                             <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ number_format($entry->rate_cents / 100, 2, ',', '.') }} €/h</div>
                                                         @endif

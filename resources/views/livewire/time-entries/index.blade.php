@@ -158,6 +158,51 @@
                                                                 {{ $rootGroup['root_name'] }}
                                                             </x-ui-badge>
                                                         </div>
+                                                        @php
+                                                            // Prüfe ob es unterschiedliche Contexts gibt
+                                                            $contexts = $rootGroup['entries']->map(function($entry) {
+                                                                if (!$entry->context) return null;
+                                                                $contextName = $entry->context instanceof \Platform\Core\Contracts\HasDisplayName 
+                                                                    ? $entry->context->getDisplayName() 
+                                                                    : ($entry->context->name ?? $entry->context->title ?? null);
+                                                                return [
+                                                                    'type' => class_basename($entry->context_type),
+                                                                    'name' => $contextName,
+                                                                    'id' => $entry->context_id,
+                                                                ];
+                                                            })->filter()->unique(function($item) {
+                                                                return ($item['type'] ?? '') . ':' . ($item['id'] ?? 0);
+                                                            })->values();
+                                                            
+                                                            $firstEntry = $rootGroup['entries']->first();
+                                                            $hasMultipleContexts = $contexts->count() > 1;
+                                                            $hasDifferentContextFromRoot = $firstEntry && $firstEntry->context_id && $firstEntry->root_context_id 
+                                                                && ($firstEntry->context_id != $firstEntry->root_context_id || $firstEntry->context_type != $firstEntry->root_context_type);
+                                                        @endphp
+                                                        @if($hasMultipleContexts || $hasDifferentContextFromRoot)
+                                                            <div class="text-xs text-[var(--ui-muted)] mt-1">
+                                                                @if($hasMultipleContexts)
+                                                                    <span class="font-semibold">Kontexte:</span>
+                                                                    @foreach($contexts as $ctx)
+                                                                        <span class="inline-block mr-2">
+                                                                            {{ $ctx['type'] }}: {{ $ctx['name'] }}
+                                                                        </span>
+                                                                    @endforeach
+                                                                @elseif($hasDifferentContextFromRoot && $firstEntry)
+                                                                    @php
+                                                                        $contextName = $firstEntry->context instanceof \Platform\Core\Contracts\HasDisplayName 
+                                                                            ? $firstEntry->context->getDisplayName() 
+                                                                            : ($firstEntry->context->name ?? $firstEntry->context->title ?? 'Unbekannt');
+                                                                        $rootContextName = $firstEntry->rootContext instanceof \Platform\Core\Contracts\HasDisplayName 
+                                                                            ? $firstEntry->rootContext->getDisplayName() 
+                                                                            : ($firstEntry->rootContext->name ?? $firstEntry->rootContext->title ?? 'Unbekannt');
+                                                                    @endphp
+                                                                    <span class="font-semibold">Kontext:</span> {{ class_basename($firstEntry->context_type) }}: {{ $contextName }}
+                                                                    <span class="mx-1">→</span>
+                                                                    <span class="font-semibold">Root:</span> {{ class_basename($firstEntry->root_context_type) }}: {{ $rootContextName }}
+                                                                @endif
+                                                            </div>
+                                                        @endif
                                                     </div>
                                                     <div class="text-right">
                                                         <div class="text-sm font-medium text-[var(--ui-secondary)]">
@@ -211,15 +256,24 @@
                                                 <td class="px-3 py-5 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
                                                     @if($entry->context)
                                                         <div class="text-gray-900 dark:text-white">
-                                                            {{ class_basename($entry->context_type) }}
-                                                        </div>
-                                                        <div class="mt-1 text-gray-500 dark:text-gray-400">
+                                                            <span class="font-semibold">{{ class_basename($entry->context_type) }}:</span>
                                                             @if($entry->context instanceof \Platform\Core\Contracts\HasDisplayName)
                                                                 {{ $entry->context->getDisplayName() ?? 'Unbekannt' }}
                                                             @else
                                                                 {{ $entry->context->name ?? $entry->context->title ?? 'Unbekannt' }}
                                                             @endif
                                                         </div>
+                                                        @if($entry->rootContext && ($entry->context_id != $entry->root_context_id || $entry->context_type != $entry->root_context_type))
+                                                            <div class="mt-1 text-gray-500 dark:text-gray-400">
+                                                                <span class="font-semibold">Root:</span>
+                                                                <span class="text-xs">{{ class_basename($entry->root_context_type) }}:</span>
+                                                                @if($entry->rootContext instanceof \Platform\Core\Contracts\HasDisplayName)
+                                                                    {{ $entry->rootContext->getDisplayName() ?? 'Unbekannt' }}
+                                                                @else
+                                                                    {{ $entry->rootContext->name ?? $entry->rootContext->title ?? 'Unbekannt' }}
+                                                                @endif
+                                                            </div>
+                                                        @endif
                                                         @if($entry->source_module_title)
                                                             <div class="mt-1">
                                                                 <x-ui-badge variant="secondary" size="xs">
@@ -227,6 +281,16 @@
                                                                 </x-ui-badge>
                                                             </div>
                                                         @endif
+                                                    @elseif($entry->rootContext)
+                                                        <div class="text-gray-900 dark:text-white">
+                                                            <span class="font-semibold">Root:</span>
+                                                            <span class="text-xs">{{ class_basename($entry->root_context_type) }}:</span>
+                                                            @if($entry->rootContext instanceof \Platform\Core\Contracts\HasDisplayName)
+                                                                {{ $entry->rootContext->getDisplayName() ?? 'Unbekannt' }}
+                                                            @else
+                                                                {{ $entry->rootContext->name ?? $entry->rootContext->title ?? 'Unbekannt' }}
+                                                            @endif
+                                                        </div>
                                                     @else
                                                         <span class="text-gray-500 dark:text-gray-400">–</span>
                                                     @endif

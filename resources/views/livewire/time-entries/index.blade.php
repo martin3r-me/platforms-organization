@@ -361,6 +361,7 @@
                                             </tr>
                                         @endforeach
                                     @endforeach
+                                    @endforeach
                                 @endforeach
                             </tbody>
                         </table>

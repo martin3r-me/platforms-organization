@@ -97,7 +97,7 @@
             @endforeach
         </div>
 
-        @if($this->timeEntriesGroupedByTeamAndRoot->isNotEmpty())
+        @if($this->timeEntriesGroupedByDateAndTeam->isNotEmpty())
             {{-- Single Table for all entries --}}
             <div class="flow-root">
                 <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
@@ -116,26 +116,26 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white dark:divide-white/10 dark:bg-gray-900">
-                                @foreach($this->timeEntriesGroupedByTeamAndRoot as $teamGroup)
-                                    {{-- Team Header Row --}}
-                                    <tr class="bg-[var(--ui-primary-5)] border-t-2 border-[var(--ui-primary)]/60">
+                                @foreach($this->timeEntriesGroupedByDateAndTeam as $dateGroup)
+                                    {{-- Date Header Row --}}
+                                    <tr class="bg-[var(--ui-primary-10)] border-t-2 border-[var(--ui-primary)]/80">
                                         <td colspan="8" class="py-4 pr-3 pl-4 sm:pl-0">
                                             <div class="flex items-center justify-between px-2">
                                                 <div class="flex-1">
-                                                    <h2 class="text-xl font-bold text-[var(--ui-primary)] mb-1">
-                                                        {{ $teamGroup['team_name'] }}
+                                                    <h2 class="text-2xl font-bold text-[var(--ui-primary)] mb-1">
+                                                        {{ $dateGroup['date']->format('d.m.Y') }}
                                                     </h2>
                                                     <div class="text-sm text-[var(--ui-muted)]">
-                                                        {{ $teamGroup['root_groups']->count() }} {{ $teamGroup['root_groups']->count() === 1 ? 'Projekt' : 'Projekte' }}
+                                                        {{ $dateGroup['date']->locale('de')->isoFormat('dddd') }} · {{ $dateGroup['team_groups']->count() }} {{ $dateGroup['team_groups']->count() === 1 ? 'Team' : 'Teams' }}
                                                     </div>
                                                 </div>
                                                 <div class="text-right">
                                                     <div class="text-lg font-bold text-[var(--ui-primary)]">
-                                                        {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($teamGroup['total_minutes']) }}
+                                                        {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($dateGroup['total_minutes']) }}
                                                     </div>
-                                                    @if($teamGroup['total_amount_cents'] > 0)
+                                                    @if($dateGroup['total_amount_cents'] > 0)
                                                         <div class="text-lg font-bold text-[var(--ui-primary)] mt-1">
-                                                            {{ number_format($teamGroup['total_amount_cents'] / 100, 2, ',', '.') }} €
+                                                            {{ number_format($dateGroup['total_amount_cents'] / 100, 2, ',', '.') }} €
                                                         </div>
                                                     @endif
                                                 </div>
@@ -143,8 +143,36 @@
                                         </td>
                                     </tr>
 
-                                    {{-- Root Groups innerhalb des Teams --}}
-                                    @foreach($teamGroup['root_groups'] as $rootGroup)
+                                    {{-- Team Groups innerhalb des Datums --}}
+                                    @foreach($dateGroup['team_groups'] as $teamGroup)
+                                        {{-- Team Header Row --}}
+                                        <tr class="bg-[var(--ui-primary-5)] border-t border-[var(--ui-primary)]/40">
+                                            <td colspan="8" class="py-3 pr-3 pl-4 sm:pl-0">
+                                                <div class="flex items-center justify-between px-2">
+                                                    <div class="flex-1">
+                                                        <h3 class="text-lg font-bold text-[var(--ui-primary)] mb-1">
+                                                            {{ $teamGroup['team_name'] }}
+                                                        </h3>
+                                                        <div class="text-sm text-[var(--ui-muted)]">
+                                                            {{ $teamGroup['root_groups']->count() }} {{ $teamGroup['root_groups']->count() === 1 ? 'Projekt' : 'Projekte' }}
+                                                        </div>
+                                                    </div>
+                                                    <div class="text-right">
+                                                        <div class="text-base font-bold text-[var(--ui-primary)]">
+                                                            {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($teamGroup['total_minutes']) }}
+                                                        </div>
+                                                        @if($teamGroup['total_amount_cents'] > 0)
+                                                            <div class="text-base font-bold text-[var(--ui-primary)] mt-1">
+                                                                {{ number_format($teamGroup['total_amount_cents'] / 100, 2, ',', '.') }} €
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </td>
+                                        </tr>
+
+                                        {{-- Root Groups innerhalb des Teams --}}
+                                        @foreach($teamGroup['root_groups'] as $rootGroup)
                                         {{-- Root Group Header Row --}}
                                         <tr class="bg-[var(--ui-muted-5)]">
                                             <td colspan="8" class="py-3 pr-3 pl-4 sm:pl-0">

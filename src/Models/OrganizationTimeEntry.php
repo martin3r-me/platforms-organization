@@ -150,6 +150,20 @@ class OrganizationTimeEntry extends Model
     }
 
     /**
+     * Gibt Minuten als dezimale Stunden zurück (z.B. "7,50 h").
+     */
+    public static function formatMinutesAsHours(int $minutes, int $precision = 2): string
+    {
+        if ($minutes < 0) {
+            $minutes = 0;
+        }
+
+        $hours = $minutes / 60;
+
+        return number_format($hours, $precision, ',', '.') . ' h';
+    }
+
+    /**
      * Gibt das Quellmodul basierend auf dem context_type zurück.
      * Extrahiert den Modul-Namen aus dem Namespace (z.B. "Platform\Planner\Models\PlannerTask" → "planner").
      * 

@@ -29,13 +29,13 @@
                         <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs text-[var(--ui-muted)]">Gesamt Stunden</span>
-                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($this->totalMinutes) }}</span>
+                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutesAsHours($this->totalMinutes) }}</span>
                             </div>
                         </div>
                         <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs text-[var(--ui-muted)]">Abgerechnet</span>
-                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($this->totalBilledMinutes) }}</span>
+                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutesAsHours($this->totalBilledMinutes) }}</span>
                             </div>
                         </div>
                         <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
@@ -84,7 +84,7 @@
                     <div class="space-y-2">
                         <div class="flex items-center justify-between">
                             <span class="text-xs text-[var(--ui-muted)]">Zeit</span>
-                            <div class="text-lg font-bold text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($teamGroup['total_minutes']) }}</div>
+                            <div class="text-lg font-bold text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutesAsHours($teamGroup['total_minutes']) }}</div>
                         </div>
                         @if($teamGroup['total_amount_cents'] > 0)
                             <div class="flex items-center justify-between pt-2 border-t border-[var(--ui-border)]/40">
@@ -131,7 +131,7 @@
                                                 </div>
                                                 <div class="text-right">
                                                     <div class="text-lg font-bold text-[var(--ui-primary)]">
-                                                        {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($dateGroup['total_minutes']) }}
+                                                        {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutesAsHours($dateGroup['total_minutes']) }}
                                                     </div>
                                                     @if($dateGroup['total_amount_cents'] > 0)
                                                         <div class="text-lg font-bold text-[var(--ui-primary)] mt-1">
@@ -159,7 +159,7 @@
                                                     </div>
                                                     <div class="text-right">
                                                         <div class="text-base font-bold text-[var(--ui-primary)]">
-                                                            {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($teamGroup['total_minutes']) }}
+                                                            {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutesAsHours($teamGroup['total_minutes']) }}
                                                         </div>
                                                         @if($teamGroup['total_amount_cents'] > 0)
                                                             <div class="text-base font-bold text-[var(--ui-primary)] mt-1">
@@ -234,7 +234,7 @@
                                                     </div>
                                                     <div class="text-right">
                                                         <div class="text-sm font-medium text-[var(--ui-secondary)]">
-                                                            {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($rootGroup['total_minutes']) }}
+                                                            {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutesAsHours($rootGroup['total_minutes']) }}
                                                         </div>
                                                         @if($rootGroup['total_amount_cents'] > 0)
                                                             <div class="text-sm font-medium text-[var(--ui-secondary)] mt-1">

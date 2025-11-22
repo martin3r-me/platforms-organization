@@ -55,6 +55,11 @@ class OrganizationServiceProvider extends ServiceProvider
             ModuleRouter::group('organization', function () {
                 $this->loadRoutesFrom(__DIR__.'/../routes/web.php');
             });
+
+            // API-Routen registrieren
+            ModuleRouter::apiGroup('organization', function () {
+                $this->loadRoutesFrom(__DIR__.'/../routes/api.php');
+            });
         }
 
         // Schritt 4: Migrationen laden

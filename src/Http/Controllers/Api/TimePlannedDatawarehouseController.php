@@ -183,5 +183,56 @@ class TimePlannedDatawarehouseController extends ApiController
             }
         }
     }
+
+    /**
+     * Health Check Endpoint
+     * Gibt einen Beispiel-Datensatz zurück für Tests
+     */
+    public function health(Request $request)
+    {
+        try {
+            $example = OrganizationTimePlanned::with('user:id,name,email', 'team:id,name')
+                ->orderBy('created_at', 'desc')
+                ->first();
+
+            if (!$example) {
+                return $this->success([
+                    'status' => 'ok',
+                    'message' => 'API ist erreichbar, aber keine Time Planned Einträge vorhanden',
+                    'example' => null,
+                    'timestamp' => now()->toIso8601String(),
+                ], 'Health Check');
+            }
+
+            $exampleData = [
+                'id' => $example->id,
+                'uuid' => $example->uuid,
+                'team_id' => $example->team_id,
+                'team_name' => $example->team?->name,
+                'user_id' => $example->user_id,
+                'user_name' => $example->user?->name,
+                'user_email' => $example->user?->email,
+                'context_type' => $example->context_type,
+                'context_id' => $example->context_id,
+                'planned_minutes' => $example->planned_minutes,
+                'hours' => $example->hours,
+                'hours_formatted' => OrganizationTimeEntry::formatMinutesAsHours($example->planned_minutes),
+                'note' => $example->note,
+                'is_active' => $example->is_active,
+                'created_at' => $example->created_at->toIso8601String(),
+                'updated_at' => $example->updated_at->toIso8601String(),
+            ];
+
+            return $this->success([
+                'status' => 'ok',
+                'message' => 'API ist erreichbar',
+                'example' => $exampleData,
+                'timestamp' => now()->toIso8601String(),
+            ], 'Health Check');
+
+        } catch (\Exception $e) {
+            return $this->error('Health Check fehlgeschlagen: ' . $e->getMessage(), 500);
+        }
+    }
 }
 

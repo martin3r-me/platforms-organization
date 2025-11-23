@@ -260,5 +260,67 @@ class TimeEntryDatawarehouseController extends ApiController
             $query->withTrashed();
         }
     }
+
+    /**
+     * Health Check Endpoint
+     * Gibt einen Beispiel-Datensatz zurück für Tests
+     */
+    public function health(Request $request)
+    {
+        try {
+            $example = OrganizationTimeEntry::with('user:id,name,email', 'team:id,name')
+                ->orderBy('work_date', 'desc')
+                ->first();
+
+            if (!$example) {
+                return $this->success([
+                    'status' => 'ok',
+                    'message' => 'API ist erreichbar, aber keine Time Entries vorhanden',
+                    'example' => null,
+                    'timestamp' => now()->toIso8601String(),
+                ], 'Health Check');
+            }
+
+            $exampleData = [
+                'id' => $example->id,
+                'uuid' => $example->uuid,
+                'team_id' => $example->team_id,
+                'team_name' => $example->team?->name,
+                'user_id' => $example->user_id,
+                'user_name' => $example->user?->name,
+                'user_email' => $example->user?->email,
+                'context_type' => $example->context_type,
+                'context_id' => $example->context_id,
+                'root_context_type' => $example->root_context_type,
+                'root_context_id' => $example->root_context_id,
+                'work_date' => $example->work_date->format('Y-m-d'),
+                'minutes' => $example->minutes,
+                'hours' => $example->hours,
+                'hours_formatted' => OrganizationTimeEntry::formatMinutesAsHours($example->minutes),
+                'rate_cents' => $example->rate_cents,
+                'rate_euros' => $example->rate_cents ? round($example->rate_cents / 100, 2) : null,
+                'amount_cents' => $example->amount_cents,
+                'amount_euros' => $example->amount_cents ? round($example->amount_cents / 100, 2) : null,
+                'is_billed' => $example->is_billed,
+                'has_key_result' => $example->has_key_result ?? false,
+                'metadata' => $example->metadata,
+                'note' => $example->note,
+                'source_module' => $example->source_module,
+                'source_module_title' => $example->source_module_title,
+                'created_at' => $example->created_at->toIso8601String(),
+                'updated_at' => $example->updated_at->toIso8601String(),
+            ];
+
+            return $this->success([
+                'status' => 'ok',
+                'message' => 'API ist erreichbar',
+                'example' => $exampleData,
+                'timestamp' => now()->toIso8601String(),
+            ], 'Health Check');
+
+        } catch (\Exception $e) {
+            return $this->error('Health Check fehlgeschlagen: ' . $e->getMessage(), 500);
+        }
+    }
 }
 

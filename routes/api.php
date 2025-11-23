@@ -10,5 +10,7 @@ use Platform\Organization\Http\Controllers\Api\TimePlannedDatawarehouseControlle
  * Datawarehouse-Endpunkte für IST- und SOLL-Zeiten
  */
 Route::get('/time-entries/datawarehouse', [TimeEntryDatawarehouseController::class, 'index']);
+Route::get('/time-entries/datawarehouse/health', [TimeEntryDatawarehouseController::class, 'health']);
 Route::get('/time-planned/datawarehouse', [TimePlannedDatawarehouseController::class, 'index']);
+Route::get('/time-planned/datawarehouse/health', [TimePlannedDatawarehouseController::class, 'health']);
 

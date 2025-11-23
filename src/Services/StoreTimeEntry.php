@@ -98,22 +98,86 @@ class StoreTimeEntry
             // 5. Root-Kontext am Entry setzen
             // Wenn Ancestors vorhanden sind: Erster Root-Kontext aus Ancestors
             // Wenn keine Ancestors vorhanden sind: Primärer Kontext ist selbst der Root (z.B. Project)
+            $rootContextType = null;
+            $rootContextId = null;
+            
             if ($firstRoot) {
-                $entry->update([
-                    'root_context_type' => $firstRoot['type'],
-                    'root_context_id' => $firstRoot['id'],
-                ]);
+                $rootContextType = $firstRoot['type'];
+                $rootContextId = $firstRoot['id'];
             } else {
                 // Keine Ancestors = primärer Kontext ist selbst der Root (z.B. Project)
                 // Bei Projects: context_type/context_id UND root_context_type/root_context_id beide = Project
-                $entry->update([
-                    'root_context_type' => $data['context_type'],
-                    'root_context_id' => $data['context_id'],
-                ]);
+                $rootContextType = $data['context_type'];
+                $rootContextId = $data['context_id'];
             }
+            
+            // 6. Prüfe ob KeyResult-Bezug vorhanden ist
+            $hasKeyResult = $this->checkKeyResultLink($data['context_type'], $data['context_id'], $rootContextType, $rootContextId);
+            
+            $entry->update([
+                'root_context_type' => $rootContextType,
+                'root_context_id' => $rootContextId,
+                'has_key_result' => $hasKeyResult,
+            ]);
 
             return $entry->fresh();
         });
+    }
+
+    /**
+     * Prüft ob ein Context oder dessen Root-Context einen KeyResult-Bezug hat
+     * 
+     * @param string $contextType Primärer Context-Typ (z.B. Task)
+     * @param int $contextId Primärer Context-ID
+     * @param string|null $rootContextType Root-Context-Typ (z.B. Project)
+     * @param int|null $rootContextId Root-Context-ID
+     * @return bool
+     */
+    protected function checkKeyResultLink(string $contextType, int $contextId, ?string $rootContextType, ?int $rootContextId): bool
+    {
+        // Prüfe ob OKR-Modul verfügbar ist
+        if (!class_exists(\Platform\Okr\Models\KeyResultContext::class)) {
+            return false;
+        }
+
+        // 1. Prüfe Root-Context (z.B. Project) - das ist der häufigste Fall
+        if ($rootContextType && $rootContextId) {
+            $hasKeyResult = \Platform\Okr\Models\KeyResultContext::where('context_type', $rootContextType)
+                ->where('context_id', $rootContextId)
+                ->where('is_primary', true)
+                ->exists();
+            
+            if ($hasKeyResult) {
+                return true;
+            }
+        }
+
+        // 2. Prüfe primären Context direkt (falls z.B. Project direkt als Context gesetzt wurde)
+        $hasKeyResult = \Platform\Okr\Models\KeyResultContext::where('context_type', $contextType)
+            ->where('context_id', $contextId)
+            ->where('is_primary', true)
+            ->exists();
+        
+        if ($hasKeyResult) {
+            return true;
+        }
+
+        // 3. Für Tasks: Prüfe über Project (falls Task ein Project hat)
+        if ($contextType === 'Platform\Planner\Models\PlannerTask' || $contextType === \Platform\Planner\Models\PlannerTask::class) {
+            $task = \Platform\Planner\Models\PlannerTask::find($contextId);
+            if ($task && $task->project_id) {
+                $hasKeyResult = \Platform\Okr\Models\KeyResultContext::where('context_type', 'Platform\Planner\Models\PlannerProject')
+                    ->where('context_id', $task->project_id)
+                    ->where('is_primary', true)
+                    ->exists();
+                
+                if ($hasKeyResult) {
+                    return true;
+                }
+            }
+        }
+
+        return false;
     }
 }
 

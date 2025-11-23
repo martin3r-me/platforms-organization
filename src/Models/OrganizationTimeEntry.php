@@ -32,6 +32,7 @@ class OrganizationTimeEntry extends Model
         'rate_cents',
         'amount_cents',
         'is_billed',
+        'has_key_result',
         'metadata',
         'note',
     ];
@@ -42,6 +43,7 @@ class OrganizationTimeEntry extends Model
         'rate_cents' => 'integer',
         'amount_cents' => 'integer',
         'is_billed' => 'boolean',
+        'has_key_result' => 'boolean',
         'metadata' => 'array',
     ];
 

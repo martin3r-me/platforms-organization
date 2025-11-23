@@ -71,6 +71,7 @@ class TimeEntryDatawarehouseController extends ApiController
                 'amount_cents' => $entry->amount_cents,
                 'amount_euros' => $entry->amount_cents ? round($entry->amount_cents / 100, 2) : null,
                 'is_billed' => $entry->is_billed,
+                'has_key_result' => $entry->has_key_result ?? false,
                 'metadata' => $entry->metadata,
                 'note' => $entry->note,
                 'source_module' => $entry->source_module, // Berechnetes Attribut

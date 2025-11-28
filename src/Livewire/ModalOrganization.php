@@ -40,6 +40,10 @@ class ModalOrganization extends Component
 
     public string $activeTab = 'entry'; // 'entry', 'overview', 'planned', 'team', or 'organization'
     public string $timeRange = 'current_month'; // 'current_week', 'current_month', 'current_year', 'last_week', 'last_month'
+    
+    // Filter für Übersicht-Tab
+    public string $overviewTimeRange = 'all'; // 'all', 'current_week', 'current_month', 'current_year', 'last_week', 'last_month'
+    public ?int $selectedUserId = null; // null = alle Personen
 
     public $entries = [];
     public $plannedEntries = [];
@@ -184,6 +188,10 @@ class ModalOrganization extends Component
         $this->rate = null;
         $this->note = null;
         
+        // Filter zurücksetzen
+        $this->overviewTimeRange = 'all';
+        $this->selectedUserId = null;
+        
         // Tab basierend auf erlaubten Aktionen setzen
         if ($this->allowTimeEntry) {
             $this->activeTab = 'entry';
@@ -219,7 +227,7 @@ class ModalOrganization extends Component
     public function close(): void
     {
         $this->resetValidation();
-        $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote', 'allowTimeEntry', 'allowContextManagement', 'canLinkToEntity', 'availableChildRelations', 'selectedOrganizationEntityId', 'selectedChildRelations');
+        $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote', 'allowTimeEntry', 'allowContextManagement', 'canLinkToEntity', 'availableChildRelations', 'selectedOrganizationEntityId', 'selectedChildRelations', 'overviewTimeRange', 'selectedUserId');
         
         // Collections zurücksetzen
         $this->organizationContext = null;
@@ -233,12 +241,22 @@ class ModalOrganization extends Component
             return;
         }
 
-        $this->entries = OrganizationTimeEntry::query()
+        $query = OrganizationTimeEntry::query()
             ->forContextKey($this->contextType, $this->contextId)
-            ->with('user')
+            ->with('user');
+
+        // Personen-Filter anwenden
+        if ($this->selectedUserId) {
+            $query->where('user_id', $this->selectedUserId);
+        }
+
+        // Zeitraum-Filter anwenden
+        $query = $this->applyOverviewTimeRangeFilter($query);
+
+        $this->entries = $query
             ->orderByDesc('work_date')
             ->orderByDesc('id')
-            ->limit(50)
+            ->limit(200)
             ->get();
     }
 
@@ -272,6 +290,39 @@ class ModalOrganization extends Component
         $now = now();
         
         return match($this->timeRange) {
+            'current_week' => $query->whereBetween('work_date', [
+                $now->startOfWeek()->toDateString(),
+                $now->endOfWeek()->toDateString()
+            ]),
+            'current_month' => $query->whereBetween('work_date', [
+                $now->startOfMonth()->toDateString(),
+                $now->endOfMonth()->toDateString()
+            ]),
+            'current_year' => $query->whereBetween('work_date', [
+                $now->startOfYear()->toDateString(),
+                $now->endOfYear()->toDateString()
+            ]),
+            'last_week' => $query->whereBetween('work_date', [
+                $now->copy()->subWeek()->startOfWeek()->toDateString(),
+                $now->copy()->subWeek()->endOfWeek()->toDateString()
+            ]),
+            'last_month' => $query->whereBetween('work_date', [
+                $now->copy()->subMonth()->startOfMonth()->toDateString(),
+                $now->copy()->subMonth()->endOfMonth()->toDateString()
+            ]),
+            default => $query,
+        };
+    }
+
+    protected function applyOverviewTimeRangeFilter($query)
+    {
+        if ($this->overviewTimeRange === 'all') {
+            return $query;
+        }
+
+        $now = now();
+        
+        return match($this->overviewTimeRange) {
             'current_week' => $query->whereBetween('work_date', [
                 $now->startOfWeek()->toDateString(),
                 $now->endOfWeek()->toDateString()
@@ -358,7 +409,16 @@ class ModalOrganization extends Component
             return 0;
         }
 
-        return (int) OrganizationTimeEntry::query()->forContextKey($this->contextType, $this->contextId)->sum('minutes');
+        $query = OrganizationTimeEntry::query()
+            ->forContextKey($this->contextType, $this->contextId);
+
+        // Filter anwenden
+        if ($this->selectedUserId) {
+            $query->where('user_id', $this->selectedUserId);
+        }
+        $query = $this->applyOverviewTimeRangeFilter($query);
+
+        return (int) $query->sum('minutes');
     }
 
     public function getBilledMinutesProperty(): int
@@ -367,7 +427,17 @@ class ModalOrganization extends Component
             return 0;
         }
 
-        return (int) OrganizationTimeEntry::query()->forContextKey($this->contextType, $this->contextId)->where('is_billed', true)->sum('minutes');
+        $query = OrganizationTimeEntry::query()
+            ->forContextKey($this->contextType, $this->contextId)
+            ->where('is_billed', true);
+
+        // Filter anwenden
+        if ($this->selectedUserId) {
+            $query->where('user_id', $this->selectedUserId);
+        }
+        $query = $this->applyOverviewTimeRangeFilter($query);
+
+        return (int) $query->sum('minutes');
     }
 
     public function getUnbilledMinutesProperty(): int
@@ -381,10 +451,17 @@ class ModalOrganization extends Component
             return 0;
         }
 
-        return (int) OrganizationTimeEntry::query()
+        $query = OrganizationTimeEntry::query()
             ->forContextKey($this->contextType, $this->contextId)
-            ->where('is_billed', false)
-            ->sum('amount_cents');
+            ->where('is_billed', false);
+
+        // Filter anwenden
+        if ($this->selectedUserId) {
+            $query->where('user_id', $this->selectedUserId);
+        }
+        $query = $this->applyOverviewTimeRangeFilter($query);
+
+        return (int) $query->sum('amount_cents');
     }
 
     public function toggleBilled(int $entryId): void
@@ -557,6 +634,46 @@ class ModalOrganization extends Component
     public function updatedTimeRange(): void
     {
         $this->loadTeamEntries();
+    }
+
+    public function updatedOverviewTimeRange(): void
+    {
+        $this->loadEntries();
+    }
+
+    public function updatedSelectedUserId(): void
+    {
+        $this->loadEntries();
+    }
+
+    public function getAvailableUsersProperty()
+    {
+        $user = Auth::user();
+        $team = $user?->currentTeamRelation;
+
+        if (! $team) {
+            return collect();
+        }
+
+        // Hole alle Benutzer, die Zeiten für diesen Kontext haben
+        $userIds = OrganizationTimeEntry::query()
+            ->forContextKey($this->contextType, $this->contextId)
+            ->distinct()
+            ->pluck('user_id')
+            ->filter()
+            ->toArray();
+
+        if (empty($userIds)) {
+            return collect();
+        }
+
+        return \Platform\Core\Models\User::query()
+            ->whereIn('id', $userIds)
+            ->whereHas('teams', function($q) use ($team) {
+                $q->where('teams.id', $team->id);
+            })
+            ->orderBy('name')
+            ->get();
     }
 
     public function save(): void

@@ -335,6 +335,91 @@
             @if($allowTimeEntry)
             <div x-show="activeTab === 'overview'" x-cloak>
                 <div class="space-y-6">
+                    <!-- Filter -->
+                    <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
+                        <!-- Personen-Filter -->
+                        <div class="flex-1 min-w-0 w-full sm:w-auto">
+                            <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">Person:</label>
+                            <select
+                                name="selectedUserId"
+                                wire:model.live="selectedUserId"
+                                class="w-full px-4 py-2 text-sm rounded-xl border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]/20 focus:border-[var(--ui-primary)]"
+                            >
+                                <option value="">Alle</option>
+                                @foreach($this->availableUsers as $user)
+                                    <option value="{{ $user->id }}">{{ $user->name }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        
+                        <!-- Zeitraum-Filter -->
+                        <div class="flex-1 min-w-0 w-full sm:w-auto">
+                            <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">Zeitraum:</label>
+                            <div class="flex gap-2 flex-wrap">
+                                <button
+                                    wire:click="$set('overviewTimeRange', 'all')"
+                                    wire:loading.attr="disabled"
+                                    :class="$wire.overviewTimeRange === 'all'
+                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
+                                        : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
+                                    class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
+                                >
+                                    Alle
+                                </button>
+                                <button
+                                    wire:click="$set('overviewTimeRange', 'current_week')"
+                                    wire:loading.attr="disabled"
+                                    :class="$wire.overviewTimeRange === 'current_week'
+                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
+                                        : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
+                                    class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
+                                >
+                                    Diese Woche
+                                </button>
+                                <button
+                                    wire:click="$set('overviewTimeRange', 'current_month')"
+                                    wire:loading.attr="disabled"
+                                    :class="$wire.overviewTimeRange === 'current_month'
+                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
+                                        : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
+                                    class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
+                                >
+                                    Dieser Monat
+                                </button>
+                                <button
+                                    wire:click="$set('overviewTimeRange', 'current_year')"
+                                    wire:loading.attr="disabled"
+                                    :class="$wire.overviewTimeRange === 'current_year'
+                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
+                                        : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
+                                    class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
+                                >
+                                    Dieses Jahr
+                                </button>
+                                <button
+                                    wire:click="$set('overviewTimeRange', 'last_week')"
+                                    wire:loading.attr="disabled"
+                                    :class="$wire.overviewTimeRange === 'last_week'
+                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
+                                        : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
+                                    class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
+                                >
+                                    Letzte Woche
+                                </button>
+                                <button
+                                    wire:click="$set('overviewTimeRange', 'last_month')"
+                                    wire:loading.attr="disabled"
+                                    :class="$wire.overviewTimeRange === 'last_month'
+                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
+                                        : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
+                                    class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
+                                >
+                                    Letzter Monat
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                     <!-- Statistics -->
                     <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         <div class="p-5 bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 shadow-sm">

@@ -40,7 +40,7 @@ class ModalOrganization extends Component
 
     public string $activeTab = 'entry'; // 'entry', 'overview', 'planned', 'team', or 'organization'
     public string $timeRange = 'current_month'; // 'current_week', 'current_month', 'current_year', 'last_week', 'last_month'
-    
+
     // Filter für Übersicht-Tab
     public string $overviewTimeRange = 'all'; // 'all', 'current_week', 'current_month', 'current_year', 'last_week', 'last_month'
     public ?int $selectedUserId = null; // null = alle Personen
@@ -48,6 +48,12 @@ class ModalOrganization extends Component
     public $entries = [];
     public $plannedEntries = [];
     public $teamEntries = [];
+    
+    // Gecachte Statistiken für Performance
+    public ?int $cachedTotalMinutes = null;
+    public ?int $cachedBilledMinutes = null;
+    public ?int $cachedUnbilledAmountCents = null;
+    public $cachedAvailableUsers = null;
     
     // Organization Context Management
     public $organizationContext = null;
@@ -58,17 +64,19 @@ class ModalOrganization extends Component
     public ?int $plannedMinutes = null;
     public ?string $plannedNote = null;
 
-    // Minute-Optionen: 5, 10, 15, 30, 45 Minuten, dann 1h bis 8h in 0.5h-Schritten
+    // Minute-Optionen: 5, 10, 15, 20, 25, 30, 45 Minuten, dann 1h bis 8h in 0.5h-Schritten
     // Statisch generiert, da Computed Properties in rules() nicht verfügbar sind
     protected function getMinuteOptions(): array
     {
         static $options = null;
         if ($options === null) {
             $options = [];
-            // Kurze Zeiten: 5, 10, 15, 30, 45 Minuten
+            // Kurze Zeiten: 5, 10, 15, 20, 25, 30, 45 Minuten
             $options[] = 5;
             $options[] = 10;
             $options[] = 15;
+            $options[] = 20;
+            $options[] = 25;
             $options[] = 30;
             $options[] = 45;
             // Dann 1h bis 8h in 0.5h-Schritten (30 Minuten)
@@ -201,6 +209,12 @@ class ModalOrganization extends Component
             $this->activeTab = 'overview';
         }
 
+        // Cache zurücksetzen beim Öffnen
+        $this->cachedTotalMinutes = null;
+        $this->cachedBilledMinutes = null;
+        $this->cachedUnbilledAmountCents = null;
+        $this->cachedAvailableUsers = null;
+
         // Wenn Kontext vorhanden und TimeEntry erlaubt, Daten laden
         if ($this->allowTimeEntry && $this->contextType && $this->contextId) {
             if (class_exists($this->contextType) && $this->contextSupportsTimeEntries($this->contextType)) {
@@ -229,35 +243,51 @@ class ModalOrganization extends Component
         $this->resetValidation();
         $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote', 'allowTimeEntry', 'allowContextManagement', 'canLinkToEntity', 'availableChildRelations', 'selectedOrganizationEntityId', 'selectedChildRelations', 'overviewTimeRange', 'selectedUserId');
         
-        // Collections zurücksetzen
+        // Collections und Cache zurücksetzen
         $this->organizationContext = null;
         $this->availableOrganizationEntities = collect();
+        $this->cachedTotalMinutes = null;
+        $this->cachedBilledMinutes = null;
+        $this->cachedUnbilledAmountCents = null;
+        $this->cachedAvailableUsers = null;
     }
 
     protected function loadEntries(): void
     {
         if (! $this->contextType || ! $this->contextId) {
             $this->entries = collect();
+            $this->cachedTotalMinutes = 0;
+            $this->cachedBilledMinutes = 0;
+            $this->cachedUnbilledAmountCents = 0;
             return;
         }
 
-        $query = OrganizationTimeEntry::query()
-            ->forContextKey($this->contextType, $this->contextId)
-            ->with('user');
+        $baseQuery = OrganizationTimeEntry::query()
+            ->forContextKey($this->contextType, $this->contextId);
 
         // Personen-Filter anwenden
         if ($this->selectedUserId) {
-            $query->where('user_id', $this->selectedUserId);
+            $baseQuery->where('user_id', $this->selectedUserId);
         }
 
         // Zeitraum-Filter anwenden
-        $query = $this->applyOverviewTimeRangeFilter($query);
+        $baseQuery = $this->applyOverviewTimeRangeFilter($baseQuery);
 
-        $this->entries = $query
+        // Einträge laden
+        $this->entries = (clone $baseQuery)
+            ->with('user')
             ->orderByDesc('work_date')
             ->orderByDesc('id')
             ->limit(200)
             ->get();
+
+        // Statistiken in einem Durchgang berechnen (Performance-Optimierung)
+        $this->cachedTotalMinutes = (int) (clone $baseQuery)->sum('minutes');
+        $this->cachedBilledMinutes = (int) (clone $baseQuery)->where('is_billed', true)->sum('minutes');
+        $this->cachedUnbilledAmountCents = (int) (clone $baseQuery)->where('is_billed', false)->sum('amount_cents');
+        
+        // Cache für verfügbare Benutzer zurücksetzen, damit er neu berechnet wird
+        $this->cachedAvailableUsers = null;
     }
 
     protected function loadTeamEntries(): void
@@ -405,6 +435,11 @@ class ModalOrganization extends Component
 
     public function getTotalMinutesProperty(): int
     {
+        // Verwende gecachte Werte für bessere Performance
+        if ($this->cachedTotalMinutes !== null) {
+            return $this->cachedTotalMinutes;
+        }
+
         if (! $this->contextType || ! $this->contextId) {
             return 0;
         }
@@ -418,11 +453,17 @@ class ModalOrganization extends Component
         }
         $query = $this->applyOverviewTimeRangeFilter($query);
 
-        return (int) $query->sum('minutes');
+        $this->cachedTotalMinutes = (int) $query->sum('minutes');
+        return $this->cachedTotalMinutes;
     }
 
     public function getBilledMinutesProperty(): int
     {
+        // Verwende gecachte Werte für bessere Performance
+        if ($this->cachedBilledMinutes !== null) {
+            return $this->cachedBilledMinutes;
+        }
+
         if (! $this->contextType || ! $this->contextId) {
             return 0;
         }
@@ -437,7 +478,8 @@ class ModalOrganization extends Component
         }
         $query = $this->applyOverviewTimeRangeFilter($query);
 
-        return (int) $query->sum('minutes');
+        $this->cachedBilledMinutes = (int) $query->sum('minutes');
+        return $this->cachedBilledMinutes;
     }
 
     public function getUnbilledMinutesProperty(): int
@@ -447,6 +489,11 @@ class ModalOrganization extends Component
 
     public function getUnbilledAmountCentsProperty(): int
     {
+        // Verwende gecachte Werte für bessere Performance
+        if ($this->cachedUnbilledAmountCents !== null) {
+            return $this->cachedUnbilledAmountCents;
+        }
+
         if (! $this->contextType || ! $this->contextId) {
             return 0;
         }
@@ -461,7 +508,8 @@ class ModalOrganization extends Component
         }
         $query = $this->applyOverviewTimeRangeFilter($query);
 
-        return (int) $query->sum('amount_cents');
+        $this->cachedUnbilledAmountCents = (int) $query->sum('amount_cents');
+        return $this->cachedUnbilledAmountCents;
     }
 
     public function toggleBilled(int $entryId): void
@@ -484,6 +532,11 @@ class ModalOrganization extends Component
         $entry->is_billed = ! $entry->is_billed;
         $entry->save();
 
+        // Cache zurücksetzen, damit Statistiken neu berechnet werden
+        $this->cachedTotalMinutes = null;
+        $this->cachedBilledMinutes = null;
+        $this->cachedUnbilledAmountCents = null;
+        
         $this->loadEntries();
 
         $this->dispatch('notify', [
@@ -510,6 +563,12 @@ class ModalOrganization extends Component
         }
 
         $entry->delete();
+        
+        // Cache zurücksetzen, damit Statistiken neu berechnet werden
+        $this->cachedTotalMinutes = null;
+        $this->cachedBilledMinutes = null;
+        $this->cachedUnbilledAmountCents = null;
+        
         $this->loadEntries();
 
         $this->dispatch('notify', [
@@ -648,14 +707,21 @@ class ModalOrganization extends Component
 
     public function getAvailableUsersProperty()
     {
+        // Verwende gecachte Werte für bessere Performance
+        if ($this->cachedAvailableUsers !== null) {
+            return $this->cachedAvailableUsers;
+        }
+
         $user = Auth::user();
         $team = $user?->currentTeamRelation;
 
-        if (! $team) {
-            return collect();
+        if (! $team || ! $this->contextType || ! $this->contextId) {
+            $this->cachedAvailableUsers = collect();
+            return $this->cachedAvailableUsers;
         }
 
         // Hole alle Benutzer, die Zeiten für diesen Kontext haben
+        // Optimiert: Verwende select() um nur die benötigten Spalten zu laden
         $userIds = OrganizationTimeEntry::query()
             ->forContextKey($this->contextType, $this->contextId)
             ->distinct()
@@ -664,16 +730,19 @@ class ModalOrganization extends Component
             ->toArray();
 
         if (empty($userIds)) {
-            return collect();
+            $this->cachedAvailableUsers = collect();
+            return $this->cachedAvailableUsers;
         }
 
-        return \Platform\Core\Models\User::query()
+        $this->cachedAvailableUsers = \Platform\Core\Models\User::query()
             ->whereIn('id', $userIds)
             ->whereHas('teams', function($q) use ($team) {
                 $q->where('teams.id', $team->id);
             })
             ->orderBy('name')
             ->get();
+            
+        return $this->cachedAvailableUsers;
     }
 
     public function save(): void

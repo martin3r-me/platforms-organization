@@ -262,8 +262,10 @@ class ModalOrganization extends Component
             return;
         }
 
+        // Nur Einträge, deren Root-Kontext genau auf den aktuellen Kontext zeigt
         $baseQuery = OrganizationTimeEntry::query()
-            ->forContextKey($this->contextType, $this->contextId);
+            ->where('root_context_type', $this->contextType)
+            ->where('root_context_id', $this->contextId);
 
         // Personen-Filter anwenden
         if ($this->selectedUserId) {

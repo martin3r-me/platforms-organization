@@ -605,7 +605,7 @@
                         <div class="space-y-5">
                             <div>
                                 <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-3">
-                                    Geplante Stunden
+                                    Geplante Zeit
                                 </label>
                                 <div class="grid gap-3 mb-3" style="grid-template-columns: repeat(8, minmax(0, 1fr));">
                                     @foreach([1, 2, 3, 4, 5, 6, 7, 8] as $quickHours)
@@ -615,6 +615,17 @@
                                             class="px-4 py-3 rounded-xl border-2 font-bold transition-all duration-200 hover:scale-105 text-sm {{ $plannedMinutes === ($quickHours * 60) ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md scale-105' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
                                         >
                                             {{ $quickHours }}h
+                                        </button>
+                                    @endforeach
+                                </div>
+                                <div class="grid gap-3 mb-3" style="grid-template-columns: repeat(5, minmax(0, 1fr));">
+                                    @foreach([1, 2, 3, 4, 5, 10, 15, 20, 30, 40] as $quickDays)
+                                        <button
+                                            type="button"
+                                            wire:click="$set('plannedMinutes', {{ $quickDays * 8 * 60 }})"
+                                            class="px-4 py-3 rounded-xl border-2 font-bold transition-all duration-200 hover:scale-105 text-sm {{ $plannedMinutes === ($quickDays * 8 * 60) ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md scale-105' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
+                                        >
+                                            {{ $quickDays }} Tag{{ $quickDays > 1 ? 'e' : '' }} (à 8h)
                                         </button>
                                     @endforeach
                                 </div>
@@ -630,7 +641,10 @@
                                     <p class="mt-2 text-xs text-[var(--ui-danger)]">{{ $message }}</p>
                                 @enderror
                                 @if($plannedMinutes)
-                                    <p class="mt-2 text-xs font-medium text-[var(--ui-secondary)]">{{ number_format($plannedMinutes / 60, 2, ',', '.') }} Stunden</p>
+                                    <p class="mt-2 text-xs font-medium text-[var(--ui-secondary)]">
+                                        {{ number_format($plannedMinutes / 60, 2, ',', '.') }} Stunden
+                                        <span class="text-[var(--ui-muted)]">({{ number_format($plannedMinutes / 480, 2, ',', '.') }} Tage à 8h)</span>
+                                    </p>
                                 @endif
                             </div>
 

@@ -110,6 +110,24 @@ class OrganizationTimeEntry extends Model
         });
     }
 
+    /**
+     * Scope: Alle Time-Entries mit gegebenem Root-Context.
+     * Berücksichtigt direkte root_context_* Felder und zusätzliche Kontexte mit is_root = true.
+     */
+    public function scopeForRootContext($query, string $type, int $id)
+    {
+        return $query->where(function ($q) use ($type, $id) {
+            $q->where(function ($rq) use ($type, $id) {
+                $rq->where('root_context_type', $type)
+                   ->where('root_context_id', $id);
+            })->orWhereHas('additionalContexts', function ($aq) use ($type, $id) {
+                $aq->where('is_root', true)
+                   ->where('context_type', $type)
+                   ->where('context_id', $id);
+            });
+        });
+    }
+
     public function getHoursAttribute(): float
     {
         return round(($this->minutes ?? 0) / 60, 2);

@@ -270,11 +270,20 @@ class ModalOrganization extends Component
                 $q->where(function ($rq) {
                     $rq->where('root_context_type', $this->contextType)
                        ->where('root_context_id', $this->contextId);
-                })->orWhere(function ($rq) {
+                })
+                // Fallback: root_context_* leer, aber direkter Kontext
+                ->orWhere(function ($rq) {
                     $rq->whereNull('root_context_type')
                        ->where('context_type', $this->contextType)
                        ->where('context_id', $this->contextId);
-                })->orWhereHas('additionalContexts', function ($aq) {
+                })
+                // Direkter Kontext, auch wenn root_context_* gesetzt ist (z. B. Task als Kontext, root=Project)
+                ->orWhere(function ($rq) {
+                    $rq->where('context_type', $this->contextType)
+                       ->where('context_id', $this->contextId);
+                })
+                // Zusätzliche Kontexte mit is_root = true
+                ->orWhereHas('additionalContexts', function ($aq) {
                     $aq->where('is_root', true)
                        ->where('context_type', $this->contextType)
                        ->where('context_id', $this->contextId);

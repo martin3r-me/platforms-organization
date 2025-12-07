@@ -262,10 +262,24 @@ class ModalOrganization extends Component
             return;
         }
 
-        // Nur Einträge, deren Root-Kontext genau auf den aktuellen Kontext zeigt
+        // Einträge, deren Root-Kontext auf den aktuellen Kontext zeigt
+        // plus Fallback: root_context_* leer, aber direct context match,
+        // plus additionalContexts mit is_root = true.
         $baseQuery = OrganizationTimeEntry::query()
-            ->where('root_context_type', $this->contextType)
-            ->where('root_context_id', $this->contextId);
+            ->where(function ($q) {
+                $q->where(function ($rq) {
+                    $rq->where('root_context_type', $this->contextType)
+                       ->where('root_context_id', $this->contextId);
+                })->orWhere(function ($rq) {
+                    $rq->whereNull('root_context_type')
+                       ->where('context_type', $this->contextType)
+                       ->where('context_id', $this->contextId);
+                })->orWhereHas('additionalContexts', function ($aq) {
+                    $aq->where('is_root', true)
+                       ->where('context_type', $this->contextType)
+                       ->where('context_id', $this->contextId);
+                });
+            });
 
         // Personen-Filter anwenden
         if ($this->selectedUserId) {

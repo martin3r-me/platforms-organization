@@ -897,6 +897,100 @@ class ModalOrganization extends Component
         return in_array(HasTimeEntries::class, class_uses_recursive($class));
     }
 
+    /**
+     * Gibt das Root-Team für Organization zurück (da Organization root-scoped ist)
+     */
+    protected function getOrganizationTeam()
+    {
+        $user = Auth::user();
+        $baseTeam = $user?->currentTeamRelation;
+        
+        if (! $baseTeam) {
+            return null;
+        }
+
+        // Organization ist root-scoped, daher immer Root-Team verwenden
+        // Prüfe explizit ob Organization root-scoped ist (analog zu OKR)
+        $organizationModule = \Platform\Core\Models\Module::where('key', 'organization')->first();
+        
+        // Wenn Organization ein Parent Tool ist, verwende das Root-Team
+        if ($organizationModule && $organizationModule->isRootScoped()) {
+            return $baseTeam->getRootTeam();
+        }
+        
+        // Fallback: Basis-Team
+        return $baseTeam;
+    }
+
+    /**
+     * Debug-Informationen für das Modal
+     */
+    public function getDebugInfoProperty(): array
+    {
+        $user = Auth::user();
+        $baseTeam = $user?->currentTeamRelation;
+        $organizationTeam = $this->getOrganizationTeam();
+        $organizationModule = \Platform\Core\Models\Module::where('key', 'organization')->first();
+
+        // Zähle Entities und Cost Centers
+        $entitiesCount = 0;
+        $costCentersCount = 0;
+        if ($organizationTeam) {
+            $entitiesCount = \Platform\Organization\Models\OrganizationEntity::query()
+                ->where('team_id', $organizationTeam->id)
+                ->where('is_active', true)
+                ->count();
+            
+            $costCentersCount = \Platform\Organization\Models\OrganizationCostCenter::query()
+                ->where('team_id', $organizationTeam->id)
+                ->where('is_active', true)
+                ->count();
+        }
+
+        // Zähle alle Entities/Cost Centers (ohne Team-Filter)
+        $allEntitiesCount = \Platform\Organization\Models\OrganizationEntity::query()
+            ->where('is_active', true)
+            ->count();
+        
+        $allCostCentersCount = \Platform\Organization\Models\OrganizationCostCenter::query()
+            ->where('is_active', true)
+            ->count();
+
+        return [
+            'user_id' => $user?->id,
+            'user_name' => $user?->name,
+            'base_team' => [
+                'id' => $baseTeam?->id,
+                'name' => $baseTeam?->name,
+                'is_root' => $baseTeam?->isRootTeam() ?? false,
+                'parent_team_id' => $baseTeam?->parent_team_id,
+            ],
+            'organization_team' => [
+                'id' => $organizationTeam?->id,
+                'name' => $organizationTeam?->name,
+                'is_root' => $organizationTeam?->isRootTeam() ?? false,
+            ],
+            'organization_module' => [
+                'exists' => $organizationModule !== null,
+                'key' => $organizationModule?->key,
+                'scope_type' => $organizationModule?->scope_type,
+                'is_root_scoped' => $organizationModule?->isRootScoped() ?? false,
+            ],
+            'counts' => [
+                'entities_in_team' => $entitiesCount,
+                'cost_centers_in_team' => $costCentersCount,
+                'all_entities' => $allEntitiesCount,
+                'all_cost_centers' => $allCostCentersCount,
+            ],
+            'available_entities_count' => is_countable($this->availableOrganizationEntities) ? count($this->availableOrganizationEntities) : 0,
+            'available_cost_centers_count' => is_countable($this->availableCostCenters) ? count($this->availableCostCenters) : 0,
+            'context' => [
+                'type' => $this->contextType,
+                'id' => $this->contextId,
+            ],
+        ];
+    }
+
     protected function rateToCents(?string $value): ?int
     {
         if ($value === null || trim($value) === '') {
@@ -935,8 +1029,7 @@ class ModalOrganization extends Component
 
     protected function loadAvailableOrganizationEntities(): void
     {
-        $user = Auth::user();
-        $team = $user?->currentTeamRelation;
+        $team = $this->getOrganizationTeam();
         
         if (! $team) {
             $this->availableOrganizationEntities = collect();
@@ -949,11 +1042,7 @@ class ModalOrganization extends Component
             ->with('type')
             ->orderBy('name');
 
-        // Bereits gelinkte Entity ausschließen (falls vorhanden)
-        if ($this->organizationContext && $this->organizationContext->organization_entity_id) {
-            $query->where('id', '!=', $this->organizationContext->organization_entity_id);
-        }
-
+        // Alle Entities anzeigen (auch bereits verknüpfte)
         $this->availableOrganizationEntities = $query->get();
     }
 
@@ -995,19 +1084,36 @@ class ModalOrganization extends Component
             return;
         }
 
-        // Verknüpfe mit ausgewählten Relations (falls vorhanden)
-        $includeRelations = !empty($this->selectedChildRelations) ? $this->selectedChildRelations : null;
-        
-        $contextModel->attachOrganizationContext($entity, $includeRelations);
+        try {
+            // Verknüpfe mit ausgewählten Relations (falls vorhanden)
+            $includeRelations = !empty($this->selectedChildRelations) ? $this->selectedChildRelations : null;
+            
+            $wasLinked = $this->organizationContext && $this->organizationContext->organizationEntity;
+            $contextModel->attachOrganizationContext($entity, $includeRelations);
 
-        $this->loadOrganizationContexts();
-        $this->selectedOrganizationEntityId = null;
-        $this->selectedChildRelations = [];
+            $this->loadOrganizationContexts();
+            $this->loadAvailableOrganizationEntities(); // Neu laden damit die Liste aktualisiert wird
+            $this->selectedOrganizationEntityId = null;
+            $this->selectedChildRelations = [];
 
-        $this->dispatch('notify', [
-            'type' => 'success',
-            'message' => 'Verknüpfung erstellt.',
-        ]);
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => $wasLinked ? 'Verknüpfung aktualisiert.' : 'Verknüpfung erstellt.',
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Fehler beim Verknüpfen der Organization Entity', [
+                'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+                'context_type' => $this->contextType,
+                'context_id' => $this->contextId,
+                'entity_id' => $entity->id,
+            ]);
+            
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Fehler beim Verknüpfen: ' . $e->getMessage(),
+            ]);
+        }
     }
 
     public function detachOrganizationContext(): void
@@ -1052,13 +1158,12 @@ class ModalOrganization extends Component
     // Cost Center Management Methods
     protected function loadCostCenters(): void
     {
-        if (! Auth::check() || ! Auth::user()->currentTeamRelation) {
+        $team = $this->getOrganizationTeam();
+        
+        if (! $team) {
             $this->availableCostCenters = collect();
             return;
         }
-
-        $user = Auth::user();
-        $team = $user->currentTeamRelation;
 
         $query = \Platform\Organization\Models\OrganizationCostCenter::query()
             ->where('team_id', $team->id)
@@ -1156,16 +1261,40 @@ class ModalOrganization extends Component
             return;
         }
 
-        // Verknüpfe Cost Center
-        $contextModel->attachCostCenter($costCenter);
+        try {
+            // Verknüpfe Cost Center direkt über die Link-Tabelle
+            // (Das Trait verwendet entity_id, aber wir brauchen cost_center_id)
+            $team = $this->getOrganizationTeam();
+            
+            \Platform\Organization\Models\OrganizationCostCenterLink::create([
+                'cost_center_id' => $costCenter->id,
+                'linkable_type' => $this->contextType,
+                'linkable_id' => $this->contextId,
+                'team_id' => $team?->id,
+                'created_by_user_id' => Auth::id(),
+                'is_primary' => false,
+            ]);
 
-        $this->loadLinkedCostCenters();
-        $this->loadCostCenters();
+            $this->loadLinkedCostCenters();
+            $this->loadCostCenters();
 
-        $this->dispatch('notify', [
-            'type' => 'success',
-            'message' => 'Kostenstelle verknüpft.',
-        ]);
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => 'Kostenstelle verknüpft.',
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Fehler beim Verknüpfen der Kostenstelle', [
+                'error' => $e->getMessage(),
+                'context_type' => $this->contextType,
+                'context_id' => $this->contextId,
+                'cost_center_id' => $costCenter->id,
+            ]);
+            
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Fehler beim Verknüpfen: ' . $e->getMessage(),
+            ]);
+        }
     }
 
     public function detachCostCenter(int $costCenterId): void
@@ -1206,26 +1335,40 @@ class ModalOrganization extends Component
             return;
         }
 
-        // Entferne Verknüpfung
-        $contextModel->detachCostCenter($costCenter);
+        try {
+            // Entferne Verknüpfung direkt über die Link-Tabelle
+            \Platform\Organization\Models\OrganizationCostCenterLink::query()
+                ->where('cost_center_id', $costCenter->id)
+                ->where('linkable_type', $this->contextType)
+                ->where('linkable_id', $this->contextId)
+                ->delete();
 
-        $this->loadLinkedCostCenters();
-        $this->loadCostCenters();
+            $this->loadLinkedCostCenters();
+            $this->loadCostCenters();
 
-        $this->dispatch('notify', [
-            'type' => 'success',
-            'message' => 'Verknüpfung entfernt.',
-        ]);
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => 'Verknüpfung entfernt.',
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('Fehler beim Entfernen der Kostenstellen-Verknüpfung', [
+                'error' => $e->getMessage(),
+                'context_type' => $this->contextType,
+                'context_id' => $this->contextId,
+                'cost_center_id' => $costCenter->id,
+            ]);
+            
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Fehler beim Entfernen: ' . $e->getMessage(),
+            ]);
+        }
     }
 
     // VSM System Management Methods
     protected function loadVsmSystems(): void
     {
-        if (! Auth::check() || ! Auth::user()->currentTeamRelation) {
-            $this->availableVsmSystems = collect();
-            return;
-        }
-
+        // VSM-Systeme sind global (kein team_id), daher keine Team-Filterung nötig
         $query = \Platform\Organization\Models\OrganizationVsmSystem::query()
             ->where('is_active', true)
             ->orderBy('sort_order')

@@ -30,6 +30,28 @@
         </div>
     </x-slot>
 
+    <!-- Debug Information -->
+    @if(config('app.debug'))
+    <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-xs">
+        <div class="font-bold mb-2 text-yellow-800">🐛 Debug Information</div>
+        <div class="space-y-1 text-yellow-700">
+            <div><strong>User:</strong> {{ $this->debugInfo['user_name'] ?? 'N/A' }} (ID: {{ $this->debugInfo['user_id'] ?? 'N/A' }})</div>
+            <div><strong>Base Team:</strong> {{ $this->debugInfo['base_team']['name'] ?? 'N/A' }} (ID: {{ $this->debugInfo['base_team']['id'] ?? 'N/A' }}) - Root: {{ $this->debugInfo['base_team']['is_root'] ? 'Ja' : 'Nein' }}</div>
+            <div><strong>Organization Team:</strong> {{ $this->debugInfo['organization_team']['name'] ?? 'N/A' }} (ID: {{ $this->debugInfo['organization_team']['id'] ?? 'N/A' }}) - Root: {{ $this->debugInfo['organization_team']['is_root'] ? 'Ja' : 'Nein' }}</div>
+            <div><strong>Module:</strong> {{ $this->debugInfo['organization_module']['key'] ?? 'N/A' }} - Scope: {{ $this->debugInfo['organization_module']['scope_type'] ?? 'N/A' }} - Root-Scoped: {{ $this->debugInfo['organization_module']['is_root_scoped'] ? 'Ja' : 'Nein' }}</div>
+            <div class="mt-2 pt-2 border-t border-yellow-300">
+                <div><strong>Entities:</strong> {{ $this->debugInfo['counts']['entities_in_team'] ?? 0 }} im Team / {{ $this->debugInfo['counts']['all_entities'] ?? 0 }} gesamt / {{ $this->debugInfo['available_entities_count'] ?? 0 }} geladen</div>
+                <div><strong>Cost Centers:</strong> {{ $this->debugInfo['counts']['cost_centers_in_team'] ?? 0 }} im Team / {{ $this->debugInfo['counts']['all_cost_centers'] ?? 0 }} gesamt / {{ $this->debugInfo['available_cost_centers_count'] ?? 0 }} geladen</div>
+            </div>
+            @if($this->debugInfo['context']['type'] ?? null)
+            <div class="mt-2 pt-2 border-t border-yellow-300">
+                <div><strong>Context:</strong> {{ class_basename($this->debugInfo['context']['type']) }} (ID: {{ $this->debugInfo['context']['id'] }})</div>
+            </div>
+            @endif
+        </div>
+    </div>
+    @endif
+
     <div>
         @if(!$contextType || !$contextId)
             <!-- Team-Übersicht: Kein Kontext -->
@@ -998,26 +1020,56 @@
                         </div>
                     </div>
 
-                    <!-- Neue Verknüpfung erstellen -->
-                    <div class="pt-6 border-t border-[var(--ui-border)]/60">
-                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">Neue Verknüpfung erstellen</h4>
-                        <div class="space-y-4">
-                            <!-- Organization Entity Auswahl -->
-                            <div>
-                                <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">
-                                    Organization Entity
-                                </label>
-                                <x-ui-input-select
-                                    name="selectedOrganizationEntityId"
-                                    wire:model.live="selectedOrganizationEntityId"
-                                    :options="is_array($availableOrganizationEntities) ? collect($availableOrganizationEntities)->pluck('name', 'id')->toArray() : $availableOrganizationEntities->pluck('name', 'id')->toArray()"
-                                    placeholder="Organization Entity auswählen..."
-                                />
+                    <!-- Organization Entity auswählen -->
+                    <div class="pt-6 {{ $organizationContext && $organizationContext->organizationEntity ? 'border-t border-[var(--ui-border)]/60' : '' }}">
+                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">Organization Entity verknüpfen</h4>
+                        
+                        <!-- Verfügbare Organization Entities -->
+                        @if($availableOrganizationEntities && $availableOrganizationEntities->count() > 0)
+                            <div class="space-y-2 max-h-96 overflow-y-auto">
+                                @foreach($availableOrganizationEntities as $entity)
+                                    @php
+                                        $isLinked = $organizationContext && $organizationContext->organizationEntity && $organizationContext->organizationEntity->id === $entity->id;
+                                    @endphp
+                                    <div class="flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:bg-[var(--ui-muted-5)] transition-colors {{ $isLinked ? 'opacity-50' : '' }}">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex-shrink-0">
+                                                    <div class="w-10 h-10 rounded-lg bg-[var(--ui-primary-5)] flex items-center justify-center">
+                                                        @svg('heroicon-o-building-office', 'w-5 h-5 text-[var(--ui-primary)]')
+                                                    </div>
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="font-semibold text-[var(--ui-secondary)] truncate">{{ $entity->name }}</div>
+                                                    @if($entity->type)
+                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ $entity->type->name }}</div>
+                                                    @endif
+                                                    @if($entity->code)
+                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">Code: {{ $entity->code }}</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="flex-shrink-0 ml-4">
+                                            @if($isLinked)
+                                                <span class="text-xs font-medium text-[var(--ui-muted)]">Bereits verknüpft</span>
+                                            @else
+                                                <x-ui-button 
+                                                    variant="primary" 
+                                                    size="sm"
+                                                    wire:click="$set('selectedOrganizationEntityId', {{ $entity->id }})"
+                                                >
+                                                    Auswählen
+                                                </x-ui-button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
                             </div>
 
-                            <!-- Child Relations Checkboxes (nur wenn verfügbar) -->
-                            @if(!empty($availableChildRelations))
-                            <div>
+                            <!-- Child Relations Checkboxes (nur wenn verfügbar und Entity ausgewählt) -->
+                            @if(!empty($availableChildRelations) && $selectedOrganizationEntityId)
+                            <div class="mt-4 pt-4 border-t border-[var(--ui-border)]/60">
                                 <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">
                                     Relations inkludieren (optional)
                                 </label>
@@ -1041,12 +1093,12 @@
                             @endif
 
                             <!-- Button -->
-                            <div>
+                            @if($selectedOrganizationEntityId)
+                            <div class="mt-4">
                                 <x-ui-button 
                                     variant="primary" 
                                     wire:click="attachOrganizationContext"
                                     wire:loading.attr="disabled"
-                                    :disabled="!$selectedOrganizationEntityId || $selectedOrganizationEntityId === '' || $selectedOrganizationEntityId === null"
                                     class="w-full"
                                 >
                                     <span wire:loading.remove wire:target="attachOrganizationContext">
@@ -1058,7 +1110,16 @@
                                     </span>
                                 </x-ui-button>
                             </div>
-                        </div>
+                            @endif
+                        @else
+                            <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
+                                    @svg('heroicon-o-building-office', 'w-8 h-8 text-[var(--ui-muted)]')
+                                </div>
+                                <p class="text-sm font-medium text-[var(--ui-secondary)]">Keine Organization Entities gefunden</p>
+                                <p class="text-xs text-[var(--ui-muted)] mt-1">Erstellen Sie zuerst eine Organization Entity im Organization-Modul.</p>
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>

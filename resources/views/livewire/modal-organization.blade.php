@@ -223,7 +223,7 @@
                     </span>
                 </button>
                 @endif
-                @if($allowContextManagement && $canLinkToEntity)
+                @if($allowEntities)
                 <button
                     @click="activeTab = 'organization'"
                     :class="activeTab === 'organization' 
@@ -233,10 +233,46 @@
                 >
                     <span class="inline-flex items-center gap-2">
                         @svg('heroicon-o-building-office', 'w-4 h-4')
-                        Organisation
+                        Entitäten
                         @if($organizationContext)
                             <span class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)]">
                                 1
+                            </span>
+                        @endif
+                    </span>
+                </button>
+                @endif
+                @if($allowDimensions)
+                <button
+                    @click="activeTab = 'cost-centers'"
+                    :class="activeTab === 'cost-centers' 
+                        ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] font-semibold bg-[var(--ui-primary-5)]/30' 
+                        : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
+                    class="px-5 py-3 text-sm transition-all duration-200 rounded-t-lg"
+                >
+                    <span class="inline-flex items-center gap-2">
+                        @svg('heroicon-o-currency-dollar', 'w-4 h-4')
+                        Kostenstellen
+                        @if($linkedCostCenters && $linkedCostCenters->count() > 0)
+                            <span class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)]">
+                                {{ $linkedCostCenters->count() }}
+                            </span>
+                        @endif
+                    </span>
+                </button>
+                <button
+                    @click="activeTab = 'vsm-systems'"
+                    :class="activeTab === 'vsm-systems' 
+                        ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] font-semibold bg-[var(--ui-primary-5)]/30' 
+                        : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
+                    class="px-5 py-3 text-sm transition-all duration-200 rounded-t-lg"
+                >
+                    <span class="inline-flex items-center gap-2">
+                        @svg('heroicon-o-rectangle-group', 'w-4 h-4')
+                        VSM Systeme
+                        @if($linkedVsmSystems && $linkedVsmSystems->count() > 0)
+                            <span class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)]">
+                                {{ $linkedVsmSystems->count() }}
                             </span>
                         @endif
                     </span>
@@ -906,7 +942,7 @@
             @endif
 
             <!-- Tab Content: Organisation -->
-            @if($allowContextManagement && $canLinkToEntity)
+            @if($allowEntities)
             <div x-show="activeTab === 'organization'" x-cloak>
                 <div class="space-y-6">
                     <!-- Bestehende Verknüpfung -->
@@ -1023,6 +1059,269 @@
                                 </x-ui-button>
                             </div>
                         </div>
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            <!-- Tab Content: Cost Centers -->
+            @if($allowDimensions)
+            <div x-show="activeTab === 'cost-centers'" x-cloak>
+                <div class="space-y-6">
+                    <!-- Verknüpfte Cost Centers -->
+                    @if($linkedCostCenters && $linkedCostCenters->count() > 0)
+                        <div>
+                            <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">Verknüpfte Kostenstellen</h4>
+                            <div class="space-y-2">
+                                @foreach($linkedCostCenters as $costCenter)
+                                    <div class="flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:bg-[var(--ui-muted-5)] transition-colors">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex-shrink-0">
+                                                    <div class="w-10 h-10 rounded-lg bg-[var(--ui-primary-5)] flex items-center justify-center">
+                                                        @svg('heroicon-o-currency-dollar', 'w-5 h-5 text-[var(--ui-primary)]')
+                                                    </div>
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="font-semibold text-[var(--ui-secondary)]">{{ $costCenter->name }}</div>
+                                                    @if($costCenter->code)
+                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">Code: {{ $costCenter->code }}</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="flex-shrink-0 ml-4">
+                                            <x-ui-button 
+                                                variant="danger-outline" 
+                                                size="sm"
+                                                wire:click="detachCostCenter({{ $costCenter->id }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="detachCostCenter({{ $costCenter->id }})"
+                                            >
+                                                <span wire:loading.remove wire:target="detachCostCenter({{ $costCenter->id }})">
+                                                    @svg('heroicon-o-trash', 'w-4 h-4')
+                                                </span>
+                                                <span wire:loading wire:target="detachCostCenter({{ $costCenter->id }})">
+                                                    @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
+                                                </span>
+                                            </x-ui-button>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    <!-- Cost Center auswählen -->
+                    <div class="pt-6 {{ $linkedCostCenters && $linkedCostCenters->count() > 0 ? 'border-t border-[var(--ui-border)]/60' : '' }}">
+                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">Kostenstelle verknüpfen</h4>
+                        
+                        <!-- Suche -->
+                        <div class="mb-4">
+                            <x-ui-input-text
+                                name="costCenterSearch"
+                                label="Suchen"
+                                wire:model.live.debounce.300ms="costCenterSearch"
+                                placeholder="Kostenstelle suchen..."
+                            />
+                        </div>
+
+                        <!-- Verfügbare Cost Centers -->
+                        @if($availableCostCenters && $availableCostCenters->count() > 0)
+                            <div class="space-y-2 max-h-96 overflow-y-auto">
+                                @foreach($availableCostCenters as $costCenter)
+                                    @php
+                                        $isLinked = $linkedCostCenters && $linkedCostCenters->contains('id', $costCenter->id);
+                                    @endphp
+                                    <div class="flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:bg-[var(--ui-muted-5)] transition-colors {{ $isLinked ? 'opacity-50' : '' }}">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex-shrink-0">
+                                                    <div class="w-10 h-10 rounded-lg bg-[var(--ui-primary-5)] flex items-center justify-center">
+                                                        @svg('heroicon-o-currency-dollar', 'w-5 h-5 text-[var(--ui-primary)]')
+                                                    </div>
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="font-semibold text-[var(--ui-secondary)] truncate">{{ $costCenter->name }}</div>
+                                                    @if($costCenter->code)
+                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">Code: {{ $costCenter->code }}</div>
+                                                    @endif
+                                                    @if($costCenter->description)
+                                                        <div class="text-xs text-[var(--ui-muted)] mt-1 line-clamp-2">{{ $costCenter->description }}</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="flex-shrink-0 ml-4">
+                                            @if($isLinked)
+                                                <span class="text-xs font-medium text-[var(--ui-muted)]">Bereits verknüpft</span>
+                                            @else
+                                                <x-ui-button 
+                                                    variant="primary" 
+                                                    size="sm"
+                                                    wire:click="attachCostCenter({{ $costCenter->id }})"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="attachCostCenter({{ $costCenter->id }})"
+                                                >
+                                                    <span wire:loading.remove wire:target="attachCostCenter({{ $costCenter->id }})">
+                                                        Verknüpfen
+                                                    </span>
+                                                    <span wire:loading wire:target="attachCostCenter({{ $costCenter->id }})" class="inline-flex items-center gap-2">
+                                                        @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
+                                                    </span>
+                                                </x-ui-button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
+                                    @svg('heroicon-o-currency-dollar', 'w-8 h-8 text-[var(--ui-muted)]')
+                                </div>
+                                <p class="text-sm font-medium text-[var(--ui-secondary)]">Keine Kostenstellen gefunden</p>
+                                <p class="text-xs text-[var(--ui-muted)] mt-1">
+                                    @if(!empty($costCenterSearch))
+                                        Keine Kostenstellen für "{{ $costCenterSearch }}" gefunden.
+                                    @else
+                                        Erstellen Sie zuerst eine Kostenstelle im Organization-Modul.
+                                    @endif
+                                </p>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+            </div>
+            @endif
+
+            <!-- Tab Content: VSM Systems -->
+            @if($allowDimensions)
+            <div x-show="activeTab === 'vsm-systems'" x-cloak>
+                <div class="space-y-6">
+                    <!-- Verknüpfte VSM Systems -->
+                    @if($linkedVsmSystems && $linkedVsmSystems->count() > 0)
+                        <div>
+                            <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">Verknüpfte VSM-Systeme</h4>
+                            <div class="space-y-2">
+                                @foreach($linkedVsmSystems as $vsmSystem)
+                                    <div class="flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:bg-[var(--ui-muted-5)] transition-colors">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex-shrink-0">
+                                                    <div class="w-10 h-10 rounded-lg bg-[var(--ui-primary-5)] flex items-center justify-center">
+                                                        @svg('heroicon-o-rectangle-group', 'w-5 h-5 text-[var(--ui-primary)]')
+                                                    </div>
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="font-semibold text-[var(--ui-secondary)]">{{ $vsmSystem->name }}</div>
+                                                    @if($vsmSystem->code)
+                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">Code: {{ $vsmSystem->code }}</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="flex-shrink-0 ml-4">
+                                            <x-ui-button 
+                                                variant="danger-outline" 
+                                                size="sm"
+                                                wire:click="detachVsmSystem({{ $vsmSystem->id }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="detachVsmSystem({{ $vsmSystem->id }})"
+                                            >
+                                                <span wire:loading.remove wire:target="detachVsmSystem({{ $vsmSystem->id }})">
+                                                    @svg('heroicon-o-trash', 'w-4 h-4')
+                                                </span>
+                                                <span wire:loading wire:target="detachVsmSystem({{ $vsmSystem->id }})">
+                                                    @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
+                                                </span>
+                                            </x-ui-button>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
+                    <!-- VSM System auswählen -->
+                    <div class="pt-6 {{ $linkedVsmSystems && $linkedVsmSystems->count() > 0 ? 'border-t border-[var(--ui-border)]/60' : '' }}">
+                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">VSM-System verknüpfen</h4>
+                        <p class="text-xs text-[var(--ui-muted)] mb-4">VSM-Systeme werden über Organization Entities verknüpft. Bitte verknüpfen Sie zuerst eine Organization Entity.</p>
+                        
+                        <!-- Suche -->
+                        <div class="mb-4">
+                            <x-ui-input-text
+                                name="vsmSystemSearch"
+                                label="Suchen"
+                                wire:model.live.debounce.300ms="vsmSystemSearch"
+                                placeholder="VSM-System suchen..."
+                            />
+                        </div>
+
+                        <!-- Verfügbare VSM Systems -->
+                        @if($availableVsmSystems && $availableVsmSystems->count() > 0)
+                            <div class="space-y-2 max-h-96 overflow-y-auto">
+                                @foreach($availableVsmSystems as $vsmSystem)
+                                    @php
+                                        $isLinked = $linkedVsmSystems && $linkedVsmSystems->contains('id', $vsmSystem->id);
+                                    @endphp
+                                    <div class="flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:bg-[var(--ui-muted-5)] transition-colors {{ $isLinked ? 'opacity-50' : '' }}">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-3">
+                                                <div class="flex-shrink-0">
+                                                    <div class="w-10 h-10 rounded-lg bg-[var(--ui-primary-5)] flex items-center justify-center">
+                                                        @svg('heroicon-o-rectangle-group', 'w-5 h-5 text-[var(--ui-primary)]')
+                                                    </div>
+                                                </div>
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="font-semibold text-[var(--ui-secondary)] truncate">{{ $vsmSystem->name }}</div>
+                                                    @if($vsmSystem->code)
+                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">Code: {{ $vsmSystem->code }}</div>
+                                                    @endif
+                                                    @if($vsmSystem->description)
+                                                        <div class="text-xs text-[var(--ui-muted)] mt-1 line-clamp-2">{{ $vsmSystem->description }}</div>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                        <div class="flex-shrink-0 ml-4">
+                                            @if($isLinked)
+                                                <span class="text-xs font-medium text-[var(--ui-muted)]">Bereits verknüpft</span>
+                                            @else
+                                                <x-ui-button 
+                                                    variant="primary" 
+                                                    size="sm"
+                                                    wire:click="attachVsmSystem({{ $vsmSystem->id }})"
+                                                    wire:loading.attr="disabled"
+                                                    wire:target="attachVsmSystem({{ $vsmSystem->id }})"
+                                                >
+                                                    <span wire:loading.remove wire:target="attachVsmSystem({{ $vsmSystem->id }})">
+                                                        Verknüpfen
+                                                    </span>
+                                                    <span wire:loading wire:target="attachVsmSystem({{ $vsmSystem->id }})" class="inline-flex items-center gap-2">
+                                                        @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
+                                                    </span>
+                                                </x-ui-button>
+                                            @endif
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @else
+                            <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
+                                    @svg('heroicon-o-rectangle-group', 'w-8 h-8 text-[var(--ui-muted)]')
+                                </div>
+                                <p class="text-sm font-medium text-[var(--ui-secondary)]">Keine VSM-Systeme gefunden</p>
+                                <p class="text-xs text-[var(--ui-muted)] mt-1">
+                                    @if(!empty($vsmSystemSearch))
+                                        Keine VSM-Systeme für "{{ $vsmSystemSearch }}" gefunden.
+                                    @else
+                                        Erstellen Sie zuerst ein VSM-System im Organization-Modul.
+                                    @endif
+                                </p>
+                            </div>
+                        @endif
                     </div>
                 </div>
             </div>

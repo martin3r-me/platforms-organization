@@ -28,17 +28,17 @@ class ModalOrganization extends Component
     // Verfügbare Relations für Children-Cascade (aus Dispatch)
     public array $availableChildRelations = [];
 
-    // Flags für erlaubte Aktionen
+    // Flags für erlaubte Aktionen (granular)
     public bool $allowTimeEntry = true;
-    public bool $allowContextManagement = true;
-    public bool $canLinkToEntity = true;
+    public bool $allowEntities = true; // Entitäten-Verknüpfung
+    public bool $allowDimensions = true; // Cost Centers und VSM-Systeme
 
     public string $workDate;
     public int $minutes = 60;
     public ?string $rate = null;
     public ?string $note = null;
 
-    public string $activeTab = 'entry'; // 'entry', 'overview', 'planned', 'team', or 'organization'
+    public string $activeTab = 'entry'; // 'entry', 'overview', 'planned', 'team', 'organization', 'cost-centers', or 'vsm-systems'
     public string $timeRange = 'current_month'; // 'current_week', 'current_month', 'current_year', 'last_week', 'last_month'
 
     // Filter für Übersicht-Tab
@@ -60,6 +60,18 @@ class ModalOrganization extends Component
     public $availableOrganizationEntities;
     public $selectedOrganizationEntityId = null;
     public array $selectedChildRelations = [];
+
+    // Cost Center Management
+    public $availableCostCenters = [];
+    public $linkedCostCenters = [];
+    public ?int $selectedCostCenterId = null;
+    public string $costCenterSearch = '';
+
+    // VSM System Management
+    public $availableVsmSystems = [];
+    public $linkedVsmSystems = [];
+    public ?int $selectedVsmSystemId = null;
+    public string $vsmSystemSearch = '';
 
     public ?int $plannedMinutes = null;
     public ?string $plannedNote = null;
@@ -146,6 +158,10 @@ class ModalOrganization extends Component
         // Initialisiere Collections für Organization Context Management
         $this->organizationContext = null;
         $this->availableOrganizationEntities = collect();
+        $this->availableCostCenters = collect();
+        $this->linkedCostCenters = collect();
+        $this->availableVsmSystems = collect();
+        $this->linkedVsmSystems = collect();
         
         \Log::info('ModalOrganization: mount() called', [
             'component_id' => $this->getId(),
@@ -170,8 +186,16 @@ class ModalOrganization extends Component
 
         // Flags setzen (defaults: alle true für Rückwärtskompatibilität)
         $this->allowTimeEntry = $payload['allow_time_entry'] ?? true;
-        $this->allowContextManagement = $payload['allow_context_management'] ?? true;
-        $this->canLinkToEntity = $payload['can_link_to_entity'] ?? true;
+        
+        // Neue granular Flags (mit Fallback auf alte Flags für Rückwärtskompatibilität)
+        $this->allowEntities = $payload['allow_entities'] 
+            ?? $payload['allow_context_management'] 
+            ?? $payload['can_link_to_entity'] 
+            ?? true;
+        
+        $this->allowDimensions = $payload['allow_dimensions'] 
+            ?? $payload['allow_context_management'] 
+            ?? true;
 
         // Wenn Modal bereits offen ist, Daten neu laden
         if ($this->open && $this->contextType && $this->contextId) {
@@ -179,6 +203,18 @@ class ModalOrganization extends Component
                 $this->loadEntries();
                 $this->loadPlannedEntries();
                 $this->loadCurrentPlanned();
+            }
+            
+            // Organization Contexts laden wenn erlaubt
+            if ($this->allowEntities) {
+                $this->loadOrganizationContexts();
+                $this->loadAvailableOrganizationEntities();
+            }
+            if ($this->allowDimensions) {
+                $this->loadCostCenters();
+                $this->loadLinkedCostCenters();
+                $this->loadVsmSystems();
+                $this->loadLinkedVsmSystems();
             }
         }
     }
@@ -203,8 +239,10 @@ class ModalOrganization extends Component
         // Tab basierend auf erlaubten Aktionen setzen
         if ($this->allowTimeEntry) {
             $this->activeTab = 'entry';
-        } elseif ($this->allowContextManagement) {
+        } elseif ($this->allowEntities) {
             $this->activeTab = 'organization';
+        } elseif ($this->allowDimensions) {
+            $this->activeTab = 'cost-centers';
         } else {
             $this->activeTab = 'overview';
         }
@@ -229,10 +267,18 @@ class ModalOrganization extends Component
             $this->loadTeamEntries();
         }
         
-        // Organization Contexts laden wenn Context Management erlaubt
-        if ($this->allowContextManagement && $this->contextType && $this->contextId) {
-            $this->loadOrganizationContexts();
-            $this->loadAvailableOrganizationEntities();
+        // Organization Contexts laden wenn erlaubt
+        if ($this->contextType && $this->contextId) {
+            if ($this->allowEntities) {
+                $this->loadOrganizationContexts();
+                $this->loadAvailableOrganizationEntities();
+            }
+            if ($this->allowDimensions) {
+                $this->loadCostCenters();
+                $this->loadLinkedCostCenters();
+                $this->loadVsmSystems();
+                $this->loadLinkedVsmSystems();
+            }
         }
 
         $this->open = true;
@@ -241,11 +287,15 @@ class ModalOrganization extends Component
     public function close(): void
     {
         $this->resetValidation();
-        $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote', 'allowTimeEntry', 'allowContextManagement', 'canLinkToEntity', 'availableChildRelations', 'selectedOrganizationEntityId', 'selectedChildRelations', 'overviewTimeRange', 'selectedUserId');
+        $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote', 'allowTimeEntry', 'allowEntities', 'allowDimensions', 'availableChildRelations', 'selectedOrganizationEntityId', 'selectedChildRelations', 'overviewTimeRange', 'selectedUserId', 'costCenterSearch', 'vsmSystemSearch');
         
         // Collections und Cache zurücksetzen
         $this->organizationContext = null;
         $this->availableOrganizationEntities = collect();
+        $this->availableCostCenters = collect();
+        $this->linkedCostCenters = collect();
+        $this->availableVsmSystems = collect();
+        $this->linkedVsmSystems = collect();
         $this->cachedTotalMinutes = null;
         $this->cachedBilledMinutes = null;
         $this->cachedUnbilledAmountCents = null;
@@ -997,6 +1047,356 @@ class ModalOrganization extends Component
             'type' => 'success',
             'message' => 'Verknüpfung entfernt.',
         ]);
+    }
+
+    // Cost Center Management Methods
+    protected function loadCostCenters(): void
+    {
+        if (! Auth::check() || ! Auth::user()->currentTeamRelation) {
+            $this->availableCostCenters = collect();
+            return;
+        }
+
+        $user = Auth::user();
+        $team = $user->currentTeamRelation;
+
+        $query = \Platform\Organization\Models\OrganizationCostCenter::query()
+            ->where('team_id', $team->id)
+            ->where('is_active', true)
+            ->orderBy('name');
+
+        // Suche
+        if (!empty($this->costCenterSearch)) {
+            $query->where(function ($q) {
+                $q->where('name', 'like', '%' . $this->costCenterSearch . '%')
+                  ->orWhere('code', 'like', '%' . $this->costCenterSearch . '%');
+            });
+        }
+
+        $this->availableCostCenters = $query->get();
+    }
+
+    protected function loadLinkedCostCenters(): void
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            $this->linkedCostCenters = collect();
+            return;
+        }
+
+        // Prüfe ob das Model das HasCostCenterLinksTrait verwendet
+        if (! class_exists($this->contextType)) {
+            $this->linkedCostCenters = collect();
+            return;
+        }
+
+        $model = $this->contextType::find($this->contextId);
+        if (! $model) {
+            $this->linkedCostCenters = collect();
+            return;
+        }
+
+        // Prüfe ob Trait vorhanden
+        if (! in_array(\Platform\Organization\Traits\HasCostCenterLinksTrait::class, class_uses_recursive($this->contextType))) {
+            $this->linkedCostCenters = collect();
+            return;
+        }
+
+        // Lade verknüpfte Cost Centers
+        $links = \Platform\Organization\Models\OrganizationCostCenterLink::query()
+            ->where('linkable_type', $this->contextType)
+            ->where('linkable_id', $this->contextId)
+            ->with('costCenter')
+            ->get();
+
+        $this->linkedCostCenters = $links->map(function ($link) {
+            return $link->costCenter;
+        })->filter();
+    }
+
+    public function updatedCostCenterSearch(): void
+    {
+        $this->loadCostCenters();
+    }
+
+    public function attachCostCenter(int $costCenterId): void
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Kein Kontext gesetzt.',
+            ]);
+            return;
+        }
+
+        $costCenter = \Platform\Organization\Models\OrganizationCostCenter::find($costCenterId);
+        if (! $costCenter) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Kostenstelle nicht gefunden.',
+            ]);
+            return;
+        }
+
+        $contextClass = $this->contextType;
+        $contextModel = $contextClass::find($this->contextId);
+        if (! $contextModel) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Kontext nicht gefunden.',
+            ]);
+            return;
+        }
+
+        // Prüfe ob Trait vorhanden
+        if (! in_array(\Platform\Organization\Traits\HasCostCenterLinksTrait::class, class_uses_recursive($contextClass))) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Dieser Kontext unterstützt keine Kostenstellen-Verknüpfungen.',
+            ]);
+            return;
+        }
+
+        // Verknüpfe Cost Center
+        $contextModel->attachCostCenter($costCenter);
+
+        $this->loadLinkedCostCenters();
+        $this->loadCostCenters();
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => 'Kostenstelle verknüpft.',
+        ]);
+    }
+
+    public function detachCostCenter(int $costCenterId): void
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Kein Kontext gesetzt.',
+            ]);
+            return;
+        }
+
+        $costCenter = \Platform\Organization\Models\OrganizationCostCenter::find($costCenterId);
+        if (! $costCenter) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Kostenstelle nicht gefunden.',
+            ]);
+            return;
+        }
+
+        $contextClass = $this->contextType;
+        $contextModel = $contextClass::find($this->contextId);
+        if (! $contextModel) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Kontext nicht gefunden.',
+            ]);
+            return;
+        }
+
+        // Prüfe ob Trait vorhanden
+        if (! in_array(\Platform\Organization\Traits\HasCostCenterLinksTrait::class, class_uses_recursive($contextClass))) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Dieser Kontext unterstützt keine Kostenstellen-Verknüpfungen.',
+            ]);
+            return;
+        }
+
+        // Entferne Verknüpfung
+        $contextModel->detachCostCenter($costCenter);
+
+        $this->loadLinkedCostCenters();
+        $this->loadCostCenters();
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => 'Verknüpfung entfernt.',
+        ]);
+    }
+
+    // VSM System Management Methods
+    protected function loadVsmSystems(): void
+    {
+        if (! Auth::check() || ! Auth::user()->currentTeamRelation) {
+            $this->availableVsmSystems = collect();
+            return;
+        }
+
+        $query = \Platform\Organization\Models\OrganizationVsmSystem::query()
+            ->where('is_active', true)
+            ->orderBy('sort_order')
+            ->orderBy('name');
+
+        // Suche
+        if (!empty($this->vsmSystemSearch)) {
+            $query->where(function ($q) {
+                $q->where('name', 'like', '%' . $this->vsmSystemSearch . '%')
+                  ->orWhere('code', 'like', '%' . $this->vsmSystemSearch . '%');
+            });
+        }
+
+        $this->availableVsmSystems = $query->get();
+    }
+
+    protected function loadLinkedVsmSystems(): void
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            $this->linkedVsmSystems = collect();
+            return;
+        }
+
+        // VSM-Systeme werden über Entities verknüpft
+        // Wenn der Kontext eine Entity hat, zeige das VSM-System dieser Entity
+        if (! class_exists($this->contextType)) {
+            $this->linkedVsmSystems = collect();
+            return;
+        }
+
+        $model = $this->contextType::find($this->contextId);
+        if (! $model) {
+            $this->linkedVsmSystems = collect();
+            return;
+        }
+
+        // Prüfe ob der Kontext eine Organization Entity hat
+        if (in_array(\Platform\Organization\Traits\HasOrganizationContexts::class, class_uses_recursive($this->contextType))) {
+            $organizationEntity = $model->getOrganizationEntity();
+            if ($organizationEntity && $organizationEntity->vsmSystem) {
+                $this->linkedVsmSystems = collect([$organizationEntity->vsmSystem]);
+                return;
+            }
+        }
+
+        // Alternative: Direkte Verknüpfung über Entity (z.B. wenn der Kontext selbst eine Entity ist)
+        if ($this->contextType === \Platform\Organization\Models\OrganizationEntity::class) {
+            if ($model->vsmSystem) {
+                $this->linkedVsmSystems = collect([$model->vsmSystem]);
+                return;
+            }
+        }
+
+        $this->linkedVsmSystems = collect();
+    }
+
+    public function updatedVsmSystemSearch(): void
+    {
+        $this->loadVsmSystems();
+    }
+
+    public function attachVsmSystem(int $vsmSystemId): void
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Kein Kontext gesetzt.',
+            ]);
+            return;
+        }
+
+        $vsmSystem = \Platform\Organization\Models\OrganizationVsmSystem::find($vsmSystemId);
+        if (! $vsmSystem) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'VSM-System nicht gefunden.',
+            ]);
+            return;
+        }
+
+        $contextClass = $this->contextType;
+        $contextModel = $contextClass::find($this->contextId);
+        if (! $contextModel) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Kontext nicht gefunden.',
+            ]);
+            return;
+        }
+
+        // VSM-Systeme werden über Organization Entities verknüpft
+        // Prüfe ob der Kontext eine Organization Entity hat oder erstelle/verknüpfe eine
+        if (in_array(\Platform\Organization\Traits\HasOrganizationContexts::class, class_uses_recursive($contextClass))) {
+            $organizationEntity = $contextModel->getOrganizationEntity();
+            
+            if (! $organizationEntity) {
+                $this->dispatch('notify', [
+                    'type' => 'error',
+                    'message' => 'Bitte verknüpfen Sie zuerst eine Organization Entity.',
+                ]);
+                return;
+            }
+
+            // Aktualisiere das VSM-System der Entity
+            $organizationEntity->vsm_system_id = $vsmSystemId;
+            $organizationEntity->save();
+
+            $this->loadLinkedVsmSystems();
+            $this->loadVsmSystems();
+
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => 'VSM-System verknüpft.',
+            ]);
+        } else {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Dieser Kontext unterstützt keine VSM-System-Verknüpfungen.',
+            ]);
+        }
+    }
+
+    public function detachVsmSystem(int $vsmSystemId): void
+    {
+        if (! $this->contextType || ! $this->contextId) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Kein Kontext gesetzt.',
+            ]);
+            return;
+        }
+
+        $contextClass = $this->contextType;
+        $contextModel = $contextClass::find($this->contextId);
+        if (! $contextModel) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Kontext nicht gefunden.',
+            ]);
+            return;
+        }
+
+        // VSM-Systeme werden über Organization Entities verknüpft
+        if (in_array(\Platform\Organization\Traits\HasOrganizationContexts::class, class_uses_recursive($contextClass))) {
+            $organizationEntity = $contextModel->getOrganizationEntity();
+            
+            if (! $organizationEntity) {
+                $this->dispatch('notify', [
+                    'type' => 'error',
+                    'message' => 'Keine Organization Entity verknüpft.',
+                ]);
+                return;
+            }
+
+            // Entferne VSM-System
+            $organizationEntity->vsm_system_id = null;
+            $organizationEntity->save();
+
+            $this->loadLinkedVsmSystems();
+            $this->loadVsmSystems();
+
+            $this->dispatch('notify', [
+                'type' => 'success',
+                'message' => 'Verknüpfung entfernt.',
+            ]);
+        } else {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Dieser Kontext unterstützt keine VSM-System-Verknüpfungen.',
+            ]);
+        }
     }
 
     public function render()

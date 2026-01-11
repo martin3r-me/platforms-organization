@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
+use Platform\Organization\Console\Commands\RetagCostCenterLinksTeam;
 use Platform\Core\PlatformCore;
 use Platform\Core\Routing\ModuleRouter;
 use RecursiveDirectoryIterator;
@@ -20,6 +21,7 @@ class OrganizationServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 SeedOrganizationData::class,
+                RetagCostCenterLinksTeam::class,
             ]);
         }
         // Keine Services in Drip vorhanden
@@ -76,6 +78,9 @@ class OrganizationServiceProvider extends ServiceProvider
         
         // Entity-Komponenten manuell registrieren (für Sicherheit)
         Livewire::component('organization.entity.modal-relations', \Platform\Organization\Livewire\Entity\ModalRelations::class);
+
+        // Tools registrieren (loose gekoppelt - für AI/Chat)
+        $this->registerTools();
     }
 
     protected function registerLivewireComponents(): void
@@ -110,6 +115,24 @@ class OrganizationServiceProvider extends ServiceProvider
             $alias = $prefix . '.' . $aliasPath;
 
             Livewire::component($alias, $class);
+        }
+    }
+
+    /**
+     * Registriert Organization-Tools für die AI/Chat-Funktionalität.
+     */
+    protected function registerTools(): void
+    {
+        try {
+            $registry = resolve(\Platform\Core\Tools\ToolRegistry::class);
+            $registry->register(new \Platform\Organization\Tools\ListCostCentersTool());
+            $registry->register(new \Platform\Organization\Tools\OrganizationLookupsTool());
+            $registry->register(new \Platform\Organization\Tools\GetOrganizationLookupTool());
+            $registry->register(new \Platform\Organization\Tools\CreateCostCenterTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateCostCenterTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteCostCenterTool());
+        } catch (\Throwable $e) {
+            \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }
     }
 }

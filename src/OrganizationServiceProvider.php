@@ -7,7 +7,6 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
-use Platform\Organization\Console\Commands\RetagCostCenterLinksTeam;
 use Platform\Core\PlatformCore;
 use Platform\Core\Routing\ModuleRouter;
 use RecursiveDirectoryIterator;
@@ -21,7 +20,6 @@ class OrganizationServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 SeedOrganizationData::class,
-                RetagCostCenterLinksTeam::class,
             ]);
         }
         // Keine Services in Drip vorhanden

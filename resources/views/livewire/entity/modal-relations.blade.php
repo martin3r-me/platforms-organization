@@ -166,14 +166,15 @@
             <div class="space-y-4">
                 <!-- Ziel-Entity -->
                 <div>
-                    <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">
-                        Ziel-Entity
-                    </label>
                     <x-ui-input-select
                         name="selectedToEntityId"
+                        label="Ziel-Entity"
                         wire:model.live="selectedToEntityId"
-                        :options="$availableEntities->pluck('name', 'id')->toArray()"
-                        placeholder="Entity auswählen..."
+                        :options="$availableEntities"
+                        optionValue="id"
+                        optionLabel="name"
+                        :nullable="true"
+                        nullLabel="Entity auswählen..."
                     />
                     @error('selectedToEntityId')
                         <p class="mt-1 text-xs text-[var(--ui-danger)]">{{ $message }}</p>
@@ -182,14 +183,15 @@
 
                 <!-- Relation Type -->
                 <div>
-                    <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">
-                        Relation Type
-                    </label>
                     <x-ui-input-select
                         name="selectedRelationTypeId"
+                        label="Relation Type"
                         wire:model.live="selectedRelationTypeId"
-                        :options="$availableRelationTypes->pluck('name', 'id')->toArray()"
-                        placeholder="Relation Type auswählen..."
+                        :options="$availableRelationTypes"
+                        optionValue="id"
+                        optionLabel="name"
+                        :nullable="true"
+                        nullLabel="Relation Type auswählen..."
                     />
                     @error('selectedRelationTypeId')
                         <p class="mt-1 text-xs text-[var(--ui-danger)]">{{ $message }}</p>

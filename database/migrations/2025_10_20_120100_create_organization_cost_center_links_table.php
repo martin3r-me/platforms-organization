@@ -18,20 +18,43 @@ return new class extends Migration
         Schema::create('organization_cost_center_links', function (Blueprint $table) {
             $table->id();
             $table->uuid('uuid')->unique();
-            $table->foreignId('cost_center_id')->constrained('organization_cost_centers')->cascadeOnDelete();
+            
+            // Foreign Keys nur erstellen, wenn die Tabellen existieren
+            $table->foreignId('cost_center_id');
+            if (Schema::hasTable('organization_cost_centers')) {
+                $table->foreign('cost_center_id')
+                    ->references('id')
+                    ->on('organization_cost_centers')
+                    ->cascadeOnDelete();
+            }
+            
             $table->string('linkable_type');
             $table->unsignedBigInteger('linkable_id');
             $table->date('start_date')->nullable();
             $table->date('end_date')->nullable();
             $table->decimal('percentage', 5, 2)->nullable();
             $table->boolean('is_primary')->default(false);
-            $table->foreignId('team_id')->constrained('teams')->cascadeOnDelete();
-            $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
+            
+            $table->foreignId('team_id');
+            if (Schema::hasTable('teams')) {
+                $table->foreign('team_id')
+                    ->references('id')
+                    ->on('teams')
+                    ->cascadeOnDelete();
+            }
+            
+            $table->foreignId('created_by_user_id')->nullable();
+            if (Schema::hasTable('users')) {
+                $table->foreign('created_by_user_id')
+                    ->references('id')
+                    ->on('users')
+                    ->nullOnDelete();
+            }
             $table->timestamps();
 
-            $table->index(['cost_center_id', 'team_id']);
-            $table->index(['linkable_type', 'linkable_id']);
-            $table->index(['linkable_type', 'linkable_id', 'cost_center_id']);
+            $table->index(['cost_center_id', 'team_id'], 'occl_cost_center_team_idx');
+            $table->index(['linkable_type', 'linkable_id'], 'occl_linkable_idx');
+            $table->index(['linkable_type', 'linkable_id', 'cost_center_id'], 'occl_linkable_cost_center_idx');
         });
     }
 

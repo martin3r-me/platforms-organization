@@ -153,5 +153,21 @@
             <x-heroicon-o-cube class="w-6 h-6 flex-shrink-0"/>
             <span x-show="!collapsed" class="truncate">Entity Types</span>
         </a>
+
+        {{-- Relation Types --}}
+        <a href="{{ route('organization.settings.relation-types.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/settings/relation-types') ||
+               window.location.pathname.endsWith('/settings/relation-types') ||
+               window.location.pathname.endsWith('/settings/relation-types/')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-arrows-right-left class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Relation Types</span>
+        </a>
     </div>
 </div>

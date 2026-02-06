@@ -6,6 +6,31 @@
     <x-slot name="sidebar">
         <x-ui-page-sidebar title="Informationen" width="w-80" :defaultOpen="true" side="left">
             <div class="p-6 space-y-6">
+                <!-- Action Buttons -->
+                <div class="pb-4 border-b border-[var(--ui-border)]/40 space-y-2">
+                    @if($this->isDirty)
+                        <div class="flex space-x-2">
+                            <x-ui-button variant="secondary-outline" wire:click="loadForm" size="sm" class="flex-1">
+                                @svg('heroicon-o-x-mark', 'w-4 h-4 mr-2')
+                                Abbrechen
+                            </x-ui-button>
+                            <x-ui-button variant="primary" wire:click="save" size="sm" class="flex-1">
+                                @svg('heroicon-o-check', 'w-4 h-4 mr-2')
+                                Speichern
+                            </x-ui-button>
+                        </div>
+                    @endif
+                    <x-ui-confirm-button
+                        variant="danger-outline"
+                        size="sm"
+                        wire:click="delete"
+                        confirm-text="Entity Type wirklich löschen?"
+                        class="w-full justify-center"
+                    >
+                        @svg('heroicon-o-trash', 'w-4 h-4 mr-2')
+                        Löschen
+                    </x-ui-confirm-button>
+                </div>
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Status</h3>
                     <div class="space-y-3">
@@ -83,26 +108,28 @@
                 <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                     <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Grunddaten</h2>
                     <div class="space-y-4">
+                        <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required />
+                        <x-ui-input-text name="code" label="Code" wire:model.live="form.code" required />
+                        <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" />
+                        <x-ui-input-text name="icon" label="Icon" wire:model.live="form.icon" placeholder="z.B. heroicon-o-cube" />
+                        <x-ui-input-number name="sort_order" label="Sortierung" wire:model.live="form.sort_order" min="0" />
                         <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Code</label>
-                            <code class="block px-3 py-2 bg-[var(--ui-muted-5)] rounded border border-[var(--ui-border)]/40 text-sm">{{ $entityType->code }}</code>
+                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Gruppe</label>
+                            <select
+                                name="entity_type_group_id"
+                                wire:model.live="form.entity_type_group_id"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
+                            >
+                                <option value="">Keine Gruppe</option>
+                                @foreach($this->entityTypeGroups as $group)
+                                    <option value="{{ $group->id }}">{{ $group->name }}</option>
+                                @endforeach
+                            </select>
                         </div>
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Name</label>
-                            <div class="px-3 py-2 bg-[var(--ui-muted-5)] rounded border border-[var(--ui-border)]/40 text-sm">{{ $entityType->name }}</div>
+                        <div class="flex items-center">
+                            <input type="checkbox" wire:model.live="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                            <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
                         </div>
-                        @if($entityType->description)
-                            <div>
-                                <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Beschreibung</label>
-                                <div class="px-3 py-2 bg-[var(--ui-muted-5)] rounded border border-[var(--ui-border)]/40 text-sm">{{ $entityType->description }}</div>
-                            </div>
-                        @endif
-                        @if($entityType->icon)
-                            <div>
-                                <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Icon</label>
-                                <div class="px-3 py-2 bg-[var(--ui-muted-5)] rounded border border-[var(--ui-border)]/40 text-sm">{{ $entityType->icon }}</div>
-                            </div>
-                        @endif
                     </div>
                 </div>
             @endif

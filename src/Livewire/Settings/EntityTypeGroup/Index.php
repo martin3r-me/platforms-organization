@@ -1,10 +1,10 @@
 <?php
 
-namespace Platform\Organization\Livewire\Settings\RelationType;
+namespace Platform\Organization\Livewire\Settings\EntityTypeGroup;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
-use Platform\Organization\Models\OrganizationEntityRelationType;
+use Platform\Organization\Models\OrganizationEntityTypeGroup;
 
 class Index extends Component
 {
@@ -14,14 +14,9 @@ class Index extends Component
 
     public $form = [
         'name' => '',
-        'code' => '',
         'description' => '',
-        'icon' => '',
         'sort_order' => 0,
         'is_active' => true,
-        'is_directional' => false,
-        'is_hierarchical' => false,
-        'is_reciprocal' => false,
     ];
 
     protected $queryString = [
@@ -30,14 +25,14 @@ class Index extends Component
     ];
 
     #[Computed]
-    public function relationTypes()
+    public function entityTypeGroups()
     {
-        $query = OrganizationEntityRelationType::query();
+        $query = OrganizationEntityTypeGroup::query()
+            ->withCount('entityTypes');
 
         if ($this->search) {
             $query->where(function ($q) {
                 $q->where('name', 'like', '%' . $this->search . '%')
-                  ->orWhere('code', 'like', '%' . $this->search . '%')
                   ->orWhere('description', 'like', '%' . $this->search . '%');
             });
         }
@@ -59,21 +54,16 @@ class Index extends Component
     public function store()
     {
         $data = $this->validate([
-            'form.name' => ['required', 'string', 'max:255'],
-            'form.code' => ['required', 'string', 'max:255', 'unique:organization_entity_relation_types,code'],
+            'form.name' => ['required', 'string', 'max:255', 'unique:organization_entity_type_groups,name'],
             'form.description' => ['nullable', 'string'],
-            'form.icon' => ['nullable', 'string', 'max:255'],
             'form.sort_order' => ['integer', 'min:0'],
             'form.is_active' => ['boolean'],
-            'form.is_directional' => ['boolean'],
-            'form.is_hierarchical' => ['boolean'],
-            'form.is_reciprocal' => ['boolean'],
         ])['form'];
 
-        OrganizationEntityRelationType::create($data);
+        OrganizationEntityTypeGroup::create($data);
 
         $this->modalShow = false;
-        $this->dispatch('toast', message: 'Relation Type erstellt');
+        $this->dispatch('toast', message: 'Entity Type Group erstellt');
     }
 
     public function toggleInactive()
@@ -83,7 +73,7 @@ class Index extends Component
 
     public function render()
     {
-        return view('organization::livewire.settings.relation-type.index')
+        return view('organization::livewire.settings.entity-type-group.index')
             ->layout('platform::layouts.app');
     }
 }

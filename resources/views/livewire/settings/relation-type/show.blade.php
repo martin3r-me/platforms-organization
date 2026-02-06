@@ -20,6 +20,16 @@
                             </x-ui-button>
                         </div>
                     @endif
+                    <x-ui-confirm-button
+                        variant="danger-outline"
+                        size="sm"
+                        wire:click="delete"
+                        confirm-text="Relation Type wirklich löschen?"
+                        class="w-full justify-center"
+                    >
+                        @svg('heroicon-o-trash', 'w-4 h-4 mr-2')
+                        Löschen
+                    </x-ui-confirm-button>
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Status</h3>

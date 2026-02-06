@@ -13,6 +13,17 @@ class Index extends Component
     public $search = '';
     public $selectedGroup = '';
     public $showInactive = false;
+    public $modalShow = false;
+
+    public $form = [
+        'name' => '',
+        'code' => '',
+        'description' => '',
+        'icon' => '',
+        'sort_order' => 0,
+        'is_active' => true,
+        'entity_type_group_id' => null,
+    ];
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -64,6 +75,31 @@ class Index extends Component
                 return [$module['key'] => $module['title'] ?? ucfirst($module['key'])];
             })
             ->toArray();
+    }
+
+    public function create()
+    {
+        $this->reset('form');
+        $this->form['is_active'] = true;
+        $this->modalShow = true;
+    }
+
+    public function store()
+    {
+        $data = $this->validate([
+            'form.name' => ['required', 'string', 'max:255'],
+            'form.code' => ['required', 'string', 'max:255', 'unique:organization_entity_types,code'],
+            'form.description' => ['nullable', 'string'],
+            'form.icon' => ['nullable', 'string', 'max:255'],
+            'form.sort_order' => ['integer', 'min:0'],
+            'form.is_active' => ['boolean'],
+            'form.entity_type_group_id' => ['nullable', 'exists:organization_entity_type_groups,id'],
+        ])['form'];
+
+        OrganizationEntityType::create($data);
+
+        $this->modalShow = false;
+        $this->dispatch('toast', message: 'Entity Type erstellt');
     }
 
     public function toggleInactive()

@@ -80,6 +80,11 @@ return [
                             'route' => 'organization.settings.entity-types.index',
                             'icon' => 'heroicon-o-cube',
                         ],
+                        'entity-type-groups' => [
+                            'title' => 'Entity Type Groups',
+                            'route' => 'organization.settings.entity-type-groups.index',
+                            'icon' => 'heroicon-o-rectangle-group',
+                        ],
                         'relation-types' => [
                             'title' => 'Relation Types',
                             'route' => 'organization.settings.relation-types.index',

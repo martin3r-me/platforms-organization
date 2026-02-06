@@ -1,6 +1,6 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="Entity Types" icon="heroicon-o-cube" />
+        <x-ui-page-navbar title="Entity Type Groups" icon="heroicon-o-rectangle-group" />
     </x-slot>
 
     <x-slot name="sidebar">
@@ -9,29 +9,16 @@
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Aktionen</h3>
                     <div class="space-y-2">
-                        <x-ui-input-text name="search" wire:model.live="search" placeholder="Suche Entity Types..." class="w-full" size="sm" />
+                        <x-ui-input-text name="search" wire:model.live="search" placeholder="Suche Entity Type Groups..." class="w-full" size="sm" />
                         <x-ui-button variant="secondary" size="sm" wire:click="create" class="w-full justify-start">
                             @svg('heroicon-o-plus','w-4 h-4')
-                            <span class="ml-2">Neuer Entity Type</span>
+                            <span class="ml-2">Neue Gruppe</span>
                         </x-ui-button>
                     </div>
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>
                     <div class="space-y-3">
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Gruppe</label>
-                            <select 
-                                name="selectedGroup"
-                                wire:model.live="selectedGroup"
-                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm"
-                            >
-                                <option value="">Alle Gruppen</option>
-                                @foreach($this->entityTypeGroups as $group)
-                                    <option value="{{ $group->id }}">{{ $group->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
                         <div class="flex items-center">
                             <input type="checkbox" wire:model.live="showInactive" id="showInactive" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
                             <label for="showInactive" class="ml-2 text-sm text-[var(--ui-secondary)]">Inaktive anzeigen</label>
@@ -51,38 +38,34 @@
     <x-ui-page-container>
         <x-ui-table compact="true">
             <x-ui-table-header>
-                <x-ui-table-header-cell compact="true">Code</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Gruppe</x-ui-table-header-cell>
+                <x-ui-table-header-cell compact="true">Beschreibung</x-ui-table-header-cell>
+                <x-ui-table-header-cell compact="true">Entity Types</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Aktionen</x-ui-table-header-cell>
             </x-ui-table-header>
 
             <x-ui-table-body>
-                @foreach($this->entityTypes as $entityType)
+                @foreach($this->entityTypeGroups as $group)
                     <x-ui-table-row compact="true">
                         <x-ui-table-cell compact="true">
-                            <code class="text-xs bg-[var(--ui-muted-5)] px-2 py-1 rounded">{{ $entityType->code }}</code>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <a href="{{ route('organization.settings.entity-types.show', $entityType) }}" class="link font-medium">
-                                {{ $entityType->name }}
+                            <a href="{{ route('organization.settings.entity-type-groups.show', $group) }}" class="link font-medium">
+                                {{ $group->name }}
                             </a>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
-                            @if($entityType->group)
-                                <x-ui-badge variant="info">{{ $entityType->group->name }}</x-ui-badge>
-                            @else
-                                <span class="text-[var(--ui-muted)]">–</span>
-                            @endif
+                            <span class="text-sm text-[var(--ui-muted)]">{{ $group->description ?? '–' }}</span>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="{{ $entityType->is_active ? 'success' : 'muted' }}">
-                                {{ $entityType->is_active ? 'Aktiv' : 'Inaktiv' }}
+                            <x-ui-badge variant="secondary" size="xs">{{ $group->entity_types_count }}</x-ui-badge>
+                        </x-ui-table-cell>
+                        <x-ui-table-cell compact="true">
+                            <x-ui-badge variant="{{ $group->is_active ? 'success' : 'muted' }}">
+                                {{ $group->is_active ? 'Aktiv' : 'Inaktiv' }}
                             </x-ui-badge>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
-                            <a href="{{ route('organization.settings.entity-types.show', $entityType) }}" class="text-[var(--ui-primary)] hover:underline text-sm">
+                            <a href="{{ route('organization.settings.entity-type-groups.show', $group) }}" class="text-[var(--ui-primary)] hover:underline text-sm">
                                 Bearbeiten
                             </a>
                         </x-ui-table-cell>
@@ -92,13 +75,13 @@
         </x-ui-table>
     </x-ui-page-container>
 
-    <!-- Create Entity Type Modal -->
+    <!-- Create Entity Type Group Modal -->
     <x-ui-modal
         wire:model="modalShow"
         size="lg"
     >
         <x-slot name="header">
-            Neuen Entity Type erstellen
+            Neue Entity Type Group erstellen
         </x-slot>
 
         <div class="space-y-4">
@@ -108,15 +91,7 @@
                     label="Name"
                     wire:model.live="form.name"
                     required
-                    placeholder="Name des Entity Types"
-                />
-
-                <x-ui-input-text
-                    name="code"
-                    label="Code"
-                    wire:model.live="form.code"
-                    required
-                    placeholder="Eindeutiger Code"
+                    placeholder="Name der Gruppe"
                 />
 
                 <x-ui-input-textarea
@@ -127,33 +102,12 @@
                     rows="3"
                 />
 
-                <x-ui-input-text
-                    name="icon"
-                    label="Icon"
-                    wire:model.live="form.icon"
-                    placeholder="z.B. heroicon-o-cube"
-                />
-
                 <x-ui-input-number
                     name="sort_order"
                     label="Sortierung"
                     wire:model.live="form.sort_order"
                     min="0"
                 />
-
-                <div>
-                    <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Gruppe</label>
-                    <select
-                        name="entity_type_group_id"
-                        wire:model.live="form.entity_type_group_id"
-                        class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
-                    >
-                        <option value="">Keine Gruppe</option>
-                        @foreach($this->entityTypeGroups as $group)
-                            <option value="{{ $group->id }}">{{ $group->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
 
                 <div class="flex items-center">
                     <input type="checkbox" wire:model.live="form.is_active" id="create_is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
@@ -179,4 +133,3 @@
         </x-slot>
     </x-ui-modal>
 </x-ui-page>
-

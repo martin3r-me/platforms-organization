@@ -70,6 +70,17 @@ class Show extends Component
         }
     }
 
+    public function delete()
+    {
+        try {
+            $this->relationType->delete();
+            $this->dispatch('toast', message: 'Relation Type gelöscht');
+            return redirect()->route('organization.settings.relation-types.index');
+        } catch (\Exception $e) {
+            $this->dispatch('toast', message: 'Fehler beim Löschen: ' . $e->getMessage(), variant: 'danger');
+        }
+    }
+
     public function render()
     {
         return view('organization::livewire.settings.relation-type.show')

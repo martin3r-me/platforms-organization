@@ -26,7 +26,9 @@ return new class extends Migration
     public function down(): void
     {
         Schema::table('organization_time_entry_contexts', function (Blueprint $table) {
+            $table->dropForeign(['time_entry_id']);
             $table->dropUnique('organization_time_entry_context_unique');
+            $table->foreign('time_entry_id')->references('id')->on('organization_time_entries')->cascadeOnDelete();
             $table->dropIndex('organization_time_entry_context_depth_index');
             $table->dropIndex('organization_time_entry_context_root_index');
             $table->dropColumn(['depth', 'is_primary', 'is_root', 'context_label']);

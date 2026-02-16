@@ -129,6 +129,13 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\CreateCostCenterTool());
             $registry->register(new \Platform\Organization\Tools\UpdateCostCenterTool());
             $registry->register(new \Platform\Organization\Tools\DeleteCostCenterTool());
+
+            // Time Tracking Tools
+            $registry->register(new \Platform\Organization\Tools\CreateTimeEntryTool());
+            $registry->register(new \Platform\Organization\Tools\ListTimeEntriesTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateTimeEntryTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteTimeEntryTool());
+            $registry->register(new \Platform\Organization\Tools\SummarizeTimeEntriesTool());
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

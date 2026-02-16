@@ -9,6 +9,7 @@ use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\Team;
 use Platform\Core\Tools\Concerns\HasStandardizedWriteOperations;
 use Platform\Organization\Models\OrganizationTimeEntry;
+use Platform\Organization\Services\ContextTypeRegistry;
 use Platform\Organization\Services\TimeContextResolver;
 
 class UpdateTimeEntryTool implements ToolContract, ToolMetadataContract
@@ -51,7 +52,8 @@ class UpdateTimeEntryTool implements ToolContract, ToolMetadataContract
                 ],
                 'context_type' => [
                     'type' => 'string',
-                    'description' => 'Optional: Neuer Kontext-Typ (Model-Klasse). Null/leer zum Entfernen des Kontexts.',
+                    'description' => 'Optional: Neuer Kontext-Typ. Kurzformen: "project" (Planner-Projekt), "task" (Planner-Aufgabe), "ticket" (Helpdesk-Ticket), "company" (CRM-Firma). Alternativ vollqualifizierter Klassenname. Null/leer zum Entfernen des Kontexts.',
+                    'enum' => ['project', 'task', 'ticket', 'company'],
                 ],
                 'context_id' => [
                     'type' => 'integer',
@@ -154,10 +156,10 @@ class UpdateTimeEntryTool implements ToolContract, ToolMetadataContract
 
             // Kontext-Änderung
             if (array_key_exists('context_type', $arguments)) {
-                $newContextType = $arguments['context_type'] ?? null;
+                $rawContextType = $arguments['context_type'] ?? null;
                 $newContextId = $arguments['context_id'] ?? null;
 
-                if (empty($newContextType) || $newContextType === 'null' || $newContextType === '') {
+                if (empty($rawContextType) || $rawContextType === 'null' || $rawContextType === '') {
                     // Kontext entfernen
                     $update['context_type'] = null;
                     $update['context_id'] = null;
@@ -166,11 +168,16 @@ class UpdateTimeEntryTool implements ToolContract, ToolMetadataContract
                     $update['has_key_result'] = false;
                     $contextChanged = true;
                 } else {
+                    // Kurzform auflösen
+                    $newContextType = ContextTypeRegistry::resolve($rawContextType);
+                    if ($newContextType === null) {
+                        return ToolResult::error('VALIDATION_ERROR', "context_type '{$rawContextType}' ist ungültig. Erlaubte Kurzformen: " . implode(', ', ContextTypeRegistry::shortNames()) . '. Nutze organization.lookups.GET (lookup="context_types") für alle erlaubten Werte.');
+                    }
                     if (!$newContextId) {
                         return ToolResult::error('VALIDATION_ERROR', 'context_id ist erforderlich wenn context_type gesetzt ist.');
                     }
                     if (!class_exists($newContextType)) {
-                        return ToolResult::error('VALIDATION_ERROR', "context_type '{$newContextType}' ist keine gültige Model-Klasse.");
+                        return ToolResult::error('VALIDATION_ERROR', "context_type '{$newContextType}' ist keine gültige Model-Klasse. Erlaubte Kurzformen: " . implode(', ', ContextTypeRegistry::shortNames()) . '.');
                     }
                     $contextModel = $newContextType::find((int) $newContextId);
                     if (!$contextModel) {

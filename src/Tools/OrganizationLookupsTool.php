@@ -6,6 +6,7 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Organization\Services\ContextTypeRegistry;
 
 /**
  * Übersicht über verfügbare Organization-Lookups.
@@ -40,6 +41,11 @@ class OrganizationLookupsTool implements ToolContract, ToolMetadataContract
                 [
                     'key' => 'cost_centers',
                     'description' => 'Kostenstellen (Root/Elterteam-scoped). Suche nach code/name und verwende dann cost_center_id in anderen Modulen.',
+                    'tool' => 'organization.lookup.GET',
+                ],
+                [
+                    'key' => 'context_types',
+                    'description' => 'Erlaubte context_type-Werte für Zeiteinträge (organization.time_entries.POST/PUT/GET). Kurzformen wie "project", "task" etc. werden automatisch aufgelöst.',
                     'tool' => 'organization.lookup.GET',
                 ],
             ],

@@ -9,6 +9,7 @@ use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\Team;
 use Platform\Organization\Models\OrganizationTimeEntry;
+use Platform\Organization\Services\ContextTypeRegistry;
 use Platform\Organization\Services\TimeContextResolver;
 
 class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
@@ -43,7 +44,8 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 ],
                 'context_type' => [
                     'type' => 'string',
-                    'description' => 'Optional: Filter nach Kontext-Typ.',
+                    'description' => 'Optional: Filter nach Kontext-Typ. Kurzformen: "project", "task", "ticket", "company" (oder vollqualifizierter Klassenname).',
+                    'enum' => ['project', 'task', 'ticket', 'company'],
                 ],
                 'context_id' => [
                     'type' => 'integer',
@@ -51,7 +53,8 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 ],
                 'root_context_type' => [
                     'type' => 'string',
-                    'description' => 'Optional: Filter nach Root-Kontext-Typ.',
+                    'description' => 'Optional: Filter nach Root-Kontext-Typ. Kurzformen: "project", "task", "ticket", "company" (oder vollqualifizierter Klassenname).',
+                    'enum' => ['project', 'task', 'ticket', 'company'],
                 ],
                 'root_context_id' => [
                     'type' => 'integer',
@@ -104,17 +107,25 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
             $query = OrganizationTimeEntry::query()
                 ->where('team_id', (int) $teamId);
 
+            // Kurzformen auflösen
+            $contextType = isset($arguments['context_type'])
+                ? (ContextTypeRegistry::resolve($arguments['context_type']) ?? $arguments['context_type'])
+                : null;
+            $rootContextType = isset($arguments['root_context_type'])
+                ? (ContextTypeRegistry::resolve($arguments['root_context_type']) ?? $arguments['root_context_type'])
+                : null;
+
             // Filter anwenden
             if (isset($arguments['user_id'])) {
                 $query->where('user_id', (int) $arguments['user_id']);
             }
-            if (isset($arguments['context_type']) && isset($arguments['context_id'])) {
-                $query->forContext($arguments['context_type'], (int) $arguments['context_id']);
-            } elseif (isset($arguments['context_type'])) {
-                $query->where('context_type', $arguments['context_type']);
+            if ($contextType && isset($arguments['context_id'])) {
+                $query->forContext($contextType, (int) $arguments['context_id']);
+            } elseif ($contextType) {
+                $query->where('context_type', $contextType);
             }
-            if (isset($arguments['root_context_type']) && isset($arguments['root_context_id'])) {
-                $query->forRootContext($arguments['root_context_type'], (int) $arguments['root_context_id']);
+            if ($rootContextType && isset($arguments['root_context_id'])) {
+                $query->forRootContext($rootContextType, (int) $arguments['root_context_id']);
             }
             if (isset($arguments['work_date_from'])) {
                 $query->where('work_date', '>=', $arguments['work_date_from']);

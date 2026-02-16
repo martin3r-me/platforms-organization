@@ -8,6 +8,7 @@ use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\Team;
 use Platform\Organization\Models\OrganizationTimeEntry;
+use Platform\Organization\Services\ContextTypeRegistry;
 use Platform\Organization\Services\StoreTimeEntry;
 use Platform\Organization\Services\TimeContextResolver;
 
@@ -20,7 +21,7 @@ class CreateTimeEntryTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /organization/time-entries - Erstellt einen Zeiteintrag. Kontext (context_type + context_id) ist optional – ohne Kontext wird eine freie Zeiterfassung erstellt. Beispiel context_type: "Platform\Planner\Models\PlannerTask", "Platform\Planner\Models\PlannerProject".';
+        return 'POST /organization/time-entries - Erstellt einen Zeiteintrag. Kontext (context_type + context_id) ist optional – ohne Kontext wird eine freie Zeiterfassung erstellt. Erlaubte context_type Kurzformen: "project", "task", "ticket", "company" (oder vollqualifizierter Klassenname). Nutze organization.lookups.GET für Details.';
     }
 
     public function getSchema(): array
@@ -50,7 +51,8 @@ class CreateTimeEntryTool implements ToolContract, ToolMetadataContract
                 ],
                 'context_type' => [
                     'type' => 'string',
-                    'description' => 'Optional: Vollqualifizierter Model-Klassenname für den Kontext (morphTo). Beispiel: "Platform\\Planner\\Models\\PlannerTask". Ohne context_type wird eine freie Zeiterfassung erstellt.',
+                    'description' => 'Optional: Kontext-Typ. Kurzformen: "project" (Planner-Projekt), "task" (Planner-Aufgabe), "ticket" (Helpdesk-Ticket), "company" (CRM-Firma). Alternativ vollqualifizierter Klassenname. Ohne context_type wird eine freie Zeiterfassung erstellt. Nutze organization.lookups.GET (lookup="context_types") für alle erlaubten Werte.',
+                    'enum' => ['project', 'task', 'ticket', 'company'],
                 ],
                 'context_id' => [
                     'type' => 'integer',
@@ -106,8 +108,16 @@ class CreateTimeEntryTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'minutes ist erforderlich und muss mindestens 1 sein.');
             }
 
-            $contextType = $arguments['context_type'] ?? null;
+            $rawContextType = $arguments['context_type'] ?? null;
             $contextId = $arguments['context_id'] ?? null;
+
+            // Kurzform auflösen (z.B. 'project' → 'Platform\Planner\Models\PlannerProject')
+            $contextType = ContextTypeRegistry::resolve($rawContextType);
+
+            // Wenn Eingabe vorhanden war aber nicht aufgelöst werden konnte → Fehler
+            if ($rawContextType && $contextType === null) {
+                return ToolResult::error('VALIDATION_ERROR', "context_type '{$rawContextType}' ist ungültig. Erlaubte Kurzformen: " . implode(', ', ContextTypeRegistry::shortNames()) . '. Nutze organization.lookups.GET (lookup="context_types") für alle erlaubten Werte.');
+            }
 
             // Wenn context_type gesetzt, muss auch context_id gesetzt sein
             if ($contextType && !$contextId) {
@@ -117,7 +127,7 @@ class CreateTimeEntryTool implements ToolContract, ToolMetadataContract
             // Kontext validieren wenn angegeben
             if ($contextType && $contextId) {
                 if (!class_exists($contextType)) {
-                    return ToolResult::error('VALIDATION_ERROR', "context_type '{$contextType}' ist keine gültige Model-Klasse.");
+                    return ToolResult::error('VALIDATION_ERROR', "context_type '{$contextType}' ist keine gültige Model-Klasse. Erlaubte Kurzformen: " . implode(', ', ContextTypeRegistry::shortNames()) . '.');
                 }
                 $contextModel = $contextType::find((int) $contextId);
                 if (!$contextModel) {

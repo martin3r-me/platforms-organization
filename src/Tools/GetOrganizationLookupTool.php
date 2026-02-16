@@ -7,9 +7,10 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Tools\Concerns\HasStandardGetOperations;
+use Platform\Organization\Services\ContextTypeRegistry;
 
 /**
- * Generisches Lookup-GET für Organization (derzeit: cost_centers).
+ * Generisches Lookup-GET für Organization (derzeit: cost_centers, context_types).
  *
  * Hinweis: Für cost_centers gibt es auch organization.cost_centers.GET.
  * Dieses Tool ist für ein konsistentes "lookups/lookup" Pattern gedacht.
@@ -18,7 +19,7 @@ class GetOrganizationLookupTool implements ToolContract, ToolMetadataContract
 {
     use HasStandardGetOperations;
 
-    private const LOOKUP_KEYS = ['cost_centers'];
+    private const LOOKUP_KEYS = ['cost_centers', 'context_types'];
 
     public function getName(): string
     {
@@ -56,8 +57,21 @@ class GetOrganizationLookupTool implements ToolContract, ToolMetadataContract
 
         return match ($lookup) {
             'cost_centers' => (new ListCostCentersTool())->execute($arguments, $context),
+            'context_types' => $this->lookupContextTypes(),
             default => ToolResult::error('VALIDATION_ERROR', 'Unbekannter lookup. Nutze organization.lookups.GET.'),
         };
+    }
+
+    protected function lookupContextTypes(): ToolResult
+    {
+        $entries = ContextTypeRegistry::lookupEntries();
+
+        return ToolResult::success([
+            'data' => $entries,
+            'description' => 'Erlaubte context_type-Werte für Zeiteinträge. Verwende die Kurzform (short) als context_type in organization.time_entries.POST/PUT/GET.',
+            'example' => 'organization.time_entries.POST mit context_type="project", context_id=123',
+            'count' => count($entries),
+        ]);
     }
 
     public function getMetadata(): array

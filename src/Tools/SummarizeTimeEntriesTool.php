@@ -11,9 +11,12 @@ use Platform\Core\Models\Team;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\ContextTypeRegistry;
 use Platform\Organization\Services\TimeContextResolver;
+use Platform\Organization\Tools\Concerns\ResolvesTimeEntryTeamScope;
 
 class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
 {
+    use ResolvesTimeEntryTeamScope;
+
     public function getName(): string
     {
         return 'organization.time_entries.SUMMARY';
@@ -21,7 +24,7 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/time-entries/summary - Gibt Zusammenfassung/Summen der getrackten Zeit zurück: pro Kontext, User, Zeitraum oder kombiniert. Ideal für Auswertungen und Reports.';
+        return 'GET /organization/time-entries/summary - Gibt Zusammenfassung/Summen der getrackten Zeit zurück: pro Kontext, User, Zeitraum oder kombiniert. Unterstützt cross-team Abfragen: Im Parent-Team werden automatisch alle Child-Teams einbezogen (wie in der UI). Ideal für Auswertungen und Reports.';
     }
 
     public function getSchema(): array
@@ -33,14 +36,18 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                     'type' => 'integer',
                     'description' => 'Optional: Team-ID. Default: Team aus Kontext.',
                 ],
+                'cross_team' => [
+                    'type' => 'boolean',
+                    'description' => 'Optional: Cross-Team Abfrage (Root-Team + alle Child-Teams). Default: true. Bei false werden nur Einträge des angegebenen Teams zusammengefasst.',
+                ],
                 'group_by' => [
                     'type' => 'string',
-                    'enum' => ['context', 'user', 'work_date', 'root_context', 'source_module'],
-                    'description' => 'Gruppierung der Zusammenfassung (ERFORDERLICH). "context" = pro Kontext (Task, Projekt etc.), "user" = pro Benutzer, "work_date" = pro Tag, "root_context" = pro Root-Kontext (z.B. Projekt), "source_module" = pro Modul (planner, crm etc.).',
+                    'enum' => ['context', 'user', 'work_date', 'root_context', 'source_module', 'team'],
+                    'description' => 'Gruppierung der Zusammenfassung (ERFORDERLICH). "context" = pro Kontext (Task, Projekt etc.), "user" = pro Benutzer, "work_date" = pro Tag, "root_context" = pro Root-Kontext (z.B. Projekt), "source_module" = pro Modul (planner, crm etc.), "team" = pro Team (sinnvoll bei cross-team Abfragen).',
                 ],
                 'user_id' => [
                     'type' => 'integer',
-                    'description' => 'Optional: Nur Einträge eines bestimmten Users.',
+                    'description' => 'Optional: Nur Einträge eines bestimmten Users. Funktioniert auch cross-team.',
                 ],
                 'context_type' => [
                     'type' => 'string',
@@ -80,32 +87,22 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
     public function execute(array $arguments, ToolContext $context): ToolResult
     {
         try {
-            if (!$context->user) {
-                return ToolResult::error('AUTH_ERROR', 'Kein User im Kontext gefunden.');
+            $scope = $this->resolveTimeEntryTeamScope($arguments, $context);
+
+            if ($scope['error']) {
+                return $scope['error'];
             }
 
-            $teamId = $arguments['team_id'] ?? $context->team?->id;
-            if (!$teamId) {
-                return ToolResult::error('MISSING_TEAM', 'Kein Team angegeben und kein Team im Kontext gefunden.');
-            }
-
-            $team = Team::find((int) $teamId);
-            if (!$team) {
-                return ToolResult::error('TEAM_NOT_FOUND', 'Team nicht gefunden.');
-            }
-
-            $userHasAccess = $context->user->teams()->where('teams.id', $team->id)->exists();
-            if (!$userHasAccess) {
-                return ToolResult::error('ACCESS_DENIED', 'Du hast keinen Zugriff auf dieses Team.');
-            }
+            $teamIds = $scope['team_ids'];
+            $isCrossTeam = $scope['is_cross_team'];
 
             $groupBy = $arguments['group_by'] ?? null;
-            if (!$groupBy || !in_array($groupBy, ['context', 'user', 'work_date', 'root_context', 'source_module'])) {
-                return ToolResult::error('VALIDATION_ERROR', 'group_by ist erforderlich. Erlaubte Werte: context, user, work_date, root_context, source_module.');
+            if (!$groupBy || !in_array($groupBy, ['context', 'user', 'work_date', 'root_context', 'source_module', 'team'])) {
+                return ToolResult::error('VALIDATION_ERROR', 'group_by ist erforderlich. Erlaubte Werte: context, user, work_date, root_context, source_module, team.');
             }
 
             $query = OrganizationTimeEntry::query()
-                ->where('team_id', (int) $teamId);
+                ->whereIn('team_id', $teamIds);
 
             // Kurzformen auflösen
             $contextType = isset($arguments['context_type'])
@@ -144,6 +141,7 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 'work_date' => $this->groupByWorkDate($query),
                 'root_context' => $this->groupByRootContext($query),
                 'source_module' => $this->groupBySourceModule($query),
+                'team' => $this->groupByTeam($query),
             };
 
             // Gesamtsumme berechnen
@@ -158,7 +156,8 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                     'total_formatted' => OrganizationTimeEntry::formatMinutes($totalMinutes),
                     'total_hours' => OrganizationTimeEntry::formatMinutesAsHours($totalMinutes),
                 ],
-                'team_id' => (int) $teamId,
+                'team_ids' => $teamIds,
+                'cross_team' => $isCrossTeam,
             ]);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler bei der Zeitauswertung: ' . $e->getMessage());
@@ -294,6 +293,28 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 'total_hours' => OrganizationTimeEntry::formatMinutesAsHours($totalMinutes),
             ];
         })->sortByDesc('total_minutes')->values()->toArray();
+    }
+
+    protected function groupByTeam($query): array
+    {
+        $results = (clone $query)
+            ->select('team_id', DB::raw('SUM(minutes) as total_minutes'), DB::raw('COUNT(*) as entry_count'))
+            ->groupBy('team_id')
+            ->orderByDesc('total_minutes')
+            ->limit(100)
+            ->get();
+
+        return $results->map(function ($row) {
+            $team = Team::find($row->team_id);
+            return [
+                'team_id' => $row->team_id,
+                'team_name' => $team?->name ?? '(Unbekannt)',
+                'entry_count' => (int) $row->entry_count,
+                'total_minutes' => (int) $row->total_minutes,
+                'total_formatted' => OrganizationTimeEntry::formatMinutes((int) $row->total_minutes),
+                'total_hours' => OrganizationTimeEntry::formatMinutesAsHours((int) $row->total_minutes),
+            ];
+        })->values()->toArray();
     }
 
     public function getMetadata(): array

@@ -10,10 +10,12 @@ use Platform\Core\Models\Team;
 use Platform\Core\Tools\Concerns\HasStandardGetOperations;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\ContextTypeRegistry;
+use Platform\Organization\Tools\Concerns\ResolvesTimeEntryTeamScope;
 
 class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
 {
     use HasStandardGetOperations;
+    use ResolvesTimeEntryTeamScope;
 
     public function getName(): string
     {
@@ -22,7 +24,7 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/time-entries - Listet Zeiteinträge mit flexiblen Filtern (Kontext, Zeitraum, User, Abrechnungsstatus). Unterstützt filters/search/sort/limit/offset.';
+        return 'GET /organization/time-entries - Listet Zeiteinträge mit flexiblen Filtern (Kontext, Zeitraum, User, Abrechnungsstatus). Unterstützt cross-team Abfragen: Im Parent-Team werden automatisch alle Child-Teams einbezogen (wie in der UI). Unterstützt filters/search/sort/limit/offset.';
     }
 
     public function getSchema(): array
@@ -35,9 +37,13 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
                         'type' => 'integer',
                         'description' => 'Optional: Team-ID. Default: Team aus Kontext.',
                     ],
+                    'cross_team' => [
+                        'type' => 'boolean',
+                        'description' => 'Optional: Cross-Team Abfrage (Root-Team + alle Child-Teams). Default: true. Bei false werden nur Einträge des angegebenen Teams zurückgegeben.',
+                    ],
                     'user_id' => [
                         'type' => 'integer',
-                        'description' => 'Optional: Filter nach User-ID.',
+                        'description' => 'Optional: Filter nach User-ID. Funktioniert auch cross-team.',
                     ],
                     'context_type' => [
                         'type' => 'string',
@@ -81,28 +87,18 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
     public function execute(array $arguments, ToolContext $context): ToolResult
     {
         try {
-            if (!$context->user) {
-                return ToolResult::error('AUTH_ERROR', 'Kein User im Kontext gefunden.');
+            $scope = $this->resolveTimeEntryTeamScope($arguments, $context);
+
+            if ($scope['error']) {
+                return $scope['error'];
             }
 
-            $teamId = $arguments['team_id'] ?? $context->team?->id;
-            if (!$teamId) {
-                return ToolResult::error('MISSING_TEAM', 'Kein Team angegeben und kein Team im Kontext gefunden.');
-            }
-
-            $team = Team::find((int) $teamId);
-            if (!$team) {
-                return ToolResult::error('TEAM_NOT_FOUND', 'Team nicht gefunden.');
-            }
-
-            $userHasAccess = $context->user->teams()->where('teams.id', $team->id)->exists();
-            if (!$userHasAccess) {
-                return ToolResult::error('ACCESS_DENIED', 'Du hast keinen Zugriff auf dieses Team.');
-            }
+            $teamIds = $scope['team_ids'];
+            $isCrossTeam = $scope['is_cross_team'];
 
             $query = OrganizationTimeEntry::query()
-                ->where('team_id', (int) $teamId)
-                ->with(['user']);
+                ->whereIn('team_id', $teamIds)
+                ->with(['user', 'team']);
 
             // Soft-Delete Handling
             if (!empty($arguments['include_deleted'])) {
@@ -159,6 +155,8 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
                 return [
                     'id' => $entry->id,
                     'uuid' => $entry->uuid,
+                    'team_id' => $entry->team_id,
+                    'team_name' => $entry->team?->name,
                     'user_id' => $entry->user_id,
                     'user_name' => $entry->user?->name,
                     'work_date' => $entry->work_date->format('Y-m-d'),
@@ -189,7 +187,8 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
                     'total_formatted' => OrganizationTimeEntry::formatMinutes($totalMinutes),
                     'total_hours' => OrganizationTimeEntry::formatMinutesAsHours($totalMinutes),
                 ],
-                'team_id' => (int) $teamId,
+                'team_ids' => $teamIds,
+                'cross_team' => $isCrossTeam,
             ]);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Laden der Zeiteinträge: ' . $e->getMessage());

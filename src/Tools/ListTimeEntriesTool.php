@@ -10,6 +10,7 @@ use Platform\Core\Models\Team;
 use Platform\Core\Tools\Concerns\HasStandardGetOperations;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\ContextTypeRegistry;
+use Platform\Organization\Services\TimeContextResolver;
 use Platform\Organization\Tools\Concerns\ResolvesTimeEntryTeamScope;
 
 class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
@@ -63,6 +64,14 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
                         'type' => 'integer',
                         'description' => 'Optional: Filter nach Root-Kontext-ID.',
                     ],
+                    'date_from' => [
+                        'type' => 'string',
+                        'description' => 'Optional: Zeiteinträge ab Datum (inklusiv, YYYY-MM-DD). Alias für work_date_from.',
+                    ],
+                    'date_to' => [
+                        'type' => 'string',
+                        'description' => 'Optional: Zeiteinträge bis Datum (inklusiv, YYYY-MM-DD). Alias für work_date_to.',
+                    ],
                     'work_date_from' => [
                         'type' => 'string',
                         'description' => 'Optional: Zeiteinträge ab Datum (inklusiv, YYYY-MM-DD).',
@@ -95,6 +104,14 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
 
             $teamIds = $scope['team_ids'];
             $isCrossTeam = $scope['is_cross_team'];
+
+            // date_from/date_to als Aliase für work_date_from/work_date_to
+            if (isset($arguments['date_from']) && !isset($arguments['work_date_from'])) {
+                $arguments['work_date_from'] = $arguments['date_from'];
+            }
+            if (isset($arguments['date_to']) && !isset($arguments['work_date_to'])) {
+                $arguments['work_date_to'] = $arguments['date_to'];
+            }
 
             $query = OrganizationTimeEntry::query()
                 ->whereIn('team_id', $teamIds)
@@ -151,7 +168,19 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
             $result = $this->applyStandardPaginationResult($query, $arguments);
             $entries = $result['data'];
 
-            $items = $entries->map(function (OrganizationTimeEntry $entry) {
+            $resolver = app(TimeContextResolver::class);
+
+            $items = $entries->map(function (OrganizationTimeEntry $entry) use ($resolver) {
+                $contextLabel = null;
+                if ($entry->context_type && $entry->context_id) {
+                    $contextLabel = $resolver->resolveLabel($entry->context_type, $entry->context_id);
+                }
+
+                $rootContextLabel = null;
+                if ($entry->root_context_type && $entry->root_context_id) {
+                    $rootContextLabel = $resolver->resolveRootName($entry->root_context_type, $entry->root_context_id);
+                }
+
                 return [
                     'id' => $entry->id,
                     'uuid' => $entry->uuid,
@@ -165,8 +194,10 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
                     'formatted' => OrganizationTimeEntry::formatMinutes($entry->minutes),
                     'context_type' => $entry->context_type,
                     'context_id' => $entry->context_id,
+                    'context_label' => $contextLabel,
                     'root_context_type' => $entry->root_context_type,
                     'root_context_id' => $entry->root_context_id,
+                    'root_context_label' => $rootContextLabel,
                     'source_module' => $entry->source_module,
                     'note' => $entry->note,
                     'is_billed' => (bool) $entry->is_billed,

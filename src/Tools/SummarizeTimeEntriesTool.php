@@ -67,6 +67,14 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                     'type' => 'integer',
                     'description' => 'Optional: Filter nach Root-Kontext-ID.',
                 ],
+                'date_from' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Ab Datum (inklusiv, YYYY-MM-DD). Alias für work_date_from.',
+                ],
+                'date_to' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Bis Datum (inklusiv, YYYY-MM-DD). Alias für work_date_to.',
+                ],
                 'work_date_from' => [
                     'type' => 'string',
                     'description' => 'Optional: Ab Datum (inklusiv, YYYY-MM-DD).',
@@ -79,10 +87,39 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                     'type' => 'boolean',
                     'description' => 'Optional: Nur abgerechnete/nicht abgerechnete Einträge.',
                 ],
+                'filters' => [
+                    'type' => 'array',
+                    'description' => 'Optional: Array von Filtern. Jeder Filter: {"field": "...", "op": "eq|ne|gt|gte|lt|lte|like|in|not_in|is_null|is_not_null", "value": ...}. Erlaubte Felder: team_id, user_id, context_type, context_id, root_context_type, root_context_id, work_date, is_billed, source_module.',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'field' => ['type' => 'string'],
+                            'op' => ['type' => 'string', 'enum' => ['eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'like', 'in', 'not_in', 'is_null', 'is_not_null']],
+                            'value' => [],
+                        ],
+                        'required' => ['field', 'op'],
+                    ],
+                ],
             ],
             'required' => ['group_by'],
         ];
     }
+
+    /**
+     * Erlaubte Felder für das filters-Array.
+     */
+    protected const ALLOWED_FILTER_FIELDS = [
+        'team_id', 'user_id', 'context_type', 'context_id',
+        'root_context_type', 'root_context_id', 'work_date',
+        'is_billed', 'source_module',
+    ];
+
+    /**
+     * Erlaubte Operatoren für das filters-Array.
+     */
+    protected const ALLOWED_FILTER_OPS = [
+        'eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'like', 'in', 'not_in', 'is_null', 'is_not_null',
+    ];
 
     public function execute(array $arguments, ToolContext $context): ToolResult
     {
@@ -101,6 +138,14 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'group_by ist erforderlich. Erlaubte Werte: context, user, work_date, root_context, source_module, team.');
             }
 
+            // date_from/date_to als Aliase für work_date_from/work_date_to
+            if (isset($arguments['date_from']) && !isset($arguments['work_date_from'])) {
+                $arguments['work_date_from'] = $arguments['date_from'];
+            }
+            if (isset($arguments['date_to']) && !isset($arguments['work_date_to'])) {
+                $arguments['work_date_to'] = $arguments['date_to'];
+            }
+
             $query = OrganizationTimeEntry::query()
                 ->whereIn('team_id', $teamIds);
 
@@ -112,7 +157,7 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 ? (ContextTypeRegistry::resolve($arguments['root_context_type']) ?? $arguments['root_context_type'])
                 : null;
 
-            // Filter anwenden
+            // Top-Level Filter anwenden
             if (isset($arguments['user_id'])) {
                 $query->where('user_id', (int) $arguments['user_id']);
             }
@@ -133,6 +178,9 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
             if (array_key_exists('is_billed', $arguments) && $arguments['is_billed'] !== null) {
                 $query->where('is_billed', (bool) $arguments['is_billed']);
             }
+
+            // filters-Array anwenden (Parität mit GET)
+            $this->applySummaryFilters($query, $arguments);
 
             // Gruppierung
             $groups = match ($groupBy) {
@@ -315,6 +363,58 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 'total_hours' => OrganizationTimeEntry::formatMinutesAsHours((int) $row->total_minutes),
             ];
         })->values()->toArray();
+    }
+
+    /**
+     * Wendet das filters-Array auf die Query an.
+     * Unterstützt dieselben Filter-Felder und Operatoren wie GET.
+     */
+    protected function applySummaryFilters($query, array $arguments): void
+    {
+        $filters = $arguments['filters'] ?? null;
+
+        if (!is_array($filters) || empty($filters)) {
+            return;
+        }
+
+        foreach ($filters as $filter) {
+            if (!is_array($filter)) {
+                continue;
+            }
+
+            $field = $filter['field'] ?? null;
+            $op = $filter['op'] ?? 'eq';
+            $value = $filter['value'] ?? null;
+
+            if (!$field || !in_array($field, self::ALLOWED_FILTER_FIELDS, true)) {
+                continue;
+            }
+            if (!in_array($op, self::ALLOWED_FILTER_OPS, true)) {
+                continue;
+            }
+
+            // context_type Kurzformen auflösen
+            if (in_array($field, ['context_type', 'root_context_type'], true) && $value !== null) {
+                $resolved = ContextTypeRegistry::resolve($value);
+                if ($resolved) {
+                    $value = $resolved;
+                }
+            }
+
+            match ($op) {
+                'eq' => $query->where($field, '=', $value),
+                'ne' => $query->where($field, '!=', $value),
+                'gt' => $query->where($field, '>', $value),
+                'gte' => $query->where($field, '>=', $value),
+                'lt' => $query->where($field, '<', $value),
+                'lte' => $query->where($field, '<=', $value),
+                'like' => $query->where($field, 'LIKE', $value),
+                'in' => $query->whereIn($field, is_array($value) ? $value : [$value]),
+                'not_in' => $query->whereNotIn($field, is_array($value) ? $value : [$value]),
+                'is_null' => $query->whereNull($field),
+                'is_not_null' => $query->whereNotNull($field),
+            };
+        }
     }
 
     public function getMetadata(): array

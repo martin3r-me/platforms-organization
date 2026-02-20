@@ -136,6 +136,18 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\UpdateTimeEntryTool());
             $registry->register(new \Platform\Organization\Tools\DeleteTimeEntryTool());
             $registry->register(new \Platform\Organization\Tools\SummarizeTimeEntriesTool());
+
+            // Entity Type Group Tools
+            $registry->register(new \Platform\Organization\Tools\ListEntityTypeGroupsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateEntityTypeGroupTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateEntityTypeGroupTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteEntityTypeGroupTool());
+
+            // Entity Type Tools
+            $registry->register(new \Platform\Organization\Tools\ListEntityTypesTool());
+            $registry->register(new \Platform\Organization\Tools\CreateEntityTypeTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateEntityTypeTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteEntityTypeTool());
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

@@ -89,7 +89,7 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 ],
                 'filters' => [
                     'type' => 'array',
-                    'description' => 'Optional: Array von Filtern. Jeder Filter: {"field": "...", "op": "eq|ne|gt|gte|lt|lte|like|in|not_in|is_null|is_not_null", "value": ...}. Erlaubte Felder: team_id, user_id, context_type, context_id, root_context_type, root_context_id, work_date, is_billed, source_module.',
+                    'description' => 'Optional: Array von Filtern. Jeder Filter: {"field": "...", "op": "eq|ne|gt|gte|lt|lte|like|in|not_in|is_null|is_not_null", "value": ...}. Erlaubte Felder: team_id, user_id, context_type, context_id, root_context_type, root_context_id, work_date (oder "date" als Alias), is_billed, source_module.',
                     'items' => [
                         'type' => 'object',
                         'properties' => [
@@ -385,6 +385,11 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
             $field = $filter['field'] ?? null;
             $op = $filter['op'] ?? 'eq';
             $value = $filter['value'] ?? null;
+
+            // "date" als Alias für "work_date" (Parität mit GET und date_from/date_to)
+            if ($field === 'date') {
+                $field = 'work_date';
+            }
 
             if (!$field || !in_array($field, self::ALLOWED_FILTER_FIELDS, true)) {
                 continue;

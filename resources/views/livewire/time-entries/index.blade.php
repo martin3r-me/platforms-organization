@@ -1,6 +1,13 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="Ist-Zeiten" />
+        <x-ui-page-navbar title="" />
+    </x-slot>
+
+    <x-slot name="actionbar">
+        <x-ui-page-actionbar :breadcrumbs="[
+            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Ist-Zeiten'],
+        ]" />
     </x-slot>
 
     <x-slot name="sidebar">

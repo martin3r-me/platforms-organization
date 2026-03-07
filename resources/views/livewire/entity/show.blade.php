@@ -1,37 +1,39 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="Organisationseinheit Details" />
+        <x-ui-page-navbar title="" />
+    </x-slot>
+
+    <x-slot name="actionbar">
+        <x-ui-page-actionbar :breadcrumbs="[
+            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Einheiten', 'href' => route('organization.entities.index')],
+            ['label' => $entity->name ?? 'Details'],
+        ]">
+            @if($this->isDirty())
+                <x-ui-button variant="secondary-ghost" size="sm" wire:click="loadForm">
+                    @svg('heroicon-o-x-mark', 'w-4 h-4')
+                    <span>Abbrechen</span>
+                </x-ui-button>
+                <x-ui-button variant="primary" size="sm" wire:click="save">
+                    @svg('heroicon-o-check', 'w-4 h-4')
+                    <span>Speichern</span>
+                </x-ui-button>
+            @else
+                <x-ui-button variant="ghost" size="sm" wire:click="edit">
+                    @svg('heroicon-o-pencil', 'w-4 h-4')
+                    <span>Bearbeiten</span>
+                </x-ui-button>
+                <x-ui-button variant="primary" size="sm" wire:click="openCreateTeamModal">
+                    @svg('heroicon-o-user-group', 'w-4 h-4')
+                    <span>Team erstellen</span>
+                </x-ui-button>
+            @endif
+        </x-ui-page-actionbar>
     </x-slot>
 
     <x-slot name="sidebar">
         <x-ui-page-sidebar title="Informationen" width="w-80" :defaultOpen="true" side="left">
             <div class="p-6 space-y-6">
-                <!-- Action Buttons -->
-                <div class="pb-4 border-b border-[var(--ui-border)]/40 space-y-2">
-                    @if($this->isDirty())
-                        <div class="flex space-x-2">
-                            <x-ui-button variant="secondary-outline" wire:click="loadForm" size="sm" class="flex-1">
-                                @svg('heroicon-o-x-mark', 'w-4 h-4 mr-2')
-                                Abbrechen
-                            </x-ui-button>
-                            <x-ui-button variant="primary" wire:click="save" size="sm" class="flex-1">
-                                @svg('heroicon-o-check', 'w-4 h-4 mr-2')
-                                Speichern
-                            </x-ui-button>
-                        </div>
-                    @else
-                        <x-ui-button variant="secondary-outline" wire:click="edit" size="sm" class="w-full">
-                            @svg('heroicon-o-pencil', 'w-4 h-4 mr-2')
-                            Bearbeiten
-                        </x-ui-button>
-                    @endif
-                    <div>
-                        <x-ui-button variant="primary-outline" wire:click="openCreateTeamModal" size="sm" class="w-full">
-                            @svg('heroicon-o-user-group', 'w-4 h-4 mr-2')
-                            Team erstellen
-                        </x-ui-button>
-                    </div>
-                </div>
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Status</h3>
                     <div class="space-y-3">

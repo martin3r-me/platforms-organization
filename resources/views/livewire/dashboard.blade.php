@@ -1,23 +1,17 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="Organization Dashboard" />
+        <x-ui-page-navbar title="" />
+    </x-slot>
+
+    <x-slot name="actionbar">
+        <x-ui-page-actionbar :breadcrumbs="[
+            ['label' => 'Organization', 'icon' => 'building-office'],
+        ]" />
     </x-slot>
 
     <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Schnellzugriff" width="w-80" :defaultOpen="true" side="left">
+        <x-ui-page-sidebar title="Übersicht" width="w-80" :defaultOpen="true" side="left">
             <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Aktionen</h3>
-                    <div class="space-y-2">
-                        <x-ui-button variant="secondary" size="sm" :href="route('organization.entities.index')" wire:navigate class="w-full">
-                            <span class="flex items-center gap-2">
-                                @svg('heroicon-o-building-office','w-4 h-4')
-                                Organisationseinheiten
-                            </span>
-                        </x-ui-button>
-                    </div>
-                </div>
-
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Statistiken</h3>
                     <div class="space-y-3">

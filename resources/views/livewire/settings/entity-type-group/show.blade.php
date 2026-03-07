@@ -1,36 +1,39 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar :title="$entityTypeGroup->name" icon="heroicon-o-rectangle-group" />
+        <x-ui-page-navbar title="" />
+    </x-slot>
+
+    <x-slot name="actionbar">
+        <x-ui-page-actionbar :breadcrumbs="[
+            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Settings'],
+            ['label' => 'Entity Type Groups', 'href' => route('organization.settings.entity-type-groups.index')],
+            ['label' => $entityTypeGroup->name],
+        ]">
+            @if($this->isDirty)
+                <x-ui-button variant="secondary-ghost" size="sm" wire:click="loadForm">
+                    @svg('heroicon-o-x-mark', 'w-4 h-4')
+                    <span>Abbrechen</span>
+                </x-ui-button>
+                <x-ui-button variant="primary" size="sm" wire:click="save">
+                    @svg('heroicon-o-check', 'w-4 h-4')
+                    <span>Speichern</span>
+                </x-ui-button>
+            @endif
+            <x-ui-confirm-button
+                variant="danger-outline"
+                size="sm"
+                wire:click="delete"
+                confirm-text="Entity Type Group wirklich löschen?"
+            >
+                @svg('heroicon-o-trash', 'w-4 h-4')
+            </x-ui-confirm-button>
+        </x-ui-page-actionbar>
     </x-slot>
 
     <x-slot name="sidebar">
         <x-ui-page-sidebar title="Informationen" width="w-80" :defaultOpen="true" side="left">
             <div class="p-6 space-y-6">
-                <!-- Action Buttons -->
-                <div class="pb-4 border-b border-[var(--ui-border)]/40 space-y-2">
-                    @if($this->isDirty)
-                        <div class="flex space-x-2">
-                            <x-ui-button variant="secondary-outline" wire:click="loadForm" size="sm" class="flex-1">
-                                @svg('heroicon-o-x-mark', 'w-4 h-4 mr-2')
-                                Abbrechen
-                            </x-ui-button>
-                            <x-ui-button variant="primary" wire:click="save" size="sm" class="flex-1">
-                                @svg('heroicon-o-check', 'w-4 h-4 mr-2')
-                                Speichern
-                            </x-ui-button>
-                        </div>
-                    @endif
-                    <x-ui-confirm-button
-                        variant="danger-outline"
-                        size="sm"
-                        wire:click="delete"
-                        confirm-text="Entity Type Group wirklich löschen?"
-                        class="w-full justify-center"
-                    >
-                        @svg('heroicon-o-trash', 'w-4 h-4 mr-2')
-                        Löschen
-                    </x-ui-confirm-button>
-                </div>
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Status</h3>
                     <div class="space-y-3">

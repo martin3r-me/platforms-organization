@@ -1,20 +1,26 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="Organisationseinheiten" />
+        <x-ui-page-navbar title="" />
+    </x-slot>
+
+    <x-slot name="actionbar">
+        <x-ui-page-actionbar :breadcrumbs="[
+            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Einheiten'],
+        ]">
+            <x-ui-button variant="primary" size="sm" wire:click="openCreateModal">
+                @svg('heroicon-o-plus', 'w-4 h-4')
+                <span>Neue Einheit</span>
+            </x-ui-button>
+        </x-ui-page-actionbar>
     </x-slot>
 
     <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Schnellzugriff" width="w-80" :defaultOpen="true" side="left">
+        <x-ui-page-sidebar title="Filter" width="w-80" :defaultOpen="true" side="left">
             <div class="p-6 space-y-6">
                 <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Aktionen</h3>
-                    <div class="space-y-2">
-                        <x-ui-input-text name="search" placeholder="Suche Organisationseinheiten..." class="w-full" size="sm" />
-                        <x-ui-button variant="secondary" size="sm" wire:click="openCreateModal" class="w-full justify-start">
-                            @svg('heroicon-o-plus','w-4 h-4')
-                            <span class="ml-2">Neue Einheit</span>
-                        </x-ui-button>
-                    </div>
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Suche</h3>
+                    <x-ui-input-text name="search" placeholder="Suche Organisationseinheiten..." class="w-full" size="sm" />
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>

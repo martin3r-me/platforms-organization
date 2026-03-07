@@ -1,20 +1,26 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="Kostenstellen" />
+        <x-ui-page-navbar title="" />
+    </x-slot>
+
+    <x-slot name="actionbar">
+        <x-ui-page-actionbar :breadcrumbs="[
+            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Kostenstellen'],
+        ]">
+            <x-ui-button variant="primary" size="sm" wire:click="create">
+                @svg('heroicon-o-plus', 'w-4 h-4')
+                <span>Neue Kostenstelle</span>
+            </x-ui-button>
+        </x-ui-page-actionbar>
     </x-slot>
 
     <x-slot name="sidebar">
         <x-ui-page-sidebar title="Filter" width="w-80" :defaultOpen="true" side="left">
             <div class="p-6 space-y-6">
                 <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Aktionen</h3>
-                    <div class="space-y-2">
-                        <x-ui-input-text name="search" wire:model.live="search" placeholder="Suche Kostenstellen..." class="w-full" size="sm" />
-                        <x-ui-button variant="secondary" size="sm" wire:click="create" class="w-full justify-start">
-                            @svg('heroicon-o-plus','w-4 h-4')
-                            <span class="ml-2">Neue Kostenstelle</span>
-                        </x-ui-button>
-                    </div>
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Suche</h3>
+                    <x-ui-input-text name="search" wire:model.live="search" placeholder="Suche Kostenstellen..." class="w-full" size="sm" />
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>

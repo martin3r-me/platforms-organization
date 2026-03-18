@@ -9,15 +9,14 @@ use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Services\DimensionLinkService;
 
 /**
- * Verknüpft ein Dimensions-Element (Kostenstelle, Kunde, Person) mit einem beliebigen Objekt.
+ * Verknüpft ein Dimensions-Element mit einem Objekt.
  *
- * Beispiel: "Ordne Kostenstelle 5 dem Projekt 42 zu mit 60%"
- * → organization.dimension_links.POST(dimension="cost-centers", context_type="...", context_id=42, dimension_item_id=5, percentage=60)
+ * Architektur: Kostenstellen (cost-centers) dürfen NUR an Entities verknüpft werden.
+ * Entities (entities) können an beliebige externe Objekte verknüpft werden.
  *
  * Modi:
- * - single (customers): Ersetzt automatisch den vorherigen Link
- * - multi (persons): Mehrere Links erlaubt
- * - multi_percent (cost-centers): Mehrere Links mit Prozent-Verteilung
+ * - multi_percent (cost-centers): Mehrere Links mit Prozent-Verteilung (nur an Entities)
+ * - multi (entities): Mehrere Links erlaubt (an beliebige Objekte)
  */
 class LinkDimensionTool implements ToolContract, ToolMetadataContract
 {
@@ -28,7 +27,7 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /organization/dimension-links - Verknüpft ein Dimensions-Element mit einem Objekt. Bei customers (single) wird der vorherige Link automatisch ersetzt. Bei cost-centers (multi_percent) kann percentage angegeben werden. Das Ziel-Objekt muss den entsprechenden Trait haben.';
+        return 'POST /organization/dimension-links - Verknüpft ein Dimensions-Element mit einem Objekt. WICHTIG: cost-centers nur an Entities erlaubt (context_type="organization_entity"). Entities können an beliebige Objekte verknüpft werden.';
     }
 
     public function getSchema(): array
@@ -90,6 +89,14 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
 
             if (!$contextType || !$contextId || !$dimensionItemId) {
                 return ToolResult::error('VALIDATION_ERROR', 'context_type, context_id und dimension_item_id sind erforderlich.');
+            }
+
+            // Enforcement: Kostenstellen dürfen nur an Entities gehängt werden
+            if ($dimension === 'cost-centers') {
+                $allowedTypes = ['organization_entity', \Platform\Organization\Models\OrganizationEntity::class];
+                if (!in_array($contextType, $allowedTypes, true)) {
+                    return ToolResult::error('VALIDATION_ERROR', "Kostenstellen können nur an Organisationseinheiten (Entities) verknüpft werden. Nutze dimension='entities' um externe Objekte mit Entities zu verknüpfen, dann Kostenstellen an die Entity.");
+                }
             }
 
             // Prüfe ob das Dimensions-Element existiert

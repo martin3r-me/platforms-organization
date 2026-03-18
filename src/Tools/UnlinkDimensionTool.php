@@ -11,8 +11,8 @@ use Platform\Organization\Services\DimensionLinkService;
 /**
  * Entfernt die Verknüpfung eines Dimensions-Elements von einem Objekt.
  *
- * Beispiel: "Entferne Kostenstelle 5 vom Projekt 42"
- * → organization.dimension_links.DELETE(dimension="cost-centers", context_type="...", context_id=42, dimension_item_id=5)
+ * Architektur: Kostenstellen (cost-centers) existieren nur an Entities.
+ * Entities (entities) können an beliebige externe Objekte verknüpft sein.
  */
 class UnlinkDimensionTool implements ToolContract, ToolMetadataContract
 {
@@ -23,7 +23,7 @@ class UnlinkDimensionTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'DELETE /organization/dimension-links - Entfernt die Verknüpfung eines Dimensions-Elements (Kostenstelle, Kunde, Person) von einem Objekt.';
+        return 'DELETE /organization/dimension-links - Entfernt die Verknüpfung eines Dimensions-Elements von einem Objekt.';
     }
 
     public function getSchema(): array
@@ -69,6 +69,14 @@ class UnlinkDimensionTool implements ToolContract, ToolMetadataContract
 
             if (!$contextType || !$contextId || !$dimensionItemId) {
                 return ToolResult::error('VALIDATION_ERROR', 'context_type, context_id und dimension_item_id sind erforderlich.');
+            }
+
+            // Enforcement: Kostenstellen dürfen nur an Entities gehängt werden
+            if ($dimension === 'cost-centers') {
+                $allowedTypes = ['organization_entity', \Platform\Organization\Models\OrganizationEntity::class];
+                if (!in_array($contextType, $allowedTypes, true)) {
+                    return ToolResult::error('VALIDATION_ERROR', "Kostenstellen-Links können nur an Organisationseinheiten (Entities) existieren.");
+                }
             }
 
             $service = new DimensionLinkService();

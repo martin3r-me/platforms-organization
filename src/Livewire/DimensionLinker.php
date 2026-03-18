@@ -5,10 +5,8 @@ namespace Platform\Organization\Livewire;
 use Livewire\Component;
 use Platform\Organization\Models\OrganizationCostCenter;
 use Platform\Organization\Models\OrganizationCostCenterLink;
-use Platform\Organization\Models\OrganizationCustomer;
-use Platform\Organization\Models\OrganizationCustomerLink;
-use Platform\Organization\Models\OrganizationPerson;
-use Platform\Organization\Models\OrganizationPersonLink;
+use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityLink;
 
 class DimensionLinker extends Component
 {
@@ -40,20 +38,12 @@ class DimensionLinker extends Component
                 'icon' => 'heroicon-o-currency-dollar',
                 'mode' => 'multi_percent',
             ],
-            'customers' => [
-                'model' => OrganizationCustomer::class,
-                'link_model' => OrganizationCustomerLink::class,
-                'fk' => 'customer_id',
-                'label' => 'Kunden',
-                'icon' => 'heroicon-o-user-group',
-                'mode' => 'single',
-            ],
-            'persons' => [
-                'model' => OrganizationPerson::class,
-                'link_model' => OrganizationPersonLink::class,
-                'fk' => 'person_id',
-                'label' => 'Personen',
-                'icon' => 'heroicon-o-user',
+            'entities' => [
+                'model' => OrganizationEntity::class,
+                'link_model' => OrganizationEntityLink::class,
+                'fk' => 'entity_id',
+                'label' => 'Organisationseinheiten',
+                'icon' => 'heroicon-o-building-office',
                 'mode' => 'multi',
             ],
         ];

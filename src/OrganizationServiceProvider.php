@@ -130,17 +130,17 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\UpdateCostCenterTool());
             $registry->register(new \Platform\Organization\Tools\DeleteCostCenterTool());
 
-            // Customer Tools
-            $registry->register(new \Platform\Organization\Tools\ListCustomersTool());
-            $registry->register(new \Platform\Organization\Tools\CreateCustomerTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateCustomerTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteCustomerTool());
+            // VSM System Tools
+            $registry->register(new \Platform\Organization\Tools\ListVsmSystemsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateVsmSystemTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateVsmSystemTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteVsmSystemTool());
 
-            // Person Tools
-            $registry->register(new \Platform\Organization\Tools\ListPersonsTool());
-            $registry->register(new \Platform\Organization\Tools\CreatePersonTool());
-            $registry->register(new \Platform\Organization\Tools\UpdatePersonTool());
-            $registry->register(new \Platform\Organization\Tools\DeletePersonTool());
+            // VSM Function Tools
+            $registry->register(new \Platform\Organization\Tools\ListVsmFunctionsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateVsmFunctionTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateVsmFunctionTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteVsmFunctionTool());
 
             // Time Tracking Tools
             $registry->register(new \Platform\Organization\Tools\CreateTimeEntryTool());

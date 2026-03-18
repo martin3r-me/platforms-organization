@@ -39,16 +39,6 @@ return [
                             'route' => 'organization.cost-centers.index',
                             'icon' => 'heroicon-o-currency-dollar',
                         ],
-                        'customers' => [
-                            'title' => 'Kunden',
-                            'route' => 'organization.customers.index',
-                            'icon' => 'heroicon-o-user-group',
-                        ],
-                        'persons' => [
-                            'title' => 'Personen',
-                            'route' => 'organization.persons.index',
-                            'icon' => 'heroicon-o-user',
-                        ],
                         'vsm-systems' => [
                             'title' => 'VSM Systeme',
                             'route' => 'organization.vsm-systems.index',

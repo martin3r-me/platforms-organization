@@ -6,21 +6,21 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
-use Platform\Organization\Models\OrganizationCustomer;
+use Platform\Organization\Models\OrganizationVsmFunction;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
-class CreateCustomerTool implements ToolContract, ToolMetadataContract
+class CreateVsmFunctionTool implements ToolContract, ToolMetadataContract
 {
     use ResolvesOrganizationTeam;
 
     public function getName(): string
     {
-        return 'organization.customers.POST';
+        return 'organization.vsm_functions.POST';
     }
 
     public function getDescription(): string
     {
-        return 'POST /organization/customers - Erstellt einen Kunden im Root/Elterteam (IDs nie raten; zuerst organization.customers.GET).';
+        return 'POST /organization/vsm-functions - Erstellt eine VSM-Funktion im Root/Elterteam. Kann global (root_entity_id=null) oder entity-spezifisch sein.';
     }
 
     public function getSchema(): array
@@ -34,11 +34,11 @@ class CreateCustomerTool implements ToolContract, ToolMetadataContract
                 ],
                 'code' => [
                     'type' => 'string',
-                    'description' => 'Optional: Kunden-Code (empfohlen).',
+                    'description' => 'Optional: Code der VSM-Funktion.',
                 ],
                 'name' => [
                     'type' => 'string',
-                    'description' => 'Name des Kunden (ERFORDERLICH).',
+                    'description' => 'ERFORDERLICH: Name der VSM-Funktion.',
                 ],
                 'description' => [
                     'type' => 'string',
@@ -50,8 +50,7 @@ class CreateCustomerTool implements ToolContract, ToolMetadataContract
                 ],
                 'is_active' => [
                     'type' => 'boolean',
-                    'description' => 'Optional: aktiv/inaktiv. Default true.',
-                    'default' => true,
+                    'description' => 'Optional: aktiv/inaktiv. Default: true.',
                 ],
                 'metadata' => [
                     'type' => 'object',
@@ -69,58 +68,47 @@ class CreateCustomerTool implements ToolContract, ToolMetadataContract
             if ($resolved['error']) {
                 return $resolved['error'];
             }
-            $rootTeamId = (int)$resolved['root_team_id'];
+            $rootTeamId = (int) $resolved['root_team_id'];
 
-            $name = trim((string)($arguments['name'] ?? ''));
+            $name = trim((string) ($arguments['name'] ?? ''));
             if ($name === '') {
                 return ToolResult::error('VALIDATION_ERROR', 'name ist erforderlich.');
             }
 
             $code = null;
             if (array_key_exists('code', $arguments)) {
-                $code = trim((string)($arguments['code'] ?? ''));
+                $code = trim((string) ($arguments['code'] ?? ''));
                 $code = $code === '' ? null : $code;
-            }
-
-            if ($code !== null) {
-                $exists = OrganizationCustomer::query()
-                    ->where('team_id', $rootTeamId)
-                    ->where('code', $code)
-                    ->whereNull('deleted_at')
-                    ->exists();
-                if ($exists) {
-                    return ToolResult::error('VALIDATION_ERROR', "Kunde mit code '{$code}' existiert bereits im Root/Elterteam.");
-                }
             }
 
             $rid = $arguments['root_entity_id'] ?? null;
             $rootEntityId = null;
             if ($rid !== null && $rid !== '' && $rid !== 'null' && $rid !== 0 && $rid !== '0') {
-                $rootEntityId = (int)$rid;
+                $rootEntityId = (int) $rid;
             }
 
-            $customer = OrganizationCustomer::create([
+            $fn = OrganizationVsmFunction::create([
                 'team_id' => $rootTeamId,
                 'user_id' => $context->user?->id,
                 'code' => $code,
                 'name' => $name,
-                'description' => (array_key_exists('description', $arguments) && $arguments['description'] !== '') ? (string)$arguments['description'] : null,
+                'description' => ($arguments['description'] ?? null) ?: null,
                 'root_entity_id' => $rootEntityId,
-                'is_active' => (bool)($arguments['is_active'] ?? true),
+                'is_active' => (bool) ($arguments['is_active'] ?? true),
                 'metadata' => (isset($arguments['metadata']) && is_array($arguments['metadata'])) ? $arguments['metadata'] : null,
             ]);
 
             return ToolResult::success([
-                'id' => $customer->id,
-                'code' => $customer->code,
-                'name' => $customer->name,
-                'team_id' => $customer->team_id,
-                'root_entity_id' => $customer->root_entity_id,
-                'is_active' => (bool)$customer->is_active,
-                'message' => 'Kunde erfolgreich erstellt.',
+                'id' => $fn->id,
+                'code' => $fn->code,
+                'name' => $fn->name,
+                'team_id' => $fn->team_id,
+                'root_entity_id' => $fn->root_entity_id,
+                'is_active' => (bool) $fn->is_active,
+                'message' => 'VSM-Funktion erfolgreich erstellt.',
             ]);
         } catch (\Throwable $e) {
-            return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Erstellen des Kunden: ' . $e->getMessage());
+            return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Erstellen der VSM-Funktion: ' . $e->getMessage());
         }
     }
 
@@ -128,7 +116,7 @@ class CreateCustomerTool implements ToolContract, ToolMetadataContract
     {
         return [
             'category' => 'action',
-            'tags' => ['organization', 'customers', 'create'],
+            'tags' => ['organization', 'vsm', 'functions', 'create'],
             'read_only' => false,
             'requires_auth' => true,
             'requires_team' => true,

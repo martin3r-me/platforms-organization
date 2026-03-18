@@ -7,22 +7,22 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Tools\Concerns\HasStandardizedWriteOperations;
-use Platform\Organization\Models\OrganizationCustomer;
+use Platform\Organization\Models\OrganizationVsmFunction;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
-class UpdateCustomerTool implements ToolContract, ToolMetadataContract
+class UpdateVsmFunctionTool implements ToolContract, ToolMetadataContract
 {
     use HasStandardizedWriteOperations;
     use ResolvesOrganizationTeam;
 
     public function getName(): string
     {
-        return 'organization.customers.PUT';
+        return 'organization.vsm_functions.PUT';
     }
 
     public function getDescription(): string
     {
-        return 'PUT /organization/customers/{id} - Aktualisiert einen Kunden im Root/Elterteam. Parameter: customer_id (required).';
+        return 'PUT /organization/vsm-functions/{id} - Aktualisiert eine VSM-Funktion. Nutze organization.vsm_functions.GET um IDs zu ermitteln.';
     }
 
     public function getSchema(): array
@@ -33,21 +33,21 @@ class UpdateCustomerTool implements ToolContract, ToolMetadataContract
                     'type' => 'integer',
                     'description' => 'Optional: Team-ID (wird auf Root/Elterteam aufgelöst). Default: Team aus Kontext.',
                 ],
-                'customer_id' => [
+                'vsm_function_id' => [
                     'type' => 'integer',
-                    'description' => 'ID des Kunden (ERFORDERLICH). Nutze organization.customers.GET.',
+                    'description' => 'ERFORDERLICH: ID der VSM-Funktion.',
                 ],
                 'code' => [
                     'type' => 'string',
-                    'description' => 'Optional: Code ("" zum Leeren).',
+                    'description' => 'Optional: Neuer Code ("" zum Leeren).',
                 ],
                 'name' => [
                     'type' => 'string',
-                    'description' => 'Optional: Name.',
+                    'description' => 'Optional: Neuer Name.',
                 ],
                 'description' => [
                     'type' => 'string',
-                    'description' => 'Optional: Beschreibung ("" zum Leeren).',
+                    'description' => 'Optional: Neue Beschreibung ("" zum Leeren).',
                 ],
                 'root_entity_id' => [
                     'type' => 'integer',
@@ -62,7 +62,7 @@ class UpdateCustomerTool implements ToolContract, ToolMetadataContract
                     'description' => 'Optional: Metadatenobjekt (null zum Leeren).',
                 ],
             ],
-            'required' => ['customer_id'],
+            'required' => ['vsm_function_id'],
         ]);
     }
 
@@ -73,51 +73,39 @@ class UpdateCustomerTool implements ToolContract, ToolMetadataContract
             if ($resolved['error']) {
                 return $resolved['error'];
             }
-            $rootTeamId = (int)$resolved['root_team_id'];
+            $rootTeamId = (int) $resolved['root_team_id'];
 
             $found = $this->validateAndFindModel(
                 $arguments,
                 $context,
-                'customer_id',
-                OrganizationCustomer::class,
+                'vsm_function_id',
+                OrganizationVsmFunction::class,
                 'NOT_FOUND',
-                'Kunde nicht gefunden.'
+                'VSM-Funktion nicht gefunden.'
             );
             if ($found['error']) {
                 return $found['error'];
             }
 
-            /** @var OrganizationCustomer $customer */
-            $customer = $found['model'];
-            if ((int)$customer->team_id !== $rootTeamId) {
-                return ToolResult::error('ACCESS_DENIED', 'Kunde gehört nicht zum Root/Elterteam des angegebenen Teams.');
+            $fn = $found['model'];
+            if ((int) $fn->team_id !== $rootTeamId) {
+                return ToolResult::error('ACCESS_DENIED', 'VSM-Funktion gehört nicht zum Root/Elterteam des angegebenen Teams.');
             }
 
             $update = [];
             if (array_key_exists('code', $arguments)) {
-                $code = trim((string)($arguments['code'] ?? ''));
+                $code = trim((string) ($arguments['code'] ?? ''));
                 $update['code'] = $code === '' ? null : $code;
-                if ($update['code'] !== null) {
-                    $exists = OrganizationCustomer::query()
-                        ->where('team_id', $rootTeamId)
-                        ->where('code', $update['code'])
-                        ->where('id', '!=', $customer->id)
-                        ->whereNull('deleted_at')
-                        ->exists();
-                    if ($exists) {
-                        return ToolResult::error('VALIDATION_ERROR', "Kunde mit code '{$update['code']}' existiert bereits im Root/Elterteam.");
-                    }
-                }
             }
             if (array_key_exists('name', $arguments)) {
-                $name = trim((string)($arguments['name'] ?? ''));
+                $name = trim((string) ($arguments['name'] ?? ''));
                 if ($name === '') {
                     return ToolResult::error('VALIDATION_ERROR', 'name darf nicht leer sein.');
                 }
                 $update['name'] = $name;
             }
             if (array_key_exists('description', $arguments)) {
-                $d = (string)($arguments['description'] ?? '');
+                $d = (string) ($arguments['description'] ?? '');
                 $update['description'] = $d === '' ? null : $d;
             }
             if (array_key_exists('root_entity_id', $arguments)) {
@@ -125,32 +113,32 @@ class UpdateCustomerTool implements ToolContract, ToolMetadataContract
                 if ($rid === null || $rid === '' || $rid === 'null' || $rid === 0 || $rid === '0') {
                     $update['root_entity_id'] = null;
                 } else {
-                    $update['root_entity_id'] = (int)$rid;
+                    $update['root_entity_id'] = (int) $rid;
                 }
             }
             if (array_key_exists('is_active', $arguments)) {
-                $update['is_active'] = (bool)$arguments['is_active'];
+                $update['is_active'] = (bool) $arguments['is_active'];
             }
             if (array_key_exists('metadata', $arguments)) {
                 $update['metadata'] = (isset($arguments['metadata']) && is_array($arguments['metadata'])) ? $arguments['metadata'] : null;
             }
 
             if (!empty($update)) {
-                $customer->update($update);
+                $fn->update($update);
             }
-            $customer->refresh();
+            $fn->refresh();
 
             return ToolResult::success([
-                'id' => $customer->id,
-                'code' => $customer->code,
-                'name' => $customer->name,
-                'team_id' => $customer->team_id,
-                'root_entity_id' => $customer->root_entity_id,
-                'is_active' => (bool)$customer->is_active,
-                'message' => 'Kunde erfolgreich aktualisiert.',
+                'id' => $fn->id,
+                'code' => $fn->code,
+                'name' => $fn->name,
+                'team_id' => $fn->team_id,
+                'root_entity_id' => $fn->root_entity_id,
+                'is_active' => (bool) $fn->is_active,
+                'message' => 'VSM-Funktion erfolgreich aktualisiert.',
             ]);
         } catch (\Throwable $e) {
-            return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Aktualisieren des Kunden: ' . $e->getMessage());
+            return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Aktualisieren der VSM-Funktion: ' . $e->getMessage());
         }
     }
 
@@ -158,7 +146,7 @@ class UpdateCustomerTool implements ToolContract, ToolMetadataContract
     {
         return [
             'category' => 'action',
-            'tags' => ['organization', 'customers', 'update'],
+            'tags' => ['organization', 'vsm', 'functions', 'update'],
             'read_only' => false,
             'requires_auth' => true,
             'requires_team' => true,

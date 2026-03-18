@@ -7,13 +7,13 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Symfony\Component\Uid\UuidV7;
 
-class OrganizationPersonLink extends Model
+class OrganizationEntityLink extends Model
 {
-    protected $table = 'organization_person_links';
+    protected $table = 'organization_entity_links';
 
     protected $fillable = [
         'uuid',
-        'person_id',
+        'entity_id',
         'linkable_type',
         'linkable_id',
         'start_date',
@@ -50,9 +50,9 @@ class OrganizationPersonLink extends Model
         });
     }
 
-    public function person(): BelongsTo
+    public function entity(): BelongsTo
     {
-        return $this->belongsTo(OrganizationPerson::class, 'person_id');
+        return $this->belongsTo(OrganizationEntity::class, 'entity_id');
     }
 
     public function linkable(): MorphTo

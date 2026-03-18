@@ -62,38 +62,6 @@
         </a>
 
 
-        {{-- Kunden --}}
-        <a href="{{ route('organization.customers.index') }}"
-           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
-           :class="[
-               window.location.pathname.includes('/customers') ||
-               window.location.pathname.endsWith('/customers') ||
-               window.location.pathname.endsWith('/customers/')
-                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
-                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
-               collapsed ? 'justify-center' : 'gap-3'
-           ]"
-           wire:navigate>
-            <x-heroicon-o-user-group class="w-6 h-6 flex-shrink-0"/>
-            <span x-show="!collapsed" class="truncate">Kunden</span>
-        </a>
-
-        {{-- Personen --}}
-        <a href="{{ route('organization.persons.index') }}"
-           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
-           :class="[
-               window.location.pathname.includes('/persons') ||
-               window.location.pathname.endsWith('/persons') ||
-               window.location.pathname.endsWith('/persons/')
-                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
-                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
-               collapsed ? 'justify-center' : 'gap-3'
-           ]"
-           wire:navigate>
-            <x-heroicon-o-user class="w-6 h-6 flex-shrink-0"/>
-            <span x-show="!collapsed" class="truncate">Personen</span>
-        </a>
-
         {{-- VSM Systeme --}}
         <a href="{{ route('organization.vsm-systems.index') }}"
            class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"

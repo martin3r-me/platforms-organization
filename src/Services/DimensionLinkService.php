@@ -6,10 +6,8 @@ use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
 use Platform\Organization\Models\OrganizationCostCenter;
 use Platform\Organization\Models\OrganizationCostCenterLink;
-use Platform\Organization\Models\OrganizationCustomer;
-use Platform\Organization\Models\OrganizationCustomerLink;
-use Platform\Organization\Models\OrganizationPerson;
-use Platform\Organization\Models\OrganizationPersonLink;
+use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityLink;
 
 class DimensionLinkService
 {
@@ -26,18 +24,11 @@ class DimensionLinkService
                 'label' => 'Kostenstellen',
                 'mode' => 'multi_percent',
             ],
-            'customers' => [
-                'model' => OrganizationCustomer::class,
-                'link_model' => OrganizationCustomerLink::class,
-                'fk' => 'customer_id',
-                'label' => 'Kunden',
-                'mode' => 'single',
-            ],
-            'persons' => [
-                'model' => OrganizationPerson::class,
-                'link_model' => OrganizationPersonLink::class,
-                'fk' => 'person_id',
-                'label' => 'Personen',
+            'entities' => [
+                'model' => OrganizationEntity::class,
+                'link_model' => OrganizationEntityLink::class,
+                'fk' => 'entity_id',
+                'label' => 'Organisationseinheiten',
                 'mode' => 'multi',
             ],
         ];

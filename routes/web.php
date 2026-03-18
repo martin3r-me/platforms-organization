@@ -13,10 +13,6 @@ use Platform\Organization\Livewire\Settings\EntityTypeGroup\Index as EntityTypeG
 use Platform\Organization\Livewire\Settings\EntityTypeGroup\Show as EntityTypeGroupShow;
 use Platform\Organization\Livewire\Settings\RelationType\Index as RelationTypeIndex;
 use Platform\Organization\Livewire\Settings\RelationType\Show as RelationTypeShow;
-use Platform\Organization\Livewire\Customer\Index as CustomerIndex;
-use Platform\Organization\Livewire\Customer\Show as CustomerShow;
-use Platform\Organization\Livewire\Person\Index as PersonIndex;
-use Platform\Organization\Livewire\Person\Show as PersonShow;
 use Platform\Organization\Livewire\TimeEntries\Index as TimeEntriesIndex;
 use Platform\Organization\Livewire\PlannedTimes\Index as PlannedTimesIndex;
 
@@ -28,14 +24,6 @@ Route::get('/entities/{entity}', EntityShow::class)->name('organization.entities
 // Dimensionen: Kostenstellen
 Route::get('/cost-centers', CostCenterIndex::class)->name('organization.cost-centers.index');
 Route::get('/cost-centers/{costCenter}', CostCenterShow::class)->name('organization.cost-centers.show');
-
-// Dimensionen: Kunden
-Route::get('/customers', CustomerIndex::class)->name('organization.customers.index');
-Route::get('/customers/{customer}', CustomerShow::class)->name('organization.customers.show');
-
-// Dimensionen: Personen
-Route::get('/persons', PersonIndex::class)->name('organization.persons.index');
-Route::get('/persons/{person}', PersonShow::class)->name('organization.persons.show');
 
 // Dimensionen: VSM Systeme
 Route::get('/vsm-systems', VsmSystemIndex::class)->name('organization.vsm-systems.index');

@@ -8,12 +8,12 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::create('organization_customer_links', function (Blueprint $table) {
+        Schema::create('organization_entity_links', function (Blueprint $table) {
             $table->id();
             $table->uuid('uuid')->unique();
 
-            $table->foreignId('customer_id')
-                ->constrained('organization_customers')
+            $table->foreignId('entity_id')
+                ->constrained('organization_entities')
                 ->cascadeOnDelete();
 
             $table->string('linkable_type');
@@ -27,14 +27,14 @@ return new class extends Migration
             $table->foreignId('created_by_user_id')->nullable()->constrained('users')->nullOnDelete();
             $table->timestamps();
 
-            $table->index(['customer_id', 'team_id'], 'ocl_customer_team_idx');
-            $table->index(['linkable_type', 'linkable_id'], 'ocl_linkable_idx');
-            $table->index(['linkable_type', 'linkable_id', 'customer_id'], 'ocl_linkable_customer_idx');
+            $table->index(['entity_id', 'team_id'], 'oel_entity_team_idx');
+            $table->index(['linkable_type', 'linkable_id'], 'oel_linkable_idx');
+            $table->index(['linkable_type', 'linkable_id', 'entity_id'], 'oel_linkable_entity_idx');
         });
     }
 
     public function down(): void
     {
-        Schema::dropIfExists('organization_customer_links');
+        Schema::dropIfExists('organization_entity_links');
     }
 };

@@ -38,7 +38,7 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
             'properties' => [
                 'dimension' => [
                     'type' => 'string',
-                    'enum' => ['cost-centers', 'customers', 'persons'],
+                    'enum' => ['cost-centers', 'entities'],
                     'description' => 'ERFORDERLICH: Dimensions-Key.',
                 ],
                 'context_type' => [

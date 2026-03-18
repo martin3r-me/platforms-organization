@@ -171,6 +171,18 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\ListDimensionLinksTool());
             $registry->register(new \Platform\Organization\Tools\LinkDimensionTool());
             $registry->register(new \Platform\Organization\Tools\UnlinkDimensionTool());
+
+            // Relation Type Tools (Beziehungstypen - global)
+            $registry->register(new \Platform\Organization\Tools\ListRelationTypesTool());
+            $registry->register(new \Platform\Organization\Tools\CreateRelationTypeTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateRelationTypeTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteRelationTypeTool());
+
+            // Entity Relationship Tools (Beziehungen zwischen Entities - team-scoped)
+            $registry->register(new \Platform\Organization\Tools\ListEntityRelationshipsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateEntityRelationshipTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateEntityRelationshipTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteEntityRelationshipTool());
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

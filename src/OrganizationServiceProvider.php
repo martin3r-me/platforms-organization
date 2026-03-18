@@ -130,6 +130,18 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\UpdateCostCenterTool());
             $registry->register(new \Platform\Organization\Tools\DeleteCostCenterTool());
 
+            // Customer Tools
+            $registry->register(new \Platform\Organization\Tools\ListCustomersTool());
+            $registry->register(new \Platform\Organization\Tools\CreateCustomerTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateCustomerTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteCustomerTool());
+
+            // Person Tools
+            $registry->register(new \Platform\Organization\Tools\ListPersonsTool());
+            $registry->register(new \Platform\Organization\Tools\CreatePersonTool());
+            $registry->register(new \Platform\Organization\Tools\UpdatePersonTool());
+            $registry->register(new \Platform\Organization\Tools\DeletePersonTool());
+
             // Time Tracking Tools
             $registry->register(new \Platform\Organization\Tools\CreateTimeEntryTool());
             $registry->register(new \Platform\Organization\Tools\ListTimeEntriesTool());
@@ -148,6 +160,11 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\CreateEntityTypeTool());
             $registry->register(new \Platform\Organization\Tools\UpdateEntityTypeTool());
             $registry->register(new \Platform\Organization\Tools\DeleteEntityTypeTool());
+
+            // Dimension Link Tools (generisch für alle Dimensionen)
+            $registry->register(new \Platform\Organization\Tools\ListDimensionLinksTool());
+            $registry->register(new \Platform\Organization\Tools\LinkDimensionTool());
+            $registry->register(new \Platform\Organization\Tools\UnlinkDimensionTool());
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

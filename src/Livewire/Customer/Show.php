@@ -1,33 +1,33 @@
 <?php
 
-namespace Platform\Organization\Livewire\CostCenter;
+namespace Platform\Organization\Livewire\Customer;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
-use Platform\Organization\Models\OrganizationCostCenter;
+use Platform\Organization\Models\OrganizationCustomer;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Services\DimensionLinkService;
 
 class Show extends Component
 {
-    public OrganizationCostCenter $costCenter;
+    public OrganizationCustomer $customer;
     public array $form = [];
     public bool $isEditing = false;
 
-    public function mount(OrganizationCostCenter $costCenter)
+    public function mount(OrganizationCustomer $customer)
     {
-        $this->costCenter = $costCenter->load('entities.type');
+        $this->customer = $customer;
         $this->loadForm();
     }
 
     public function loadForm()
     {
         $this->form = [
-            'code' => $this->costCenter->code,
-            'name' => $this->costCenter->name,
-            'description' => $this->costCenter->description,
-            'root_entity_id' => $this->costCenter->root_entity_id,
-            'is_active' => $this->costCenter->is_active,
+            'code' => $this->customer->code,
+            'name' => $this->customer->name,
+            'description' => $this->customer->description,
+            'root_entity_id' => $this->customer->root_entity_id,
+            'is_active' => $this->customer->is_active,
         ];
     }
 
@@ -46,27 +46,27 @@ class Show extends Component
             'form.is_active' => 'boolean',
         ]);
 
-        $this->costCenter->update($this->form);
-        $this->loadForm(); // Reload form to reset dirty state
-        
-        session()->flash('message', 'Kostenstelle erfolgreich aktualisiert.');
+        $this->customer->update($this->form);
+        $this->loadForm();
+
+        session()->flash('message', 'Kunde erfolgreich aktualisiert.');
     }
 
     #[Computed]
     public function isDirty()
     {
-        return $this->form['name'] !== $this->costCenter->name ||
-               $this->form['code'] !== $this->costCenter->code ||
-               $this->form['description'] !== $this->costCenter->description ||
-               $this->form['root_entity_id'] != $this->costCenter->root_entity_id ||
-               $this->form['is_active'] !== $this->costCenter->is_active;
+        return $this->form['name'] !== $this->customer->name ||
+               $this->form['code'] !== $this->customer->code ||
+               $this->form['description'] !== $this->customer->description ||
+               $this->form['root_entity_id'] != $this->customer->root_entity_id ||
+               $this->form['is_active'] !== $this->customer->is_active;
     }
 
     #[Computed]
     public function linkedContexts()
     {
         $service = new DimensionLinkService();
-        return $service->getLinkedContexts('cost-centers', $this->costCenter->id);
+        return $service->getLinkedContexts('customers', $this->customer->id);
     }
 
     #[Computed]
@@ -80,7 +80,7 @@ class Show extends Component
 
     public function render()
     {
-        return view('organization::livewire.cost-center.show')
+        return view('organization::livewire.customer.show')
             ->layout('platform::layouts.app');
     }
 }

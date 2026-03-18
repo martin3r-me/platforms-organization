@@ -119,14 +119,6 @@ class Show extends Component
             ->get();
     }
 
-    public function getAvailableCostCentersProperty()
-    {
-        return OrganizationCostCenter::getForEntityWithHierarchy(
-            auth()->user()->currentTeam->id,
-            $this->entity->id
-        );
-    }
-
     public function getAvailableVsmFunctionsProperty()
     {
         return OrganizationVsmFunction::getForEntityWithHierarchy(

@@ -164,35 +164,22 @@
                 </div>
             </div>
 
-            <!-- Verfügbare Dimensionen -->
+            <!-- Dimensionen -->
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Verfügbare Dimensionen</h2>
+                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Dimensionen</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
-                    <!-- Kostenstellen -->
+                    <!-- Kostenstellen (interaktiv) -->
                     <div>
                         <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Kostenstellen</h3>
-                        <div class="space-y-2">
-                            @if($this->availableCostCenters->count() > 0)
-                                @foreach($this->availableCostCenters as $costCenter)
-                                    <div class="flex items-center justify-between py-2 px-3 bg-[var(--ui-muted-5)] rounded">
-                                        <div>
-                                            <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $costCenter->name }}</div>
-                                            <div class="text-xs text-[var(--ui-muted)]">{{ $costCenter->code }}</div>
-                                        </div>
-                                        @if($costCenter->isGlobal())
-                                            <x-ui-badge variant="secondary" size="sm">Global</x-ui-badge>
-                                        @else
-                                            <x-ui-badge variant="info" size="sm">Entitätsspezifisch</x-ui-badge>
-                                        @endif
-                                    </div>
-                                @endforeach
-                            @else
-                                <div class="text-sm text-[var(--ui-muted)] py-2">Keine Kostenstellen verfügbar</div>
-                            @endif
-                        </div>
+                        <livewire:organization.dimension-linker
+                            dimension="cost-centers"
+                            :contextType="$entity::class"
+                            :contextId="$entity->id"
+                            :key="'dim-cost-centers-'.$entity->id"
+                        />
                     </div>
 
-                    <!-- VSM Funktionen -->
+                    <!-- VSM Funktionen (read-only, Hierarchie-basiert) -->
                     <div>
                         <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">VSM Funktionen</h3>
                         <div class="space-y-2">

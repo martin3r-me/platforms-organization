@@ -2,6 +2,7 @@
 
 use Illuminate\Database\Migrations\Migration;
 use Illuminate\Database\Schema\Blueprint;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
@@ -12,33 +13,36 @@ return new class extends Migration
             return;
         }
 
-        // Only add FKs/indexes if they don't already exist (100004 may have succeeded on fresh installs)
-        $sm = Schema::getConnection()->getDoctrineSchemaManager();
-        $fks = collect($sm->listTableForeignKeys('organization_entity_relationship_interlinks'))
-            ->map(fn ($fk) => $fk->getName())
-            ->toArray();
+        $db = Schema::getConnection()->getDatabaseName();
+        $table = 'organization_entity_relationship_interlinks';
 
-        Schema::table('organization_entity_relationship_interlinks', function (Blueprint $table) use ($fks) {
-            if (!in_array('org_eri_relationship_id_fk', $fks)) {
-                $table->foreign('entity_relationship_id', 'org_eri_relationship_id_fk')
+        // Check existing FKs via information_schema
+        $existingFks = collect(DB::select(
+            "SELECT CONSTRAINT_NAME FROM information_schema.TABLE_CONSTRAINTS WHERE TABLE_SCHEMA = ? AND TABLE_NAME = ? AND CONSTRAINT_TYPE = 'FOREIGN KEY'",
+            [$db, $table]
+        ))->pluck('CONSTRAINT_NAME')->toArray();
+
+        Schema::table($table, function (Blueprint $t) use ($existingFks) {
+            if (!in_array('org_eri_relationship_id_fk', $existingFks)) {
+                $t->foreign('entity_relationship_id', 'org_eri_relationship_id_fk')
                     ->references('id')->on('organization_entity_relationships')->cascadeOnDelete();
             }
-            if (!in_array('org_eri_interlink_id_fk', $fks)) {
-                $table->foreign('interlink_id', 'org_eri_interlink_id_fk')
+            if (!in_array('org_eri_interlink_id_fk', $existingFks)) {
+                $t->foreign('interlink_id', 'org_eri_interlink_id_fk')
                     ->references('id')->on('organization_interlinks')->cascadeOnDelete();
             }
         });
 
-        $indexes = collect($sm->listTableIndexes('organization_entity_relationship_interlinks'))
-            ->keys()
-            ->toArray();
+        // Check existing indexes
+        $existingIndexes = collect(DB::select("SHOW INDEX FROM `{$table}`"))
+            ->pluck('Key_name')->unique()->toArray();
 
-        Schema::table('organization_entity_relationship_interlinks', function (Blueprint $table) use ($indexes) {
-            if (!in_array('org_eri_rel_interlink_unique', $indexes)) {
-                $table->unique(['entity_relationship_id', 'interlink_id'], 'org_eri_rel_interlink_unique');
+        Schema::table($table, function (Blueprint $t) use ($existingIndexes) {
+            if (!in_array('org_eri_rel_interlink_unique', $existingIndexes)) {
+                $t->unique(['entity_relationship_id', 'interlink_id'], 'org_eri_rel_interlink_unique');
             }
-            if (!in_array('org_eri_interlink_idx', $indexes)) {
-                $table->index(['interlink_id'], 'org_eri_interlink_idx');
+            if (!in_array('org_eri_interlink_idx', $existingIndexes)) {
+                $t->index(['interlink_id'], 'org_eri_interlink_idx');
             }
         });
     }

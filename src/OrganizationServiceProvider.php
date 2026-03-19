@@ -183,6 +183,29 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\CreateEntityRelationshipTool());
             $registry->register(new \Platform\Organization\Tools\UpdateEntityRelationshipTool());
             $registry->register(new \Platform\Organization\Tools\DeleteEntityRelationshipTool());
+
+            // Interlink Category Tools (global)
+            $registry->register(new \Platform\Organization\Tools\ListInterlinkCategoriesTool());
+            $registry->register(new \Platform\Organization\Tools\CreateInterlinkCategoryTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateInterlinkCategoryTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteInterlinkCategoryTool());
+
+            // Interlink Type Tools (global)
+            $registry->register(new \Platform\Organization\Tools\ListInterlinkTypesTool());
+            $registry->register(new \Platform\Organization\Tools\CreateInterlinkTypeTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateInterlinkTypeTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteInterlinkTypeTool());
+
+            // Interlink Tools (team-scoped)
+            $registry->register(new \Platform\Organization\Tools\ListInterlinksTool());
+            $registry->register(new \Platform\Organization\Tools\CreateInterlinkTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateInterlinkTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteInterlinkTool());
+
+            // Entity Relationship Interlink Tools (Link/Unlink - team-scoped)
+            $registry->register(new \Platform\Organization\Tools\ListEntityRelationshipInterlinksTool());
+            $registry->register(new \Platform\Organization\Tools\LinkInterlinkToRelationshipTool());
+            $registry->register(new \Platform\Organization\Tools\UnlinkInterlinkFromRelationshipTool());
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

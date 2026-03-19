@@ -13,6 +13,10 @@ use Platform\Organization\Livewire\Settings\EntityTypeGroup\Index as EntityTypeG
 use Platform\Organization\Livewire\Settings\EntityTypeGroup\Show as EntityTypeGroupShow;
 use Platform\Organization\Livewire\Settings\RelationType\Index as RelationTypeIndex;
 use Platform\Organization\Livewire\Settings\RelationType\Show as RelationTypeShow;
+use Platform\Organization\Livewire\Settings\InterlinkCategory\Index as InterlinkCategoryIndex;
+use Platform\Organization\Livewire\Settings\InterlinkCategory\Show as InterlinkCategoryShow;
+use Platform\Organization\Livewire\Settings\InterlinkType\Index as InterlinkTypeIndex;
+use Platform\Organization\Livewire\Settings\InterlinkType\Show as InterlinkTypeShow;
 use Platform\Organization\Livewire\TimeEntries\Index as TimeEntriesIndex;
 use Platform\Organization\Livewire\PlannedTimes\Index as PlannedTimesIndex;
 
@@ -40,6 +44,14 @@ Route::get('/settings/entity-type-groups/{entityTypeGroup}', EntityTypeGroupShow
 // Settings: Relation Types
 Route::get('/settings/relation-types', RelationTypeIndex::class)->name('organization.settings.relation-types.index');
 Route::get('/settings/relation-types/{relationType}', RelationTypeShow::class)->name('organization.settings.relation-types.show');
+
+// Settings: Interlink-Kategorien
+Route::get('/settings/interlink-categories', InterlinkCategoryIndex::class)->name('organization.settings.interlink-categories.index');
+Route::get('/settings/interlink-categories/{interlinkCategory}', InterlinkCategoryShow::class)->name('organization.settings.interlink-categories.show');
+
+// Settings: Interlink-Typen
+Route::get('/settings/interlink-types', InterlinkTypeIndex::class)->name('organization.settings.interlink-types.index');
+Route::get('/settings/interlink-types/{interlinkType}', InterlinkTypeShow::class)->name('organization.settings.interlink-types.show');
 
 // Zeiten: Ist-Zeiten und Geplante Zeiten
 Route::get('/time-entries', TimeEntriesIndex::class)->name('organization.time-entries.index');

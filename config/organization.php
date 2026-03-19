@@ -90,6 +90,16 @@ return [
                             'route' => 'organization.settings.relation-types.index',
                             'icon' => 'heroicon-o-arrows-right-left',
                         ],
+                        'interlink-categories' => [
+                            'title' => 'Interlink-Kategorien',
+                            'route' => 'organization.settings.interlink-categories.index',
+                            'icon' => 'heroicon-o-tag',
+                        ],
+                        'interlink-types' => [
+                            'title' => 'Interlink-Typen',
+                            'route' => 'organization.settings.interlink-types.index',
+                            'icon' => 'heroicon-o-link',
+                        ],
                     ],
                 ],
             ],

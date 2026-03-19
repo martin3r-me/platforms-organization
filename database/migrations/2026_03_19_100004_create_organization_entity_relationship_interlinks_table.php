@@ -8,6 +8,10 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('organization_entity_relationship_interlinks')) {
+            return;
+        }
+
         Schema::create('organization_entity_relationship_interlinks', function (Blueprint $table) {
             $table->id();
             $table->uuid('uuid')->unique();

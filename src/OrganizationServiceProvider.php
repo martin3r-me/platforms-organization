@@ -6,6 +6,7 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Platform\Organization\Console\Commands\GenerateReportsCommand;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
 use Platform\Core\PlatformCore;
 use Platform\Core\Routing\ModuleRouter;
@@ -20,6 +21,7 @@ class OrganizationServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 SeedOrganizationData::class,
+                GenerateReportsCommand::class,
             ]);
         }
         // Keine Services in Drip vorhanden
@@ -206,6 +208,16 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\ListEntityRelationshipInterlinksTool());
             $registry->register(new \Platform\Organization\Tools\LinkInterlinkToRelationshipTool());
             $registry->register(new \Platform\Organization\Tools\UnlinkInterlinkFromRelationshipTool());
+
+            // Report Type Tools (Berichtstypen)
+            $registry->register(new \Platform\Organization\Tools\ListReportTypesTool());
+            $registry->register(new \Platform\Organization\Tools\CreateReportTypeTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateReportTypeTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteReportTypeTool());
+
+            // Report Tools (Berichte)
+            $registry->register(new \Platform\Organization\Tools\ListReportsTool());
+            $registry->register(new \Platform\Organization\Tools\GenerateReportTool());
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

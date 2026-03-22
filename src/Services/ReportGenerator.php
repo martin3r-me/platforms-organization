@@ -58,7 +58,6 @@ class ReportGenerator
                 'max_iterations' => 50,
                 'max_output_tokens' => 16000,
                 'max_output_continuations' => 5,
-                'reasoning' => ['effort' => 'medium'],
             ]);
 
             $content = $result['assistant'] ?? '';

@@ -5,6 +5,7 @@ namespace Platform\Organization\Livewire\Entity;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationVsmSystem;
 use Platform\Organization\Models\OrganizationCostCenter;
@@ -22,16 +23,29 @@ class Show extends Component
         'name' => '',
         'parent_team_id' => null,
     ];
+
+    protected array $linkTypeConfig = [
+        'project' => ['label' => 'Projekte', 'icon' => 'folder', 'route' => 'planner.projects.show'],
+        'planner_task' => ['label' => 'Aufgaben', 'icon' => 'clipboard-document-check', 'route' => null],
+        'helpdesk_ticket' => ['label' => 'Tickets', 'icon' => 'ticket', 'route' => null],
+        'hcm_employee' => ['label' => 'Mitarbeiter', 'icon' => 'user', 'route' => null],
+        'rec_applicant' => ['label' => 'Bewerber', 'icon' => 'user-plus', 'route' => null],
+        'rec_position' => ['label' => 'Positionen', 'icon' => 'briefcase', 'route' => null],
+        'sheets_spreadsheet' => ['label' => 'Spreadsheets', 'icon' => 'table-cells', 'route' => null],
+    ];
+
     public function mount(OrganizationEntity $entity)
     {
         $this->entity = $entity->load([
-            'type.group', 
-            'vsmSystem', 
-            'costCenter', 
-            'parent', 
-            'children.type', 
-            'team', 
+            'type.group',
+            'vsmSystem',
+            'costCenter',
+            'parent',
+            'children.type',
+            'children.children',
+            'team',
             'user',
+            'entityLinks.linkable',
             'relationsFrom.toEntity.type',
             'relationsFrom.relationType',
             'relationsTo.fromEntity.type',
@@ -215,6 +229,32 @@ class Show extends Component
         ->whereNull('parent_team_id')
         ->orderBy('name')
         ->get();
+    }
+
+    #[Computed]
+    public function entityLinksGrouped()
+    {
+        $links = OrganizationEntityLink::where('entity_id', $this->entity->id)
+            ->with('linkable')
+            ->get()
+            ->filter(fn ($link) => $link->linkable !== null);
+
+        $grouped = $links->groupBy('linkable_type');
+
+        return $grouped->map(function ($items, $type) {
+            $config = $this->linkTypeConfig[$type] ?? [
+                'label' => $type,
+                'icon' => 'link',
+                'route' => null,
+            ];
+
+            return [
+                'label' => $config['label'],
+                'icon' => $config['icon'],
+                'route' => $config['route'],
+                'items' => $items,
+            ];
+        });
     }
 
     public function render()

@@ -205,6 +205,57 @@
                 </div>
             </div>
 
+            <!-- Verknüpfungen -->
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Verknüpfungen</h2>
+                @if($this->entityLinksGrouped->count() > 0)
+                    <div class="space-y-4">
+                        @foreach($this->entityLinksGrouped as $type => $group)
+                            <div>
+                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
+                                    @svg('heroicon-o-' . $group['icon'], 'w-4 h-4 text-[var(--ui-muted)]')
+                                    {{ $group['label'] }}
+                                    <x-ui-badge variant="secondary" size="xs">{{ $group['items']->count() }}</x-ui-badge>
+                                </h3>
+                                <div class="space-y-1">
+                                    @foreach($group['items'] as $link)
+                                        @php $linkable = $link->linkable; @endphp
+                                        @if($group['route'] && $linkable)
+                                            <a href="{{ route($group['route'], $linkable) }}" class="flex items-center justify-between p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)] hover:bg-[var(--ui-muted-10)] transition-colors">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $linkable->name ?? $linkable->title ?? '—' }}</span>
+                                                    @if($linkable->status ?? null)
+                                                        <x-ui-badge variant="secondary" size="xs">{{ $linkable->status }}</x-ui-badge>
+                                                    @endif
+                                                </div>
+                                                @svg('heroicon-o-arrow-top-right-on-square', 'w-4 h-4 text-[var(--ui-muted)]')
+                                            </a>
+                                        @else
+                                            <div class="flex items-center justify-between p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                                <div class="flex items-center gap-2">
+                                                    <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $linkable->name ?? $linkable->title ?? '—' }}</span>
+                                                    @if($linkable->status ?? null)
+                                                        <x-ui-badge variant="secondary" size="xs">{{ $linkable->status }}</x-ui-badge>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
+                            @svg('heroicon-o-puzzle-piece', 'w-8 h-8 text-[var(--ui-muted)]')
+                        </div>
+                        <p class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Keine externen Verknüpfungen</p>
+                        <p class="text-xs text-[var(--ui-muted)]">Diese Einheit ist noch nicht mit Projekten, Tickets oder anderen Elementen verknüpft</p>
+                    </div>
+                @endif
+            </div>
+
             <!-- Relations -->
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                 <div class="flex items-center justify-between mb-4">
@@ -278,17 +329,17 @@
                 </div>
             </div>
 
-            @if($entity->children && $entity->children->count() > 0)
-                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Untergeordnete Einheiten</h2>
+            <!-- Untergeordnete Einheiten -->
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Untergeordnete Einheiten</h2>
+                @if($entity->children && $entity->children->count() > 0)
                     <div class="space-y-2">
                         @foreach($entity->children as $child)
-                            <div class="flex items-center justify-between py-2 px-3 bg-[var(--ui-muted-5)] rounded">
+                            <a href="{{ route('organization.entities.show', $child) }}" class="flex items-center justify-between py-2 px-3 bg-[var(--ui-muted-5)] rounded hover:bg-[var(--ui-muted-10)] transition-colors">
                                 <div class="flex items-center">
                                     @if($child->type->icon)
                                         @php
                                             $iconName = str_replace('heroicons.', '', $child->type->icon);
-                                            // Map non-existent icons to valid alternatives
                                             $iconMap = [
                                                 'user-check' => 'user',
                                                 'folder-kanban' => 'folder',
@@ -301,14 +352,31 @@
                                         @endphp
                                         @svg('heroicon-o-' . $iconName, 'w-4 h-4 text-[var(--ui-muted)] mr-2')
                                     @endif
-                                    <span class="text-sm font-medium">{{ $child->name }}</span>
+                                    <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $child->name }}</span>
+                                    @if($child->code)
+                                        <span class="ml-2 text-xs text-[var(--ui-muted)]">{{ $child->code }}</span>
+                                    @endif
                                 </div>
-                                <x-ui-badge variant="secondary" size="sm">{{ $child->type->name }}</x-ui-badge>
-                            </div>
+                                <div class="flex items-center gap-2">
+                                    @if($child->children->count() > 0)
+                                        <x-ui-badge variant="info" size="xs">{{ $child->children->count() }} Kinder</x-ui-badge>
+                                    @endif
+                                    <x-ui-badge variant="secondary" size="sm">{{ $child->type->name }}</x-ui-badge>
+                                    @svg('heroicon-o-chevron-right', 'w-4 h-4 text-[var(--ui-muted)]')
+                                </div>
+                            </a>
                         @endforeach
                     </div>
-                </div>
-            @endif
+                @else
+                    <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
+                            @svg('heroicon-o-rectangle-group', 'w-8 h-8 text-[var(--ui-muted)]')
+                        </div>
+                        <p class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Keine untergeordneten Einheiten</p>
+                        <p class="text-xs text-[var(--ui-muted)]">Diese Einheit hat keine Kinder-Entities</p>
+                    </div>
+                @endif
+            </div>
         </div>
     </x-ui-page-container>
 

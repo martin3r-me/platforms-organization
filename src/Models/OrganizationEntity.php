@@ -170,6 +170,14 @@ class OrganizationEntity extends Model
     }
 
     /**
+     * Beziehung zu Entity Links (polymorphe Verknüpfungen zu anderen Modulen)
+     */
+    public function entityLinks()
+    {
+        return $this->hasMany(OrganizationEntityLink::class, 'entity_id');
+    }
+
+    /**
      * Relations, die von dieser Entity ausgehen
      */
     public function relationsFrom()

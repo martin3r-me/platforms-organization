@@ -11,6 +11,7 @@ use Platform\Core\Services\OpenAiService;
 use Platform\Core\Tools\ToolExecutor;
 use Platform\Core\Tools\ToolRegistry;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationReport;
 use Platform\Organization\Models\OrganizationReportType;
 
@@ -80,8 +81,12 @@ class ReportGenerator
         $periodResolver = new ReportPeriodResolver();
         $period = $periodResolver->resolve($type->frequency ?? 'manual');
 
+        // Phase 0: Entity-Kontext auflösen (Entity + Kinder rekursiv)
+        $entityContext = $this->resolveEntityContext($entity);
+
         $templateData = [
             'entity' => $entity,
+            'entity_context' => $entityContext,
             'period_from' => $period['from']->toDateString(),
             'period_to' => $period['to']->toDateString(),
             'period_from_iso' => $period['from']->toIso8601String(),
@@ -100,7 +105,7 @@ class ReportGenerator
                 continue;
             }
 
-            $params = $this->resolveParams($source['params'] ?? [], $entity, $period);
+            $params = $this->resolveParams($source['params'] ?? [], $entity, $period, $entityContext);
 
             try {
                 $result = $toolExecutor->execute($toolName, $params, $context);
@@ -192,6 +197,10 @@ class ReportGenerator
                 'tool_calls' => $toolCallNames,
                 'ai_sections' => collect($type->ai_sections ?? [])->pluck('key')->toArray(),
                 'model' => 'gpt-5.4-mini',
+                'entity_context' => [
+                    'entity_ids' => $entityContext['entity_ids'],
+                    'linked_types' => array_keys($entityContext['linked']),
+                ],
             ],
         ]);
 
@@ -199,9 +208,9 @@ class ReportGenerator
     }
 
     /**
-     * Ersetzt Platzhalter in Tool-Parametern.
+     * Ersetzt Platzhalter in Tool-Parametern (rekursiv für verschachtelte Arrays).
      */
-    protected function resolveParams(array $params, OrganizationEntity $entity, array $period): array
+    protected function resolveParams(array $params, OrganizationEntity $entity, array $period, array $entityContext = []): array
     {
         $replacements = [
             '{{entity.id}}' => $entity->id,
@@ -212,18 +221,111 @@ class ReportGenerator
             '{{period.to}}' => $period['to']->toDateString(),
             '{{period.from_iso}}' => $period['from']->toIso8601String(),
             '{{period.to_iso}}' => $period['to']->toIso8601String(),
+            '{{entity_context.entity_ids}}' => $entityContext['entity_ids'] ?? [],
+            '{{entity_context.project_ids}}' => $entityContext['linked']['project'] ?? [],
+            '{{entity_context.ticket_ids}}' => $entityContext['linked']['helpdesk_ticket'] ?? [],
         ];
 
+        return $this->resolveParamsRecursive($params, $replacements);
+    }
+
+    /**
+     * Rekursive Platzhalter-Auflösung für verschachtelte Strukturen.
+     */
+    protected function resolveParamsRecursive(array $params, array $replacements): array
+    {
         $resolved = [];
         foreach ($params as $key => $value) {
             if (is_string($value) && isset($replacements[$value])) {
                 $resolved[$key] = $replacements[$value];
+            } elseif (is_array($value)) {
+                $resolved[$key] = $this->resolveParamsRecursive($value, $replacements);
             } else {
                 $resolved[$key] = $value;
             }
         }
 
         return $resolved;
+    }
+
+    /**
+     * Löst den Entity-Kontext auf: Entity + alle Kinder rekursiv + verknüpfte Objekte.
+     */
+    protected function resolveEntityContext(OrganizationEntity $entity): array
+    {
+        // Entity mit rekursiven Kindern laden
+        $entity->load('allChildren');
+
+        // Alle Entity-IDs sammeln (self + descendants)
+        $allEntityIds = $this->collectEntityIds($entity);
+        $allEntityNames = $this->collectEntityNames($entity);
+
+        // Alle EntityLinks für diese IDs laden
+        $links = OrganizationEntityLink::whereIn('entity_id', $allEntityIds)
+            ->get();
+
+        // Nach linkable_type gruppiert → IDs extrahieren
+        $linked = [];
+        foreach ($links as $link) {
+            $type = $link->linkable_type;
+            if (!isset($linked[$type])) {
+                $linked[$type] = [];
+            }
+            if (!in_array($link->linkable_id, $linked[$type])) {
+                $linked[$type][] = $link->linkable_id;
+            }
+        }
+
+        // Links nach Entity gruppiert (für detaillierte Aufschlüsselung)
+        $linksByEntity = [];
+        foreach ($links as $link) {
+            $entityId = $link->entity_id;
+            $type = $link->linkable_type;
+            if (!isset($linksByEntity[$entityId])) {
+                $linksByEntity[$entityId] = [];
+            }
+            if (!isset($linksByEntity[$entityId][$type])) {
+                $linksByEntity[$entityId][$type] = [];
+            }
+            if (!in_array($link->linkable_id, $linksByEntity[$entityId][$type])) {
+                $linksByEntity[$entityId][$type][] = $link->linkable_id;
+            }
+        }
+
+        return [
+            'entity_ids' => $allEntityIds,
+            'entity_names' => $allEntityNames,
+            'linked' => $linked,
+            'links_by_entity' => $linksByEntity,
+        ];
+    }
+
+    /**
+     * Sammelt alle Entity-IDs rekursiv (self + descendants).
+     */
+    protected function collectEntityIds(OrganizationEntity $entity): array
+    {
+        $ids = [$entity->id];
+
+        foreach ($entity->allChildren ?? [] as $child) {
+            $ids = array_merge($ids, $this->collectEntityIds($child));
+        }
+
+        return $ids;
+    }
+
+    /**
+     * Sammelt alle Entity-Namen rekursiv (self + descendants).
+     */
+    protected function collectEntityNames(OrganizationEntity $entity): array
+    {
+        $names = [$entity->name];
+
+        foreach ($entity->allChildren ?? [] as $child) {
+            $names = array_merge($names, $this->collectEntityNames($child));
+        }
+
+        return $names;
     }
 
     /**

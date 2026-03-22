@@ -33,6 +33,12 @@ class Show extends Component
         'rec_applicant' => ['label' => 'Bewerber', 'icon' => 'user-plus', 'route' => null],
         'rec_position' => ['label' => 'Positionen', 'icon' => 'briefcase', 'route' => null],
         'sheets_spreadsheet' => ['label' => 'Spreadsheets', 'icon' => 'table-cells', 'route' => null],
+        'canvas' => ['label' => 'Canvas', 'icon' => 'squares-2x2', 'route' => null],
+        'bmc_canvas' => ['label' => 'BMC', 'icon' => 'squares-2x2', 'route' => null],
+        'pc_canvas' => ['label' => 'Project Canvas', 'icon' => 'clipboard-document-list', 'route' => null],
+        'notes_note' => ['label' => 'Notizen', 'icon' => 'document-text', 'route' => null],
+        'slides_presentation' => ['label' => 'Präsentationen', 'icon' => 'presentation-chart-bar', 'route' => null],
+        'okr' => ['label' => 'OKR', 'icon' => 'chart-bar', 'route' => null],
     ];
 
     public function mount(OrganizationEntity $entity)

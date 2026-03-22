@@ -54,10 +54,11 @@ class ReportGenerator
             $context = ToolContext::fromAuth();
 
             $runner = AiToolLoopRunner::make();
-            $result = $runner->run($messages, 'gpt-4.1', $context, [
+            $result = $runner->run($messages, 'o4-mini', $context, [
                 'max_iterations' => 50,
                 'max_output_tokens' => 16000,
                 'max_output_continuations' => 5,
+                'reasoning' => ['effort' => 'medium'],
             ]);
 
             $content = $result['assistant'] ?? '';
@@ -85,7 +86,7 @@ class ReportGenerator
                 'metadata' => [
                     'iterations' => $result['iterations'] ?? null,
                     'tool_calls' => $result['all_tool_call_names'] ?? [],
-                    'model' => 'gpt-4.1',
+                    'model' => 'o4-mini',
                 ],
             ]);
 

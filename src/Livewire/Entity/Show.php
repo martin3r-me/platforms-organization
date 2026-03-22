@@ -7,6 +7,7 @@ use Livewire\Attributes\Computed;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationEntityType;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Platform\Organization\Models\OrganizationVsmSystem;
 use Platform\Organization\Models\OrganizationCostCenter;
 use Platform\Organization\Models\OrganizationVsmFunction;
@@ -45,7 +46,7 @@ class Show extends Component
             'children.children',
             'team',
             'user',
-            'entityLinks.linkable',
+            'entityLinks',
             'relationsFrom.toEntity.type',
             'relationsFrom.relationType',
             'relationsTo.fromEntity.type',
@@ -234,12 +235,22 @@ class Show extends Component
     #[Computed]
     public function entityLinksGrouped()
     {
-        $links = OrganizationEntityLink::where('entity_id', $this->entity->id)
-            ->with('linkable')
-            ->get()
-            ->filter(fn ($link) => $link->linkable !== null);
+        $morphMap = Relation::morphMap();
 
-        $grouped = $links->groupBy('linkable_type');
+        $links = OrganizationEntityLink::where('entity_id', $this->entity->id)->get();
+
+        // Nur Links behalten, deren Morph-Typ auflösbar ist
+        $resolvable = $links->filter(function ($link) use ($morphMap) {
+            $type = $link->linkable_type;
+            return isset($morphMap[$type]) || class_exists($type);
+        });
+
+        // Linkable nachladen für auflösbare Links
+        $resolvable->load('linkable');
+
+        $withLinkable = $resolvable->filter(fn ($link) => $link->linkable !== null);
+
+        $grouped = $withLinkable->groupBy('linkable_type');
 
         return $grouped->map(function ($items, $type) {
             $config = $this->linkTypeConfig[$type] ?? [

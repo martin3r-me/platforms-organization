@@ -26,6 +26,9 @@ class OrganizationReportType extends Model
         'frequency',
         'output_channel',
         'obsidian_folder',
+        'template',
+        'data_sources',
+        'ai_sections',
         'is_active',
         'created_by',
     ];
@@ -35,6 +38,8 @@ class OrganizationReportType extends Model
         'requirements' => 'array',
         'modules' => 'array',
         'include_time_entries' => 'boolean',
+        'data_sources' => 'array',
+        'ai_sections' => 'array',
         'is_active' => 'boolean',
     ];
 
@@ -61,6 +66,11 @@ class OrganizationReportType extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function usesTemplateEngine(): bool
+    {
+        return !empty($this->template);
     }
 
     public function scopeForTeam($query, $teamId)

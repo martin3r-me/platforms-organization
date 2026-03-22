@@ -3,9 +3,13 @@
 namespace Platform\Organization\Services;
 
 use Illuminate\Contracts\Auth\Authenticatable;
+use Illuminate\Support\Facades\Blade;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Services\AiToolLoopRunner;
+use Platform\Core\Services\OpenAiService;
+use Platform\Core\Tools\ToolExecutor;
+use Platform\Core\Tools\ToolRegistry;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationReport;
 use Platform\Organization\Models\OrganizationReportType;
@@ -24,7 +28,6 @@ class ReportGenerator
         $outputChannel = $outputChannelOverride ?? $type->output_channel;
         $now = now();
 
-        // Report-Datensatz erstellen mit status=generating
         $report = OrganizationReport::create([
             'team_id' => $type->team_id,
             'report_type_id' => $type->id,
@@ -37,62 +40,11 @@ class ReportGenerator
         ]);
 
         try {
-            $systemPrompt = $this->buildSystemPrompt($type, $entity, $outputChannel);
-
-            $messages = [
-                [
-                    'role' => 'system',
-                    'content' => $systemPrompt,
-                ],
-                [
-                    'role' => 'user',
-                    'content' => "Erstelle jetzt den Bericht \"{$type->name}\" für die Entity \"{$entity->name}\". "
-                        . "Schritt 1: Lade die benötigten Module-Tools via tools.GET(module=\"...\") für jedes Modul. "
-                        . "Schritt 2: Hole alle relevanten Daten über die geladenen Tools. "
-                        . "Schritt 3: Gib den fertigen Bericht als Markdown-Text aus (keine Tool-Calls mehr, nur Text).",
-                ],
-            ];
-
-            $context = ToolContext::fromAuth();
-
-            $runner = AiToolLoopRunner::make();
-            $result = $runner->run($messages, 'gpt-5.4-mini', $context, [
-                'max_iterations' => 50,
-                'max_output_tokens' => 16000,
-                'max_output_continuations' => 5,
-                'reasoning' => ['effort' => 'medium'],
-            ]);
-
-            $content = $result['assistant'] ?? '';
-
-            if (empty(trim($content))) {
-                $report->update([
-                    'status' => 'failed',
-                    'error_message' => 'AI hat keinen Inhalt generiert.',
-                ]);
-                return $report->refresh();
+            if ($type->usesTemplateEngine()) {
+                return $this->generateFromTemplate($report, $type, $entity, $outputChannel, $now);
             }
 
-            // Obsidian-Pfad bestimmen
-            $obsidianPath = null;
-            if (in_array($outputChannel, ['obsidian', 'all']) && $type->obsidian_folder) {
-                $date = $now->format('Y-m-d');
-                $entityCode = $entity->code ?? $entity->id;
-                $obsidianPath = rtrim($type->obsidian_folder, '/') . "/{$date}-{$entityCode}-{$type->key}.md";
-            }
-
-            $report->update([
-                'generated_content' => $content,
-                'status' => 'final',
-                'obsidian_path' => $obsidianPath,
-                'metadata' => [
-                    'iterations' => $result['iterations'] ?? null,
-                    'tool_calls' => $result['all_tool_call_names'] ?? [],
-                    'model' => 'gpt-5.4-mini',
-                ],
-            ]);
-
-            return $report->refresh();
+            return $this->generateFromAiLoop($report, $type, $entity, $outputChannel, $now);
         } catch (\Throwable $e) {
             Log::error('[ReportGenerator] Bericht-Generierung fehlgeschlagen', [
                 'report_id' => $report->id,
@@ -108,6 +60,239 @@ class ReportGenerator
 
             return $report->refresh();
         }
+    }
+
+    /**
+     * Template-Engine: Deterministische Datenabfrage + gezielte AI-Abschnitte + Blade-Rendering.
+     */
+    protected function generateFromTemplate(
+        OrganizationReport $report,
+        OrganizationReportType $type,
+        OrganizationEntity $entity,
+        string $outputChannel,
+        \Carbon\Carbon $now,
+    ): OrganizationReport {
+        $context = ToolContext::fromAuth();
+        $registry = app(ToolRegistry::class);
+        $toolExecutor = new ToolExecutor($registry);
+
+        // Phase 1: Zeitraum berechnen
+        $periodResolver = new ReportPeriodResolver();
+        $period = $periodResolver->resolve($type->frequency ?? 'manual');
+
+        $templateData = [
+            'entity' => $entity,
+            'period_from' => $period['from']->toDateString(),
+            'period_to' => $period['to']->toDateString(),
+            'period_from_iso' => $period['from']->toIso8601String(),
+            'period_to_iso' => $period['to']->toIso8601String(),
+            'report_type' => $type,
+            'generated_at' => $now->toIso8601String(),
+        ];
+
+        $toolCallNames = [];
+
+        // Phase 1: Daten holen via ToolExecutor
+        foreach ($type->data_sources ?? [] as $source) {
+            $key = $source['key'] ?? null;
+            $toolName = $source['tool'] ?? null;
+            if (!$key || !$toolName) {
+                continue;
+            }
+
+            $params = $this->resolveParams($source['params'] ?? [], $entity, $period);
+
+            try {
+                $result = $toolExecutor->execute($toolName, $params, $context);
+                $toolCallNames[] = $toolName;
+
+                if ($result->success) {
+                    $templateData[$key] = $result->data['data'] ?? $result->data;
+                } else {
+                    Log::warning("[ReportGenerator] Tool {$toolName} fehlgeschlagen", [
+                        'report_id' => $report->id,
+                        'error' => $result->metadata['message'] ?? 'Unbekannt',
+                    ]);
+                    $templateData[$key] = [];
+                }
+            } catch (\Throwable $e) {
+                Log::warning("[ReportGenerator] Tool {$toolName} Exception", [
+                    'report_id' => $report->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $templateData[$key] = [];
+            }
+        }
+
+        // Phase 2: AI-Abschnitte generieren
+        $openAi = app(OpenAiService::class);
+
+        foreach ($type->ai_sections ?? [] as $section) {
+            $sectionKey = $section['key'] ?? null;
+            $instruction = $section['instruction'] ?? null;
+            if (!$sectionKey || !$instruction) {
+                continue;
+            }
+
+            $basedOn = $section['based_on'] ?? [];
+            $relevantData = [];
+            foreach ($basedOn as $dataKey) {
+                if (isset($templateData[$dataKey])) {
+                    $relevantData[$dataKey] = $templateData[$dataKey];
+                }
+            }
+
+            $maxTokens = (int) ($section['max_tokens'] ?? 500);
+
+            try {
+                $messages = [
+                    [
+                        'role' => 'system',
+                        'content' => "Du bist ein professioneller Berichts-Autor. Entity: {$entity->name}. Zeitraum: {$templateData['period_from']} bis {$templateData['period_to']}.",
+                    ],
+                    [
+                        'role' => 'user',
+                        'content' => "Daten:\n" . json_encode($relevantData, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT)
+                            . "\n\nAnweisung: {$instruction}",
+                    ],
+                ];
+
+                $aiResult = $openAi->chat($messages, 'gpt-5.4-mini', [
+                    'tools' => false,
+                    'max_tokens' => $maxTokens,
+                ]);
+
+                $templateData[$sectionKey] = $aiResult['content'] ?? '';
+            } catch (\Throwable $e) {
+                Log::warning("[ReportGenerator] AI-Section {$sectionKey} fehlgeschlagen", [
+                    'report_id' => $report->id,
+                    'error' => $e->getMessage(),
+                ]);
+                $templateData[$sectionKey] = '*AI-Abschnitt konnte nicht generiert werden.*';
+            }
+        }
+
+        // Phase 3: Blade-Template rendern
+        $content = Blade::render($type->template, $templateData);
+
+        // Obsidian-Pfad bestimmen
+        $obsidianPath = null;
+        if (in_array($outputChannel, ['obsidian', 'all']) && $type->obsidian_folder) {
+            $date = $now->format('Y-m-d');
+            $entityCode = $entity->code ?? $entity->id;
+            $obsidianPath = rtrim($type->obsidian_folder, '/') . "/{$date}-{$entityCode}-{$type->key}.md";
+        }
+
+        $report->update([
+            'generated_content' => $content,
+            'status' => 'final',
+            'obsidian_path' => $obsidianPath,
+            'metadata' => [
+                'engine' => 'template',
+                'tool_calls' => $toolCallNames,
+                'ai_sections' => collect($type->ai_sections ?? [])->pluck('key')->toArray(),
+                'model' => 'gpt-5.4-mini',
+            ],
+        ]);
+
+        return $report->refresh();
+    }
+
+    /**
+     * Ersetzt Platzhalter in Tool-Parametern.
+     */
+    protected function resolveParams(array $params, OrganizationEntity $entity, array $period): array
+    {
+        $replacements = [
+            '{{entity.id}}' => $entity->id,
+            '{{entity.code}}' => $entity->code,
+            '{{entity.name}}' => $entity->name,
+            '{{entity.team_id}}' => $entity->team_id,
+            '{{period.from}}' => $period['from']->toDateString(),
+            '{{period.to}}' => $period['to']->toDateString(),
+            '{{period.from_iso}}' => $period['from']->toIso8601String(),
+            '{{period.to_iso}}' => $period['to']->toIso8601String(),
+        ];
+
+        $resolved = [];
+        foreach ($params as $key => $value) {
+            if (is_string($value) && isset($replacements[$value])) {
+                $resolved[$key] = $replacements[$value];
+            } else {
+                $resolved[$key] = $value;
+            }
+        }
+
+        return $resolved;
+    }
+
+    /**
+     * Bestehender AI-Loop-Modus (backward-kompatibel).
+     */
+    protected function generateFromAiLoop(
+        OrganizationReport $report,
+        OrganizationReportType $type,
+        OrganizationEntity $entity,
+        string $outputChannel,
+        \Carbon\Carbon $now,
+    ): OrganizationReport {
+        $systemPrompt = $this->buildSystemPrompt($type, $entity, $outputChannel);
+
+        $messages = [
+            [
+                'role' => 'system',
+                'content' => $systemPrompt,
+            ],
+            [
+                'role' => 'user',
+                'content' => "Erstelle jetzt den Bericht \"{$type->name}\" für die Entity \"{$entity->name}\". "
+                    . "Schritt 1: Lade die benötigten Module-Tools via tools.GET(module=\"...\") für jedes Modul. "
+                    . "Schritt 2: Hole alle relevanten Daten über die geladenen Tools. "
+                    . "Schritt 3: Gib den fertigen Bericht als Markdown-Text aus (keine Tool-Calls mehr, nur Text).",
+            ],
+        ];
+
+        $context = ToolContext::fromAuth();
+
+        $runner = AiToolLoopRunner::make();
+        $result = $runner->run($messages, 'gpt-5.4-mini', $context, [
+            'max_iterations' => 50,
+            'max_output_tokens' => 16000,
+            'max_output_continuations' => 5,
+            'reasoning' => ['effort' => 'medium'],
+        ]);
+
+        $content = $result['assistant'] ?? '';
+
+        if (empty(trim($content))) {
+            $report->update([
+                'status' => 'failed',
+                'error_message' => 'AI hat keinen Inhalt generiert.',
+            ]);
+            return $report->refresh();
+        }
+
+        // Obsidian-Pfad bestimmen
+        $obsidianPath = null;
+        if (in_array($outputChannel, ['obsidian', 'all']) && $type->obsidian_folder) {
+            $date = $now->format('Y-m-d');
+            $entityCode = $entity->code ?? $entity->id;
+            $obsidianPath = rtrim($type->obsidian_folder, '/') . "/{$date}-{$entityCode}-{$type->key}.md";
+        }
+
+        $report->update([
+            'generated_content' => $content,
+            'status' => 'final',
+            'obsidian_path' => $obsidianPath,
+            'metadata' => [
+                'engine' => 'ai_loop',
+                'iterations' => $result['iterations'] ?? null,
+                'tool_calls' => $result['all_tool_call_names'] ?? [],
+                'model' => 'gpt-5.4-mini',
+            ],
+        ]);
+
+        return $report->refresh();
     }
 
     /**
@@ -190,7 +375,6 @@ PROMPT;
 
         foreach ($hull as $key => $value) {
             if (is_array($value)) {
-                // Nested section
                 $title = is_string($key) ? $key : "Abschnitt " . ($key + 1);
                 $md .= "{$prefix} {$title}\n";
                 if (isset($value['description'])) {
@@ -201,7 +385,6 @@ PROMPT;
                     $md .= $this->hullToMarkdown($value, $level + 1);
                 }
             } else {
-                // Simple section with description
                 $title = is_string($key) ? $key : $value;
                 $desc = is_string($key) ? $value : '';
                 $md .= "{$prefix} {$title}\n";

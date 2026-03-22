@@ -22,7 +22,7 @@ class GenerateReportTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /organization/reports - Generiert einen Bericht. Lädt den Berichtstyp, holt Daten via AI-Agent und Module-Tools, füllt die Hülle und speichert das Ergebnis. Kann einige Minuten dauern.';
+        return 'POST /organization/reports - Generiert einen Bericht. Zwei Modi: (1) Template-Engine (wenn template gesetzt) — deterministische Tool-Calls, AI nur für markierte Abschnitte, Blade-Rendering. (2) AI-Loop (Fallback) — LLM holt Daten selbst via Tools. Kann einige Minuten dauern.';
     }
 
     public function getSchema(): array

@@ -80,6 +80,37 @@ class UpdateReportTypeTool implements ToolContract, ToolMetadataContract
                     'type' => 'string',
                     'description' => 'Optional: Neuer Obsidian-Ordner ("" zum Leeren).',
                 ],
+                'template' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Blade-Markdown-Template ("" zum Leeren → zurück zu AI-Loop).',
+                ],
+                'data_sources' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'key' => ['type' => 'string'],
+                            'tool' => ['type' => 'string'],
+                            'params' => ['type' => 'object'],
+                        ],
+                        'required' => ['key', 'tool'],
+                    ],
+                    'description' => 'Optional: Tool-Call-Definitionen (null zum Leeren).',
+                ],
+                'ai_sections' => [
+                    'type' => 'array',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'key' => ['type' => 'string'],
+                            'instruction' => ['type' => 'string'],
+                            'based_on' => ['type' => 'array', 'items' => ['type' => 'string']],
+                            'max_tokens' => ['type' => 'integer'],
+                        ],
+                        'required' => ['key', 'instruction'],
+                    ],
+                    'description' => 'Optional: AI-Abschnitt-Definitionen (null zum Leeren).',
+                ],
                 'is_active' => [
                     'type' => 'boolean',
                     'description' => 'Optional: aktiv/inaktiv.',
@@ -180,6 +211,19 @@ class UpdateReportTypeTool implements ToolContract, ToolMetadataContract
                 $update['obsidian_folder'] = $of === '' ? null : $of;
             }
 
+            if (array_key_exists('template', $arguments)) {
+                $t = (string) ($arguments['template'] ?? '');
+                $update['template'] = $t === '' ? null : $t;
+            }
+
+            if (array_key_exists('data_sources', $arguments)) {
+                $update['data_sources'] = (isset($arguments['data_sources']) && is_array($arguments['data_sources'])) ? $arguments['data_sources'] : null;
+            }
+
+            if (array_key_exists('ai_sections', $arguments)) {
+                $update['ai_sections'] = (isset($arguments['ai_sections']) && is_array($arguments['ai_sections'])) ? $arguments['ai_sections'] : null;
+            }
+
             if (array_key_exists('is_active', $arguments)) {
                 $update['is_active'] = (bool) $arguments['is_active'];
             }
@@ -196,6 +240,7 @@ class UpdateReportTypeTool implements ToolContract, ToolMetadataContract
                 'key' => $reportType->key,
                 'frequency' => $reportType->frequency,
                 'output_channel' => $reportType->output_channel,
+                'engine' => $reportType->usesTemplateEngine() ? 'template' : 'ai_loop',
                 'is_active' => (bool) $reportType->is_active,
                 'message' => 'Berichtstyp erfolgreich aktualisiert.',
             ]);

@@ -95,6 +95,10 @@ class ListReportTypesTool implements ToolContract, ToolMetadataContract
                     'frequency' => $rt->frequency,
                     'output_channel' => $rt->output_channel,
                     'obsidian_folder' => $rt->obsidian_folder,
+                    'template' => $rt->template,
+                    'data_sources' => $rt->data_sources,
+                    'ai_sections' => $rt->ai_sections,
+                    'engine' => $rt->usesTemplateEngine() ? 'template' : 'ai_loop',
                     'is_active' => (bool) $rt->is_active,
                     'created_at' => $rt->created_at?->toIso8601String(),
                 ];

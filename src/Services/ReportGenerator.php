@@ -47,7 +47,9 @@ class ReportGenerator
                 [
                     'role' => 'user',
                     'content' => "Erstelle jetzt den Bericht \"{$type->name}\" für die Entity \"{$entity->name}\". "
-                        . "Lade zuerst die benötigten Module-Tools via tools.GET, dann hole die Daten und fülle die Hülle aus.",
+                        . "Schritt 1: Lade die benötigten Module-Tools via tools.GET(module=\"...\") für jedes Modul. "
+                        . "Schritt 2: Hole alle relevanten Daten über die geladenen Tools. "
+                        . "Schritt 3: Gib den fertigen Bericht als Markdown-Text aus (keine Tool-Calls mehr, nur Text).",
                 ],
             ];
 
@@ -167,10 +169,12 @@ PROMPT;
         $prompt .= <<<PROMPT
 
 WICHTIG:
-- Antworte ausschließlich mit dem fertigen Bericht im Markdown-Format.
+- Nachdem du alle Daten via Tools geholt hast, MUSST du den fertigen Bericht als Markdown-Text ausgeben.
+- Der Bericht muss als deine letzte Nachricht im Chat erscheinen — als normaler Text, NICHT als Tool-Call.
 - Halte dich exakt an die vorgegebene Hülle/Gliederung.
 - Nutze nur Daten, die du über die Tools abgerufen hast.
 - Wenn für einen Abschnitt keine Daten vorliegen, schreibe "Keine Daten verfügbar."
+- Deine finale Antwort MUSS der vollständige Bericht sein.
 PROMPT;
 
         return $prompt;

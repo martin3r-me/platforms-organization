@@ -4,6 +4,7 @@ namespace Platform\Organization\Livewire\TimeEntries;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
+use Platform\Organization\Models\OrganizationContext;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Core\Models\Team;
 use Illuminate\Support\Facades\Auth;
@@ -19,7 +20,6 @@ class Index extends Component
 
     public function mount()
     {
-        // Setze Standard-Datum auf aktuellen Monat
         $this->dateFrom = now()->startOfMonth()->format('Y-m-d');
         $this->dateTo = now()->endOfMonth()->format('Y-m-d');
     }
@@ -29,7 +29,7 @@ class Index extends Component
     {
         $user = Auth::user();
         $baseTeam = $user->currentTeamRelation;
-        
+
         if (!$baseTeam) {
             return null;
         }
@@ -41,24 +41,21 @@ class Index extends Component
     public function relevantTeamIds()
     {
         $rootTeam = $this->rootTeam;
-        
+
         if (!$rootTeam) {
             return [];
         }
 
-        // Root-Team + alle Kind-Teams
         $teamIds = [$rootTeam->id];
-        
-        // Rekursiv alle Kind-Teams sammeln
         $this->collectChildTeamIds($rootTeam, $teamIds);
-        
+
         return $teamIds;
     }
 
     protected function collectChildTeamIds(Team $team, array &$teamIds)
     {
         $childTeams = $team->childTeams()->get();
-        
+
         foreach ($childTeams as $childTeam) {
             $teamIds[] = $childTeam->id;
             $this->collectChildTeamIds($childTeam, $teamIds);
@@ -69,14 +66,14 @@ class Index extends Component
     public function timeEntries()
     {
         $teamIds = $this->relevantTeamIds;
-        
+
         if (empty($teamIds)) {
             return collect();
         }
 
         $query = OrganizationTimeEntry::query()
             ->whereIn('team_id', $teamIds)
-            ->with(['user', 'team', 'context', 'rootContext'])
+            ->with(['user', 'team', 'context'])
             ->orderBy('work_date', 'desc')
             ->orderBy('created_at', 'desc');
 
@@ -94,17 +91,14 @@ class Index extends Component
             });
         }
 
-        // Team-Filter
         if ($this->selectedTeamId) {
             $query->where('team_id', $this->selectedTeamId);
         }
 
-        // User-Filter
         if ($this->selectedUserId) {
             $query->where('user_id', $this->selectedUserId);
         }
 
-        // Datum-Filter
         if ($this->dateFrom) {
             $query->where('work_date', '>=', $this->dateFrom);
         }
@@ -113,7 +107,6 @@ class Index extends Component
             $query->where('work_date', '<=', $this->dateTo);
         }
 
-        // Abgerechnet-Filter
         if ($this->showBilledOnly) {
             $query->where('is_billed', true);
         }
@@ -121,60 +114,137 @@ class Index extends Component
         return $query->get();
     }
 
+    /**
+     * Baut eine Reverse-Map: "context_type:context_id" → Entity
+     * für alle geladenen Entries.
+     */
+    #[Computed]
+    public function contextToEntityMap()
+    {
+        $entries = $this->timeEntries;
+        if ($entries->isEmpty()) {
+            return collect();
+        }
+
+        // Alle OrganizationContexts laden (aktive)
+        $contexts = OrganizationContext::query()
+            ->where('is_active', true)
+            ->with('organizationEntity.type')
+            ->get();
+
+        $map = [];
+
+        foreach ($contexts as $ctx) {
+            // Direkte contextable Zuordnung
+            $key = $ctx->contextable_type . ':' . $ctx->contextable_id;
+            if ($ctx->organizationEntity) {
+                $map[$key] = $ctx->organizationEntity;
+            }
+
+            // Children-Relations berücksichtigen
+            if (!empty($ctx->include_children_relations) && $ctx->contextable_type && $ctx->contextable_id && class_exists($ctx->contextable_type)) {
+                $model = $ctx->contextable_type::find($ctx->contextable_id);
+                if ($model && $ctx->organizationEntity) {
+                    foreach ($ctx->include_children_relations as $relationPath) {
+                        $this->resolveRelationPathForMapping($model, $relationPath, $ctx->organizationEntity, $map);
+                    }
+                }
+            }
+        }
+
+        return collect($map);
+    }
+
+    protected function resolveRelationPathForMapping($model, string $path, $entity, array &$map): void
+    {
+        $segments = explode('.', $path);
+        $currentModels = collect([$model]);
+
+        foreach ($segments as $segment) {
+            $nextModels = collect();
+            foreach ($currentModels as $currentModel) {
+                if (!method_exists($currentModel, $segment)) {
+                    continue;
+                }
+                $related = $currentModel->{$segment};
+                if ($related instanceof \Illuminate\Database\Eloquent\Collection) {
+                    $nextModels = $nextModels->merge($related);
+                } elseif ($related instanceof \Illuminate\Database\Eloquent\Model) {
+                    $nextModels->push($related);
+                }
+            }
+            $currentModels = $nextModels;
+        }
+
+        foreach ($currentModels as $leafModel) {
+            $leafKey = get_class($leafModel) . ':' . $leafModel->id;
+            $map[$leafKey] = $entity;
+        }
+    }
+
     #[Computed]
     public function timeEntriesGroupedByTeamAndRoot()
     {
-        // Zuerst nach Team gruppieren
+        $entityMap = $this->contextToEntityMap;
+
         $groupedByTeam = $this->timeEntries->groupBy('team_id');
-        
-        return $groupedByTeam->map(function($teamEntries, $teamId) {
+
+        return $groupedByTeam->map(function($teamEntries, $teamId) use ($entityMap) {
             $team = $teamEntries->first()->team ?? null;
-            
-            // Innerhalb des Teams nach Root gruppieren
-            $groupedByRoot = $teamEntries->groupBy(function($entry) {
-                // Gruppiere nach root_context_type und root_context_id
-                if ($entry->root_context_type && $entry->root_context_id) {
-                    return $entry->root_context_type . ':' . $entry->root_context_id;
-                }
-                // Fallback: Wenn kein Root vorhanden, nach primärem Kontext gruppieren
-                return ($entry->context_type ?? 'unknown') . ':' . ($entry->context_id ?? 0);
+
+            // Innerhalb des Teams nach Entity gruppieren
+            $groupedByEntity = $teamEntries->groupBy(function($entry) use ($entityMap) {
+                $key = ($entry->context_type ?? '') . ':' . ($entry->context_id ?? 0);
+                $entity = $entityMap[$key] ?? null;
+                return $entity ? 'entity:' . $entity->id : 'none:' . $key;
             });
-            
-            $rootGroups = $groupedByRoot->map(function($entries, $key) {
-                $parts = explode(':', $key);
-                $rootType = $parts[0] ?? null;
-                $rootId = $parts[1] ?? null;
-                
+
+            $rootGroups = $groupedByEntity->map(function($entries, $groupKey) use ($entityMap) {
+                $rootName = 'Nicht verknüpft';
+                $rootType = null;
+                $rootId = null;
                 $rootModel = null;
-                $rootName = 'Unbekannt';
-                
-                if ($rootType && $rootId && class_exists($rootType)) {
-                    $rootModel = $rootType::find($rootId);
-                    if ($rootModel) {
-                        if ($rootModel instanceof \Platform\Core\Contracts\HasDisplayName) {
-                            $rootName = $rootModel->getDisplayName() ?? 'Unbekannt';
-                        } else {
-                            $rootName = $rootModel->name ?? $rootModel->title ?? 'Unbekannt';
+
+                if (str_starts_with($groupKey, 'entity:')) {
+                    $entityId = (int) substr($groupKey, 7);
+                    // Finde Entity aus einem der Entries
+                    foreach ($entries as $entry) {
+                        $key = ($entry->context_type ?? '') . ':' . ($entry->context_id ?? 0);
+                        $entity = $entityMap[$key] ?? null;
+                        if ($entity && $entity->id === $entityId) {
+                            $rootName = $entity->name;
+                            $rootType = 'OrganizationEntity';
+                            $rootId = $entity->id;
+                            $rootModel = $entity;
+                            break;
+                        }
+                    }
+                } else {
+                    // Kein Entity → nach direktem Kontext benennen
+                    $firstEntry = $entries->first();
+                    if ($firstEntry && $firstEntry->context_type && $firstEntry->context_id && class_exists($firstEntry->context_type)) {
+                        $ctxModel = $firstEntry->context_type::find($firstEntry->context_id);
+                        if ($ctxModel) {
+                            if ($ctxModel instanceof \Platform\Core\Contracts\HasDisplayName) {
+                                $rootName = $ctxModel->getDisplayName() ?? 'Unbekannt';
+                            } else {
+                                $rootName = $ctxModel->name ?? $ctxModel->title ?? 'Unbekannt';
+                            }
+                            $rootType = $firstEntry->context_type;
+                            $rootId = $firstEntry->context_id;
+                            $rootModel = $ctxModel;
                         }
                     }
                 }
-                
-                // Prüfe ob alle Einträge aus demselben Modul kommen
-                $sourceModules = $entries->map(function($entry) {
-                    return $entry->source_module;
-                })->filter()->unique()->values();
-                
+
+                $sourceModules = $entries->map(fn($e) => $e->source_module)->filter()->unique()->values();
                 $sourceModuleTitle = null;
                 if ($sourceModules->count() === 1) {
                     $moduleKey = $sourceModules->first();
                     $module = \Platform\Core\PlatformCore::getModule($moduleKey);
-                    if ($module && isset($module['title'])) {
-                        $sourceModuleTitle = $module['title'];
-                    } else {
-                        $sourceModuleTitle = ucfirst($moduleKey);
-                    }
+                    $sourceModuleTitle = ($module && isset($module['title'])) ? $module['title'] : ucfirst($moduleKey);
                 }
-                
+
                 return [
                     'root_type' => $rootType,
                     'root_id' => $rootId,
@@ -186,7 +256,7 @@ class Index extends Component
                     'total_amount_cents' => $entries->sum('amount_cents'),
                 ];
             })->sortBy('root_name')->values();
-            
+
             return [
                 'team' => $team,
                 'team_name' => $team->name ?? 'Unbekanntes Team',
@@ -200,65 +270,70 @@ class Index extends Component
     #[Computed]
     public function timeEntriesGroupedByDateAndTeam()
     {
-        // Zuerst nach Datum gruppieren (neueste zuerst)
+        $entityMap = $this->contextToEntityMap;
+
         $groupedByDate = $this->timeEntries->groupBy(function($entry) {
             return $entry->work_date->format('Y-m-d');
         });
-        
-        return $groupedByDate->map(function($dateEntries, $dateKey) {
+
+        return $groupedByDate->map(function($dateEntries, $dateKey) use ($entityMap) {
             $workDate = $dateEntries->first()->work_date;
-            
-            // Innerhalb des Datums nach Team gruppieren
+
             $groupedByTeam = $dateEntries->groupBy('team_id');
-            
-            $teamGroups = $groupedByTeam->map(function($teamEntries, $teamId) {
+
+            $teamGroups = $groupedByTeam->map(function($teamEntries, $teamId) use ($entityMap) {
                 $team = $teamEntries->first()->team ?? null;
-                
-                // Innerhalb des Teams nach Root gruppieren
-                $groupedByRoot = $teamEntries->groupBy(function($entry) {
-                    // Gruppiere nach root_context_type und root_context_id
-                    if ($entry->root_context_type && $entry->root_context_id) {
-                        return $entry->root_context_type . ':' . $entry->root_context_id;
-                    }
-                    // Fallback: Wenn kein Root vorhanden, nach primärem Kontext gruppieren
-                    return ($entry->context_type ?? 'unknown') . ':' . ($entry->context_id ?? 0);
+
+                $groupedByEntity = $teamEntries->groupBy(function($entry) use ($entityMap) {
+                    $key = ($entry->context_type ?? '') . ':' . ($entry->context_id ?? 0);
+                    $entity = $entityMap[$key] ?? null;
+                    return $entity ? 'entity:' . $entity->id : 'none:' . $key;
                 });
-                
-                $rootGroups = $groupedByRoot->map(function($entries, $key) {
-                    $parts = explode(':', $key);
-                    $rootType = $parts[0] ?? null;
-                    $rootId = $parts[1] ?? null;
-                    
+
+                $rootGroups = $groupedByEntity->map(function($entries, $groupKey) use ($entityMap) {
+                    $rootName = 'Nicht verknüpft';
+                    $rootType = null;
+                    $rootId = null;
                     $rootModel = null;
-                    $rootName = 'Unbekannt';
-                    
-                    if ($rootType && $rootId && class_exists($rootType)) {
-                        $rootModel = $rootType::find($rootId);
-                        if ($rootModel) {
-                            if ($rootModel instanceof \Platform\Core\Contracts\HasDisplayName) {
-                                $rootName = $rootModel->getDisplayName() ?? 'Unbekannt';
-                            } else {
-                                $rootName = $rootModel->name ?? $rootModel->title ?? 'Unbekannt';
+
+                    if (str_starts_with($groupKey, 'entity:')) {
+                        $entityId = (int) substr($groupKey, 7);
+                        foreach ($entries as $entry) {
+                            $key = ($entry->context_type ?? '') . ':' . ($entry->context_id ?? 0);
+                            $entity = $entityMap[$key] ?? null;
+                            if ($entity && $entity->id === $entityId) {
+                                $rootName = $entity->name;
+                                $rootType = 'OrganizationEntity';
+                                $rootId = $entity->id;
+                                $rootModel = $entity;
+                                break;
+                            }
+                        }
+                    } else {
+                        $firstEntry = $entries->first();
+                        if ($firstEntry && $firstEntry->context_type && $firstEntry->context_id && class_exists($firstEntry->context_type)) {
+                            $ctxModel = $firstEntry->context_type::find($firstEntry->context_id);
+                            if ($ctxModel) {
+                                if ($ctxModel instanceof \Platform\Core\Contracts\HasDisplayName) {
+                                    $rootName = $ctxModel->getDisplayName() ?? 'Unbekannt';
+                                } else {
+                                    $rootName = $ctxModel->name ?? $ctxModel->title ?? 'Unbekannt';
+                                }
+                                $rootType = $firstEntry->context_type;
+                                $rootId = $firstEntry->context_id;
+                                $rootModel = $ctxModel;
                             }
                         }
                     }
-                    
-                    // Prüfe ob alle Einträge aus demselben Modul kommen
-                    $sourceModules = $entries->map(function($entry) {
-                        return $entry->source_module;
-                    })->filter()->unique()->values();
-                    
+
+                    $sourceModules = $entries->map(fn($e) => $e->source_module)->filter()->unique()->values();
                     $sourceModuleTitle = null;
                     if ($sourceModules->count() === 1) {
                         $moduleKey = $sourceModules->first();
                         $module = \Platform\Core\PlatformCore::getModule($moduleKey);
-                        if ($module && isset($module['title'])) {
-                            $sourceModuleTitle = $module['title'];
-                        } else {
-                            $sourceModuleTitle = ucfirst($moduleKey);
-                        }
+                        $sourceModuleTitle = ($module && isset($module['title'])) ? $module['title'] : ucfirst($moduleKey);
                     }
-                    
+
                     return [
                         'root_type' => $rootType,
                         'root_id' => $rootId,
@@ -270,7 +345,7 @@ class Index extends Component
                         'total_amount_cents' => $entries->sum('amount_cents'),
                     ];
                 })->sortBy('root_name')->values();
-                
+
                 return [
                     'team' => $team,
                     'team_name' => $team->name ?? 'Unbekanntes Team',
@@ -279,7 +354,7 @@ class Index extends Component
                     'total_amount_cents' => $teamEntries->sum('amount_cents'),
                 ];
             })->sortBy('team_name')->values();
-            
+
             return [
                 'date' => $workDate,
                 'date_key' => $dateKey,
@@ -294,7 +369,7 @@ class Index extends Component
     public function availableTeams()
     {
         $teamIds = $this->relevantTeamIds;
-        
+
         if (empty($teamIds)) {
             return collect();
         }
@@ -308,7 +383,7 @@ class Index extends Component
     public function availableUsers()
     {
         $teamIds = $this->relevantTeamIds;
-        
+
         if (empty($teamIds)) {
             return collect();
         }
@@ -356,41 +431,12 @@ class Index extends Component
         return $this->totalAmountCents - $this->totalBilledAmountCents;
     }
 
-    // Helper: Minuten zu Tagen (1 Tag = 8 Stunden = 480 Minuten)
-    protected function minutesToDays($minutes)
-    {
-        return $minutes / 480;
-    }
-
-    public function updatedSearch()
-    {
-        // Trigger recomputation
-    }
-
-    public function updatedSelectedTeamId()
-    {
-        // Trigger recomputation
-    }
-
-    public function updatedSelectedUserId()
-    {
-        // Trigger recomputation
-    }
-
-    public function updatedDateFrom()
-    {
-        // Trigger recomputation
-    }
-
-    public function updatedDateTo()
-    {
-        // Trigger recomputation
-    }
-
-    public function updatedShowBilledOnly()
-    {
-        // Trigger recomputation
-    }
+    public function updatedSearch() {}
+    public function updatedSelectedTeamId() {}
+    public function updatedSelectedUserId() {}
+    public function updatedDateFrom() {}
+    public function updatedDateTo() {}
+    public function updatedShowBilledOnly() {}
 
     public function render()
     {
@@ -398,4 +444,3 @@ class Index extends Component
             ->layout('platform::layouts.app');
     }
 }
-

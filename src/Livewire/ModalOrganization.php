@@ -7,8 +7,8 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
+use Platform\Organization\Models\OrganizationContext;
 use Platform\Organization\Models\OrganizationTimeEntry;
-use Platform\Organization\Models\OrganizationTimeEntryContext;
 use Platform\Organization\Models\OrganizationTimePlanned;
 use Platform\Organization\Services\StoreTimeEntry;
 use Platform\Organization\Services\StorePlannedTime;
@@ -122,9 +122,9 @@ class ModalOrganization extends Component
         }
 
         $breadcrumb = [];
-        
-        // Primärkontext
         $resolver = app(TimeContextResolver::class);
+
+        // Primärkontext
         $label = $resolver->resolveLabel($this->contextType, $this->contextId);
         if ($label) {
             $breadcrumb[] = [
@@ -133,21 +133,20 @@ class ModalOrganization extends Component
             ];
         }
 
-        // Vorfahren-Kontexte
-        if (class_exists($this->contextType)) {
-            $model = $this->contextType::find($this->contextId);
-            if ($model && $model instanceof \Platform\Core\Contracts\HasTimeAncestors) {
-                $ancestors = $model->timeAncestors();
-                foreach ($ancestors as $ancestor) {
-                    $ancestorLabel = $ancestor['label'] ?? $resolver->resolveLabel($ancestor['type'], $ancestor['id']);
-                    if ($ancestorLabel) {
-                        $breadcrumb[] = [
-                            'type' => class_basename($ancestor['type']),
-                            'label' => $ancestorLabel,
-                        ];
-                    }
-                }
-            }
+        // Entity-Verknüpfung über OrganizationContext nachschlagen
+        $orgContext = OrganizationContext::query()
+            ->where('contextable_type', $this->contextType)
+            ->where('contextable_id', $this->contextId)
+            ->where('is_active', true)
+            ->with('organizationEntity.type')
+            ->first();
+
+        if ($orgContext && $orgContext->organizationEntity) {
+            $entity = $orgContext->organizationEntity;
+            $breadcrumb[] = [
+                'type' => $entity->type?->name ?? 'Entity',
+                'label' => $entity->name,
+            ];
         }
 
         return $breadcrumb;
@@ -312,32 +311,19 @@ class ModalOrganization extends Component
             return;
         }
 
-        // Einträge, deren Root-Kontext auf den aktuellen Kontext zeigt
-        // plus Fallback: root_context_* leer, aber direct context match,
-        // plus additionalContexts mit is_root = true.
+        // Sammle alle Context-Paare: direkt + über include_children_relations
+        $contextPairs = [$this->contextType => [$this->contextId]];
+        $this->collectChildContextPairs($contextPairs);
+
+        // Query mit allen Context-Paaren bauen
         $baseQuery = OrganizationTimeEntry::query()
-            ->where(function ($q) {
-                $q->where(function ($rq) {
-                    $rq->where('root_context_type', $this->contextType)
-                       ->where('root_context_id', $this->contextId);
-                })
-                // Fallback: root_context_* leer, aber direkter Kontext
-                ->orWhere(function ($rq) {
-                    $rq->whereNull('root_context_type')
-                       ->where('context_type', $this->contextType)
-                       ->where('context_id', $this->contextId);
-                })
-                // Direkter Kontext, auch wenn root_context_* gesetzt ist (z. B. Task als Kontext, root=Project)
-                ->orWhere(function ($rq) {
-                    $rq->where('context_type', $this->contextType)
-                       ->where('context_id', $this->contextId);
-                })
-                // Zusätzliche Kontexte mit is_root = true
-                ->orWhereHas('additionalContexts', function ($aq) {
-                    $aq->where('is_root', true)
-                       ->where('context_type', $this->contextType)
-                       ->where('context_id', $this->contextId);
-                });
+            ->where(function ($q) use ($contextPairs) {
+                foreach ($contextPairs as $type => $ids) {
+                    $q->orWhere(function ($sq) use ($type, $ids) {
+                        $sq->where('context_type', $type)
+                           ->whereIn('context_id', array_unique($ids));
+                    });
+                }
             });
 
         // Personen-Filter anwenden
@@ -356,13 +342,72 @@ class ModalOrganization extends Component
             ->limit(200)
             ->get();
 
-        // Statistiken in einem Durchgang berechnen (Performance-Optimierung)
+        // Statistiken berechnen
         $this->cachedTotalMinutes = (int) (clone $baseQuery)->sum('minutes');
         $this->cachedBilledMinutes = (int) (clone $baseQuery)->where('is_billed', true)->sum('minutes');
         $this->cachedUnbilledAmountCents = (int) (clone $baseQuery)->where('is_billed', false)->sum('amount_cents');
-        
-        // Cache für verfügbare Benutzer zurücksetzen, damit er neu berechnet wird
+
+        // Cache für verfügbare Benutzer zurücksetzen
         $this->cachedAvailableUsers = null;
+    }
+
+    /**
+     * Sammelt Kind-Context-Paare über OrganizationContext include_children_relations.
+     */
+    protected function collectChildContextPairs(array &$pairs): void
+    {
+        $orgContext = OrganizationContext::query()
+            ->where('contextable_type', $this->contextType)
+            ->where('contextable_id', $this->contextId)
+            ->where('is_active', true)
+            ->first();
+
+        if (! $orgContext || empty($orgContext->include_children_relations)) {
+            return;
+        }
+
+        if (! class_exists($this->contextType)) {
+            return;
+        }
+
+        $model = $this->contextType::find($this->contextId);
+        if (! $model) {
+            return;
+        }
+
+        foreach ($orgContext->include_children_relations as $relationPath) {
+            $this->resolveRelationPathForPairs($model, $relationPath, $pairs);
+        }
+    }
+
+    /**
+     * Löst einen Relation-Pfad auf und sammelt die Ergebnis-Models als Context-Paare.
+     */
+    protected function resolveRelationPathForPairs($model, string $path, array &$pairs): void
+    {
+        $segments = explode('.', $path);
+        $currentModels = collect([$model]);
+
+        foreach ($segments as $segment) {
+            $nextModels = collect();
+            foreach ($currentModels as $currentModel) {
+                if (! method_exists($currentModel, $segment)) {
+                    continue;
+                }
+                $related = $currentModel->{$segment};
+                if ($related instanceof \Illuminate\Database\Eloquent\Collection) {
+                    $nextModels = $nextModels->merge($related);
+                } elseif ($related instanceof \Illuminate\Database\Eloquent\Model) {
+                    $nextModels->push($related);
+                }
+            }
+            $currentModels = $nextModels;
+        }
+
+        foreach ($currentModels as $leafModel) {
+            $type = get_class($leafModel);
+            $pairs[$type][] = $leafModel->id;
+        }
     }
 
     protected function loadTeamEntries(): void
@@ -377,8 +422,7 @@ class ModalOrganization extends Component
 
         $query = OrganizationTimeEntry::query()
             ->where('team_id', $team->id)
-            ->with('user')
-            ->with('additionalContexts');
+            ->with('user');
 
         // Zeitraum-Filter anwenden
         $query = $this->applyTimeRangeFilter($query);

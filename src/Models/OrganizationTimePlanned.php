@@ -4,7 +4,6 @@ namespace Platform\Organization\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Team;
@@ -41,7 +40,7 @@ class OrganizationTimePlanned extends Model
             $planned->uuid = $uuid;
 
             if (! $planned->team_id && Auth::user()?->currentTeamRelation) {
-                $planned->team_id = Auth::user()->currentTeamRelation->id; // Child-Team (nicht dynamisch)
+                $planned->team_id = Auth::user()->currentTeamRelation->id;
             }
 
             if (! $planned->user_id && Auth::user()) {
@@ -71,19 +70,6 @@ class OrganizationTimePlanned extends Model
         return $this->morphTo();
     }
 
-    public function additionalContexts(): HasMany
-    {
-        return $this->hasMany(OrganizationTimePlannedContext::class, 'planned_id');
-    }
-
-    public function scopeForContext($query, string $type, int $id)
-    {
-        return $query->whereHas('additionalContexts', function ($q) use ($type, $id) {
-            $q->where('context_type', $type)
-              ->where('context_id', $id);
-        });
-    }
-
     public function scopeForContextKey($query, string $type, int $id)
     {
         return $query->where('context_type', $type)
@@ -100,4 +86,3 @@ class OrganizationTimePlanned extends Model
         return round(($this->planned_minutes ?? 0) / 60, 2);
     }
 }
-

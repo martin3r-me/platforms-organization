@@ -8,8 +8,10 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\Team;
+use Platform\Organization\Models\OrganizationContext;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\ContextTypeRegistry;
+use Platform\Organization\Services\EntityTimeResolver;
 use Platform\Organization\Services\TimeContextResolver;
 use Platform\Organization\Tools\Concerns\ResolvesTimeEntryTeamScope;
 
@@ -24,7 +26,7 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/time-entries/summary - Gibt Zusammenfassung/Summen der getrackten Zeit zurück: pro Kontext, User, Zeitraum oder kombiniert. Unterstützt cross-team Abfragen: Im Parent-Team werden automatisch alle Child-Teams einbezogen (wie in der UI). Ideal für Auswertungen und Reports.';
+        return 'GET /organization/time-entries/summary - Gibt Zusammenfassung/Summen der getrackten Zeit zurück: pro Kontext, User, Zeitraum, Entity oder kombiniert. Unterstützt cross-team Abfragen. Ideal für Auswertungen und Reports.';
     }
 
     public function getSchema(): array
@@ -38,16 +40,24 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 ],
                 'cross_team' => [
                     'type' => 'boolean',
-                    'description' => 'Optional: Cross-Team Abfrage (Root-Team + alle Child-Teams). Default: true. Bei false werden nur Einträge des angegebenen Teams zusammengefasst.',
+                    'description' => 'Optional: Cross-Team Abfrage (Root-Team + alle Child-Teams). Default: true.',
                 ],
                 'group_by' => [
                     'type' => 'string',
-                    'enum' => ['context', 'user', 'work_date', 'root_context', 'source_module', 'team'],
-                    'description' => 'Gruppierung der Zusammenfassung (ERFORDERLICH). "context" = pro Kontext (Task, Projekt etc.), "user" = pro Benutzer, "work_date" = pro Tag, "root_context" = pro Root-Kontext (z.B. Projekt), "source_module" = pro Modul (planner, crm etc.), "team" = pro Team (sinnvoll bei cross-team Abfragen).',
+                    'enum' => ['context', 'user', 'work_date', 'entity', 'source_module', 'team'],
+                    'description' => 'Gruppierung der Zusammenfassung (ERFORDERLICH). "context" = pro Kontext (Task, Projekt etc.), "user" = pro Benutzer, "work_date" = pro Tag, "entity" = pro Organization Entity, "source_module" = pro Modul (planner, crm etc.), "team" = pro Team.',
+                ],
+                'entity_id' => [
+                    'type' => 'integer',
+                    'description' => 'Optional: Filter nach Organization Entity-ID. Sammelt automatisch alle zugehörigen Kontexte.',
+                ],
+                'include_child_entities' => [
+                    'type' => 'boolean',
+                    'description' => 'Optional: Bei entity_id auch Child-Entities einbeziehen. Default: false.',
                 ],
                 'user_id' => [
                     'type' => 'integer',
-                    'description' => 'Optional: Nur Einträge eines bestimmten Users. Funktioniert auch cross-team.',
+                    'description' => 'Optional: Nur Einträge eines bestimmten Users.',
                 ],
                 'context_type' => [
                     'type' => 'string',
@@ -57,15 +67,6 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 'context_id' => [
                     'type' => 'integer',
                     'description' => 'Optional: Filter nach Kontext-ID (zusammen mit context_type).',
-                ],
-                'root_context_type' => [
-                    'type' => 'string',
-                    'description' => 'Optional: Filter nach Root-Kontext-Typ. Kurzformen: "project", "task", "ticket", "company" (oder vollqualifizierter Klassenname).',
-                    'enum' => ['project', 'task', 'ticket', 'company'],
-                ],
-                'root_context_id' => [
-                    'type' => 'integer',
-                    'description' => 'Optional: Filter nach Root-Kontext-ID.',
                 ],
                 'date_from' => [
                     'type' => 'string',
@@ -89,7 +90,7 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 ],
                 'filters' => [
                     'type' => 'array',
-                    'description' => 'Optional: Array von Filtern. Jeder Filter: {"field": "...", "op": "eq|ne|gt|gte|lt|lte|like|in|not_in|is_null|is_not_null", "value": ...}. Erlaubte Felder: team_id, user_id, context_type, context_id, root_context_type, root_context_id, work_date (oder "date" als Alias), is_billed, source_module.',
+                    'description' => 'Optional: Array von Filtern. Jeder Filter: {"field": "...", "op": "eq|ne|gt|gte|lt|lte|like|in|not_in|is_null|is_not_null", "value": ...}. Erlaubte Felder: team_id, user_id, context_type, context_id, work_date (oder "date" als Alias), is_billed, source_module.',
                     'items' => [
                         'type' => 'object',
                         'properties' => [
@@ -105,18 +106,11 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
         ];
     }
 
-    /**
-     * Erlaubte Felder für das filters-Array.
-     */
     protected const ALLOWED_FILTER_FIELDS = [
         'team_id', 'user_id', 'context_type', 'context_id',
-        'root_context_type', 'root_context_id', 'work_date',
-        'is_billed', 'source_module',
+        'work_date', 'is_billed', 'source_module',
     ];
 
-    /**
-     * Erlaubte Operatoren für das filters-Array.
-     */
     protected const ALLOWED_FILTER_OPS = [
         'eq', 'ne', 'gt', 'gte', 'lt', 'lte', 'like', 'in', 'not_in', 'is_null', 'is_not_null',
     ];
@@ -134,11 +128,11 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
             $isCrossTeam = $scope['is_cross_team'];
 
             $groupBy = $arguments['group_by'] ?? null;
-            if (!$groupBy || !in_array($groupBy, ['context', 'user', 'work_date', 'root_context', 'source_module', 'team'])) {
-                return ToolResult::error('VALIDATION_ERROR', 'group_by ist erforderlich. Erlaubte Werte: context, user, work_date, root_context, source_module, team.');
+            if (!$groupBy || !in_array($groupBy, ['context', 'user', 'work_date', 'entity', 'source_module', 'team'])) {
+                return ToolResult::error('VALIDATION_ERROR', 'group_by ist erforderlich. Erlaubte Werte: context, user, work_date, entity, source_module, team.');
             }
 
-            // date_from/date_to als Aliase für work_date_from/work_date_to
+            // date_from/date_to als Aliase
             if (isset($arguments['date_from']) && !isset($arguments['work_date_from'])) {
                 $arguments['work_date_from'] = $arguments['date_from'];
             }
@@ -146,15 +140,24 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 $arguments['work_date_to'] = $arguments['date_to'];
             }
 
-            $query = OrganizationTimeEntry::query()
-                ->whereIn('team_id', $teamIds);
+            // Entity-basierter Filter
+            if (isset($arguments['entity_id'])) {
+                $entity = \Platform\Organization\Models\OrganizationEntity::find((int) $arguments['entity_id']);
+                if (!$entity) {
+                    return ToolResult::error('NOT_FOUND', 'Organization Entity nicht gefunden.');
+                }
+                $resolver = app(EntityTimeResolver::class);
+                $includeChildren = (bool) ($arguments['include_child_entities'] ?? false);
+                $query = $resolver->buildTimeEntryQuery($entity, $includeChildren)
+                    ->whereIn('team_id', $teamIds);
+            } else {
+                $query = OrganizationTimeEntry::query()
+                    ->whereIn('team_id', $teamIds);
+            }
 
             // Kurzformen auflösen
             $contextType = isset($arguments['context_type'])
                 ? (ContextTypeRegistry::resolve($arguments['context_type']) ?? $arguments['context_type'])
-                : null;
-            $rootContextType = isset($arguments['root_context_type'])
-                ? (ContextTypeRegistry::resolve($arguments['root_context_type']) ?? $arguments['root_context_type'])
                 : null;
 
             // Top-Level Filter anwenden
@@ -162,12 +165,9 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 $query->where('user_id', (int) $arguments['user_id']);
             }
             if ($contextType && isset($arguments['context_id'])) {
-                $query->forContext($contextType, (int) $arguments['context_id']);
+                $query->forContextKey($contextType, (int) $arguments['context_id']);
             } elseif ($contextType) {
                 $query->where('context_type', $contextType);
-            }
-            if ($rootContextType && isset($arguments['root_context_id'])) {
-                $query->forRootContext($rootContextType, (int) $arguments['root_context_id']);
             }
             if (isset($arguments['work_date_from'])) {
                 $query->where('work_date', '>=', $arguments['work_date_from']);
@@ -179,7 +179,7 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 $query->where('is_billed', (bool) $arguments['is_billed']);
             }
 
-            // filters-Array anwenden (Parität mit GET)
+            // filters-Array anwenden
             $this->applySummaryFilters($query, $arguments);
 
             // Gruppierung
@@ -187,12 +187,11 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
                 'context' => $this->groupByContext($query),
                 'user' => $this->groupByUser($query),
                 'work_date' => $this->groupByWorkDate($query),
-                'root_context' => $this->groupByRootContext($query),
+                'entity' => $this->groupByEntity($query, $teamIds),
                 'source_module' => $this->groupBySourceModule($query),
                 'team' => $this->groupByTeam($query),
             };
 
-            // Gesamtsumme berechnen
             $totalMinutes = collect($groups)->sum('total_minutes');
 
             return ToolResult::success([
@@ -283,37 +282,140 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
         })->values()->toArray();
     }
 
-    protected function groupByRootContext($query): array
+    /**
+     * Gruppiert nach Organization Entity.
+     * Baut eine Reverse-Map: (context_type, context_id) → Entity
+     */
+    protected function groupByEntity($query, array $teamIds): array
     {
-        $results = (clone $query)
-            ->select('root_context_type', 'root_context_id', DB::raw('SUM(minutes) as total_minutes'), DB::raw('COUNT(*) as entry_count'))
-            ->groupBy('root_context_type', 'root_context_id')
-            ->orderByDesc('total_minutes')
-            ->limit(100)
+        $entries = (clone $query)->get();
+
+        if ($entries->isEmpty()) {
+            return [];
+        }
+
+        // Sammle alle context_type/context_id Paare
+        $contextPairs = $entries->map(fn($e) => $e->context_type . ':' . $e->context_id)->unique()->values();
+
+        // Lade alle OrganizationContexts für diese contextable Paare
+        $contexts = OrganizationContext::query()
+            ->where('is_active', true)
+            ->with('organizationEntity')
             ->get();
 
-        $resolver = app(TimeContextResolver::class);
-
-        return $results->map(function ($row) use ($resolver) {
-            $label = null;
-            if ($row->root_context_type && $row->root_context_id) {
-                $label = $resolver->resolveRootName($row->root_context_type, $row->root_context_id);
+        // Baue Reverse-Map: "contextable_type:contextable_id" → Entity
+        $contextToEntity = [];
+        foreach ($contexts as $ctx) {
+            $key = $ctx->contextable_type . ':' . $ctx->contextable_id;
+            if ($ctx->organizationEntity) {
+                $contextToEntity[$key] = $ctx->organizationEntity;
             }
+
+            // Auch Children-Relations berücksichtigen
+            if (!empty($ctx->include_children_relations) && $ctx->contextable_type && $ctx->contextable_id) {
+                $this->mapChildRelationsToEntity($ctx, $contextToEntity);
+            }
+        }
+
+        // Gruppiere Entries nach Entity
+        $grouped = [];
+        $unlinkedMinutes = 0;
+        $unlinkedCount = 0;
+
+        foreach ($entries as $entry) {
+            $key = $entry->context_type . ':' . $entry->context_id;
+            $entity = $contextToEntity[$key] ?? null;
+
+            if ($entity) {
+                $entityId = $entity->id;
+                if (!isset($grouped[$entityId])) {
+                    $grouped[$entityId] = [
+                        'entity_id' => $entity->id,
+                        'entity_name' => $entity->name,
+                        'entity_type' => $entity->type?->name ?? null,
+                        'entry_count' => 0,
+                        'total_minutes' => 0,
+                    ];
+                }
+                $grouped[$entityId]['entry_count']++;
+                $grouped[$entityId]['total_minutes'] += $entry->minutes;
+            } else {
+                $unlinkedMinutes += $entry->minutes;
+                $unlinkedCount++;
+            }
+        }
+
+        $result = collect($grouped)->map(function ($g) {
             return [
-                'root_context_type' => $row->root_context_type,
-                'root_context_id' => $row->root_context_id,
-                'root_context_label' => $label ?? '(Ohne Root-Kontext)',
-                'entry_count' => (int) $row->entry_count,
-                'total_minutes' => (int) $row->total_minutes,
-                'total_formatted' => OrganizationTimeEntry::formatMinutes((int) $row->total_minutes),
-                'total_hours' => OrganizationTimeEntry::formatMinutesAsHours((int) $row->total_minutes),
+                ...$g,
+                'total_formatted' => OrganizationTimeEntry::formatMinutes($g['total_minutes']),
+                'total_hours' => OrganizationTimeEntry::formatMinutesAsHours($g['total_minutes']),
             ];
-        })->values()->toArray();
+        })->sortByDesc('total_minutes')->values()->toArray();
+
+        if ($unlinkedCount > 0) {
+            $result[] = [
+                'entity_id' => null,
+                'entity_name' => '(Nicht verknüpft)',
+                'entity_type' => null,
+                'entry_count' => $unlinkedCount,
+                'total_minutes' => $unlinkedMinutes,
+                'total_formatted' => OrganizationTimeEntry::formatMinutes($unlinkedMinutes),
+                'total_hours' => OrganizationTimeEntry::formatMinutesAsHours($unlinkedMinutes),
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
+     * Mappt Child-Relations eines OrganizationContext auf die Entity.
+     */
+    protected function mapChildRelationsToEntity(OrganizationContext $ctx, array &$map): void
+    {
+        if (!class_exists($ctx->contextable_type)) {
+            return;
+        }
+
+        $model = $ctx->contextable_type::find($ctx->contextable_id);
+        if (!$model || !$ctx->organizationEntity) {
+            return;
+        }
+
+        foreach ($ctx->include_children_relations as $relationPath) {
+            $this->resolveRelationPathForMapping($model, $relationPath, $ctx->organizationEntity, $map);
+        }
+    }
+
+    protected function resolveRelationPathForMapping($model, string $path, $entity, array &$map): void
+    {
+        $segments = explode('.', $path);
+        $currentModels = collect([$model]);
+
+        foreach ($segments as $segment) {
+            $nextModels = collect();
+            foreach ($currentModels as $currentModel) {
+                if (!method_exists($currentModel, $segment)) {
+                    continue;
+                }
+                $related = $currentModel->{$segment};
+                if ($related instanceof \Illuminate\Database\Eloquent\Collection) {
+                    $nextModels = $nextModels->merge($related);
+                } elseif ($related instanceof \Illuminate\Database\Eloquent\Model) {
+                    $nextModels->push($related);
+                }
+            }
+            $currentModels = $nextModels;
+        }
+
+        foreach ($currentModels as $leafModel) {
+            $key = get_class($leafModel) . ':' . $leafModel->id;
+            $map[$key] = $entity;
+        }
     }
 
     protected function groupBySourceModule($query): array
     {
-        // Gruppierung nach Modul (aus context_type abgeleitet)
         $entries = (clone $query)->get();
 
         $grouped = $entries->groupBy(function (OrganizationTimeEntry $entry) {
@@ -324,7 +426,6 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
             $totalMinutes = $entries->sum('minutes');
             $moduleTitle = $module === '_none' ? '(Freie Zeiterfassung)' : ucfirst($module);
 
-            // Versuche Modul-Titel aus Registry
             if ($module !== '_none') {
                 $mod = \Platform\Core\PlatformCore::getModule($module);
                 if ($mod && isset($mod['title'])) {
@@ -365,10 +466,6 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
         })->values()->toArray();
     }
 
-    /**
-     * Wendet das filters-Array auf die Query an.
-     * Unterstützt dieselben Filter-Felder und Operatoren wie GET.
-     */
     protected function applySummaryFilters($query, array $arguments): void
     {
         $filters = $arguments['filters'] ?? null;
@@ -386,7 +483,6 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
             $op = $filter['op'] ?? 'eq';
             $value = $filter['value'] ?? null;
 
-            // "date" als Alias für "work_date" (Parität mit GET und date_from/date_to)
             if ($field === 'date') {
                 $field = 'work_date';
             }
@@ -399,7 +495,7 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
             }
 
             // context_type Kurzformen auflösen
-            if (in_array($field, ['context_type', 'root_context_type'], true) && $value !== null) {
+            if ($field === 'context_type' && $value !== null) {
                 $resolved = ContextTypeRegistry::resolve($value);
                 if ($resolved) {
                     $value = $resolved;

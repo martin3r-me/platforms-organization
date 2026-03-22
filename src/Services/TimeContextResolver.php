@@ -2,36 +2,8 @@
 
 namespace Platform\Organization\Services;
 
-use Platform\Core\Contracts\HasTimeAncestors;
-
 class TimeContextResolver
 {
-    /**
-     * Lädt das Modell und gibt dessen Vorfahren zurück.
-     *
-     * @param string $type Model-Klasse
-     * @param int $id Model-ID
-     * @return array Array von Vorfahren-Kontexten
-     */
-    public function resolveAncestors(string $type, int $id): array
-    {
-        if (! class_exists($type)) {
-            return [];
-        }
-
-        $model = $type::find($id);
-
-        if (! $model) {
-            return [];
-        }
-
-        if (! $model instanceof HasTimeAncestors) {
-            return [];
-        }
-
-        return $model->timeAncestors();
-    }
-
     /**
      * Erstellt einen Kontext-Label aus dem Modell.
      *
@@ -79,21 +51,4 @@ class TimeContextResolver
 
         return null;
     }
-
-    /**
-     * Gibt den Namen/Titel eines Root-Kontexts zurück.
-     * 
-     * @param string|null $type Model-Klasse
-     * @param int|null $id Model-ID
-     * @return string|null
-     */
-    public function resolveRootName(?string $type, ?int $id): ?string
-    {
-        if (!$type || !$id) {
-            return null;
-        }
-
-        return $this->resolveLabel($type, $id);
-    }
 }
-

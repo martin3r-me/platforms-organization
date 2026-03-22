@@ -10,7 +10,6 @@ use Platform\Core\Models\Team;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\ContextTypeRegistry;
 use Platform\Organization\Services\StoreTimeEntry;
-use Platform\Organization\Services\TimeContextResolver;
 
 class CreateTimeEntryTool implements ToolContract, ToolMetadataContract
 {
@@ -166,8 +165,6 @@ class CreateTimeEntryTool implements ToolContract, ToolMetadataContract
                     'user_id' => (int) ($arguments['user_id'] ?? $context->user->id),
                     'context_type' => null,
                     'context_id' => null,
-                    'root_context_type' => null,
-                    'root_context_id' => null,
                     'work_date' => $workDate,
                     'minutes' => (int) $minutes,
                     'rate_cents' => $rateCents,
@@ -189,8 +186,6 @@ class CreateTimeEntryTool implements ToolContract, ToolMetadataContract
                 'formatted' => OrganizationTimeEntry::formatMinutes($entry->minutes),
                 'context_type' => $entry->context_type,
                 'context_id' => $entry->context_id,
-                'root_context_type' => $entry->root_context_type,
-                'root_context_id' => $entry->root_context_id,
                 'note' => $entry->note,
                 'is_billed' => (bool) $entry->is_billed,
                 'message' => 'Zeiteintrag erfolgreich erstellt (' . OrganizationTimeEntry::formatMinutes($entry->minutes) . ').',

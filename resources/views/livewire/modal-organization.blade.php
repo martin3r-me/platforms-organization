@@ -103,9 +103,9 @@
                                     <tbody class="divide-y divide-[var(--ui-border)]/40 bg-[var(--ui-surface)]">
                                         @forelse($teamEntries ?? [] as $entry)
                                             @php
-                                                $primaryContext = $entry->additionalContexts->where('is_primary', true)->first();
-                                                $contextLabel = $primaryContext?->context_label ?? 'Unbekannt';
-                                                $contextType = $primaryContext ? class_basename($primaryContext->context_type) : '';
+                                                $resolver = app(\Platform\Organization\Services\TimeContextResolver::class);
+                                                $contextLabel = ($entry->context_type && $entry->context_id) ? ($resolver->resolveLabel($entry->context_type, $entry->context_id) ?? 'Unbekannt') : 'Freie Zeiterfassung';
+                                                $contextType = $entry->context_type ? class_basename($entry->context_type) : '';
                                             @endphp
                                             <tr class="hover:bg-[var(--ui-muted-5)]/50 transition-colors">
                                                 <td class="whitespace-nowrap py-5 pl-6 pr-3 text-sm">
@@ -883,9 +883,9 @@
                                         <tbody class="divide-y divide-[var(--ui-border)]/40 bg-[var(--ui-surface)]">
                                             @forelse($teamEntries ?? [] as $entry)
                                                 @php
-                                                    $primaryContext = $entry->additionalContexts->where('is_primary', true)->first();
-                                                    $contextLabel = $primaryContext?->context_label ?? 'Unbekannt';
-                                                    $contextType = $primaryContext ? class_basename($primaryContext->context_type) : '';
+                                                    $resolver = app(\Platform\Organization\Services\TimeContextResolver::class);
+                                                    $contextLabel = ($entry->context_type && $entry->context_id) ? ($resolver->resolveLabel($entry->context_type, $entry->context_id) ?? 'Unbekannt') : 'Freie Zeiterfassung';
+                                                    $contextType = $entry->context_type ? class_basename($entry->context_type) : '';
                                                 @endphp
                                                 <tr class="hover:bg-[var(--ui-muted-5)]/50 transition-colors">
                                                     <td class="whitespace-nowrap py-5 pl-6 pr-3 text-sm">

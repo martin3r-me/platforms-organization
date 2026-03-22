@@ -6,10 +6,10 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
-use Platform\Core\Models\Team;
 use Platform\Core\Tools\Concerns\HasStandardGetOperations;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\ContextTypeRegistry;
+use Platform\Organization\Services\EntityTimeResolver;
 use Platform\Organization\Services\TimeContextResolver;
 use Platform\Organization\Tools\Concerns\ResolvesTimeEntryTeamScope;
 
@@ -25,7 +25,7 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/time-entries - Listet Zeiteinträge mit flexiblen Filtern (Kontext, Zeitraum, User, Abrechnungsstatus). Unterstützt cross-team Abfragen: Im Parent-Team werden automatisch alle Child-Teams einbezogen (wie in der UI). Unterstützt filters/search/sort/limit/offset.';
+        return 'GET /organization/time-entries - Listet Zeiteinträge mit flexiblen Filtern (Kontext, Entity, Zeitraum, User, Abrechnungsstatus). Unterstützt cross-team Abfragen: Im Parent-Team werden automatisch alle Child-Teams einbezogen (wie in der UI). Unterstützt filters/search/sort/limit/offset.';
     }
 
     public function getSchema(): array
@@ -46,6 +46,14 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
                         'type' => 'integer',
                         'description' => 'Optional: Filter nach User-ID. Funktioniert auch cross-team.',
                     ],
+                    'entity_id' => [
+                        'type' => 'integer',
+                        'description' => 'Optional: Filter nach Organization Entity-ID. Sammelt automatisch alle zugehörigen Kontexte (Projekte, Tasks etc.) und gibt deren Zeiteinträge zurück.',
+                    ],
+                    'include_child_entities' => [
+                        'type' => 'boolean',
+                        'description' => 'Optional: Bei entity_id auch Child-Entities (Hierarchie) einbeziehen. Default: false.',
+                    ],
                     'context_type' => [
                         'type' => 'string',
                         'description' => 'Optional: Filter nach Kontext-Typ. Kurzformen: "project", "task", "ticket", "company" (oder vollqualifizierter Klassenname).',
@@ -54,15 +62,6 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
                     'context_id' => [
                         'type' => 'integer',
                         'description' => 'Optional: Filter nach Kontext-ID. Wird zusammen mit context_type verwendet.',
-                    ],
-                    'root_context_type' => [
-                        'type' => 'string',
-                        'description' => 'Optional: Filter nach Root-Kontext-Typ. Kurzformen: "project", "task", "ticket", "company" (oder vollqualifizierter Klassenname).',
-                        'enum' => ['project', 'task', 'ticket', 'company'],
-                    ],
-                    'root_context_id' => [
-                        'type' => 'integer',
-                        'description' => 'Optional: Filter nach Root-Kontext-ID.',
                     ],
                     'date_from' => [
                         'type' => 'string',
@@ -113,9 +112,22 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
                 $arguments['work_date_to'] = $arguments['date_to'];
             }
 
-            $query = OrganizationTimeEntry::query()
-                ->whereIn('team_id', $teamIds)
-                ->with(['user', 'team']);
+            // Entity-basierter Filter via EntityTimeResolver
+            if (isset($arguments['entity_id'])) {
+                $entity = \Platform\Organization\Models\OrganizationEntity::find((int) $arguments['entity_id']);
+                if (!$entity) {
+                    return ToolResult::error('NOT_FOUND', 'Organization Entity nicht gefunden.');
+                }
+                $resolver = app(EntityTimeResolver::class);
+                $includeChildren = (bool) ($arguments['include_child_entities'] ?? false);
+                $query = $resolver->buildTimeEntryQuery($entity, $includeChildren)
+                    ->whereIn('team_id', $teamIds)
+                    ->with(['user', 'team']);
+            } else {
+                $query = OrganizationTimeEntry::query()
+                    ->whereIn('team_id', $teamIds)
+                    ->with(['user', 'team']);
+            }
 
             // Soft-Delete Handling
             if (!empty($arguments['include_deleted'])) {
@@ -127,24 +139,16 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
                 $query->where('user_id', (int) $arguments['user_id']);
             }
 
-            // Kurzformen auflösen
+            // Kurzform auflösen
             $contextType = isset($arguments['context_type'])
                 ? (ContextTypeRegistry::resolve($arguments['context_type']) ?? $arguments['context_type'])
                 : null;
-            $rootContextType = isset($arguments['root_context_type'])
-                ? (ContextTypeRegistry::resolve($arguments['root_context_type']) ?? $arguments['root_context_type'])
-                : null;
 
-            // Kontext-Filter (direkt oder über Kaskade)
+            // Kontext-Filter (direkter Lookup)
             if ($contextType && isset($arguments['context_id'])) {
-                $query->forContext($contextType, (int) $arguments['context_id']);
+                $query->forContextKey($contextType, (int) $arguments['context_id']);
             } elseif ($contextType) {
                 $query->where('context_type', $contextType);
-            }
-
-            // Root-Kontext-Filter
-            if ($rootContextType && isset($arguments['root_context_id'])) {
-                $query->forRootContext($rootContextType, (int) $arguments['root_context_id']);
             }
 
             // Datum-Filter
@@ -168,17 +172,12 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
             $result = $this->applyStandardPaginationResult($query, $arguments);
             $entries = $result['data'];
 
-            $resolver = app(TimeContextResolver::class);
+            $labelResolver = app(TimeContextResolver::class);
 
-            $items = $entries->map(function (OrganizationTimeEntry $entry) use ($resolver) {
+            $items = $entries->map(function (OrganizationTimeEntry $entry) use ($labelResolver) {
                 $contextLabel = null;
                 if ($entry->context_type && $entry->context_id) {
-                    $contextLabel = $resolver->resolveLabel($entry->context_type, $entry->context_id);
-                }
-
-                $rootContextLabel = null;
-                if ($entry->root_context_type && $entry->root_context_id) {
-                    $rootContextLabel = $resolver->resolveRootName($entry->root_context_type, $entry->root_context_id);
+                    $contextLabel = $labelResolver->resolveLabel($entry->context_type, $entry->context_id);
                 }
 
                 return [
@@ -195,9 +194,6 @@ class ListTimeEntriesTool implements ToolContract, ToolMetadataContract
                     'context_type' => $entry->context_type,
                     'context_id' => $entry->context_id,
                     'context_label' => $contextLabel,
-                    'root_context_type' => $entry->root_context_type,
-                    'root_context_id' => $entry->root_context_id,
-                    'root_context_label' => $rootContextLabel,
                     'source_module' => $entry->source_module,
                     'note' => $entry->note,
                     'is_billed' => (bool) $entry->is_billed,

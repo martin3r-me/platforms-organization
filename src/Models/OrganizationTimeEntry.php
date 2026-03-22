@@ -4,8 +4,6 @@ namespace Platform\Organization\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
@@ -25,8 +23,6 @@ class OrganizationTimeEntry extends Model
         'user_id',
         'context_type',
         'context_id',
-        'root_context_type',
-        'root_context_id',
         'work_date',
         'minutes',
         'rate_cents',
@@ -57,7 +53,7 @@ class OrganizationTimeEntry extends Model
             $entry->uuid = $uuid;
 
             if (! $entry->team_id && Auth::user()?->currentTeamRelation) {
-                $entry->team_id = Auth::user()->currentTeamRelation->id; // Child-Team (nicht dynamisch)
+                $entry->team_id = Auth::user()->currentTeamRelation->id;
             }
         });
     }
@@ -77,55 +73,10 @@ class OrganizationTimeEntry extends Model
         return $this->morphTo();
     }
 
-    public function rootContext(): MorphTo
-    {
-        return $this->morphTo('rootContext', 'root_context_type', 'root_context_id');
-    }
-
-    public function additionalContexts(): HasMany
-    {
-        return $this->hasMany(OrganizationTimeEntryContext::class, 'time_entry_id');
-    }
-
     public function scopeForContextKey($query, string $type, int $id)
     {
         return $query->where('context_type', $type)
             ->where('context_id', $id);
-    }
-
-    /**
-     * Scope für Abfragen über Kontext-Kaskade.
-     * Findet alle Time-Entries, die über ihre Contexts zu einem bestimmten Kontext gehören.
-     * 
-     * @param \Illuminate\Database\Eloquent\Builder $query
-     * @param string $type Model-Klasse
-     * @param int $id Model-ID
-     * @return \Illuminate\Database\Eloquent\Builder
-     */
-    public function scopeForContext($query, string $type, int $id)
-    {
-        return $query->whereHas('additionalContexts', function ($q) use ($type, $id) {
-            $q->where('context_type', $type)
-              ->where('context_id', $id);
-        });
-    }
-
-    /**
-     * Scope: Alle Time-Entries mit gegebenem Root-Context.
-     * Berücksichtigt direkte root_context_* Felder und zusätzliche Kontexte mit is_root = true.
-     */
-    public function scopeForRootContext($query, string $type, int $id)
-    {
-        return $query->where(function ($q) use ($type, $id) {
-            $q->where(function ($rq) use ($type, $id) {
-                $rq->where('root_context_type', $type)
-                   ->where('root_context_id', $id);
-            })->orWhereHas('additionalContexts', function ($aq) use ($type, $id) {
-                $aq->where('is_root', true)
-                   ->where('context_type', $type)
-                   ->where('context_id', $id);
-            });
-        });
     }
 
     public function getHoursAttribute(): float
@@ -137,9 +88,6 @@ class OrganizationTimeEntry extends Model
      * Formatiert Minuten in ein lesbares Format.
      * Wenn weniger als 1 Tag: "2h 30min"
      * Wenn 1 Tag oder mehr: "1d 2h 30min"
-     * 
-     * @param int $minutes
-     * @return string
      */
     public static function formatMinutes(int $minutes): string
     {
@@ -153,15 +101,15 @@ class OrganizationTimeEntry extends Model
         $mins = $remainingMinutes % 60;
 
         $parts = [];
-        
+
         if ($days > 0) {
             $parts[] = $days . 'd';
         }
-        
+
         if ($hours > 0) {
             $parts[] = $hours . 'h';
         }
-        
+
         if ($mins > 0 || empty($parts)) {
             $parts[] = $mins . 'min';
         }
@@ -185,9 +133,6 @@ class OrganizationTimeEntry extends Model
 
     /**
      * Gibt das Quellmodul basierend auf dem context_type zurück.
-     * Extrahiert den Modul-Namen aus dem Namespace (z.B. "Platform\Planner\Models\PlannerTask" → "planner").
-     * 
-     * @return string|null
      */
     public function getSourceModuleAttribute(): ?string
     {
@@ -195,12 +140,9 @@ class OrganizationTimeEntry extends Model
             return null;
         }
 
-        // Extrahiere Modul-Name aus Namespace
-        // Format: Platform\{Module}\Models\{Model}
         if (preg_match('/Platform\\\\([^\\\\]+)\\\\/', $this->context_type, $matches)) {
             $moduleName = strtolower($matches[1]);
-            
-            // Bekannte Module-Mappings
+
             $moduleMappings = [
                 'planner' => 'planner',
                 'crm' => 'crm',
@@ -208,7 +150,7 @@ class OrganizationTimeEntry extends Model
                 'cms' => 'cms',
                 'core' => 'core',
             ];
-            
+
             return $moduleMappings[$moduleName] ?? $moduleName;
         }
 
@@ -217,25 +159,20 @@ class OrganizationTimeEntry extends Model
 
     /**
      * Gibt den anzeigbaren Modul-Titel zurück.
-     * 
-     * @return string|null
      */
     public function getSourceModuleTitleAttribute(): ?string
     {
         $moduleKey = $this->source_module;
-        
+
         if (!$moduleKey) {
             return null;
         }
 
-        // Versuche Modul-Titel aus der Registry zu holen
         $module = \Platform\Core\PlatformCore::getModule($moduleKey);
         if ($module && isset($module['title'])) {
             return $module['title'];
         }
 
-        // Fallback: Erster Buchstabe groß
         return ucfirst($moduleKey);
     }
 }
-

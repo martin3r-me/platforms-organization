@@ -10,7 +10,6 @@ use Platform\Core\Models\Team;
 use Platform\Core\Tools\Concerns\HasStandardizedWriteOperations;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\ContextTypeRegistry;
-use Platform\Organization\Services\TimeContextResolver;
 
 class UpdateTimeEntryTool implements ToolContract, ToolMetadataContract
 {
@@ -113,13 +112,11 @@ class UpdateTimeEntryTool implements ToolContract, ToolMetadataContract
             /** @var OrganizationTimeEntry $entry */
             $entry = $found['model'];
 
-            // Team-Zugehörigkeit prüfen
             if ((int) $entry->team_id !== (int) $teamId) {
                 return ToolResult::error('ACCESS_DENIED', 'Zeiteintrag gehört nicht zum angegebenen Team.');
             }
 
             $update = [];
-            $contextChanged = false;
 
             if (array_key_exists('work_date', $arguments)) {
                 $wd = trim((string) ($arguments['work_date'] ?? ''));
@@ -163,10 +160,7 @@ class UpdateTimeEntryTool implements ToolContract, ToolMetadataContract
                     // Kontext entfernen
                     $update['context_type'] = null;
                     $update['context_id'] = null;
-                    $update['root_context_type'] = null;
-                    $update['root_context_id'] = null;
                     $update['has_key_result'] = false;
-                    $contextChanged = true;
                 } else {
                     // Kurzform auflösen
                     $newContextType = ContextTypeRegistry::resolve($rawContextType);
@@ -185,7 +179,6 @@ class UpdateTimeEntryTool implements ToolContract, ToolMetadataContract
                     }
                     $update['context_type'] = $newContextType;
                     $update['context_id'] = (int) $newContextId;
-                    $contextChanged = true;
                 }
             }
 
@@ -202,63 +195,6 @@ class UpdateTimeEntryTool implements ToolContract, ToolMetadataContract
                 $entry->update($update);
             }
 
-            // Wenn Kontext geändert: alte Contexts löschen und neu aufbauen
-            if ($contextChanged && $entry->context_type && $entry->context_id) {
-                $entry->additionalContexts()->delete();
-                // Kontext-Kaskade neu aufbauen über StoreTimeEntry-Logik
-                $resolver = app(TimeContextResolver::class);
-                $ancestors = $resolver->resolveAncestors($entry->context_type, $entry->context_id);
-
-                $hasAncestors = !empty($ancestors);
-                $isPrimaryRoot = !$hasAncestors;
-
-                $primaryLabel = $resolver->resolveLabel($entry->context_type, $entry->context_id);
-                \Platform\Organization\Models\OrganizationTimeEntryContext::updateOrCreate(
-                    [
-                        'time_entry_id' => $entry->id,
-                        'context_type' => $entry->context_type,
-                        'context_id' => $entry->context_id,
-                    ],
-                    [
-                        'depth' => 0,
-                        'is_primary' => true,
-                        'is_root' => $isPrimaryRoot,
-                        'context_label' => $primaryLabel,
-                    ]
-                );
-
-                $firstRoot = null;
-                foreach ($ancestors as $depth => $ancestor) {
-                    $isRoot = $ancestor['is_root'] ?? false;
-                    if ($firstRoot === null && $isRoot) {
-                        $firstRoot = ['type' => $ancestor['type'], 'id' => $ancestor['id']];
-                    }
-                    \Platform\Organization\Models\OrganizationTimeEntryContext::updateOrCreate(
-                        [
-                            'time_entry_id' => $entry->id,
-                            'context_type' => $ancestor['type'],
-                            'context_id' => $ancestor['id'],
-                        ],
-                        [
-                            'depth' => $depth + 1,
-                            'is_primary' => false,
-                            'is_root' => $isRoot,
-                            'context_label' => $ancestor['label'] ?? $resolver->resolveLabel($ancestor['type'], $ancestor['id']),
-                        ]
-                    );
-                }
-
-                $rootType = $firstRoot ? $firstRoot['type'] : $entry->context_type;
-                $rootId = $firstRoot ? $firstRoot['id'] : $entry->context_id;
-                $entry->update([
-                    'root_context_type' => $rootType,
-                    'root_context_id' => $rootId,
-                ]);
-            } elseif ($contextChanged && !$entry->context_type) {
-                // Kontext wurde entfernt
-                $entry->additionalContexts()->delete();
-            }
-
             $entry->refresh();
 
             return ToolResult::success([
@@ -271,8 +207,6 @@ class UpdateTimeEntryTool implements ToolContract, ToolMetadataContract
                 'formatted' => OrganizationTimeEntry::formatMinutes($entry->minutes),
                 'context_type' => $entry->context_type,
                 'context_id' => $entry->context_id,
-                'root_context_type' => $entry->root_context_type,
-                'root_context_id' => $entry->root_context_id,
                 'note' => $entry->note,
                 'is_billed' => (bool) $entry->is_billed,
                 'rate_cents' => $entry->rate_cents,

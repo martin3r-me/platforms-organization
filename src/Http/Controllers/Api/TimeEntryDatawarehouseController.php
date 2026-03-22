@@ -60,8 +60,6 @@ class TimeEntryDatawarehouseController extends ApiController
                 'user_email' => $entry->user?->email, // User-Email mitliefern
                 'context_type' => $entry->context_type,
                 'context_id' => $entry->context_id,
-                'root_context_type' => $entry->root_context_type,
-                'root_context_id' => $entry->root_context_id,
                 'work_date' => $entry->work_date->format('Y-m-d'),
                 'minutes' => $entry->minutes,
                 'hours' => $entry->hours, // Berechnetes Attribut
@@ -154,13 +152,6 @@ class TimeEntryDatawarehouseController extends ApiController
         if ($request->has('context_id')) {
             $query->where('context_id', $request->context_id);
         }
-        if ($request->has('root_context_type')) {
-            $query->where('root_context_type', $request->root_context_type);
-        }
-        if ($request->has('root_context_id')) {
-            $query->where('root_context_id', $request->root_context_id);
-        }
-
         // Datums-Filter
         if ($request->has('work_date')) {
             $query->whereDate('work_date', $request->work_date);
@@ -291,8 +282,6 @@ class TimeEntryDatawarehouseController extends ApiController
                 'user_email' => $example->user?->email,
                 'context_type' => $example->context_type,
                 'context_id' => $example->context_id,
-                'root_context_type' => $example->root_context_type,
-                'root_context_id' => $example->root_context_id,
                 'work_date' => $example->work_date->format('Y-m-d'),
                 'minutes' => $example->minutes,
                 'hours' => $example->hours,

@@ -3,23 +3,38 @@
 namespace Platform\Organization\Services;
 
 use Illuminate\Database\Eloquent\Builder;
-use Platform\Organization\Models\OrganizationContext;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Models\OrganizationTimePlanned;
 
 class EntityTimeResolver
 {
     /**
+     * Cascade-Registry: Welche linkable_types haben zeitrelevante Kinder?
+     *
+     * Format: morph_alias => [FQCN, [child-relation-paths]]
+     * Nur Typen mit Zeiterfassung. Canvas, BMC, Notes, Slides etc. sind nicht enthalten.
+     */
+    public static function getTimeTrackableCascades(): array
+    {
+        return [
+            'project' => [\Platform\Planner\Models\PlannerProject::class, ['tasks', 'projectSlots.tasks']],
+            'planner_task' => [\Platform\Planner\Models\PlannerTask::class, []],
+            'helpdesk_ticket' => [\Platform\Helpdesk\Models\HelpdeskTicket::class, []],
+        ];
+    }
+
+    /**
      * Sammelt alle (context_type, context_id[]) Paare für eine Entity.
      *
      * Algorithmus:
-     * Entity → OrganizationContexts (aktive) → contextable Model
-     *   → direkt: (contextable_type, contextable_id)
-     *   → include_children_relations folgen → Kind-Models sammeln
+     * Entity → EntityLinks → linkable Model (FQCN)
+     *   → direkt: (FQCN, linkable_id)
+     *   → Cascade-Registry: Child-Relations folgen → Kind-Models sammeln
      * Optional: Child-Entities rekursiv (parent_entity_id Hierarchie)
      *
-     * @return array<string, int[]> Gruppiert nach context_type
+     * @return array<string, int[]> Gruppiert nach context_type (FQCN)
      */
     public function resolveContextPairs(OrganizationEntity $entity, bool $includeChildEntities = false): array
     {
@@ -55,36 +70,37 @@ class EntityTimeResolver
     }
 
     /**
-     * Sammelt Context-Paare für eine einzelne Entity (ohne Children).
+     * Sammelt Context-Paare für eine einzelne Entity (ohne Children) über EntityLinks.
      */
     protected function collectPairsForEntity(OrganizationEntity $entity, array &$pairs): void
     {
-        $contexts = OrganizationContext::query()
-            ->where('organization_entity_id', $entity->id)
-            ->where('is_active', true)
+        $cascades = static::getTimeTrackableCascades();
+
+        $links = OrganizationEntityLink::query()
+            ->where('entity_id', $entity->id)
             ->get();
 
-        foreach ($contexts as $context) {
-            $type = $context->contextable_type;
-            $id = $context->contextable_id;
+        foreach ($links as $link) {
+            $morphAlias = $link->linkable_type;
 
-            if (! $type || ! $id) {
+            if (! isset($cascades[$morphAlias])) {
                 continue;
             }
 
-            // Das contextable Model selbst als Context-Paar
-            $pairs[$type][] = $id;
+            [$fqcn, $childRelations] = $cascades[$morphAlias];
 
-            // include_children_relations folgen
-            $childRelations = $context->include_children_relations ?? [];
+            // Das linkable Model selbst als Context-Paar
+            $pairs[$fqcn][] = $link->linkable_id;
+
+            // Child-Relations folgen
             if (! empty($childRelations)) {
-                $this->collectChildRelationPairs($type, $id, $childRelations, $pairs);
+                $this->collectChildRelationPairs($fqcn, $link->linkable_id, $childRelations, $pairs);
             }
         }
     }
 
     /**
-     * Folgt include_children_relations und sammelt Kind-Model Context-Paare.
+     * Folgt Child-Relations und sammelt Kind-Model Context-Paare.
      *
      * Unterstützt verschachtelte Relationen wie "tasks", "projectSlots.tasks"
      */

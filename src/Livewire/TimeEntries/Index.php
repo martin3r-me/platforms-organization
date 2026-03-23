@@ -4,8 +4,9 @@ namespace Platform\Organization\Livewire\TimeEntries;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
-use Platform\Organization\Models\OrganizationContext;
+use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationTimeEntry;
+use Platform\Organization\Services\EntityTimeResolver;
 use Platform\Core\Models\Team;
 use Illuminate\Support\Facades\Auth;
 
@@ -116,7 +117,7 @@ class Index extends Component
 
     /**
      * Baut eine Reverse-Map: "context_type:context_id" → Entity
-     * für alle geladenen Entries.
+     * für alle geladenen Entries, basierend auf EntityLinks + Cascade-Registry.
      */
     #[Computed]
     public function contextToEntityMap()
@@ -126,27 +127,39 @@ class Index extends Component
             return collect();
         }
 
-        // Alle OrganizationContexts laden (aktive)
-        $contexts = OrganizationContext::query()
-            ->where('is_active', true)
-            ->with('organizationEntity.type')
+        $cascades = EntityTimeResolver::getTimeTrackableCascades();
+
+        // Alle EntityLinks laden mit Entity-Relation
+        $links = OrganizationEntityLink::query()
+            ->whereIn('linkable_type', array_keys($cascades))
+            ->with('entity.type')
             ->get();
 
         $map = [];
 
-        foreach ($contexts as $ctx) {
-            // Direkte contextable Zuordnung
-            $key = $ctx->contextable_type . ':' . $ctx->contextable_id;
-            if ($ctx->organizationEntity) {
-                $map[$key] = $ctx->organizationEntity;
+        foreach ($links as $link) {
+            $morphAlias = $link->linkable_type;
+
+            if (!isset($cascades[$morphAlias])) {
+                continue;
             }
 
-            // Children-Relations berücksichtigen
-            if (!empty($ctx->include_children_relations) && $ctx->contextable_type && $ctx->contextable_id && class_exists($ctx->contextable_type)) {
-                $model = $ctx->contextable_type::find($ctx->contextable_id);
-                if ($model && $ctx->organizationEntity) {
-                    foreach ($ctx->include_children_relations as $relationPath) {
-                        $this->resolveRelationPathForMapping($model, $relationPath, $ctx->organizationEntity, $map);
+            $entity = $link->entity;
+            if (!$entity) {
+                continue;
+            }
+
+            [$fqcn, $childRelations] = $cascades[$morphAlias];
+
+            // Direkte Zuordnung: FQCN:ID → Entity
+            $map[$fqcn . ':' . $link->linkable_id] = $entity;
+
+            // Child-Relations traversieren
+            if (!empty($childRelations) && class_exists($fqcn)) {
+                $model = $fqcn::find($link->linkable_id);
+                if ($model) {
+                    foreach ($childRelations as $relationPath) {
+                        $this->resolveRelationPathForMapping($model, $relationPath, $entity, $map);
                     }
                 }
             }

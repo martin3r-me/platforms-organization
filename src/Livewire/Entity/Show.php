@@ -16,6 +16,7 @@ use Platform\Core\Models\Team;
 use Platform\Core\Enums\TeamRole;
 use Platform\Organization\Services\EntityTimeResolver;
 use Illuminate\Support\Facades\DB;
+use Carbon\Carbon;
 
 class Show extends Component
 {
@@ -268,6 +269,61 @@ class Show extends Component
     {
         $resolver = new EntityTimeResolver();
         return $this->getTimeSummaryForEntity($this->entity, $resolver, includeChildren: true);
+    }
+
+    #[Computed]
+    public function monthlyTimeData(): array
+    {
+        try {
+            $resolver = new EntityTimeResolver();
+            $query = $resolver->buildTimeEntryQuery($this->entity, includeChildEntities: true);
+
+            $dbRows = $query
+                ->selectRaw("DATE_FORMAT(work_date, '%Y-%m') as month")
+                ->selectRaw('COALESCE(SUM(minutes), 0) as total_minutes')
+                ->selectRaw('COALESCE(SUM(CASE WHEN is_billed = 1 THEN minutes ELSE 0 END), 0) as billed_minutes')
+                ->groupByRaw("DATE_FORMAT(work_date, '%Y-%m')")
+                ->get()
+                ->keyBy('month');
+
+            $months = [];
+            $maxMinutes = 0;
+            $now = Carbon::now();
+            $germanMonths = ['Jan', 'Feb', 'Mär', 'Apr', 'Mai', 'Jun', 'Jul', 'Aug', 'Sep', 'Okt', 'Nov', 'Dez'];
+
+            for ($i = 11; $i >= 0; $i--) {
+                $date = $now->copy()->subMonths($i);
+                $key = $date->format('Y-m');
+                $row = $dbRows[$key] ?? null;
+
+                $totalMin = (int) ($row?->total_minutes ?? 0);
+                $billedMin = (int) ($row?->billed_minutes ?? 0);
+                $openMin = $totalMin - $billedMin;
+
+                if ($totalMin > $maxMinutes) {
+                    $maxMinutes = $totalMin;
+                }
+
+                $months[] = [
+                    'month' => $key,
+                    'label' => $germanMonths[$date->month - 1],
+                    'year' => $date->format('Y'),
+                    'total_minutes' => $totalMin,
+                    'billed_minutes' => $billedMin,
+                    'open_minutes' => $openMin,
+                ];
+            }
+
+            return [
+                'months' => $months,
+                'max_minutes' => $maxMinutes,
+            ];
+        } catch (\Exception $e) {
+            return [
+                'months' => [],
+                'max_minutes' => 0,
+            ];
+        }
     }
 
     #[Computed]

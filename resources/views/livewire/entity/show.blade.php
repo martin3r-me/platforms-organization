@@ -168,6 +168,82 @@
                         <div class="text-xs text-[var(--ui-muted)] mt-1">Offene Stunden</div>
                     </div>
                 </div>
+
+                {{-- Monthly Time Chart --}}
+                @php
+                    $monthlyData = $this->monthlyTimeData;
+                    $chartMonths = $monthlyData['months'] ?? [];
+                    $maxMin = $monthlyData['max_minutes'] ?? 0;
+                @endphp
+                @if($maxMin > 0)
+                    <div class="mt-6 pt-6 border-t border-[var(--ui-border)]/40"
+                         x-data="{ tooltip: null }">
+                        {{-- Header with legend --}}
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-xs font-medium text-[var(--ui-muted)]">Zeitverlauf (12 Monate)</span>
+                            <div class="flex items-center gap-3">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
+                                    <span class="text-[10px] text-[var(--ui-muted)]">abgerechnet</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-amber-400"></span>
+                                    <span class="text-[10px] text-[var(--ui-muted)]">offen</span>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Bars --}}
+                        <div class="flex items-end gap-1.5" style="height: 136px;">
+                            @foreach($chartMonths as $idx => $m)
+                                <div class="flex-1 flex flex-col items-center h-full relative"
+                                     @mouseenter="tooltip = {{ $idx }}"
+                                     @mouseleave="tooltip = null">
+                                    {{-- Tooltip --}}
+                                    <div x-show="tooltip === {{ $idx }}" x-cloak
+                                         class="absolute bottom-full mb-2 px-2.5 py-1.5 rounded-lg bg-[var(--ui-secondary)] text-white text-[10px] whitespace-nowrap z-10 shadow-lg pointer-events-none"
+                                         x-transition.opacity>
+                                        {{ $m['label'] }} {{ $m['year'] }}:
+                                        {{ intdiv($m['total_minutes'], 60) }}:{{ str_pad($m['total_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h
+                                        ({{ intdiv($m['billed_minutes'], 60) }}:{{ str_pad($m['billed_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h abgerechnet,
+                                        {{ intdiv($m['open_minutes'], 60) }}:{{ str_pad($m['open_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h offen)
+                                    </div>
+
+                                    {{-- Bar stack --}}
+                                    <div class="w-full flex flex-col justify-end flex-1 rounded-t overflow-hidden">
+                                        @if($m['total_minutes'] > 0)
+                                            @php
+                                                $barHeight = round(($m['total_minutes'] / $maxMin) * 120);
+                                                $billedHeight = $m['billed_minutes'] > 0 ? max(2, round(($m['billed_minutes'] / $maxMin) * 120)) : 0;
+                                                $openHeight = $m['open_minutes'] > 0 ? max(2, $barHeight - $billedHeight) : 0;
+                                                if ($billedHeight + $openHeight > $barHeight && $barHeight > 4) {
+                                                    // Adjust if min-heights pushed total over
+                                                    $billedHeight = $barHeight - $openHeight;
+                                                }
+                                            @endphp
+                                            <div class="w-full flex flex-col justify-end mt-auto">
+                                                @if($m['open_minutes'] > 0)
+                                                    <div class="w-full bg-amber-400 rounded-t" style="height: {{ $openHeight }}px;"></div>
+                                                @endif
+                                                @if($m['billed_minutes'] > 0)
+                                                    <div class="w-full bg-green-500 {{ $m['open_minutes'] <= 0 ? 'rounded-t' : '' }}" style="height: {{ $billedHeight }}px;"></div>
+                                                @endif
+                                            </div>
+                                        @else
+                                            {{-- Empty month: thin track --}}
+                                            <div class="w-full mt-auto">
+                                                <div class="w-full bg-[var(--ui-border)]/20 rounded-t" style="height: 1px;"></div>
+                                            </div>
+                                        @endif
+                                    </div>
+
+                                    {{-- Month label --}}
+                                    <div class="text-[10px] text-[var(--ui-muted)] mt-1 leading-none">{{ $m['label'] }}</div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
             </div>
 
             {{-- Tab Navigation --}}

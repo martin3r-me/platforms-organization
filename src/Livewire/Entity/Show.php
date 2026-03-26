@@ -439,7 +439,7 @@ class Show extends Component
             'total_links' => $totalLinks,
             'own_time' => $ownTime,
             'cascaded_time' => $cascadedTime,
-            'own_links' => $ownLinks,
+            'own_links_grouped' => $ownLinks,
         ];
     }
 
@@ -525,8 +525,9 @@ class Show extends Component
     }
 
     /**
-     * Resolve entity links for given entity IDs into flat arrays with pre-generated URLs.
-     * Returns: [entity_id => [{id, type, name, status, icon, label, url}, ...]]
+     * Resolve entity links for given entity IDs into grouped arrays.
+     * Returns: [entity_id => [{type, label, icon, items: [{id, name, status, url}, ...]}, ...]]
+     * Groups are sorted by label.
      */
     protected function getEntityLinksForIds(array $entityIds): array
     {
@@ -547,7 +548,8 @@ class Show extends Component
 
         $resolvable->load('linkable');
 
-        $result = [];
+        // First collect flat links per entity, grouped by type
+        $byEntityAndType = [];
         foreach ($resolvable as $link) {
             if (!$link->linkable) {
                 continue;
@@ -569,16 +571,25 @@ class Show extends Component
             }
 
             $linkable = $link->linkable;
+            $type = $link->linkable_type;
 
-            $result[$link->entity_id][] = [
+            $byEntityAndType[$link->entity_id][$type]['items'][] = [
                 'id' => $link->id,
-                'type' => $link->linkable_type,
                 'name' => $linkable->name ?? $linkable->title ?? '—',
                 'status' => $linkable->status ?? null,
-                'icon' => $config['icon'],
-                'label' => $config['label'],
                 'url' => $url,
             ];
+            $byEntityAndType[$link->entity_id][$type]['label'] = $config['label'];
+            $byEntityAndType[$link->entity_id][$type]['icon'] = $config['icon'];
+            $byEntityAndType[$link->entity_id][$type]['type'] = $type;
+        }
+
+        // Convert to sorted array of groups per entity
+        $result = [];
+        foreach ($byEntityAndType as $entityId => $types) {
+            $groups = array_values($types);
+            usort($groups, fn($a, $b) => strcmp($a['label'], $b['label']));
+            $result[$entityId] = $groups;
         }
 
         return $result;

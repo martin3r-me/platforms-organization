@@ -287,39 +287,133 @@
                 <div x-show="tab === 'hierarchy'" x-cloak x-data="{ linkConfig: {{ Js::from(collect($this->linkTypeConfig)->map(fn($c) => ['label' => $c['label'], 'icon' => $c['icon']])) }} }">
                     <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                         @if(count($this->rootEntityLinks) > 0 || count($this->treeNodes) > 0)
-                            <div class="space-y-1">
-                                {{-- Root Entity Links (leaf nodes) --}}
-                                @foreach($this->rootEntityLinks as $link)
-                                    <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">
-                                        <div class="flex items-center gap-2">
-                                            <div class="w-5 h-5 flex-shrink-0"></div>
-                                            @svg('heroicon-o-' . $link['icon'], 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
-                                            @if($link['url'])
-                                                <a href="{{ $link['url'] }}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate">
-                                                    {{ $link['name'] }}
-                                                </a>
-                                            @else
-                                                <span class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $link['name'] }}</span>
-                                            @endif
-                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] flex-shrink-0">
-                                                {{ $link['label'] }}
-                                            </span>
-                                            @if($link['status'])
-                                                <x-ui-badge variant="secondary" size="xs">{{ $link['status'] }}</x-ui-badge>
-                                            @endif
-                                            @if($link['url'])
-                                                <div class="ml-auto flex-shrink-0">
-                                                    @svg('heroicon-o-arrow-top-right-on-square', 'w-3.5 h-3.5 text-[var(--ui-muted)]')
-                                                </div>
-                                            @endif
-                                        </div>
-                                    </div>
-                                @endforeach
+                            @php
+                                $rootCascaded = $this->cascadedTimeSummary;
+                                $rootTotalMin = $rootCascaded['total_minutes'];
+                                $rootBilledMin = $rootCascaded['billed_minutes'];
+                                $rootOpenMin = $rootTotalMin - $rootBilledMin;
+                                $rootHours = intdiv($rootTotalMin, 60);
+                                $rootMins = $rootTotalMin % 60;
+                                $rootOpenH = intdiv(abs($rootOpenMin), 60);
+                                $rootOpenM = abs($rootOpenMin) % 60;
+                                $rootTypeIcon = null;
+                                if ($entity->type->icon) {
+                                    $icon = str_replace('heroicons.', '', $entity->type->icon);
+                                    $iconMap = ['user-check' => 'user', 'folder-kanban' => 'folder', 'briefcase-globe' => 'briefcase', 'server-cog' => 'server', 'package-check' => 'archive-box', 'badge-check' => 'check-badge'];
+                                    $rootTypeIcon = $iconMap[$icon] ?? $icon;
+                                }
+                            @endphp
 
-                                {{-- Child Entities (expandable tree nodes) --}}
-                                @foreach($this->treeNodes as $node)
-                                    @include('organization::livewire.entity.partials.tree-node', ['node' => $node, 'depth' => 0])
-                                @endforeach
+                            <div x-data="{ rootExpanded: true }" class="space-y-1">
+                                {{-- Root Entity Node --}}
+                                <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">
+                                    <div class="flex items-center gap-2 cursor-pointer" @click="rootExpanded = !rootExpanded">
+                                        {{-- Chevron --}}
+                                        <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                                                class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200"
+                                                :class="{ 'rotate-90': rootExpanded }">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                                            </svg>
+                                        </div>
+
+                                        {{-- Type Icon --}}
+                                        @if($rootTypeIcon)
+                                            @svg('heroicon-o-' . $rootTypeIcon, 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
+                                        @endif
+
+                                        {{-- Name --}}
+                                        <span class="text-sm font-semibold text-[var(--ui-secondary)] truncate">{{ $entity->name }}</span>
+
+                                        {{-- Code --}}
+                                        @if($entity->code)
+                                            <span class="text-xs text-[var(--ui-muted)] font-mono flex-shrink-0">{{ $entity->code }}</span>
+                                        @endif
+
+                                        {{-- Type Badge --}}
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] flex-shrink-0">
+                                            {{ $entity->type->name }}
+                                        </span>
+
+                                        {{-- Time Summary --}}
+                                        @if($rootTotalMin > 0)
+                                            <div class="flex items-center gap-2 ml-auto flex-shrink-0">
+                                                <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ui-secondary)]">
+                                                    @if($rootOpenMin > 0)
+                                                        <span class="w-2 h-2 rounded-full flex-shrink-0 bg-amber-400"></span>
+                                                    @else
+                                                        <span class="w-2 h-2 rounded-full flex-shrink-0 bg-green-500"></span>
+                                                    @endif
+                                                    {{ $rootHours }}:{{ str_pad($rootMins, 2, '0', STR_PAD_LEFT) }}h
+                                                </span>
+                                                @if($rootOpenMin > 0)
+                                                    <span class="text-[10px] text-amber-600 font-medium">
+                                                        {{ $rootOpenH }}:{{ str_pad($rootOpenM, 2, '0', STR_PAD_LEFT) }}h offen
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+
+                                {{-- Root Expanded Content --}}
+                                <div x-show="rootExpanded" x-collapse>
+                                    {{-- Root Typ-Gruppen (grouped links) --}}
+                                    @foreach($this->rootEntityLinks as $group)
+                                        <div x-data="{ groupOpen: false }" class="ml-6 border-l-2 border-[var(--ui-border)]/20">
+                                            {{-- Group Header --}}
+                                            <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3 cursor-pointer"
+                                                @click="groupOpen = !groupOpen">
+                                                <div class="flex items-center gap-2">
+                                                    <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                                                            class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200"
+                                                            :class="{ 'rotate-90': groupOpen }">
+                                                            <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                                                        </svg>
+                                                    </div>
+                                                    @svg('heroicon-o-' . $group['icon'], 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
+                                                    <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $group['label'] }}</span>
+                                                    <span class="text-xs text-[var(--ui-muted)]">({{ count($group['items']) }})</span>
+                                                </div>
+                                            </div>
+
+                                            {{-- Group Items (Link Leaves) --}}
+                                            <div x-show="groupOpen" x-collapse x-cloak>
+                                                @foreach($group['items'] as $link)
+                                                    <div class="ml-6 border-l-2 border-[var(--ui-border)]/20">
+                                                        <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">
+                                                            <div class="flex items-center gap-2">
+                                                                <div class="w-5 h-5 flex-shrink-0"></div>
+                                                                @svg('heroicon-o-' . $group['icon'], 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
+                                                                @if($link['url'])
+                                                                    <a href="{{ $link['url'] }}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate" @click.stop>
+                                                                        {{ $link['name'] }}
+                                                                    </a>
+                                                                @else
+                                                                    <span class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $link['name'] }}</span>
+                                                                @endif
+                                                                @if($link['status'])
+                                                                    <x-ui-badge variant="secondary" size="xs">{{ $link['status'] }}</x-ui-badge>
+                                                                @endif
+                                                                @if($link['url'])
+                                                                    <div class="ml-auto flex-shrink-0">
+                                                                        @svg('heroicon-o-arrow-top-right-on-square', 'w-3.5 h-3.5 text-[var(--ui-muted)]')
+                                                                    </div>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endforeach
+
+                                    {{-- Child Entities (expandable tree nodes) --}}
+                                    @foreach($this->treeNodes as $node)
+                                        @include('organization::livewire.entity.partials.tree-node', ['node' => $node, 'depth' => 1])
+                                    @endforeach
+                                </div>
                             </div>
                         @else
                             <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">

@@ -243,6 +243,16 @@ class Show extends Component
     }
 
     #[Computed]
+    public function linkTypeIconSvgs(): array
+    {
+        $svgs = [];
+        foreach ($this->linkTypeConfig as $type => $config) {
+            $svgs[$type] = svg('heroicon-o-' . $config['icon'], 'w-4 h-4 text-[var(--ui-muted)]')->toHtml();
+        }
+        return $svgs;
+    }
+
+    #[Computed]
     public function treeNodes(): array
     {
         $children = $this->entity->children()
@@ -357,38 +367,51 @@ class Show extends Component
     protected function buildNodesForEntities($entities): array
     {
         $entityIds = $entities->pluck('id')->toArray();
-        $ownLinkCounts = $this->getEntityLinkCountsForIds($entityIds);
+
+        // 1. Single CTE for all descendants
+        $descendantMap = $this->getAllDescendantMap($entityIds);
+
+        // 2. Collect ALL IDs (entities + all descendants) for batch queries
+        $allIds = $entityIds;
+        foreach ($descendantMap as $descIds) {
+            $allIds = array_merge($allIds, $descIds);
+        }
+        $allIds = array_values(array_unique($allIds));
+
+        // 3. Batch link counts for all IDs in one query
+        $allLinkCounts = $this->getEntityLinkCountsForIds($allIds);
+
+        // 4. Resolved links for the entities themselves (not descendants)
         $ownLinksResolved = $this->getEntityLinksForIds($entityIds);
+
+        // 5. Children counts
         $childrenCounts = $this->getChildrenCountsForIds($entityIds);
 
+        // 6. Batch time summaries via EntityTimeResolver
         $resolver = new EntityTimeResolver();
+        $cascadedPairs = $resolver->resolveContextPairsBatch($entityIds, $descendantMap);
+        $ownPairs = $resolver->resolveContextPairsBatch($entityIds, []); // no descendants
+        $cascadedTimeSummaries = $resolver->batchTimeSummaries($cascadedPairs);
+        $ownTimeSummaries = $resolver->batchTimeSummaries($ownPairs);
+
         $nodes = [];
-
         foreach ($entities as $entity) {
-            $descendantIds = $this->getDescendantEntityIds($entity->id);
-            $hasDescendants = !empty($descendantIds);
+            $descendantIds = $descendantMap[$entity->id] ?? [];
 
-            // Cascaded link counts: own + all descendants
-            $cascadedLinkCounts = $ownLinkCounts[$entity->id] ?? [];
-            if ($hasDescendants) {
-                $descLinkCounts = $this->getEntityLinkCountsForIds($descendantIds);
-                foreach ($descLinkCounts as $descEntityId => $typeCounts) {
-                    foreach ($typeCounts as $type => $count) {
-                        $cascadedLinkCounts[$type] = ($cascadedLinkCounts[$type] ?? 0) + $count;
-                    }
+            // Cascaded link counts: own + all descendants (from pre-fetched data)
+            $cascadedLinkCounts = $allLinkCounts[$entity->id] ?? [];
+            foreach ($descendantIds as $descId) {
+                foreach ($allLinkCounts[$descId] ?? [] as $type => $count) {
+                    $cascadedLinkCounts[$type] = ($cascadedLinkCounts[$type] ?? 0) + $count;
                 }
             }
 
-            // Cascaded time: own + all descendants via EntityTimeResolver
-            $cascadedTime = $this->getTimeSummaryForEntity($entity, $resolver, includeChildren: true);
-            $ownTime = $this->getTimeSummaryForEntity($entity, $resolver, includeChildren: false);
-
             $nodes[] = $this->buildNodeData(
                 $entity,
-                ownLinkCounts: $ownLinkCounts[$entity->id] ?? [],
+                ownLinkCounts: $allLinkCounts[$entity->id] ?? [],
                 cascadedLinkCounts: $cascadedLinkCounts,
-                ownTime: $ownTime,
-                cascadedTime: $cascadedTime,
+                ownTime: $ownTimeSummaries[$entity->id] ?? ['total_minutes' => 0, 'billed_minutes' => 0],
+                cascadedTime: $cascadedTimeSummaries[$entity->id] ?? ['total_minutes' => 0, 'billed_minutes' => 0],
                 childrenCount: $childrenCounts[$entity->id] ?? 0,
                 descendantCount: count($descendantIds),
                 ownLinks: $ownLinksResolved[$entity->id] ?? [],
@@ -424,12 +447,22 @@ class Show extends Component
 
         $totalLinks = array_sum($cascadedLinkCounts);
 
+        $typeIconSvg = null;
+        if ($iconName) {
+            try {
+                $typeIconSvg = svg('heroicon-o-' . $iconName, 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')->toHtml();
+            } catch (\Exception $e) {
+                $typeIconSvg = null;
+            }
+        }
+
         return [
             'id' => $entity->id,
             'name' => $entity->name,
             'code' => $entity->code,
             'type_name' => $entity->type->name,
             'type_icon' => $iconName,
+            'type_icon_svg' => $typeIconSvg,
             'is_active' => $entity->is_active,
             'children_count' => $childrenCount,
             'descendant_count' => $descendantCount,
@@ -448,24 +481,38 @@ class Show extends Component
      */
     protected function getDescendantEntityIds(int $entityId): array
     {
-        $allIds = [];
-        $currentIds = [$entityId];
+        return $this->getAllDescendantMap([$entityId])[$entityId] ?? [];
+    }
 
-        while (!empty($currentIds)) {
-            $childIds = OrganizationEntity::query()
-                ->whereIn('parent_entity_id', $currentIds)
-                ->pluck('id')
-                ->toArray();
-
-            if (empty($childIds)) {
-                break;
-            }
-
-            $allIds = array_merge($allIds, $childIds);
-            $currentIds = $childIds;
+    /**
+     * Batch-collect descendant entity IDs for multiple roots using a single recursive CTE.
+     * Returns: [rootId => [descendantId, ...]]
+     */
+    protected function getAllDescendantMap(array $rootIds): array
+    {
+        if (empty($rootIds)) {
+            return [];
         }
 
-        return $allIds;
+        $placeholders = implode(',', array_fill(0, count($rootIds), '?'));
+        $rows = DB::select("
+            WITH RECURSIVE entity_tree AS (
+                SELECT id, parent_entity_id, parent_entity_id as root_id
+                FROM organization_entities
+                WHERE parent_entity_id IN ({$placeholders})
+                UNION ALL
+                SELECT e.id, e.parent_entity_id, et.root_id
+                FROM organization_entities e
+                INNER JOIN entity_tree et ON e.parent_entity_id = et.id
+            )
+            SELECT root_id, id FROM entity_tree
+        ", $rootIds);
+
+        $result = array_fill_keys($rootIds, []);
+        foreach ($rows as $row) {
+            $result[$row->root_id][] = $row->id;
+        }
+        return $result;
     }
 
     protected function getEntityLinkCountsForIds(array $entityIds): array
@@ -537,8 +584,7 @@ class Show extends Component
 
         $morphMap = Relation::morphMap();
 
-        $links = OrganizationEntityLink::whereIn('entity_id', $entityIds)
-            ->get();
+        $links = OrganizationEntityLink::whereIn('entity_id', $entityIds)->get();
 
         // Filter to resolvable morph types
         $resolvable = $links->filter(function ($link) use ($morphMap) {
@@ -546,17 +592,44 @@ class Show extends Component
             return isset($morphMap[$type]) || class_exists($type);
         });
 
-        $resolvable->load('linkable');
+        // Group by linkable_type for batch loading with eager relations
+        $linksByType = $resolvable->groupBy('linkable_type');
+        $modelsById = [];
 
-        // First collect flat links per entity, grouped by type
+        foreach ($linksByType as $morphAlias => $typeLinks) {
+            $fqcn = $morphMap[$morphAlias] ?? $morphAlias;
+            if (!class_exists($fqcn)) {
+                continue;
+            }
+            $ids = $typeLinks->pluck('linkable_id')->unique()->toArray();
+            $query = $fqcn::whereIn('id', $ids);
+
+            // Eager load counts per type
+            if ($morphAlias === 'project') {
+                $query->withCount([
+                    'tasks',
+                    'tasks as done_tasks_count' => fn($q) => $q->where('is_done', true),
+                ]);
+            }
+
+            $models = $query->get()->keyBy('id');
+            foreach ($models as $id => $model) {
+                $modelsById[$morphAlias . ':' . $id] = $model;
+            }
+        }
+
+        // Build grouped links per entity
         $byEntityAndType = [];
         foreach ($resolvable as $link) {
-            if (!$link->linkable) {
+            $type = $link->linkable_type;
+            $modelKey = $type . ':' . $link->linkable_id;
+            $linkable = $modelsById[$modelKey] ?? null;
+            if (!$linkable) {
                 continue;
             }
 
-            $config = $this->linkTypeConfig[$link->linkable_type] ?? [
-                'label' => $link->linkable_type,
+            $config = $this->linkTypeConfig[$type] ?? [
+                'label' => $type,
                 'icon' => 'link',
                 'route' => null,
             ];
@@ -564,21 +637,20 @@ class Show extends Component
             $url = null;
             if ($config['route']) {
                 try {
-                    $url = route($config['route'], $link->linkable);
+                    $url = route($config['route'], $linkable);
                 } catch (\Exception $e) {
                     $url = null;
                 }
             }
 
-            $linkable = $link->linkable;
-            $type = $link->linkable_type;
+            $metadata = $this->extractLinkMetadata($type, $linkable);
 
-            $byEntityAndType[$link->entity_id][$type]['items'][] = [
+            $byEntityAndType[$link->entity_id][$type]['items'][] = array_merge([
                 'id' => $link->id,
                 'name' => $linkable->name ?? $linkable->title ?? '—',
                 'status' => $linkable->status ?? null,
                 'url' => $url,
-            ];
+            ], $metadata);
             $byEntityAndType[$link->entity_id][$type]['label'] = $config['label'];
             $byEntityAndType[$link->entity_id][$type]['icon'] = $config['icon'];
             $byEntityAndType[$link->entity_id][$type]['type'] = $type;
@@ -590,6 +662,57 @@ class Show extends Component
             $groups = array_values($types);
             usort($groups, fn($a, $b) => strcmp($a['label'], $b['label']));
             $result[$entityId] = $groups;
+        }
+
+        return $result;
+    }
+
+    protected function extractLinkMetadata(string $type, $linkable): array
+    {
+        return match ($type) {
+            'project' => [
+                'done' => $linkable->done ?? false,
+                'task_count' => $linkable->tasks_count ?? 0,
+                'done_task_count' => $linkable->done_tasks_count ?? 0,
+                'logged_minutes' => method_exists($linkable, 'getLoggedMinutesAttribute') ? ($linkable->logged_minutes ?? 0) : 0,
+                'budget_amount' => $linkable->budget_amount,
+            ],
+            'planner_task' => [
+                'is_done' => $linkable->is_done ?? false,
+                'priority' => $linkable->priority?->value ?? null,
+                'due_date' => $linkable->due_date?->format('d.m.Y'),
+                'story_points' => $linkable->story_points?->value ?? null,
+            ],
+            'helpdesk_ticket' => [
+                'is_done' => $linkable->is_done ?? false,
+                'priority' => $linkable->priority?->value ?? null,
+                'escalation_level' => $linkable->escalation_level?->value ?? null,
+            ],
+            default => [],
+        };
+    }
+
+    public function loadEntireTree(): array
+    {
+        // Load all descendants of the current entity
+        $allDescendantIds = $this->getDescendantEntityIds($this->entity->id);
+        if (empty($allDescendantIds)) {
+            return [];
+        }
+
+        // Load all descendant entities with their types
+        $allEntities = OrganizationEntity::whereIn('id', $allDescendantIds)
+            ->with('type')
+            ->orderBy('name')
+            ->get();
+
+        // Group by parent_entity_id
+        $byParent = $allEntities->groupBy('parent_entity_id');
+
+        // Build nodes for each parent group using batch approach
+        $result = [];
+        foreach ($byParent as $parentId => $children) {
+            $result[$parentId] = $this->buildNodesForEntities($children);
         }
 
         return $result;

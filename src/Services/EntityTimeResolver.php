@@ -156,6 +156,153 @@ class EntityTimeResolver
     }
 
     /**
+     * Batch-resolve context pairs for multiple entities at once.
+     * Returns: [entityId => [fqcn => [ids]]]
+     */
+    public function resolveContextPairsBatch(array $entityIds, array $descendantMap = []): array
+    {
+        if (empty($entityIds)) {
+            return [];
+        }
+
+        $cascades = static::getTimeTrackableCascades();
+
+        // Collect ALL entity IDs (own + descendants)
+        $allEntityIds = $entityIds;
+        foreach ($entityIds as $id) {
+            if (!empty($descendantMap[$id])) {
+                $allEntityIds = array_merge($allEntityIds, $descendantMap[$id]);
+            }
+        }
+        $allEntityIds = array_values(array_unique($allEntityIds));
+
+        // One query for all links
+        $links = OrganizationEntityLink::query()
+            ->whereIn('entity_id', $allEntityIds)
+            ->get();
+
+        // Group links by entity_id
+        $linksByEntity = [];
+        foreach ($links as $link) {
+            $linksByEntity[$link->entity_id][] = $link;
+        }
+
+        // Group linkable_ids by morph type for batch loading
+        $idsByType = [];
+        foreach ($links as $link) {
+            if (isset($cascades[$link->linkable_type])) {
+                $idsByType[$link->linkable_type][] = $link->linkable_id;
+            }
+        }
+
+        // Batch load models by type with child relations
+        $modelsByType = [];
+        foreach ($idsByType as $morphAlias => $ids) {
+            $uniqueIds = array_values(array_unique($ids));
+            [$fqcn, $childRelations] = $cascades[$morphAlias];
+            if (!class_exists($fqcn)) {
+                continue;
+            }
+            $query = $fqcn::whereIn('id', $uniqueIds);
+            if (!empty($childRelations)) {
+                $query->with($childRelations);
+            }
+            $modelsByType[$morphAlias] = $query->get()->keyBy('id');
+        }
+
+        // Build pairs per entity (including descendants)
+        $result = [];
+        foreach ($entityIds as $entityId) {
+            $relevantIds = [$entityId];
+            if (!empty($descendantMap[$entityId])) {
+                $relevantIds = array_merge($relevantIds, $descendantMap[$entityId]);
+            }
+
+            $pairs = [];
+            foreach ($relevantIds as $relId) {
+                foreach ($linksByEntity[$relId] ?? [] as $link) {
+                    $morphAlias = $link->linkable_type;
+                    if (!isset($cascades[$morphAlias])) {
+                        continue;
+                    }
+                    [$fqcn, $childRelations] = $cascades[$morphAlias];
+                    $pairs[$fqcn][] = $link->linkable_id;
+
+                    // Follow child relations from pre-loaded models
+                    if (!empty($childRelations) && isset($modelsByType[$morphAlias][$link->linkable_id])) {
+                        $model = $modelsByType[$morphAlias][$link->linkable_id];
+                        foreach ($childRelations as $relationPath) {
+                            $this->resolveRelationPath($model, $relationPath, $pairs);
+                        }
+                    }
+                }
+            }
+            $result[$entityId] = $pairs;
+        }
+
+        return $result;
+    }
+
+    /**
+     * Batch compute time summaries for multiple entities.
+     * Returns: [entityId => ['total_minutes' => X, 'billed_minutes' => Y]]
+     */
+    public function batchTimeSummaries(array $pairsByEntity): array
+    {
+        if (empty($pairsByEntity)) {
+            return [];
+        }
+
+        // Merge all pairs into a single set for one query
+        $allPairs = [];
+        foreach ($pairsByEntity as $pairs) {
+            foreach ($pairs as $type => $ids) {
+                $allPairs[$type] = array_merge($allPairs[$type] ?? [], $ids);
+            }
+        }
+
+        // Deduplicate
+        foreach ($allPairs as $type => $ids) {
+            $allPairs[$type] = array_values(array_unique($ids));
+        }
+
+        if (empty($allPairs)) {
+            return array_fill_keys(array_keys($pairsByEntity), ['total_minutes' => 0, 'billed_minutes' => 0]);
+        }
+
+        // Build a mapping: for each (context_type, context_id) -> which entity IDs need it
+        $contextToEntities = [];
+        foreach ($pairsByEntity as $entityId => $pairs) {
+            foreach ($pairs as $type => $ids) {
+                foreach (array_unique($ids) as $id) {
+                    $contextToEntities[$type . '|' . $id][] = $entityId;
+                }
+            }
+        }
+
+        // Query all time entries matching any pair
+        $query = OrganizationTimeEntry::query();
+        $query = $this->applyContextPairsToQuery($query, $allPairs);
+        $rows = $query->select('context_type', 'context_id')
+            ->selectRaw('COALESCE(SUM(minutes), 0) as total_minutes')
+            ->selectRaw('COALESCE(SUM(CASE WHEN is_billed = 1 THEN minutes ELSE 0 END), 0) as billed_minutes')
+            ->groupBy('context_type', 'context_id')
+            ->get();
+
+        // Distribute to entities
+        $result = array_fill_keys(array_keys($pairsByEntity), ['total_minutes' => 0, 'billed_minutes' => 0]);
+        foreach ($rows as $row) {
+            $key = $row->context_type . '|' . $row->context_id;
+            foreach ($contextToEntities[$key] ?? [] as $entityId) {
+                $result[$entityId]['total_minutes'] += (int) $row->total_minutes;
+                $result[$entityId]['billed_minutes'] += (int) $row->billed_minutes;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
      * Sammelt Context-Paare für alle Child-Entities (rekursiv).
      */
     protected function collectPairsForChildEntities(OrganizationEntity $entity, array &$pairs): void

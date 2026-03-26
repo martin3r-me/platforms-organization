@@ -284,9 +284,34 @@
                 </div>
 
                 {{-- Tab: Hierarchie --}}
-                <div x-show="tab === 'hierarchy'" x-cloak x-data="{ linkConfig: {{ Js::from(collect($this->linkTypeConfig)->map(fn($c) => ['label' => $c['label'], 'icon' => $c['icon']])) }} }">
+                <div x-show="tab === 'hierarchy'" x-cloak x-data="{
+                    linkConfig: {{ Js::from(collect($this->linkTypeConfig)->map(fn($c) => ['label' => $c['label'], 'icon' => $c['icon']])) }},
+                    linkIconSvgs: {{ Js::from($this->linkTypeIconSvgs) }}
+                }">
                     <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                         @if(count($this->rootEntityLinks) > 0 || count($this->treeNodes) > 0)
+                            {{-- Expand/Collapse All Button --}}
+                            <div class="flex justify-end mb-4">
+                                <button
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-[var(--ui-border)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)] transition-colors"
+                                    x-data
+                                    @click="$store.tree.allExpanded ? $store.tree.collapseAll() : $store.tree.expandAll($wire)"
+                                    :disabled="$store.tree.loading"
+                                >
+                                    <template x-if="$store.tree.loading">
+                                        <svg class="w-3.5 h-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                        </svg>
+                                    </template>
+                                    <template x-if="!$store.tree.loading">
+                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
+                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                                        </svg>
+                                    </template>
+                                    <span x-text="$store.tree.allExpanded ? 'Alle einklappen' : 'Alle aufklappen'"></span>
+                                </button>
+                            </div>
                             @php
                                 $rootCascaded = $this->cascadedTimeSummary;
                                 $rootTotalMin = $rootCascaded['total_minutes'];
@@ -393,6 +418,7 @@
                                                                 @else
                                                                     <span class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $link['name'] }}</span>
                                                                 @endif
+                                                                @include('organization::livewire.entity.partials.link-meta', ['link' => $link, 'linkType' => $group['type']])
                                                                 @if($link['status'])
                                                                     <x-ui-badge variant="secondary" size="xs">{{ $link['status'] }}</x-ui-badge>
                                                                 @endif
@@ -601,6 +627,260 @@
             </div>
         </div>
     </x-ui-page-container>
+
+    {{-- Alpine treeNode component for recursive tree rendering --}}
+    <script>
+    document.addEventListener('alpine:init', () => {
+        // Store linkConfig and linkIconSvgs globally for tree nodes
+        Alpine.store('treeConfig', {
+            linkConfig: @js(collect($this->linkTypeConfig)->map(fn($c) => ['label' => $c['label'], 'icon' => $c['icon']])),
+            linkIconSvgs: @js($this->linkTypeIconSvgs),
+        });
+        const escHtml = (s) => s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : '';
+
+        const chevronSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[var(--ui-muted)]"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>`;
+        const spinnerSvg = `<svg class="w-4 h-4 animate-spin text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+        const externalSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5 text-[var(--ui-muted)]"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>`;
+
+        function formatTime(totalMin) {
+            const h = Math.floor(totalMin / 60);
+            const m = String(totalMin % 60).padStart(2, '0');
+            return h + ':' + m + 'h';
+        }
+
+        function formatOpenTime(totalMin, billedMin) {
+            const open = totalMin - billedMin;
+            if (open <= 0) return '';
+            return Math.floor(open / 60) + ':' + String(open % 60).padStart(2, '0') + 'h offen';
+        }
+
+        // Render rich metadata for a link item
+        function renderLinkMeta(link, type) {
+            let parts = [];
+            if (type === 'project') {
+                if (link.task_count > 0) {
+                    parts.push(`${link.done_task_count || 0}/${link.task_count} Tasks`);
+                }
+                if (link.logged_minutes > 0) {
+                    parts.push(formatTime(link.logged_minutes));
+                }
+                if (link.done) {
+                    parts.push('<span class="text-green-600">erledigt</span>');
+                }
+            } else if (type === 'planner_task') {
+                if (link.priority) {
+                    parts.push(escHtml(link.priority));
+                }
+                if (link.due_date) {
+                    parts.push(escHtml(link.due_date));
+                }
+                if (link.is_done) {
+                    parts.push('<span class="text-green-600">erledigt</span>');
+                }
+            } else if (type === 'helpdesk_ticket') {
+                if (link.priority) {
+                    parts.push(escHtml(link.priority));
+                }
+                if (link.escalation_level) {
+                    parts.push('<span class="text-red-600">' + escHtml(link.escalation_level) + '</span>');
+                }
+                if (link.is_done) {
+                    parts.push('<span class="text-green-600">erledigt</span>');
+                }
+            }
+            if (parts.length === 0) return '';
+            return `<span class="inline-flex items-center gap-1.5 text-[10px] text-[var(--ui-muted)] flex-shrink-0">${parts.join(' · ')}</span>`;
+        }
+
+        // Shared render function for a node card (used at all Alpine levels)
+        window._treeRenderNode = function(node, linkConfig, linkIconSvgs) {
+            const isExpandable = node.has_children || (node.own_links_grouped && node.own_links_grouped.length > 0);
+            const totalMin = node.cascaded_time ? node.cascaded_time.total_minutes : 0;
+            const billedMin = node.cascaded_time ? node.cascaded_time.billed_minutes : 0;
+            const openMin = totalMin - billedMin;
+
+            let html = `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3 ${!node.is_active ? 'opacity-50' : ''}">`;
+            html += `<div class="flex items-center gap-2 ${isExpandable ? 'cursor-pointer' : ''}" @click="nodeToggle()">`;
+
+            // Chevron/spinner
+            html += `<div class="w-5 h-5 flex items-center justify-center flex-shrink-0">`;
+            if (isExpandable) {
+                html += `<template x-if="nodeLoading">${spinnerSvg}</template>`;
+                html += `<template x-if="!nodeLoading"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200" :class="{ 'rotate-90': nodeExpanded }"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></template>`;
+            }
+            html += `</div>`;
+
+            // Type icon (pre-rendered SVG)
+            if (node.type_icon_svg) {
+                html += node.type_icon_svg;
+            }
+
+            // Name link
+            html += `<a href="/organization/entities/${node.id}" class="text-sm font-semibold text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate" @click.stop>${escHtml(node.name)}</a>`;
+
+            // Code
+            if (node.code) {
+                html += `<span class="text-xs text-[var(--ui-muted)] font-mono flex-shrink-0">${escHtml(node.code)}</span>`;
+            }
+
+            // Type badge
+            html += `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] flex-shrink-0">${escHtml(node.type_name)}</span>`;
+
+            // Time
+            if (totalMin > 0) {
+                const dotClass = openMin > 0 ? 'bg-amber-400' : 'bg-green-500';
+                html += `<div class="flex items-center gap-2 ml-auto flex-shrink-0">`;
+                html += `<span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ui-secondary)]">`;
+                html += `<span class="w-2 h-2 rounded-full flex-shrink-0 ${dotClass}"></span>`;
+                html += formatTime(totalMin);
+                html += `</span>`;
+                if (openMin > 0) {
+                    html += `<span class="text-[10px] text-amber-600 font-medium">${formatOpenTime(totalMin, billedMin)}</span>`;
+                }
+                html += `</div>`;
+            }
+
+            html += `</div>`; // end row 1
+
+            // Row 2: Link pills
+            if (node.total_links > 0 || node.descendant_count > 0) {
+                html += `<div class="flex items-center gap-1.5 mt-1.5 ml-7 flex-wrap">`;
+                if (node.cascaded_link_counts) {
+                    for (const [type, count] of Object.entries(node.cascaded_link_counts)) {
+                        if (count > 0 && linkConfig[type]) {
+                            const iconSvg = linkIconSvgs[type] ? linkIconSvgs[type].replace('w-4 h-4', 'w-3 h-3') : '';
+                            html += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/20">`;
+                            html += iconSvg;
+                            html += `${escHtml(linkConfig[type].label)} <span class="font-semibold text-[var(--ui-secondary)]">${count}</span>`;
+                            html += `</span>`;
+                        }
+                    }
+                }
+                if (node.descendant_count > 0) {
+                    html += `<span class="text-[10px] text-[var(--ui-muted)] ml-1">inkl. ${node.descendant_count} ${node.descendant_count === 1 ? 'Untereinheit' : 'Untereinheiten'}</span>`;
+                }
+                html += `</div>`;
+            }
+
+            html += `</div>`; // end card
+            return html;
+        };
+
+        // Shared render function for link groups (used at all Alpine levels)
+        window._treeRenderLinkGroups = function(node, linkConfig, linkIconSvgs) {
+            if (!node.own_links_grouped || node.own_links_grouped.length === 0) return '';
+
+            let html = '';
+            for (const group of node.own_links_grouped) {
+                const iconSvg = linkIconSvgs[group.type] || '';
+                html += `<div x-data="{ gOpen: false }" class="ml-6 border-l-2 border-[var(--ui-border)]/20">`;
+                // Group header
+                html += `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3 cursor-pointer" @click.stop="gOpen = !gOpen">`;
+                html += `<div class="flex items-center gap-2">`;
+                html += `<div class="w-5 h-5 flex items-center justify-center flex-shrink-0"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200" :class="{ 'rotate-90': gOpen }"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></div>`;
+                html += iconSvg;
+                html += `<span class="text-sm font-medium text-[var(--ui-secondary)]">${escHtml(group.label)}</span>`;
+                html += `<span class="text-xs text-[var(--ui-muted)]">(${group.items.length})</span>`;
+                html += `</div></div>`;
+
+                // Group items
+                html += `<div x-show="gOpen" x-collapse x-cloak>`;
+                for (const link of group.items) {
+                    html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20">`;
+                    html += `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">`;
+                    html += `<div class="flex items-center gap-2">`;
+                    html += `<div class="w-5 h-5 flex-shrink-0"></div>`;
+                    html += iconSvg;
+                    if (link.url) {
+                        html += `<a href="${escHtml(link.url)}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate" @click.stop>${escHtml(link.name)}</a>`;
+                    } else {
+                        html += `<span class="text-sm font-medium text-[var(--ui-secondary)] truncate">${escHtml(link.name)}</span>`;
+                    }
+                    // Rich metadata
+                    html += renderLinkMeta(link, group.type);
+                    if (link.status) {
+                        html += `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] flex-shrink-0">${escHtml(link.status)}</span>`;
+                    }
+                    if (link.url) {
+                        html += `<div class="ml-auto flex-shrink-0">${externalSvg}</div>`;
+                    }
+                    html += `</div></div></div>`;
+                }
+                html += `</div></div>`;
+            }
+            return html;
+        };
+
+        Alpine.store('tree', {
+            allExpanded: false,
+            preloadedNodes: {},
+            loading: false,
+            async expandAll(wire) {
+                this.loading = true;
+                try {
+                    this.preloadedNodes = await wire.loadEntireTree();
+                    this.allExpanded = true;
+                } finally {
+                    this.loading = false;
+                }
+            },
+            collapseAll() {
+                this.allExpanded = false;
+                this.preloadedNodes = {};
+            },
+        });
+
+        Alpine.data('treeNode', (node) => ({
+            nodeExpanded: false,
+            nodeLoading: false,
+            nodeChildren: [],
+            get nodeIsExpandable() { return node.has_children || (node.own_links_grouped && node.own_links_grouped.length > 0); },
+            init() {
+                this.$watch('$store.tree.allExpanded', (val) => {
+                    if (val && this.nodeIsExpandable) {
+                        this.nodeExpand();
+                    } else if (!val) {
+                        this.nodeExpanded = false;
+                        this.nodeChildren = [];
+                    }
+                });
+            },
+            async nodeExpand() {
+                if (node.has_children && this.nodeChildren.length === 0) {
+                    const store = Alpine.store('tree');
+                    const preloaded = store?.preloadedNodes?.[node.id];
+                    if (preloaded) {
+                        this.nodeChildren = preloaded;
+                    }
+                }
+                this.nodeExpanded = true;
+            },
+            async nodeToggle() {
+                if (!this.nodeIsExpandable) return;
+                if (this.nodeExpanded) { this.nodeExpanded = false; return; }
+                if (node.has_children && this.nodeChildren.length === 0) {
+                    this.nodeLoading = true;
+                    try {
+                        const store = Alpine.store('tree');
+                        const preloaded = store?.preloadedNodes?.[node.id];
+                        this.nodeChildren = preloaded || await this.$wire.loadChildNodes(node.id);
+                    } finally {
+                        this.nodeLoading = false;
+                    }
+                }
+                this.nodeExpanded = true;
+            },
+            renderNode(n) {
+                const cfg = Alpine.store('treeConfig');
+                return window._treeRenderNode(n, cfg.linkConfig, cfg.linkIconSvgs);
+            },
+            renderLinkGroups(n) {
+                const cfg = Alpine.store('treeConfig');
+                return window._treeRenderLinkGroups(n, cfg.linkConfig, cfg.linkIconSvgs);
+            },
+        }));
+    });
+    </script>
 
     <!-- Relations Modal -->
     <livewire:organization.entity.modal-relations/>

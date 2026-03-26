@@ -149,6 +149,11 @@
                             @svg('heroicon-o-' . $group['icon'], 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
                             <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $group['label'] }}</span>
                             <span class="text-xs text-[var(--ui-muted)]">({{ count($group['items']) }})</span>
+                            @if(($group['group_logged_minutes'] ?? 0) > 0)
+                                <span class="text-xs text-[var(--ui-muted)] ml-auto flex-shrink-0">
+                                    {{ intdiv($group['group_logged_minutes'], 60) }}:{{ str_pad($group['group_logged_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h
+                                </span>
+                            @endif
                         </div>
                     </div>
                     <div x-show="groupOpen" x-collapse x-cloak>

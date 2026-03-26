@@ -18,6 +18,11 @@
         if ($link['priority'] ?? null) {
             $metaParts[] = e($link['priority']);
         }
+        if (($link['logged_minutes'] ?? 0) > 0) {
+            $h = intdiv($link['logged_minutes'], 60);
+            $m = $link['logged_minutes'] % 60;
+            $metaParts[] = $h . ':' . str_pad($m, 2, '0', STR_PAD_LEFT) . 'h';
+        }
         if ($link['due_date'] ?? null) {
             $metaParts[] = e($link['due_date']);
         }

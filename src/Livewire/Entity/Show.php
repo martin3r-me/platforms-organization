@@ -656,10 +656,14 @@ class Show extends Component
             $byEntityAndType[$link->entity_id][$type]['type'] = $type;
         }
 
-        // Convert to sorted array of groups per entity
+        // Convert to sorted array of groups per entity, with aggregated time
         $result = [];
         foreach ($byEntityAndType as $entityId => $types) {
             $groups = array_values($types);
+            foreach ($groups as &$group) {
+                $group['group_logged_minutes'] = array_sum(array_column($group['items'], 'logged_minutes'));
+            }
+            unset($group);
             usort($groups, fn($a, $b) => strcmp($a['label'], $b['label']));
             $result[$entityId] = $groups;
         }
@@ -682,6 +686,7 @@ class Show extends Component
                 'priority' => $linkable->priority?->value ?? null,
                 'due_date' => $linkable->due_date?->format('d.m.Y'),
                 'story_points' => $linkable->story_points?->value ?? null,
+                'logged_minutes' => method_exists($linkable, 'getLoggedMinutesAttribute') ? ($linkable->logged_minutes ?? 0) : 0,
             ],
             'helpdesk_ticket' => [
                 'is_done' => $linkable->is_done ?? false,

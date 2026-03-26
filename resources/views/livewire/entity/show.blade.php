@@ -400,6 +400,11 @@
                                                     @svg('heroicon-o-' . $group['icon'], 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
                                                     <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $group['label'] }}</span>
                                                     <span class="text-xs text-[var(--ui-muted)]">({{ count($group['items']) }})</span>
+                                                    @if(($group['group_logged_minutes'] ?? 0) > 0)
+                                                        <span class="text-xs text-[var(--ui-muted)] ml-auto flex-shrink-0">
+                                                            {{ intdiv($group['group_logged_minutes'], 60) }}:{{ str_pad($group['group_logged_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h
+                                                        </span>
+                                                    @endif
                                                 </div>
                                             </div>
 
@@ -671,6 +676,9 @@
                 if (link.priority) {
                     parts.push(escHtml(link.priority));
                 }
+                if (link.logged_minutes > 0) {
+                    parts.push(formatTime(link.logged_minutes));
+                }
                 if (link.due_date) {
                     parts.push(escHtml(link.due_date));
                 }
@@ -781,6 +789,9 @@
                 html += iconSvg;
                 html += `<span class="text-sm font-medium text-[var(--ui-secondary)]">${escHtml(group.label)}</span>`;
                 html += `<span class="text-xs text-[var(--ui-muted)]">(${group.items.length})</span>`;
+                if (group.group_logged_minutes > 0) {
+                    html += `<span class="text-xs text-[var(--ui-muted)] ml-auto flex-shrink-0">${formatTime(group.group_logged_minutes)}</span>`;
+                }
                 html += `</div></div>`;
 
                 // Group items

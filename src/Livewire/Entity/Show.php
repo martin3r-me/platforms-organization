@@ -606,7 +606,7 @@ class Show extends Component
 
             // Eager load relations, counts and time sums per type
             if ($morphAlias === 'project') {
-                $query->with(['tasks' => fn($q) => $q->withSum('timeEntries', 'minutes')->orderBy('sort_order')->orderBy('name')])
+                $query->with(['tasks' => fn($q) => $q->withSum('timeEntries', 'minutes')->orderBy('name')])
                     ->withCount([
                         'tasks',
                         'tasks as done_tasks_count' => fn($q) => $q->where('is_done', true),

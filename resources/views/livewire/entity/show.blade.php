@@ -136,6 +136,7 @@
                 {{-- Stats Grid --}}
                 @php
                     $childCount = $entity->children->count();
+                    $descendantCount = $this->totalDescendantCount;
                     $linkCount = $this->totalLinkCount;
                     $cascaded = $this->cascadedTimeSummary;
                     $totalHours = intdiv($cascaded['total_minutes'], 60);
@@ -147,11 +148,16 @@
                 <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
                     <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 text-center">
                         <div class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $childCount }}</div>
-                        <div class="text-xs text-[var(--ui-muted)] mt-1">Einheiten</div>
+                        <div class="text-xs text-[var(--ui-muted)] mt-1">
+                            Einheiten
+                            @if($descendantCount > $childCount)
+                                <span class="text-[var(--ui-muted)]">({{ $descendantCount }} gesamt)</span>
+                            @endif
+                        </div>
                     </div>
                     <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 text-center">
                         <div class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $linkCount }}</div>
-                        <div class="text-xs text-[var(--ui-muted)] mt-1">Verknüpfungen</div>
+                        <div class="text-xs text-[var(--ui-muted)] mt-1">Verknüpfungen gesamt</div>
                     </div>
                     <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 text-center">
                         <div class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $totalHours }}:{{ str_pad($totalMins, 2, '0', STR_PAD_LEFT) }}</div>
@@ -212,7 +218,7 @@
                 </div>
 
                 {{-- Tab: Hierarchie --}}
-                <div x-show="tab === 'hierarchy'" x-cloak>
+                <div x-show="tab === 'hierarchy'" x-cloak x-data="{ linkConfig: {{ Js::from(collect($this->linkTypeConfig)->map(fn($c) => ['label' => $c['label'], 'icon' => $c['icon']])) }} }">
                     <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                         <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Untergeordnete Einheiten</h2>
                         @if(count($this->treeNodes) > 0)

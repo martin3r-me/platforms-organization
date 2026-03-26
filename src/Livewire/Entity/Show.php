@@ -253,22 +253,7 @@ class Show extends Component
             return [];
         }
 
-        $childIds = $children->pluck('id')->toArray();
-        $linkCounts = $this->getEntityLinkCountsForIds($childIds);
-        $childrenCounts = $this->getChildrenCountsForIds($childIds);
-
-        $resolver = new EntityTimeResolver();
-        $timeSummaries = [];
-        foreach ($children as $child) {
-            $timeSummaries[$child->id] = $this->getTimeSummaryForEntity($child, $resolver);
-        }
-
-        return $children->map(fn ($child) => $this->buildNodeData(
-            $child,
-            $linkCounts[$child->id] ?? [],
-            $timeSummaries[$child->id] ?? ['total_minutes' => 0, 'billed_minutes' => 0],
-            $childrenCounts[$child->id] ?? 0,
-        ))->toArray();
+        return $this->buildNodesForEntities($children);
     }
 
     #[Computed]
@@ -286,9 +271,16 @@ class Show extends Component
     }
 
     #[Computed]
+    public function totalDescendantCount(): int
+    {
+        return count($this->getDescendantEntityIds($this->entity->id));
+    }
+
+    #[Computed]
     public function totalLinkCount(): int
     {
-        return OrganizationEntityLink::where('entity_id', $this->entity->id)->count();
+        $ids = array_merge([$this->entity->id], $this->getDescendantEntityIds($this->entity->id));
+        return OrganizationEntityLink::whereIn('entity_id', $ids)->count();
     }
 
     public function loadChildNodes(int $entityId): array
@@ -303,26 +295,60 @@ class Show extends Component
             return [];
         }
 
-        $childIds = $children->pluck('id')->toArray();
-        $linkCounts = $this->getEntityLinkCountsForIds($childIds);
-        $childrenCounts = $this->getChildrenCountsForIds($childIds);
-
-        $resolver = new EntityTimeResolver();
-        $timeSummaries = [];
-        foreach ($children as $child) {
-            $timeSummaries[$child->id] = $this->getTimeSummaryForEntity($child, $resolver);
-        }
-
-        return $children->map(fn ($child) => $this->buildNodeData(
-            $child,
-            $linkCounts[$child->id] ?? [],
-            $timeSummaries[$child->id] ?? ['total_minutes' => 0, 'billed_minutes' => 0],
-            $childrenCounts[$child->id] ?? 0,
-        ))->toArray();
+        return $this->buildNodesForEntities($children);
     }
 
-    protected function buildNodeData(OrganizationEntity $entity, array $linkCounts, array $timeSummary, int $childrenCount): array
+    protected function buildNodesForEntities($entities): array
     {
+        $entityIds = $entities->pluck('id')->toArray();
+        $ownLinkCounts = $this->getEntityLinkCountsForIds($entityIds);
+        $childrenCounts = $this->getChildrenCountsForIds($entityIds);
+
+        $resolver = new EntityTimeResolver();
+        $nodes = [];
+
+        foreach ($entities as $entity) {
+            $descendantIds = $this->getDescendantEntityIds($entity->id);
+            $hasDescendants = !empty($descendantIds);
+
+            // Cascaded link counts: own + all descendants
+            $cascadedLinkCounts = $ownLinkCounts[$entity->id] ?? [];
+            if ($hasDescendants) {
+                $descLinkCounts = $this->getEntityLinkCountsForIds($descendantIds);
+                foreach ($descLinkCounts as $descEntityId => $typeCounts) {
+                    foreach ($typeCounts as $type => $count) {
+                        $cascadedLinkCounts[$type] = ($cascadedLinkCounts[$type] ?? 0) + $count;
+                    }
+                }
+            }
+
+            // Cascaded time: own + all descendants via EntityTimeResolver
+            $cascadedTime = $this->getTimeSummaryForEntity($entity, $resolver, includeChildren: true);
+            $ownTime = $this->getTimeSummaryForEntity($entity, $resolver, includeChildren: false);
+
+            $nodes[] = $this->buildNodeData(
+                $entity,
+                ownLinkCounts: $ownLinkCounts[$entity->id] ?? [],
+                cascadedLinkCounts: $cascadedLinkCounts,
+                ownTime: $ownTime,
+                cascadedTime: $cascadedTime,
+                childrenCount: $childrenCounts[$entity->id] ?? 0,
+                descendantCount: count($descendantIds),
+            );
+        }
+
+        return $nodes;
+    }
+
+    protected function buildNodeData(
+        OrganizationEntity $entity,
+        array $ownLinkCounts,
+        array $cascadedLinkCounts,
+        array $ownTime,
+        array $cascadedTime,
+        int $childrenCount,
+        int $descendantCount,
+    ): array {
         $iconName = null;
         if ($entity->type->icon) {
             $icon = str_replace('heroicons.', '', $entity->type->icon);
@@ -337,6 +363,8 @@ class Show extends Component
             $iconName = $iconMap[$icon] ?? $icon;
         }
 
+        $totalLinks = array_sum($cascadedLinkCounts);
+
         return [
             'id' => $entity->id,
             'name' => $entity->name,
@@ -345,10 +373,39 @@ class Show extends Component
             'type_icon' => $iconName,
             'is_active' => $entity->is_active,
             'children_count' => $childrenCount,
+            'descendant_count' => $descendantCount,
             'has_children' => $childrenCount > 0,
-            'link_counts' => $linkCounts,
-            'time_summary' => $timeSummary,
+            'own_link_counts' => $ownLinkCounts,
+            'cascaded_link_counts' => $cascadedLinkCounts,
+            'total_links' => $totalLinks,
+            'own_time' => $ownTime,
+            'cascaded_time' => $cascadedTime,
         ];
+    }
+
+    /**
+     * Collect all descendant entity IDs recursively (breadth-first).
+     */
+    protected function getDescendantEntityIds(int $entityId): array
+    {
+        $allIds = [];
+        $currentIds = [$entityId];
+
+        while (!empty($currentIds)) {
+            $childIds = OrganizationEntity::query()
+                ->whereIn('parent_entity_id', $currentIds)
+                ->pluck('id')
+                ->toArray();
+
+            if (empty($childIds)) {
+                break;
+            }
+
+            $allIds = array_merge($allIds, $childIds);
+            $currentIds = $childIds;
+        }
+
+        return $allIds;
     }
 
     protected function getEntityLinkCountsForIds(array $entityIds): array

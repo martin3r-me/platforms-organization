@@ -604,12 +604,14 @@ class Show extends Component
             $ids = $typeLinks->pluck('linkable_id')->unique()->toArray();
             $query = $fqcn::whereIn('id', $ids);
 
-            // Eager load counts per type
+            // Eager load counts and time sums per type
             if ($morphAlias === 'project') {
                 $query->withCount([
                     'tasks',
                     'tasks as done_tasks_count' => fn($q) => $q->where('is_done', true),
-                ]);
+                ])->withSum('timeEntries', 'minutes');
+            } elseif ($morphAlias === 'planner_task') {
+                $query->withSum('timeEntries', 'minutes');
             }
 
             $models = $query->get()->keyBy('id');
@@ -678,7 +680,7 @@ class Show extends Component
                 'done' => $linkable->done ?? false,
                 'task_count' => $linkable->tasks_count ?? 0,
                 'done_task_count' => $linkable->done_tasks_count ?? 0,
-                'logged_minutes' => method_exists($linkable, 'getLoggedMinutesAttribute') ? ($linkable->logged_minutes ?? 0) : 0,
+                'logged_minutes' => (int) ($linkable->time_entries_sum_minutes ?? 0),
                 'budget_amount' => $linkable->budget_amount,
             ],
             'planner_task' => [
@@ -686,7 +688,7 @@ class Show extends Component
                 'priority' => $linkable->priority?->value ?? null,
                 'due_date' => $linkable->due_date?->format('d.m.Y'),
                 'story_points' => $linkable->story_points?->value ?? null,
-                'logged_minutes' => method_exists($linkable, 'getLoggedMinutesAttribute') ? ($linkable->logged_minutes ?? 0) : 0,
+                'logged_minutes' => (int) ($linkable->time_entries_sum_minutes ?? 0),
             ],
             'helpdesk_ticket' => [
                 'is_done' => $linkable->is_done ?? false,

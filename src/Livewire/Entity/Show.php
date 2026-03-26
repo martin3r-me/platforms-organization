@@ -358,6 +358,7 @@ class Show extends Component
     {
         $entityIds = $entities->pluck('id')->toArray();
         $ownLinkCounts = $this->getEntityLinkCountsForIds($entityIds);
+        $ownLinksResolved = $this->getEntityLinksForIds($entityIds);
         $childrenCounts = $this->getChildrenCountsForIds($entityIds);
 
         $resolver = new EntityTimeResolver();
@@ -390,6 +391,7 @@ class Show extends Component
                 cascadedTime: $cascadedTime,
                 childrenCount: $childrenCounts[$entity->id] ?? 0,
                 descendantCount: count($descendantIds),
+                ownLinks: $ownLinksResolved[$entity->id] ?? [],
             );
         }
 
@@ -404,6 +406,7 @@ class Show extends Component
         array $cascadedTime,
         int $childrenCount,
         int $descendantCount,
+        array $ownLinks = [],
     ): array {
         $iconName = null;
         if ($entity->type->icon) {
@@ -436,6 +439,7 @@ class Show extends Component
             'total_links' => $totalLinks,
             'own_time' => $ownTime,
             'cascaded_time' => $cascadedTime,
+            'own_links' => $ownLinks,
         ];
     }
 
@@ -514,39 +518,70 @@ class Show extends Component
     }
 
     #[Computed]
-    public function entityLinksGrouped()
+    public function rootEntityLinks(): array
     {
+        $linksMap = $this->getEntityLinksForIds([$this->entity->id]);
+        return $linksMap[$this->entity->id] ?? [];
+    }
+
+    /**
+     * Resolve entity links for given entity IDs into flat arrays with pre-generated URLs.
+     * Returns: [entity_id => [{id, type, name, status, icon, label, url}, ...]]
+     */
+    protected function getEntityLinksForIds(array $entityIds): array
+    {
+        if (empty($entityIds)) {
+            return [];
+        }
+
         $morphMap = Relation::morphMap();
 
-        $links = OrganizationEntityLink::where('entity_id', $this->entity->id)->get();
+        $links = OrganizationEntityLink::whereIn('entity_id', $entityIds)
+            ->get();
 
-        // Nur Links behalten, deren Morph-Typ auflösbar ist
+        // Filter to resolvable morph types
         $resolvable = $links->filter(function ($link) use ($morphMap) {
             $type = $link->linkable_type;
             return isset($morphMap[$type]) || class_exists($type);
         });
 
-        // Linkable nachladen für auflösbare Links
         $resolvable->load('linkable');
 
-        $withLinkable = $resolvable->filter(fn ($link) => $link->linkable !== null);
+        $result = [];
+        foreach ($resolvable as $link) {
+            if (!$link->linkable) {
+                continue;
+            }
 
-        $grouped = $withLinkable->groupBy('linkable_type');
-
-        return $grouped->map(function ($items, $type) {
-            $config = $this->linkTypeConfig[$type] ?? [
-                'label' => $type,
+            $config = $this->linkTypeConfig[$link->linkable_type] ?? [
+                'label' => $link->linkable_type,
                 'icon' => 'link',
                 'route' => null,
             ];
 
-            return [
-                'label' => $config['label'],
+            $url = null;
+            if ($config['route']) {
+                try {
+                    $url = route($config['route'], $link->linkable);
+                } catch (\Exception $e) {
+                    $url = null;
+                }
+            }
+
+            $linkable = $link->linkable;
+
+            $result[$link->entity_id][] = [
+                'id' => $link->id,
+                'type' => $link->linkable_type,
+                'name' => $linkable->name ?? $linkable->title ?? '—',
+                'status' => $linkable->status ?? null,
                 'icon' => $config['icon'],
-                'route' => $config['route'],
-                'items' => $items,
+                'label' => $config['label'],
+                'url' => $url,
             ];
-        });
+        }
+
+        return $result;
     }
 
     public function render()

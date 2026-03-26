@@ -135,7 +135,7 @@
         <div x-show="expanded" x-collapse x-cloak>
             {{-- Server-rendered own link groups --}}
             @foreach($node['own_links_grouped'] as $group)
-                <div x-data="{ groupOpen: false }" class="ml-6 border-l-2 border-[var(--ui-border)]/20">
+                <div x-data="{ groupOpen: false, init() { this.$watch('$store.tree.allExpanded', v => this.groupOpen = v); } }" class="ml-6 border-l-2 border-[var(--ui-border)]/20">
                     <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3 cursor-pointer"
                         @click="groupOpen = !groupOpen">
                         <div class="flex items-center gap-2">

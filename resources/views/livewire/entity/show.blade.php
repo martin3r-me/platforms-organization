@@ -385,7 +385,7 @@
                                 <div x-show="rootExpanded" x-collapse>
                                     {{-- Root Typ-Gruppen (grouped links) --}}
                                     @foreach($this->rootEntityLinks as $group)
-                                        <div x-data="{ groupOpen: false }" class="ml-6 border-l-2 border-[var(--ui-border)]/20">
+                                        <div x-data="{ groupOpen: false, init() { this.$watch('$store.tree.allExpanded', v => this.groupOpen = v); } }" class="ml-6 border-l-2 border-[var(--ui-border)]/20">
                                             {{-- Group Header --}}
                                             <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3 cursor-pointer"
                                                 @click="groupOpen = !groupOpen">
@@ -769,7 +769,7 @@
             let html = '';
             for (const group of node.own_links_grouped) {
                 const iconSvg = linkIconSvgs[group.type] || '';
-                html += `<div x-data="{ gOpen: false }" class="ml-6 border-l-2 border-[var(--ui-border)]/20">`;
+                html += `<div x-data="{ gOpen: $store.tree.allExpanded, init() { this.$watch('$store.tree.allExpanded', v => this.gOpen = v); } }" class="ml-6 border-l-2 border-[var(--ui-border)]/20">`;
                 // Group header
                 html += `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3 cursor-pointer" @click.stop="gOpen = !gOpen">`;
                 html += `<div class="flex items-center gap-2">`;
@@ -788,7 +788,7 @@
                     const hasTasks = link.has_tasks && link.task_items && link.task_items.length > 0;
                     const linkId = 'link_' + link.id;
 
-                    html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20"${hasTasks ? ` x-data="{ ${linkId}: false }"` : ''}>`;
+                    html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20"${hasTasks ? ` x-data="{ ${linkId}: $store.tree.allExpanded, init() { this.$watch('$store.tree.allExpanded', v => this.${linkId} = v); } }"` : ''}>`;
                     html += `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">`;
                     html += `<div class="flex items-center gap-2${hasTasks ? ' cursor-pointer' : ''}"${hasTasks ? ` @click="${linkId} = !${linkId}"` : ''}>`;
 

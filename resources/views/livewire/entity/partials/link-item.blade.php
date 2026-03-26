@@ -7,7 +7,7 @@
 @endphp
 
 <div class="ml-6 border-l-2 border-[var(--ui-border)]/20"
-    @if($hasChildren) x-data="{ taskOpen: false }" @endif
+    @if($hasChildren) x-data="{ taskOpen: false, init() { this.$watch('$store.tree.allExpanded', v => this.taskOpen = v); } }" @endif
 >
     <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">
         <div class="flex items-center gap-2 {{ $hasChildren ? 'cursor-pointer' : '' }}"

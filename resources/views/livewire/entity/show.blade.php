@@ -411,30 +411,7 @@
                                             {{-- Group Items (Link Leaves) --}}
                                             <div x-show="groupOpen" x-collapse x-cloak>
                                                 @foreach($group['items'] as $link)
-                                                    <div class="ml-6 border-l-2 border-[var(--ui-border)]/20">
-                                                        <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">
-                                                            <div class="flex items-center gap-2">
-                                                                <div class="w-5 h-5 flex-shrink-0"></div>
-                                                                @svg('heroicon-o-' . $group['icon'], 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
-                                                                @if($link['url'])
-                                                                    <a href="{{ $link['url'] }}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate" @click.stop>
-                                                                        {{ $link['name'] }}
-                                                                    </a>
-                                                                @else
-                                                                    <span class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $link['name'] }}</span>
-                                                                @endif
-                                                                @include('organization::livewire.entity.partials.link-meta', ['link' => $link, 'linkType' => $group['type']])
-                                                                @if($link['status'])
-                                                                    <x-ui-badge variant="secondary" size="xs">{{ $link['status'] }}</x-ui-badge>
-                                                                @endif
-                                                                @if($link['url'])
-                                                                    <div class="ml-auto flex-shrink-0">
-                                                                        @svg('heroicon-o-arrow-top-right-on-square', 'w-3.5 h-3.5 text-[var(--ui-muted)]')
-                                                                    </div>
-                                                                @endif
-                                                            </div>
-                                                        </div>
-                                                    </div>
+                                                    @include('organization::livewire.entity.partials.link-item', ['link' => $link, 'group' => $group])
                                                 @endforeach
                                             </div>
                                         </div>
@@ -797,17 +774,26 @@
                 // Group items
                 html += `<div x-show="gOpen" x-collapse x-cloak>`;
                 for (const link of group.items) {
-                    html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20">`;
+                    const hasTasks = link.has_tasks && link.task_items && link.task_items.length > 0;
+                    const linkId = 'link_' + link.id;
+
+                    html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20"${hasTasks ? ` x-data="{ ${linkId}: false }"` : ''}>`;
                     html += `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">`;
-                    html += `<div class="flex items-center gap-2">`;
-                    html += `<div class="w-5 h-5 flex-shrink-0"></div>`;
+                    html += `<div class="flex items-center gap-2${hasTasks ? ' cursor-pointer' : ''}"${hasTasks ? ` @click="${linkId} = !${linkId}"` : ''}>`;
+
+                    // Chevron for expandable projects
+                    html += `<div class="w-5 h-5 flex items-center justify-center flex-shrink-0">`;
+                    if (hasTasks) {
+                        html += `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200" :class="{ 'rotate-90': ${linkId} }"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>`;
+                    }
+                    html += `</div>`;
+
                     html += iconSvg;
                     if (link.url) {
                         html += `<a href="${escHtml(link.url)}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate" @click.stop>${escHtml(link.name)}</a>`;
                     } else {
                         html += `<span class="text-sm font-medium text-[var(--ui-secondary)] truncate">${escHtml(link.name)}</span>`;
                     }
-                    // Rich metadata
                     html += renderLinkMeta(link, group.type);
                     if (link.status) {
                         html += `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] flex-shrink-0">${escHtml(link.status)}</span>`;
@@ -815,7 +801,30 @@
                     if (link.url) {
                         html += `<div class="ml-auto flex-shrink-0">${externalSvg}</div>`;
                     }
-                    html += `</div></div></div>`;
+                    html += `</div></div>`;
+
+                    // Task children for projects
+                    if (hasTasks) {
+                        const taskIconSvg = linkIconSvgs['planner_task'] || '';
+                        html += `<div x-show="${linkId}" x-collapse x-cloak>`;
+                        for (const task of link.task_items) {
+                            const doneClass = task.is_done ? 'line-through opacity-60' : '';
+                            html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20">`;
+                            html += `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">`;
+                            html += `<div class="flex items-center gap-2">`;
+                            html += `<div class="w-5 h-5 flex-shrink-0"></div>`;
+                            html += taskIconSvg;
+                            html += `<span class="text-sm font-medium text-[var(--ui-secondary)] truncate ${doneClass}">${escHtml(task.name)}</span>`;
+                            if (task.priority) html += `<span class="text-[10px] text-[var(--ui-muted)]">${escHtml(task.priority)}</span>`;
+                            if (task.logged_minutes > 0) html += `<span class="text-[10px] text-[var(--ui-muted)]">${formatTime(task.logged_minutes)}</span>`;
+                            if (task.due_date) html += `<span class="text-[10px] text-[var(--ui-muted)]">${escHtml(task.due_date)}</span>`;
+                            if (task.is_done) html += `<span class="text-[10px] text-green-600">erledigt</span>`;
+                            html += `</div></div></div>`;
+                        }
+                        html += `</div>`;
+                    }
+
+                    html += `</div>`;
                 }
                 html += `</div></div>`;
             }

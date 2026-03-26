@@ -604,12 +604,13 @@ class Show extends Component
             $ids = $typeLinks->pluck('linkable_id')->unique()->toArray();
             $query = $fqcn::whereIn('id', $ids);
 
-            // Eager load counts and time sums per type
+            // Eager load relations, counts and time sums per type
             if ($morphAlias === 'project') {
-                $query->withCount([
-                    'tasks',
-                    'tasks as done_tasks_count' => fn($q) => $q->where('is_done', true),
-                ])->withSum('timeEntries', 'minutes');
+                $query->with(['tasks' => fn($q) => $q->withSum('timeEntries', 'minutes')->orderBy('sort_order')->orderBy('name')])
+                    ->withCount([
+                        'tasks',
+                        'tasks as done_tasks_count' => fn($q) => $q->where('is_done', true),
+                    ]);
             } elseif ($morphAlias === 'planner_task') {
                 $query->withSum('timeEntries', 'minutes');
             }
@@ -676,13 +677,7 @@ class Show extends Component
     protected function extractLinkMetadata(string $type, $linkable): array
     {
         return match ($type) {
-            'project' => [
-                'done' => $linkable->done ?? false,
-                'task_count' => $linkable->tasks_count ?? 0,
-                'done_task_count' => $linkable->done_tasks_count ?? 0,
-                'logged_minutes' => (int) ($linkable->time_entries_sum_minutes ?? 0),
-                'budget_amount' => $linkable->budget_amount,
-            ],
+            'project' => $this->extractProjectMetadata($linkable),
             'planner_task' => [
                 'is_done' => $linkable->is_done ?? false,
                 'priority' => $linkable->priority?->value ?? null,
@@ -697,6 +692,36 @@ class Show extends Component
             ],
             default => [],
         };
+    }
+
+    protected function extractProjectMetadata($project): array
+    {
+        $tasks = $project->tasks ?? collect();
+        $loggedMinutes = $tasks->sum(fn($t) => (int) ($t->time_entries_sum_minutes ?? 0));
+
+        $taskItems = [];
+        foreach ($tasks as $task) {
+            $taskMinutes = (int) ($task->time_entries_sum_minutes ?? 0);
+            $taskItems[] = [
+                'id' => $task->id,
+                'name' => $task->name ?? '—',
+                'is_done' => (bool) $task->is_done,
+                'priority' => $task->priority?->value ?? null,
+                'due_date' => $task->due_date?->format('d.m.Y'),
+                'story_points' => $task->story_points?->value ?? null,
+                'logged_minutes' => $taskMinutes,
+            ];
+        }
+
+        return [
+            'done' => $project->done ?? false,
+            'task_count' => $project->tasks_count ?? 0,
+            'done_task_count' => $project->done_tasks_count ?? 0,
+            'logged_minutes' => $loggedMinutes,
+            'budget_amount' => $project->budget_amount,
+            'has_tasks' => count($taskItems) > 0,
+            'task_items' => $taskItems,
+        ];
     }
 
     public function loadEntireTree(): array

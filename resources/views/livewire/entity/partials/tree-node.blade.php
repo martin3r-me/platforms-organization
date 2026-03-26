@@ -158,30 +158,7 @@
                     </div>
                     <div x-show="groupOpen" x-collapse x-cloak>
                         @foreach($group['items'] as $link)
-                            <div class="ml-6 border-l-2 border-[var(--ui-border)]/20">
-                                <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">
-                                    <div class="flex items-center gap-2">
-                                        <div class="w-5 h-5 flex-shrink-0"></div>
-                                        @svg('heroicon-o-' . $group['icon'], 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
-                                        @if($link['url'])
-                                            <a href="{{ $link['url'] }}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate" @click.stop>
-                                                {{ $link['name'] }}
-                                            </a>
-                                        @else
-                                            <span class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $link['name'] }}</span>
-                                        @endif
-                                        @include('organization::livewire.entity.partials.link-meta', ['link' => $link, 'linkType' => $group['type']])
-                                        @if($link['status'])
-                                            <x-ui-badge variant="secondary" size="xs">{{ $link['status'] }}</x-ui-badge>
-                                        @endif
-                                        @if($link['url'])
-                                            <div class="ml-auto flex-shrink-0">
-                                                @svg('heroicon-o-arrow-top-right-on-square', 'w-3.5 h-3.5 text-[var(--ui-muted)]')
-                                            </div>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
+                            @include('organization::livewire.entity.partials.link-item', ['link' => $link, 'group' => $group])
                         @endforeach
                     </div>
                 </div>

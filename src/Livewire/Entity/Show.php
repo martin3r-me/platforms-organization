@@ -607,21 +607,7 @@ class Show extends Component
             // Eager load relations, counts and time sums per type
             // Note: withSum('timeEntries') won't work because context_type stores
             // the FQCN while morphMap uses aliases. Use raw subquery instead.
-            if ($morphAlias === 'project') {
-                $taskFqcn = \Platform\Planner\Models\PlannerTask::class;
-                $taskTimeSql = $this->timeMinutesSubquery('planner_tasks', $taskFqcn);
-                $query->with(['tasks' => fn($q) => $q
-                        ->selectRaw("planner_tasks.*, ({$taskTimeSql}) as logged_minutes_sum")
-                        ->orderBy('order')
-                    ])
-                    ->withCount([
-                        'tasks',
-                        'tasks as done_tasks_count' => fn($q) => $q->where('is_done', true),
-                    ]);
-            } elseif ($morphAlias === 'planner_task') {
-                $taskTimeSql = $this->timeMinutesSubquery('planner_tasks', $fqcn);
-                $query->selectRaw("planner_tasks.*, ({$taskTimeSql}) as logged_minutes_sum");
-            }
+            $this->applyTypeEagerLoading($query, $morphAlias, $fqcn);
 
             $models = $query->get()->keyBy('id');
             foreach ($models as $id => $model) {
@@ -682,6 +668,42 @@ class Show extends Component
         return $result;
     }
 
+    protected function applyTypeEagerLoading($query, string $morphAlias, string $fqcn): void
+    {
+        match ($morphAlias) {
+            'project' => $query
+                ->with(['tasks' => fn($q) => $q
+                    ->selectRaw("planner_tasks.*, ({$this->timeMinutesSubquery('planner_tasks', \Platform\Planner\Models\PlannerTask::class)}) as logged_minutes_sum")
+                    ->orderBy('order')
+                ])
+                ->withCount([
+                    'tasks',
+                    'tasks as done_tasks_count' => fn($q) => $q->where('is_done', true),
+                ]),
+            'planner_task' => $query
+                ->selectRaw("planner_tasks.*, ({$this->timeMinutesSubquery('planner_tasks', $fqcn)}) as logged_minutes_sum"),
+            'helpdesk_ticket' => $query
+                ->withCount('escalations'),
+            'canvas' => $query
+                ->withCount('buildingBlocks'),
+            'bmc_canvas' => $query
+                ->withCount('buildingBlocks'),
+            'pc_canvas' => $query
+                ->withCount('buildingBlocks'),
+            'okr' => $query
+                ->withCount(['objectives', 'cycles']),
+            'slides_presentation' => $query
+                ->withCount('slides'),
+            'sheets_spreadsheet' => $query
+                ->withCount('worksheets'),
+            'rec_position' => $query
+                ->withCount('postings'),
+            'rec_applicant' => $query
+                ->withCount('postings'),
+            default => null,
+        };
+    }
+
     protected function extractLinkMetadata(string $type, $linkable): array
     {
         return match ($type) {
@@ -697,6 +719,43 @@ class Show extends Component
                 'is_done' => $linkable->is_done ?? false,
                 'priority' => $linkable->priority?->value ?? null,
                 'escalation_level' => $linkable->escalation_level?->value ?? null,
+                'story_points' => $linkable->story_points?->value ?? null,
+                'due_date' => $linkable->due_date?->format('d.m.Y') ?? null,
+                'escalation_count' => (int) ($linkable->escalations_count ?? 0),
+            ],
+            'canvas', 'bmc_canvas', 'pc_canvas' => [
+                'status' => $linkable->status ?? null,
+                'block_count' => (int) ($linkable->building_blocks_count ?? 0),
+            ],
+            'okr' => [
+                'objective_count' => (int) ($linkable->objectives_count ?? 0),
+                'cycle_count' => (int) ($linkable->cycles_count ?? 0),
+                'performance_score' => $linkable->performance_score ? round((float) $linkable->performance_score * 100) : null,
+            ],
+            'notes_note' => [
+                'is_done' => (bool) ($linkable->done ?? false),
+                'is_pinned' => (bool) ($linkable->is_pinned ?? false),
+            ],
+            'slides_presentation' => [
+                'is_published' => (bool) ($linkable->is_published ?? false),
+                'slide_count' => (int) ($linkable->slides_count ?? 0),
+            ],
+            'sheets_spreadsheet' => [
+                'worksheet_count' => (int) ($linkable->worksheets_count ?? 0),
+            ],
+            'rec_applicant' => [
+                'is_active' => (bool) ($linkable->is_active ?? false),
+                'progress' => (int) ($linkable->progress ?? 0),
+                'posting_count' => (int) ($linkable->postings_count ?? 0),
+                'applied_at' => $linkable->applied_at?->format('d.m.Y'),
+            ],
+            'rec_position' => [
+                'is_active' => (bool) ($linkable->is_active ?? false),
+                'posting_count' => (int) ($linkable->postings_count ?? 0),
+            ],
+            'hcm_employee' => [
+                'is_active' => (bool) ($linkable->is_active ?? false),
+                'employee_number' => $linkable->employee_number ?? null,
             ],
             default => [],
         };

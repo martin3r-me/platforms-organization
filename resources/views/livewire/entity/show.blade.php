@@ -640,38 +640,47 @@
         function renderLinkMeta(link, type) {
             let parts = [];
             if (type === 'project') {
-                if (link.task_count > 0) {
-                    parts.push(`${link.done_task_count || 0}/${link.task_count} Tasks`);
-                }
-                if (link.logged_minutes > 0) {
-                    parts.push(formatTime(link.logged_minutes));
-                }
-                if (link.done) {
-                    parts.push('<span class="text-green-600">erledigt</span>');
-                }
+                if (link.task_count > 0) parts.push(`${link.done_task_count || 0}/${link.task_count} Tasks`);
+                if (link.logged_minutes > 0) parts.push(formatTime(link.logged_minutes));
+                if (link.done) parts.push('<span class="text-green-600">erledigt</span>');
             } else if (type === 'planner_task') {
-                if (link.priority) {
-                    parts.push(escHtml(link.priority));
-                }
-                if (link.logged_minutes > 0) {
-                    parts.push(formatTime(link.logged_minutes));
-                }
-                if (link.due_date) {
-                    parts.push(escHtml(link.due_date));
-                }
-                if (link.is_done) {
-                    parts.push('<span class="text-green-600">erledigt</span>');
-                }
+                if (link.priority) parts.push(escHtml(link.priority));
+                if (link.logged_minutes > 0) parts.push(formatTime(link.logged_minutes));
+                if (link.due_date) parts.push(escHtml(link.due_date));
+                if (link.is_done) parts.push('<span class="text-green-600">erledigt</span>');
             } else if (type === 'helpdesk_ticket') {
-                if (link.priority) {
-                    parts.push(escHtml(link.priority));
-                }
-                if (link.escalation_level) {
-                    parts.push('<span class="text-red-600">' + escHtml(link.escalation_level) + '</span>');
-                }
-                if (link.is_done) {
-                    parts.push('<span class="text-green-600">erledigt</span>');
-                }
+                if (link.priority) parts.push(escHtml(link.priority));
+                if (link.escalation_level) parts.push('<span class="text-red-600">' + escHtml(link.escalation_level) + '</span>');
+                if (link.story_points) parts.push(escHtml(link.story_points) + ' SP');
+                if (link.due_date) parts.push(escHtml(link.due_date));
+                if (link.escalation_count > 0) parts.push(link.escalation_count + ' Eskalation' + (link.escalation_count > 1 ? 'en' : ''));
+                if (link.is_done) parts.push('<span class="text-green-600">erledigt</span>');
+            } else if (type === 'canvas' || type === 'bmc_canvas' || type === 'pc_canvas') {
+                if (link.status) parts.push(escHtml(link.status));
+                if (link.block_count > 0) parts.push(link.block_count + ' Blocks');
+            } else if (type === 'okr') {
+                if (link.objective_count > 0) parts.push(link.objective_count + ' Objectives');
+                if (link.cycle_count > 0) parts.push(link.cycle_count + ' Zyklen');
+                if (link.performance_score != null) parts.push(link.performance_score + '%');
+            } else if (type === 'notes_note') {
+                if (link.is_pinned) parts.push('angepinnt');
+                if (link.is_done) parts.push('<span class="text-green-600">erledigt</span>');
+            } else if (type === 'slides_presentation') {
+                if (link.slide_count > 0) parts.push(link.slide_count + ' Folien');
+                if (link.is_published) parts.push('<span class="text-green-600">veröffentlicht</span>');
+            } else if (type === 'sheets_spreadsheet') {
+                if (link.worksheet_count > 0) parts.push(link.worksheet_count + ' Blätter');
+            } else if (type === 'rec_applicant') {
+                if (link.applied_at) parts.push('beworben ' + escHtml(link.applied_at));
+                if (link.posting_count > 0) parts.push(link.posting_count + ' Stellen');
+                if (link.progress > 0) parts.push(link.progress + '% Fortschritt');
+                if (link.is_active === false) parts.push('<span class="text-amber-600">inaktiv</span>');
+            } else if (type === 'rec_position') {
+                if (link.posting_count > 0) parts.push(link.posting_count + ' Ausschreibungen');
+                if (link.is_active === false) parts.push('<span class="text-amber-600">inaktiv</span>');
+            } else if (type === 'hcm_employee') {
+                if (link.employee_number) parts.push('#' + escHtml(link.employee_number));
+                if (link.is_active === false) parts.push('<span class="text-amber-600">inaktiv</span>');
             }
             if (parts.length === 0) return '';
             return `<span class="inline-flex items-center gap-1.5 text-[10px] text-[var(--ui-muted)] flex-shrink-0">${parts.join(' · ')}</span>`;

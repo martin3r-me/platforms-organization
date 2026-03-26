@@ -655,6 +655,8 @@
                 if (link.due_date) parts.push(escHtml(link.due_date));
                 if (link.escalation_count > 0) parts.push(link.escalation_count + ' Eskalation' + (link.escalation_count > 1 ? 'en' : ''));
                 if (link.is_done) parts.push('<span class="text-green-600">erledigt</span>');
+            } else if (type === 'helpdesk_board') {
+                if (link.ticket_count > 0) parts.push(link.ticket_count + ' Tickets');
             } else if (type === 'canvas' || type === 'bmc_canvas' || type === 'pc_canvas') {
                 if (link.status) parts.push(escHtml(link.status));
                 if (link.block_count > 0) parts.push(link.block_count + ' Blocks');

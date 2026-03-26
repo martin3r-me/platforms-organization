@@ -48,6 +48,10 @@
         if ($link['is_done'] ?? false) {
             $metaParts[] = '<span class="text-green-600">erledigt</span>';
         }
+    } elseif ($linkType === 'helpdesk_board') {
+        if (($link['ticket_count'] ?? 0) > 0) {
+            $metaParts[] = $link['ticket_count'] . ' Tickets';
+        }
     } elseif (in_array($linkType, ['canvas', 'bmc_canvas', 'pc_canvas'])) {
         if ($link['status'] ?? null) {
             $metaParts[] = e($link['status']);

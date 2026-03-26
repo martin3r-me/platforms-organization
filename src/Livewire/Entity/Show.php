@@ -33,6 +33,7 @@ class Show extends Component
         'project' => ['label' => 'Projekte', 'icon' => 'folder', 'route' => 'planner.projects.show'],
         'planner_task' => ['label' => 'Aufgaben', 'icon' => 'clipboard-document-check', 'route' => null],
         'helpdesk_ticket' => ['label' => 'Tickets', 'icon' => 'ticket', 'route' => null],
+        'helpdesk_board' => ['label' => 'Helpdesk Boards', 'icon' => 'view-columns', 'route' => null],
         'hcm_employee' => ['label' => 'Mitarbeiter', 'icon' => 'user', 'route' => null],
         'rec_applicant' => ['label' => 'Bewerber', 'icon' => 'user-plus', 'route' => null],
         'rec_position' => ['label' => 'Positionen', 'icon' => 'briefcase', 'route' => null],
@@ -521,6 +522,8 @@ class Show extends Component
             return [];
         }
 
+        $reverseMorphMap = array_flip(Relation::morphMap());
+
         $rows = OrganizationEntityLink::query()
             ->whereIn('entity_id', $entityIds)
             ->select('entity_id', 'linkable_type', DB::raw('COUNT(*) as cnt'))
@@ -529,7 +532,9 @@ class Show extends Component
 
         $result = [];
         foreach ($rows as $row) {
-            $result[$row->entity_id][$row->linkable_type] = $row->cnt;
+            // Normalize FQCN to morph alias
+            $type = $reverseMorphMap[$row->linkable_type] ?? $row->linkable_type;
+            $result[$row->entity_id][$type] = ($result[$row->entity_id][$type] ?? 0) + $row->cnt;
         }
 
         return $result;
@@ -583,8 +588,17 @@ class Show extends Component
         }
 
         $morphMap = Relation::morphMap();
+        // Reverse map: FQCN -> morph alias (for normalizing DB entries stored as FQCN)
+        $reverseMorphMap = array_flip($morphMap);
 
         $links = OrganizationEntityLink::whereIn('entity_id', $entityIds)->get();
+
+        // Normalize linkable_type: convert FQCNs to morph aliases where possible
+        $links->each(function ($link) use ($reverseMorphMap) {
+            if (isset($reverseMorphMap[$link->linkable_type])) {
+                $link->linkable_type = $reverseMorphMap[$link->linkable_type];
+            }
+        });
 
         // Filter to resolvable morph types
         $resolvable = $links->filter(function ($link) use ($morphMap) {
@@ -684,6 +698,8 @@ class Show extends Component
                 ->selectRaw("planner_tasks.*, ({$this->timeMinutesSubquery('planner_tasks', $fqcn)}) as logged_minutes_sum"),
             'helpdesk_ticket' => $query
                 ->withCount('escalations'),
+            'helpdesk_board' => $query
+                ->withCount('tickets'),
             'canvas' => $query
                 ->withCount('buildingBlocks'),
             'bmc_canvas' => $query
@@ -722,6 +738,9 @@ class Show extends Component
                 'story_points' => $linkable->story_points?->value ?? null,
                 'due_date' => $linkable->due_date?->format('d.m.Y') ?? null,
                 'escalation_count' => (int) ($linkable->escalations_count ?? 0),
+            ],
+            'helpdesk_board' => [
+                'ticket_count' => (int) ($linkable->tickets_count ?? 0),
             ],
             'canvas', 'bmc_canvas', 'pc_canvas' => [
                 'status' => $linkable->status ?? null,

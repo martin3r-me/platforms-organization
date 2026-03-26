@@ -4,10 +4,12 @@
     $hasChildren = ($link['has_tasks'] ?? false) && !empty($link['task_items'] ?? []);
     $groupIcon = $group['icon'] ?? 'link';
     $linkType = $group['type'] ?? '';
+    $isDone = $link['done'] ?? $link['is_done'] ?? false;
 @endphp
 
 <div class="ml-6 border-l-2 border-[var(--ui-border)]/20"
     @if($hasChildren) x-data="{ taskOpen: false, init() { this.$watch('$store.tree.allExpanded', v => this.taskOpen = v); } }" @endif
+    @if($isDone) x-show="$store.tree.showDone" x-transition @endif
 >
     <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">
         <div class="flex items-center gap-2 {{ $hasChildren ? 'cursor-pointer' : '' }}"
@@ -25,11 +27,11 @@
             </div>
             @svg('heroicon-o-' . $groupIcon, 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
             @if($link['url'])
-                <a href="{{ $link['url'] }}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate" @click.stop>
+                <a href="{{ $link['url'] }}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate {{ $isDone ? 'line-through opacity-60' : '' }}" @click.stop>
                     {{ $link['name'] }}
                 </a>
             @else
-                <span class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $link['name'] }}</span>
+                <span class="text-sm font-medium text-[var(--ui-secondary)] truncate {{ $isDone ? 'line-through opacity-60' : '' }}">{{ $link['name'] }}</span>
             @endif
             @include('organization::livewire.entity.partials.link-meta', ['link' => $link, 'linkType' => $linkType])
             @if($link['status'])
@@ -47,7 +49,9 @@
     @if($hasChildren)
         <div x-show="taskOpen" x-collapse x-cloak>
             @foreach($link['task_items'] as $task)
-                <div class="ml-6 border-l-2 border-[var(--ui-border)]/20">
+                <div class="ml-6 border-l-2 border-[var(--ui-border)]/20"
+                    @if($task['is_done'] ?? false) x-show="$store.tree.showDone" x-transition @endif
+                >
                     <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">
                         <div class="flex items-center gap-2">
                             <div class="w-5 h-5 flex-shrink-0"></div>

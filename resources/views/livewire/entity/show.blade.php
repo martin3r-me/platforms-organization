@@ -290,11 +290,20 @@
                 }">
                     <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                         @if(count($this->rootEntityLinks) > 0 || count($this->treeNodes) > 0)
-                            {{-- Expand/Collapse All Button --}}
-                            <div class="flex justify-end mb-4">
+                            {{-- Tree Controls --}}
+                            <div class="flex justify-end gap-2 mb-4" x-data>
+                                <button
+                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors"
+                                    :class="$store.tree.showDone ? 'border-green-300 text-green-700 bg-green-50 hover:bg-green-100' : 'border-[var(--ui-border)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
+                                    @click="$store.tree.showDone = !$store.tree.showDone"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
+                                    </svg>
+                                    <span x-text="$store.tree.showDone ? 'Erledigte ausblenden' : 'Erledigte anzeigen'"></span>
+                                </button>
                                 <button
                                     class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-[var(--ui-border)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)] transition-colors"
-                                    x-data
                                     @click="$store.tree.allExpanded ? $store.tree.collapseAll() : $store.tree.expandAll($wire)"
                                     :disabled="$store.tree.loading"
                                 >
@@ -787,8 +796,11 @@
                 for (const link of group.items) {
                     const hasTasks = link.has_tasks && link.task_items && link.task_items.length > 0;
                     const linkId = 'link_' + link.id;
+                    const linkIsDone = link.done || link.is_done;
+                    const doneShowAttr = linkIsDone ? ' x-show="$store.tree.showDone" x-transition' : '';
+                    const doneNameClass = linkIsDone ? ' line-through opacity-60' : '';
 
-                    html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20"${hasTasks ? ` x-data="{ ${linkId}: $store.tree.allExpanded, init() { this.$watch('$store.tree.allExpanded', v => this.${linkId} = v); } }"` : ''}>`;
+                    html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20"${hasTasks ? ` x-data="{ ${linkId}: $store.tree.allExpanded, init() { this.$watch('$store.tree.allExpanded', v => this.${linkId} = v); } }"` : ''}${doneShowAttr}>`;
                     html += `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">`;
                     html += `<div class="flex items-center gap-2${hasTasks ? ' cursor-pointer' : ''}"${hasTasks ? ` @click="${linkId} = !${linkId}"` : ''}>`;
 
@@ -801,9 +813,9 @@
 
                     html += iconSvg;
                     if (link.url) {
-                        html += `<a href="${escHtml(link.url)}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate" @click.stop>${escHtml(link.name)}</a>`;
+                        html += `<a href="${escHtml(link.url)}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate${doneNameClass}" @click.stop>${escHtml(link.name)}</a>`;
                     } else {
-                        html += `<span class="text-sm font-medium text-[var(--ui-secondary)] truncate">${escHtml(link.name)}</span>`;
+                        html += `<span class="text-sm font-medium text-[var(--ui-secondary)] truncate${doneNameClass}">${escHtml(link.name)}</span>`;
                     }
                     html += renderLinkMeta(link, group.type);
                     if (link.status) {
@@ -819,13 +831,14 @@
                         const taskIconSvg = linkIconSvgs['planner_task'] || '';
                         html += `<div x-show="${linkId}" x-collapse x-cloak>`;
                         for (const task of link.task_items) {
-                            const doneClass = task.is_done ? 'line-through opacity-60' : '';
-                            html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20">`;
+                            const taskDoneClass = task.is_done ? 'line-through opacity-60' : '';
+                            const taskDoneShow = task.is_done ? ' x-show="$store.tree.showDone" x-transition' : '';
+                            html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20"${taskDoneShow}>`;
                             html += `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">`;
                             html += `<div class="flex items-center gap-2">`;
                             html += `<div class="w-5 h-5 flex-shrink-0"></div>`;
                             html += taskIconSvg;
-                            html += `<span class="text-sm font-medium text-[var(--ui-secondary)] truncate ${doneClass}">${escHtml(task.name)}</span>`;
+                            html += `<span class="text-sm font-medium text-[var(--ui-secondary)] truncate ${taskDoneClass}">${escHtml(task.name)}</span>`;
                             if (task.priority) html += `<span class="text-[10px] text-[var(--ui-muted)]">${escHtml(task.priority)}</span>`;
                             if (task.logged_minutes > 0) html += `<span class="text-[10px] text-[var(--ui-muted)]">${formatTime(task.logged_minutes)}</span>`;
                             if (task.due_date) html += `<span class="text-[10px] text-[var(--ui-muted)]">${escHtml(task.due_date)}</span>`;
@@ -844,6 +857,7 @@
 
         Alpine.store('tree', {
             allExpanded: false,
+            showDone: false,
             preloadedNodes: {},
             loading: false,
             async expandAll(wire) {

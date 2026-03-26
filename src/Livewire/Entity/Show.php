@@ -605,14 +605,22 @@ class Show extends Component
             $query = $fqcn::whereIn('id', $ids);
 
             // Eager load relations, counts and time sums per type
+            // Note: withSum('timeEntries') won't work because context_type stores
+            // the FQCN while morphMap uses aliases. Use raw subquery instead.
             if ($morphAlias === 'project') {
-                $query->with(['tasks' => fn($q) => $q->withSum('timeEntries', 'minutes')->orderBy('order')])
+                $taskFqcn = \Platform\Planner\Models\PlannerTask::class;
+                $taskTimeSql = $this->timeMinutesSubquery('planner_tasks', $taskFqcn);
+                $query->with(['tasks' => fn($q) => $q
+                        ->selectRaw("planner_tasks.*, ({$taskTimeSql}) as logged_minutes_sum")
+                        ->orderBy('order')
+                    ])
                     ->withCount([
                         'tasks',
                         'tasks as done_tasks_count' => fn($q) => $q->where('is_done', true),
                     ]);
             } elseif ($morphAlias === 'planner_task') {
-                $query->withSum('timeEntries', 'minutes');
+                $taskTimeSql = $this->timeMinutesSubquery('planner_tasks', $fqcn);
+                $query->selectRaw("planner_tasks.*, ({$taskTimeSql}) as logged_minutes_sum");
             }
 
             $models = $query->get()->keyBy('id');
@@ -683,7 +691,7 @@ class Show extends Component
                 'priority' => $linkable->priority?->value ?? null,
                 'due_date' => $linkable->due_date?->format('d.m.Y'),
                 'story_points' => $linkable->story_points?->value ?? null,
-                'logged_minutes' => (int) ($linkable->time_entries_sum_minutes ?? 0),
+                'logged_minutes' => (int) ($linkable->logged_minutes_sum ?? 0),
             ],
             'helpdesk_ticket' => [
                 'is_done' => $linkable->is_done ?? false,
@@ -694,14 +702,20 @@ class Show extends Component
         };
     }
 
+    protected function timeMinutesSubquery(string $table, string $fqcn): string
+    {
+        $quoted = DB::getPdo()->quote($fqcn);
+        return "SELECT COALESCE(SUM(minutes), 0) FROM organization_time_entries WHERE context_id = {$table}.id AND context_type = {$quoted} AND deleted_at IS NULL";
+    }
+
     protected function extractProjectMetadata($project): array
     {
         $tasks = $project->tasks ?? collect();
-        $loggedMinutes = $tasks->sum(fn($t) => (int) ($t->time_entries_sum_minutes ?? 0));
+        $loggedMinutes = $tasks->sum(fn($t) => (int) ($t->logged_minutes_sum ?? 0));
 
         $taskItems = [];
         foreach ($tasks as $task) {
-            $taskMinutes = (int) ($task->time_entries_sum_minutes ?? 0);
+            $taskMinutes = (int) ($task->logged_minutes_sum ?? 0);
             $taskItems[] = [
                 'id' => $task->id,
                 'name' => $task->title ?? '—',

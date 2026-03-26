@@ -14,18 +14,21 @@ use Platform\Organization\Models\OrganizationVsmFunction;
 use Platform\Organization\Models\OrganizationContext;
 use Platform\Core\Models\Team;
 use Platform\Core\Enums\TeamRole;
+use Platform\Organization\Services\EntityTimeResolver;
+use Illuminate\Support\Facades\DB;
 
 class Show extends Component
 {
     public OrganizationEntity $entity;
     public array $form = [];
+    public string $activeTab = 'hierarchy';
     public bool $showCreateTeamModal = false;
     public array $newTeam = [
         'name' => '',
         'parent_team_id' => null,
     ];
 
-    protected array $linkTypeConfig = [
+    public array $linkTypeConfig = [
         'project' => ['label' => 'Projekte', 'icon' => 'folder', 'route' => 'planner.projects.show'],
         'planner_task' => ['label' => 'Aufgaben', 'icon' => 'clipboard-document-check', 'route' => null],
         'helpdesk_ticket' => ['label' => 'Tickets', 'icon' => 'ticket', 'route' => null],
@@ -236,6 +239,165 @@ class Show extends Component
         ->whereNull('parent_team_id')
         ->orderBy('name')
         ->get();
+    }
+
+    #[Computed]
+    public function treeNodes(): array
+    {
+        $children = $this->entity->children()
+            ->with('type')
+            ->orderBy('name')
+            ->get();
+
+        if ($children->isEmpty()) {
+            return [];
+        }
+
+        $childIds = $children->pluck('id')->toArray();
+        $linkCounts = $this->getEntityLinkCountsForIds($childIds);
+        $childrenCounts = $this->getChildrenCountsForIds($childIds);
+
+        $resolver = new EntityTimeResolver();
+        $timeSummaries = [];
+        foreach ($children as $child) {
+            $timeSummaries[$child->id] = $this->getTimeSummaryForEntity($child, $resolver);
+        }
+
+        return $children->map(fn ($child) => $this->buildNodeData(
+            $child,
+            $linkCounts[$child->id] ?? [],
+            $timeSummaries[$child->id] ?? ['total_minutes' => 0, 'billed_minutes' => 0],
+            $childrenCounts[$child->id] ?? 0,
+        ))->toArray();
+    }
+
+    #[Computed]
+    public function entityTimeSummary(): array
+    {
+        $resolver = new EntityTimeResolver();
+        return $this->getTimeSummaryForEntity($this->entity, $resolver);
+    }
+
+    #[Computed]
+    public function cascadedTimeSummary(): array
+    {
+        $resolver = new EntityTimeResolver();
+        return $this->getTimeSummaryForEntity($this->entity, $resolver, includeChildren: true);
+    }
+
+    #[Computed]
+    public function totalLinkCount(): int
+    {
+        return OrganizationEntityLink::where('entity_id', $this->entity->id)->count();
+    }
+
+    public function loadChildNodes(int $entityId): array
+    {
+        $entity = OrganizationEntity::findOrFail($entityId);
+        $children = $entity->children()
+            ->with('type')
+            ->orderBy('name')
+            ->get();
+
+        if ($children->isEmpty()) {
+            return [];
+        }
+
+        $childIds = $children->pluck('id')->toArray();
+        $linkCounts = $this->getEntityLinkCountsForIds($childIds);
+        $childrenCounts = $this->getChildrenCountsForIds($childIds);
+
+        $resolver = new EntityTimeResolver();
+        $timeSummaries = [];
+        foreach ($children as $child) {
+            $timeSummaries[$child->id] = $this->getTimeSummaryForEntity($child, $resolver);
+        }
+
+        return $children->map(fn ($child) => $this->buildNodeData(
+            $child,
+            $linkCounts[$child->id] ?? [],
+            $timeSummaries[$child->id] ?? ['total_minutes' => 0, 'billed_minutes' => 0],
+            $childrenCounts[$child->id] ?? 0,
+        ))->toArray();
+    }
+
+    protected function buildNodeData(OrganizationEntity $entity, array $linkCounts, array $timeSummary, int $childrenCount): array
+    {
+        $iconName = null;
+        if ($entity->type->icon) {
+            $icon = str_replace('heroicons.', '', $entity->type->icon);
+            $iconMap = [
+                'user-check' => 'user',
+                'folder-kanban' => 'folder',
+                'briefcase-globe' => 'briefcase',
+                'server-cog' => 'server',
+                'package-check' => 'archive-box',
+                'badge-check' => 'check-badge',
+            ];
+            $iconName = $iconMap[$icon] ?? $icon;
+        }
+
+        return [
+            'id' => $entity->id,
+            'name' => $entity->name,
+            'code' => $entity->code,
+            'type_name' => $entity->type->name,
+            'type_icon' => $iconName,
+            'is_active' => $entity->is_active,
+            'children_count' => $childrenCount,
+            'has_children' => $childrenCount > 0,
+            'link_counts' => $linkCounts,
+            'time_summary' => $timeSummary,
+        ];
+    }
+
+    protected function getEntityLinkCountsForIds(array $entityIds): array
+    {
+        if (empty($entityIds)) {
+            return [];
+        }
+
+        $rows = OrganizationEntityLink::query()
+            ->whereIn('entity_id', $entityIds)
+            ->select('entity_id', 'linkable_type', DB::raw('COUNT(*) as cnt'))
+            ->groupBy('entity_id', 'linkable_type')
+            ->get();
+
+        $result = [];
+        foreach ($rows as $row) {
+            $result[$row->entity_id][$row->linkable_type] = $row->cnt;
+        }
+
+        return $result;
+    }
+
+    protected function getChildrenCountsForIds(array $entityIds): array
+    {
+        if (empty($entityIds)) {
+            return [];
+        }
+
+        return OrganizationEntity::query()
+            ->whereIn('parent_entity_id', $entityIds)
+            ->select('parent_entity_id', DB::raw('COUNT(*) as cnt'))
+            ->groupBy('parent_entity_id')
+            ->pluck('cnt', 'parent_entity_id')
+            ->toArray();
+    }
+
+    protected function getTimeSummaryForEntity(OrganizationEntity $entity, EntityTimeResolver $resolver, bool $includeChildren = false): array
+    {
+        try {
+            $query = $resolver->buildTimeEntryQuery($entity, $includeChildren);
+            $result = $query->selectRaw('COALESCE(SUM(minutes), 0) as total_minutes, COALESCE(SUM(CASE WHEN is_billed = 1 THEN minutes ELSE 0 END), 0) as billed_minutes')->first();
+
+            return [
+                'total_minutes' => (int) ($result?->total_minutes ?? 0),
+                'billed_minutes' => (int) ($result?->billed_minutes ?? 0),
+            ];
+        } catch (\Exception $e) {
+            return ['total_minutes' => 0, 'billed_minutes' => 0];
+        }
     }
 
     #[Computed]

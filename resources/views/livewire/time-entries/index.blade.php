@@ -138,7 +138,7 @@
                                                         {{ $dateGroup['date']->format('d.m.Y') }}
                                                     </h2>
                                                     <div class="text-sm text-[var(--ui-muted)]">
-                                                        {{ $dateGroup['date']->locale('de')->isoFormat('dddd') }} &middot; {{ $dateGroup['entity_groups']->count() }} {{ $dateGroup['entity_groups']->count() === 1 ? 'Entit&auml;t' : 'Entit&auml;ten' }}
+                                                        {{ $dateGroup['date']->locale('de')->isoFormat('dddd') }} &middot; {{ $dateGroup['entity_groups']->count() }} {{ $dateGroup['entity_groups']->count() === 1 ? 'Entität' : 'Entitäten' }}
                                                     </div>
                                                 </div>
                                                 <div class="text-right">
@@ -305,7 +305,7 @@
         @else
             <div class="text-center py-8">
                 <div class="text-sm text-[var(--ui-muted)]">
-                    Keine Zeiteintr&auml;ge gefunden.
+                    Keine Zeiteinträge gefunden.
                 </div>
             </div>
         @endif

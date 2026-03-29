@@ -4,6 +4,7 @@ namespace Platform\Organization\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Team;
@@ -93,6 +94,14 @@ class OrganizationEntityRelationship extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
+    }
+
+    /**
+     * Interlinks dieser Relationship
+     */
+    public function interlinks(): HasMany
+    {
+        return $this->hasMany(OrganizationEntityRelationshipInterlink::class, 'entity_relationship_id');
     }
 
     /**

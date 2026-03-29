@@ -7,6 +7,8 @@ use Livewire\Attributes\On;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntityRelationType;
+use Platform\Organization\Models\OrganizationEntityRelationshipInterlink;
+use Platform\Organization\Models\OrganizationInterlink;
 use Illuminate\Support\Facades\Auth;
 
 class ModalRelations extends Component
@@ -29,11 +31,18 @@ class ModalRelations extends Component
     public $availableEntities;
     public $availableRelationTypes;
 
+    // Interlink-Verwaltung pro Relation
+    public ?int $expandedRelationId = null;
+    public ?int $selectedInterlinkId = null;
+    public ?string $interlinkNote = null;
+    public $availableInterlinks;
+
     public function mount(?int $entityId = null)
     {
         $this->entityId = $entityId;
         $this->availableEntities = collect();
         $this->availableRelationTypes = collect();
+        $this->availableInterlinks = collect();
         if ($entityId) {
             $this->loadEntity();
         }
@@ -54,6 +63,7 @@ class ModalRelations extends Component
         $this->loadRelations();
         $this->loadAvailableEntities();
         $this->loadAvailableRelationTypes();
+        $this->loadAvailableInterlinks();
         $this->resetForm();
         $this->open = true;
     }
@@ -64,6 +74,8 @@ class ModalRelations extends Component
         $this->resetForm();
         $this->availableEntities = collect();
         $this->availableRelationTypes = collect();
+        $this->availableInterlinks = collect();
+        $this->expandedRelationId = null;
         $this->reset('entityId', 'entity', 'relationsFrom', 'relationsTo');
     }
 
@@ -76,12 +88,12 @@ class ModalRelations extends Component
     protected function loadRelations()
     {
         $this->relationsFrom = $this->entity->relationsFrom()
-            ->with(['toEntity.type', 'relationType', 'user'])
+            ->with(['toEntity.type', 'relationType', 'user', 'interlinks.interlink.category', 'interlinks.interlink.type'])
             ->orderBy('created_at', 'desc')
             ->get();
-            
+
         $this->relationsTo = $this->entity->relationsTo()
-            ->with(['fromEntity.type', 'relationType', 'user'])
+            ->with(['fromEntity.type', 'relationType', 'user', 'interlinks.interlink.category', 'interlinks.interlink.type'])
             ->orderBy('created_at', 'desc')
             ->get();
     }
@@ -181,6 +193,88 @@ class ModalRelations extends Component
             session()->flash('message', 'Relation erfolgreich gelöscht.');
         } catch (\Exception $e) {
             session()->flash('error', 'Fehler beim Löschen: ' . $e->getMessage());
+        }
+    }
+
+    protected function loadAvailableInterlinks()
+    {
+        $team = Auth::user()?->currentTeamRelation;
+        if (!$team) {
+            $this->availableInterlinks = collect();
+            return;
+        }
+
+        $this->availableInterlinks = OrganizationInterlink::query()
+            ->where('team_id', $team->id)
+            ->active()
+            ->with(['category', 'type'])
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function toggleRelationInterlinks(int $relationId)
+    {
+        $this->expandedRelationId = $this->expandedRelationId === $relationId ? null : $relationId;
+        $this->selectedInterlinkId = null;
+        $this->interlinkNote = null;
+    }
+
+    public function linkInterlink(int $relationId)
+    {
+        $this->validate([
+            'selectedInterlinkId' => 'required|exists:organization_interlinks,id',
+            'interlinkNote' => 'nullable|string|max:500',
+        ], [
+            'selectedInterlinkId.required' => 'Bitte wählen Sie einen Interlink aus.',
+        ]);
+
+        $relation = OrganizationEntityRelationship::findOrFail($relationId);
+
+        if ($relation->team_id !== Auth::user()?->currentTeamRelation?->id) {
+            session()->flash('error', 'Keine Berechtigung.');
+            return;
+        }
+
+        // Prüfe Duplikat
+        $exists = OrganizationEntityRelationshipInterlink::where('entity_relationship_id', $relationId)
+            ->where('interlink_id', $this->selectedInterlinkId)
+            ->exists();
+
+        if ($exists) {
+            $this->addError('selectedInterlinkId', 'Dieser Interlink ist bereits verknüpft.');
+            return;
+        }
+
+        try {
+            OrganizationEntityRelationshipInterlink::create([
+                'entity_relationship_id' => $relationId,
+                'interlink_id' => $this->selectedInterlinkId,
+                'note' => $this->interlinkNote ?: null,
+                'is_active' => true,
+            ]);
+
+            $this->selectedInterlinkId = null;
+            $this->interlinkNote = null;
+            $this->loadRelations();
+        } catch (\Exception $e) {
+            $this->addError('general', 'Fehler: ' . $e->getMessage());
+        }
+    }
+
+    public function unlinkInterlink(int $pivotId)
+    {
+        try {
+            $pivot = OrganizationEntityRelationshipInterlink::findOrFail($pivotId);
+
+            if ($pivot->team_id !== Auth::user()?->currentTeamRelation?->id) {
+                session()->flash('error', 'Keine Berechtigung.');
+                return;
+            }
+
+            $pivot->delete();
+            $this->loadRelations();
+        } catch (\Exception $e) {
+            session()->flash('error', 'Fehler beim Entfernen: ' . $e->getMessage());
         }
     }
 

@@ -84,11 +84,7 @@
                 <div class="p-4 bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60 shadow-sm hover:shadow-md transition-shadow">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-8 h-8 bg-[var(--ui-primary-10)] rounded-lg flex items-center justify-center flex-shrink-0">
-                            @if($entityGroup['entity_type_icon'])
-                                @svg('heroicon-o-' . $entityGroup['entity_type_icon'], 'w-4 h-4 text-[var(--ui-primary)]')
-                            @else
-                                @svg('heroicon-o-cube', 'w-4 h-4 text-[var(--ui-primary)]')
-                            @endif
+                            @svg('heroicon-o-' . ($entityGroup['entity_type_icon'] ?? 'cube'), 'w-4 h-4 text-[var(--ui-primary)]')
                         </div>
                         <div class="min-w-0">
                             <h3 class="text-sm font-bold text-[var(--ui-secondary)] truncate">{{ $entityGroup['entity_name'] }}</h3>
@@ -168,11 +164,7 @@
                                                     <div class="flex-1">
                                                         <div class="flex items-center gap-2 mb-1">
                                                             <div class="w-6 h-6 bg-[var(--ui-primary-10)] rounded flex items-center justify-center flex-shrink-0">
-                                                                @if($entityGroup['entity_type_icon'])
-                                                                    @svg('heroicon-o-' . $entityGroup['entity_type_icon'], 'w-3.5 h-3.5 text-[var(--ui-primary)]')
-                                                                @else
-                                                                    @svg('heroicon-o-cube', 'w-3.5 h-3.5 text-[var(--ui-primary)]')
-                                                                @endif
+                                                                @svg('heroicon-o-' . ($entityGroup['entity_type_icon'] ?? 'cube'), 'w-3.5 h-3.5 text-[var(--ui-primary)]')
                                                             </div>
                                                             <h3 class="text-xl font-semibold text-[var(--ui-secondary)]">
                                                                 {{ $entityGroup['entity_name'] }}

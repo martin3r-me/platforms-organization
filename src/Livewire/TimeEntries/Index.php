@@ -221,6 +221,20 @@ class Index extends Component
     }
 
     /**
+     * Prüft ob ein Heroicon existiert, gibt den Namen zurück oder null als Fallback.
+     */
+    protected function resolveHeroicon(string $iconName): ?string
+    {
+        try {
+            $factory = app(\BladeUI\Icons\Factory::class);
+            $factory->svg('heroicon-o-' . $iconName);
+            return $iconName;
+        } catch (\Exception $e) {
+            return null;
+        }
+    }
+
+    /**
      * Hilfsmethode: Löst eine Entry zu ihrem Entity-Gruppenschlüssel auf.
      */
     protected function resolveEntityGroupKey($entry, $entityMap): string
@@ -249,7 +263,8 @@ class Index extends Component
                     $entityName = $entity->name;
                     $entityModel = $entity;
                     $entityType = $entity->type;
-                    $entityTypeIcon = $entityType->icon ?? null;
+                    $rawIcon = $entityType->icon ?? null;
+                    $entityTypeIcon = $rawIcon ? $this->resolveHeroicon($rawIcon) : null;
                     break;
                 }
             }

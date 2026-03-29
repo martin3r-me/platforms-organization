@@ -15,12 +15,13 @@
             <div class="p-6 space-y-6">
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Suche</h3>
-                    <x-ui-input-text wire:model.live="search" name="search" placeholder="Suche nach Notizen, Benutzer, Team..." class="w-full" size="sm" />
+                    <x-ui-input-text wire:model.live="search" name="search" placeholder="Suche nach Notizen, Benutzer..." class="w-full" size="sm" />
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>
                     <div class="space-y-3">
-                        <x-ui-input-select wire:model.live="selectedTeamId" name="selectedTeamId" label="Team" :options="$this->availableTeams->pluck('name', 'id')->toArray()" :nullable="true" nullLabel="– Alle Teams –" size="sm" />
+                        <x-ui-input-select wire:model.live="selectedEntityTypeId" name="selectedEntityTypeId" label="Entitätstyp" :options="$this->availableEntityTypes->pluck('name', 'id')->toArray()" :nullable="true" nullLabel="– Alle Typen –" size="sm" />
+                        <x-ui-input-select wire:model.live="selectedEntityId" name="selectedEntityId" label="Entität" :options="$this->availableEntities->pluck('name', 'id')->toArray()" :nullable="true" nullLabel="– Alle Entitäten –" size="sm" />
                         <x-ui-input-select wire:model.live="selectedUserId" name="selectedUserId" label="Benutzer" :options="$this->availableUsers->pluck('name', 'id')->toArray()" :nullable="true" nullLabel="– Alle Benutzer –" size="sm" />
                         <x-ui-input-date wire:model.live="dateFrom" name="dateFrom" label="Von" size="sm" />
                         <x-ui-input-date wire:model.live="dateTo" name="dateTo" label="Bis" size="sm" />
@@ -48,13 +49,13 @@
                         <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs text-[var(--ui-muted)]">Gesamt Betrag</span>
-                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ number_format($this->totalAmountCents / 100, 2, ',', '.') }} €</span>
+                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ number_format($this->totalAmountCents / 100, 2, ',', '.') }} &euro;</span>
                             </div>
                         </div>
                         <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                             <div class="flex items-center justify-between mb-2">
                                 <span class="text-xs text-[var(--ui-muted)]">Abgerechnet Betrag</span>
-                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ number_format($this->totalBilledAmountCents / 100, 2, ',', '.') }} €</span>
+                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ number_format($this->totalBilledAmountCents / 100, 2, ',', '.') }} &euro;</span>
                             </div>
                         </div>
                     </div>
@@ -71,32 +72,41 @@
                     @svg('heroicon-o-calendar', 'w-5 h-5 text-[var(--ui-muted)]')
                     <span class="text-sm font-semibold text-[var(--ui-secondary)]">Zeitraum:</span>
                     <span class="text-sm text-[var(--ui-secondary)]">
-                        {{ \Carbon\Carbon::parse($dateFrom)->format('d.m.Y') }} – {{ \Carbon\Carbon::parse($dateTo)->format('d.m.Y') }}
+                        {{ \Carbon\Carbon::parse($dateFrom)->format('d.m.Y') }} &ndash; {{ \Carbon\Carbon::parse($dateTo)->format('d.m.Y') }}
                     </span>
                 </div>
             </div>
         </div>
 
-        {{-- Team Dashboard Tiles --}}
+        {{-- Entity Dashboard Tiles --}}
         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-8">
-            @foreach($this->timeEntriesGroupedByTeamAndRoot as $teamGroup)
+            @foreach($this->timeEntriesGroupedByEntity as $entityGroup)
                 <div class="p-4 bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/60 shadow-sm hover:shadow-md transition-shadow">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-8 h-8 bg-[var(--ui-primary-10)] rounded-lg flex items-center justify-center flex-shrink-0">
-                            @svg('heroicon-o-user-group', 'w-4 h-4 text-[var(--ui-primary)]')
+                            @if($entityGroup['entity_type_icon'])
+                                @svg('heroicon-o-' . $entityGroup['entity_type_icon'], 'w-4 h-4 text-[var(--ui-primary)]')
+                            @else
+                                @svg('heroicon-o-cube', 'w-4 h-4 text-[var(--ui-primary)]')
+                            @endif
                         </div>
-                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] truncate">{{ $teamGroup['team_name'] }}</h3>
+                        <div class="min-w-0">
+                            <h3 class="text-sm font-bold text-[var(--ui-secondary)] truncate">{{ $entityGroup['entity_name'] }}</h3>
+                            @if($entityGroup['entity_type'])
+                                <div class="text-xs text-[var(--ui-muted)] truncate">{{ $entityGroup['entity_type']->name }}</div>
+                            @endif
+                        </div>
                     </div>
-                    
+
                     <div class="space-y-2">
                         <div class="flex items-center justify-between">
                             <span class="text-xs text-[var(--ui-muted)]">Zeit</span>
-                            <div class="text-lg font-bold text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutesAsHours($teamGroup['total_minutes']) }}</div>
+                            <div class="text-lg font-bold text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutesAsHours($entityGroup['total_minutes']) }}</div>
                         </div>
-                        @if($teamGroup['total_amount_cents'] > 0)
+                        @if($entityGroup['total_amount_cents'] > 0)
                             <div class="flex items-center justify-between pt-2 border-t border-[var(--ui-border)]/40">
                                 <span class="text-xs text-[var(--ui-muted)]">Betrag</span>
-                                <div class="text-sm font-semibold text-[var(--ui-primary)]">{{ number_format($teamGroup['total_amount_cents'] / 100, 2, ',', '.') }} €</div>
+                                <div class="text-sm font-semibold text-[var(--ui-primary)]">{{ number_format($entityGroup['total_amount_cents'] / 100, 2, ',', '.') }} &euro;</div>
                             </div>
                         @endif
                     </div>
@@ -104,7 +114,7 @@
             @endforeach
         </div>
 
-        @if($this->timeEntriesGroupedByDateAndTeam->isNotEmpty())
+        @if($this->timeEntriesGroupedByDateAndEntity->isNotEmpty())
             {{-- Single Table for all entries --}}
             <div class="flow-root">
                 <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
@@ -114,7 +124,6 @@
                                 <tr>
                                     <th scope="col" class="py-3.5 pr-3 pl-4 text-left text-sm font-semibold text-gray-900 sm:pl-0 dark:text-white">Datum</th>
                                     <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Benutzer</th>
-                                    <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Team</th>
                                     <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Kontext</th>
                                     <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Zeit</th>
                                     <th scope="col" class="px-3 py-3.5 text-left text-sm font-semibold text-gray-900 dark:text-white">Betrag</th>
@@ -123,17 +132,17 @@
                                 </tr>
                             </thead>
                             <tbody class="divide-y divide-gray-200 bg-white dark:divide-white/10 dark:bg-gray-900">
-                                @foreach($this->timeEntriesGroupedByDateAndTeam as $dateGroup)
+                                @foreach($this->timeEntriesGroupedByDateAndEntity as $dateGroup)
                                     {{-- Date Header Row --}}
                                     <tr class="bg-[var(--ui-primary-10)] border-t-2 border-[var(--ui-primary)]/80">
-                                        <td colspan="8" class="py-4 pr-3 pl-4 sm:pl-0">
+                                        <td colspan="7" class="py-4 pr-3 pl-4 sm:pl-0">
                                             <div class="flex items-center justify-between px-2">
                                                 <div class="flex-1">
                                                     <h2 class="text-2xl font-bold text-[var(--ui-primary)] mb-1">
                                                         {{ $dateGroup['date']->format('d.m.Y') }}
                                                     </h2>
                                                     <div class="text-sm text-[var(--ui-muted)]">
-                                                        {{ $dateGroup['date']->locale('de')->isoFormat('dddd') }} · {{ $dateGroup['team_groups']->count() }} {{ $dateGroup['team_groups']->count() === 1 ? 'Team' : 'Teams' }}
+                                                        {{ $dateGroup['date']->locale('de')->isoFormat('dddd') }} &middot; {{ $dateGroup['entity_groups']->count() }} {{ $dateGroup['entity_groups']->count() === 1 ? 'Entit&auml;t' : 'Entit&auml;ten' }}
                                                     </div>
                                                 </div>
                                                 <div class="text-right">
@@ -142,7 +151,7 @@
                                                     </div>
                                                     @if($dateGroup['total_amount_cents'] > 0)
                                                         <div class="text-lg font-bold text-[var(--ui-primary)] mt-1">
-                                                            {{ number_format($dateGroup['total_amount_cents'] / 100, 2, ',', '.') }} €
+                                                            {{ number_format($dateGroup['total_amount_cents'] / 100, 2, ',', '.') }} &euro;
                                                         </div>
                                                     @endif
                                                 </div>
@@ -150,72 +159,39 @@
                                         </td>
                                     </tr>
 
-                                    {{-- Team Groups innerhalb des Datums --}}
-                                    @foreach($dateGroup['team_groups'] as $teamGroup)
-                                        {{-- Team Header Row --}}
-                                        <tr class="bg-[var(--ui-primary-5)] border-t border-[var(--ui-primary)]/40">
-                                            <td colspan="8" class="py-3 pr-3 pl-4 sm:pl-0">
-                                                <div class="flex items-center justify-between px-2">
-                                                    <div class="flex-1">
-                                                        <h3 class="text-lg font-bold text-[var(--ui-primary)] mb-1">
-                                                            {{ $teamGroup['team_name'] }}
-                                                        </h3>
-                                                        <div class="text-sm text-[var(--ui-muted)]">
-                                                            {{ $teamGroup['root_groups']->count() }} {{ $teamGroup['root_groups']->count() === 1 ? 'Projekt' : 'Projekte' }}
-                                                        </div>
-                                                    </div>
-                                                    <div class="text-right">
-                                                        <div class="text-base font-bold text-[var(--ui-primary)]">
-                                                            {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutesAsHours($teamGroup['total_minutes']) }}
-                                                        </div>
-                                                        @if($teamGroup['total_amount_cents'] > 0)
-                                                            <div class="text-base font-bold text-[var(--ui-primary)] mt-1">
-                                                                {{ number_format($teamGroup['total_amount_cents'] / 100, 2, ',', '.') }} €
-                                                            </div>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </td>
-                                        </tr>
-
-                                        {{-- Root Groups innerhalb des Teams --}}
-                                        @foreach($teamGroup['root_groups'] as $rootGroup)
-                                        {{-- Root Group Header Row --}}
+                                    {{-- Entity Groups innerhalb des Datums --}}
+                                    @foreach($dateGroup['entity_groups'] as $entityGroup)
+                                        {{-- Entity Header Row --}}
                                         <tr class="bg-[var(--ui-muted-5)]">
-                                            <td colspan="8" class="py-3 pr-3 pl-4 sm:pl-0">
+                                            <td colspan="7" class="py-3 pr-3 pl-4 sm:pl-0">
                                                 <div class="flex items-center justify-between px-2">
                                                     <div class="flex-1">
                                                         <div class="flex items-center gap-2 mb-1">
+                                                            <div class="w-6 h-6 bg-[var(--ui-primary-10)] rounded flex items-center justify-center flex-shrink-0">
+                                                                @if($entityGroup['entity_type_icon'])
+                                                                    @svg('heroicon-o-' . $entityGroup['entity_type_icon'], 'w-3.5 h-3.5 text-[var(--ui-primary)]')
+                                                                @else
+                                                                    @svg('heroicon-o-cube', 'w-3.5 h-3.5 text-[var(--ui-primary)]')
+                                                                @endif
+                                                            </div>
                                                             <h3 class="text-xl font-semibold text-[var(--ui-secondary)]">
-                                                                {{ $rootGroup['source_module_title'] ?? class_basename($rootGroup['root_type']) }}
+                                                                {{ $entityGroup['entity_name'] }}
                                                             </h3>
-                                                            <x-ui-badge variant="secondary" size="xs">
-                                                                {{ $rootGroup['root_name'] }}
-                                                            </x-ui-badge>
+                                                            @if($entityGroup['entity_type'])
+                                                                <x-ui-badge variant="secondary" size="xs">
+                                                                    {{ $entityGroup['entity_type']->name }}
+                                                                </x-ui-badge>
+                                                            @endif
+                                                            @if($entityGroup['source_module_title'])
+                                                                <x-ui-badge variant="secondary" size="xs">
+                                                                    {{ $entityGroup['source_module_title'] }}
+                                                                </x-ui-badge>
+                                                            @endif
                                                         </div>
-                                                        @php
-                                                            // Prüfe ob es unterschiedliche Contexts gibt
-                                                            $contexts = $rootGroup['entries']->map(function($entry) {
-                                                                if (!$entry->context) return null;
-                                                                $contextName = $entry->context instanceof \Platform\Core\Contracts\HasDisplayName 
-                                                                    ? $entry->context->getDisplayName() 
-                                                                    : ($entry->context->name ?? $entry->context->title ?? null);
-                                                                return [
-                                                                    'type' => class_basename($entry->context_type),
-                                                                    'name' => $contextName,
-                                                                    'id' => $entry->context_id,
-                                                                ];
-                                                            })->filter()->unique(function($item) {
-                                                                return ($item['type'] ?? '') . ':' . ($item['id'] ?? 0);
-                                                            })->values();
-                                                            
-                                                            $firstEntry = $rootGroup['entries']->first();
-                                                            $hasMultipleContexts = $contexts->count() > 1;
-                                                        @endphp
-                                                        @if($hasMultipleContexts)
-                                                            <div class="text-xs text-[var(--ui-muted)] mt-1">
+                                                        @if($entityGroup['context_details']->count() > 1)
+                                                            <div class="text-xs text-[var(--ui-muted)] mt-1 ml-8">
                                                                 <span class="font-semibold">Kontexte:</span>
-                                                                @foreach($contexts as $ctx)
+                                                                @foreach($entityGroup['context_details'] as $ctx)
                                                                     <span class="inline-block mr-2">
                                                                         {{ $ctx['type'] }}: {{ $ctx['name'] }}
                                                                     </span>
@@ -225,11 +201,11 @@
                                                     </div>
                                                     <div class="text-right">
                                                         <div class="text-sm font-medium text-[var(--ui-secondary)]">
-                                                            {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutesAsHours($rootGroup['total_minutes']) }}
+                                                            {{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutesAsHours($entityGroup['total_minutes']) }}
                                                         </div>
-                                                        @if($rootGroup['total_amount_cents'] > 0)
+                                                        @if($entityGroup['total_amount_cents'] > 0)
                                                             <div class="text-sm font-medium text-[var(--ui-secondary)] mt-1">
-                                                                {{ number_format($rootGroup['total_amount_cents'] / 100, 2, ',', '.') }} €
+                                                                {{ number_format($entityGroup['total_amount_cents'] / 100, 2, ',', '.') }} &euro;
                                                             </div>
                                                         @endif
                                                     </div>
@@ -237,8 +213,8 @@
                                             </td>
                                         </tr>
 
-                                        {{-- Entries for this Root Group --}}
-                                        @foreach($rootGroup['entries'] as $entry)
+                                        {{-- Entries for this Entity Group --}}
+                                        @foreach($entityGroup['entries'] as $entry)
                                             <tr>
                                                 <td class="py-5 pr-3 pl-4 text-sm whitespace-nowrap sm:pl-0">
                                                     <div class="text-gray-900 dark:text-white font-medium">
@@ -270,9 +246,6 @@
                                                     </div>
                                                 </td>
                                                 <td class="px-3 py-5 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
-                                                    {{ $entry->team->name ?? 'Unbekannt' }}
-                                                </td>
-                                                <td class="px-3 py-5 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
                                                     @if($entry->context)
                                                         <div class="text-gray-900 dark:text-white">
                                                             <span class="font-semibold">{{ class_basename($entry->context_type) }}:</span>
@@ -290,7 +263,7 @@
                                                             </div>
                                                         @endif
                                                     @else
-                                                        <span class="text-gray-500 dark:text-gray-400">–</span>
+                                                        <span class="text-gray-500 dark:text-gray-400">&ndash;</span>
                                                     @endif
                                                 </td>
                                                 <td class="px-3 py-5 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
@@ -301,15 +274,15 @@
                                                 <td class="px-3 py-5 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
                                                     @if($entry->amount_cents)
                                                         <div class="text-gray-900 dark:text-white font-medium">
-                                                            {{ number_format($entry->amount_cents / 100, 2, ',', '.') }} €
+                                                            {{ number_format($entry->amount_cents / 100, 2, ',', '.') }} &euro;
                                                         </div>
                                                         @if($entry->rate_cents)
                                                             <div class="mt-1 text-gray-500 dark:text-gray-400">
-                                                                {{ number_format($entry->rate_cents / 100, 2, ',', '.') }} €/h
+                                                                {{ number_format($entry->rate_cents / 100, 2, ',', '.') }} &euro;/h
                                                             </div>
                                                         @endif
                                                     @else
-                                                        <span class="text-gray-500 dark:text-gray-400">–</span>
+                                                        <span class="text-gray-500 dark:text-gray-400">&ndash;</span>
                                                     @endif
                                                 </td>
                                                 <td class="px-3 py-5 text-sm whitespace-nowrap text-gray-500 dark:text-gray-400">
@@ -325,12 +298,11 @@
                                                             {{ Str::limit($entry->note, 50) }}
                                                         </div>
                                                     @else
-                                                        <span class="text-gray-500 dark:text-gray-400">–</span>
+                                                        <span class="text-gray-500 dark:text-gray-400">&ndash;</span>
                                                     @endif
                                                 </td>
                                             </tr>
                                         @endforeach
-                                    @endforeach
                                     @endforeach
                                 @endforeach
                             </tbody>
@@ -341,10 +313,9 @@
         @else
             <div class="text-center py-8">
                 <div class="text-sm text-[var(--ui-muted)]">
-                    Keine Zeiteinträge gefunden.
+                    Keine Zeiteintr&auml;ge gefunden.
                 </div>
             </div>
         @endif
     </x-ui-page-container>
 </x-ui-page>
-

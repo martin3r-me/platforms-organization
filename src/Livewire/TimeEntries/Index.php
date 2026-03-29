@@ -4,7 +4,9 @@ namespace Platform\Organization\Livewire\TimeEntries;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
+use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityLink;
+use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\EntityTimeResolver;
 use Platform\Core\Models\Team;
@@ -13,7 +15,8 @@ use Illuminate\Support\Facades\Auth;
 class Index extends Component
 {
     public $search = '';
-    public $selectedTeamId = null;
+    public $selectedEntityTypeId = null;
+    public $selectedEntityId = null;
     public $selectedUserId = null;
     public $dateFrom = null;
     public $dateTo = null;
@@ -78,22 +81,14 @@ class Index extends Component
             ->orderBy('work_date', 'desc')
             ->orderBy('created_at', 'desc');
 
-        // Suchfilter
         if ($this->search) {
             $query->where(function($q) {
                 $q->where('note', 'like', '%' . $this->search . '%')
                   ->orWhereHas('user', function($q) {
                       $q->where('name', 'like', '%' . $this->search . '%')
                         ->orWhere('email', 'like', '%' . $this->search . '%');
-                  })
-                  ->orWhereHas('team', function($q) {
-                      $q->where('name', 'like', '%' . $this->search . '%');
                   });
             });
-        }
-
-        if ($this->selectedTeamId) {
-            $query->where('team_id', $this->selectedTeamId);
         }
 
         if ($this->selectedUserId) {
@@ -113,6 +108,36 @@ class Index extends Component
         }
 
         return $query->get();
+    }
+
+    /**
+     * Filtert timeEntries nach Entity/EntityType Selection.
+     * Wenn kein Entity-Filter aktiv, werden alle Entries zurückgegeben.
+     */
+    #[Computed]
+    public function filteredTimeEntries()
+    {
+        $entries = $this->timeEntries;
+        $entityMap = $this->contextToEntityMap;
+
+        if (!$this->selectedEntityId && !$this->selectedEntityTypeId) {
+            return $entries;
+        }
+
+        return $entries->filter(function($entry) use ($entityMap) {
+            $key = ($entry->context_type ?? '') . ':' . ($entry->context_id ?? 0);
+            $entity = $entityMap[$key] ?? null;
+
+            if ($this->selectedEntityId) {
+                return $entity && $entity->id == $this->selectedEntityId;
+            }
+
+            if ($this->selectedEntityTypeId) {
+                return $entity && $entity->entity_type_id == $this->selectedEntityTypeId;
+            }
+
+            return true;
+        })->values();
     }
 
     /**
@@ -195,183 +220,121 @@ class Index extends Component
         }
     }
 
-    #[Computed]
-    public function timeEntriesGroupedByTeamAndRoot()
+    /**
+     * Hilfsmethode: Löst eine Entry zu ihrem Entity-Gruppenschlüssel auf.
+     */
+    protected function resolveEntityGroupKey($entry, $entityMap): string
     {
-        $entityMap = $this->contextToEntityMap;
-
-        $groupedByTeam = $this->timeEntries->groupBy('team_id');
-
-        return $groupedByTeam->map(function($teamEntries, $teamId) use ($entityMap) {
-            $team = $teamEntries->first()->team ?? null;
-
-            // Innerhalb des Teams nach Entity gruppieren
-            $groupedByEntity = $teamEntries->groupBy(function($entry) use ($entityMap) {
-                $key = ($entry->context_type ?? '') . ':' . ($entry->context_id ?? 0);
-                $entity = $entityMap[$key] ?? null;
-                return $entity ? 'entity:' . $entity->id : 'none:' . $key;
-            });
-
-            $rootGroups = $groupedByEntity->map(function($entries, $groupKey) use ($entityMap) {
-                $rootName = 'Nicht verknüpft';
-                $rootType = null;
-                $rootId = null;
-                $rootModel = null;
-
-                if (str_starts_with($groupKey, 'entity:')) {
-                    $entityId = (int) substr($groupKey, 7);
-                    // Finde Entity aus einem der Entries
-                    foreach ($entries as $entry) {
-                        $key = ($entry->context_type ?? '') . ':' . ($entry->context_id ?? 0);
-                        $entity = $entityMap[$key] ?? null;
-                        if ($entity && $entity->id === $entityId) {
-                            $rootName = $entity->name;
-                            $rootType = 'OrganizationEntity';
-                            $rootId = $entity->id;
-                            $rootModel = $entity;
-                            break;
-                        }
-                    }
-                } else {
-                    // Kein Entity → nach direktem Kontext benennen
-                    $firstEntry = $entries->first();
-                    if ($firstEntry && $firstEntry->context_type && $firstEntry->context_id && class_exists($firstEntry->context_type)) {
-                        $ctxModel = $firstEntry->context_type::find($firstEntry->context_id);
-                        if ($ctxModel) {
-                            if ($ctxModel instanceof \Platform\Core\Contracts\HasDisplayName) {
-                                $rootName = $ctxModel->getDisplayName() ?? 'Unbekannt';
-                            } else {
-                                $rootName = $ctxModel->name ?? $ctxModel->title ?? 'Unbekannt';
-                            }
-                            $rootType = $firstEntry->context_type;
-                            $rootId = $firstEntry->context_id;
-                            $rootModel = $ctxModel;
-                        }
-                    }
-                }
-
-                $sourceModules = $entries->map(fn($e) => $e->source_module)->filter()->unique()->values();
-                $sourceModuleTitle = null;
-                if ($sourceModules->count() === 1) {
-                    $moduleKey = $sourceModules->first();
-                    $module = \Platform\Core\PlatformCore::getModule($moduleKey);
-                    $sourceModuleTitle = ($module && isset($module['title'])) ? $module['title'] : ucfirst($moduleKey);
-                }
-
-                return [
-                    'root_type' => $rootType,
-                    'root_id' => $rootId,
-                    'root_name' => $rootName,
-                    'root_model' => $rootModel,
-                    'entries' => $entries,
-                    'source_module_title' => $sourceModuleTitle,
-                    'total_minutes' => $entries->sum('minutes'),
-                    'total_amount_cents' => $entries->sum('amount_cents'),
-                ];
-            })->sortBy('root_name')->values();
-
-            return [
-                'team' => $team,
-                'team_name' => $team->name ?? 'Unbekanntes Team',
-                'root_groups' => $rootGroups,
-                'total_minutes' => $teamEntries->sum('minutes'),
-                'total_amount_cents' => $teamEntries->sum('amount_cents'),
-            ];
-        })->sortBy('team_name');
+        $key = ($entry->context_type ?? '') . ':' . ($entry->context_id ?? 0);
+        $entity = $entityMap[$key] ?? null;
+        return $entity ? 'entity:' . $entity->id : 'none';
     }
 
+    /**
+     * Hilfsmethode: Baut Entity-Info für eine Gruppe aus Entries.
+     */
+    protected function buildEntityGroupInfo(string $groupKey, $entries, $entityMap): array
+    {
+        $entityName = 'Nicht verknüpft';
+        $entityType = null;
+        $entityModel = null;
+        $entityTypeIcon = null;
+
+        if (str_starts_with($groupKey, 'entity:')) {
+            $entityId = (int) substr($groupKey, 7);
+            foreach ($entries as $entry) {
+                $key = ($entry->context_type ?? '') . ':' . ($entry->context_id ?? 0);
+                $entity = $entityMap[$key] ?? null;
+                if ($entity && $entity->id === $entityId) {
+                    $entityName = $entity->name;
+                    $entityModel = $entity;
+                    $entityType = $entity->type;
+                    $entityTypeIcon = $entityType->icon ?? null;
+                    break;
+                }
+            }
+        }
+
+        return [
+            'entity_name' => $entityName,
+            'entity_model' => $entityModel,
+            'entity_type' => $entityType,
+            'entity_type_icon' => $entityTypeIcon,
+            'entries' => $entries,
+            'total_minutes' => $entries->sum('minutes'),
+            'total_amount_cents' => $entries->sum('amount_cents'),
+        ];
+    }
+
+    /**
+     * Dashboard Tiles: Gruppiert nach Entity (statt Team).
+     */
     #[Computed]
-    public function timeEntriesGroupedByDateAndTeam()
+    public function timeEntriesGroupedByEntity()
     {
         $entityMap = $this->contextToEntityMap;
+        $entries = $this->filteredTimeEntries;
 
-        $groupedByDate = $this->timeEntries->groupBy(function($entry) {
+        $grouped = $entries->groupBy(function($entry) use ($entityMap) {
+            return $this->resolveEntityGroupKey($entry, $entityMap);
+        });
+
+        return $grouped->map(function($groupEntries, $groupKey) use ($entityMap) {
+            return $this->buildEntityGroupInfo($groupKey, $groupEntries, $entityMap);
+        })->sortBy('entity_name')->values();
+    }
+
+    /**
+     * Tabelle: Datum → Entity → Entries (statt Datum → Team → Entity).
+     */
+    #[Computed]
+    public function timeEntriesGroupedByDateAndEntity()
+    {
+        $entityMap = $this->contextToEntityMap;
+        $entries = $this->filteredTimeEntries;
+
+        $groupedByDate = $entries->groupBy(function($entry) {
             return $entry->work_date->format('Y-m-d');
         });
 
         return $groupedByDate->map(function($dateEntries, $dateKey) use ($entityMap) {
             $workDate = $dateEntries->first()->work_date;
 
-            $groupedByTeam = $dateEntries->groupBy('team_id');
+            $groupedByEntity = $dateEntries->groupBy(function($entry) use ($entityMap) {
+                return $this->resolveEntityGroupKey($entry, $entityMap);
+            });
 
-            $teamGroups = $groupedByTeam->map(function($teamEntries, $teamId) use ($entityMap) {
-                $team = $teamEntries->first()->team ?? null;
+            $entityGroups = $groupedByEntity->map(function($groupEntries, $groupKey) use ($entityMap) {
+                $info = $this->buildEntityGroupInfo($groupKey, $groupEntries, $entityMap);
 
-                $groupedByEntity = $teamEntries->groupBy(function($entry) use ($entityMap) {
-                    $key = ($entry->context_type ?? '') . ':' . ($entry->context_id ?? 0);
-                    $entity = $entityMap[$key] ?? null;
-                    return $entity ? 'entity:' . $entity->id : 'none:' . $key;
-                });
-
-                $rootGroups = $groupedByEntity->map(function($entries, $groupKey) use ($entityMap) {
-                    $rootName = 'Nicht verknüpft';
-                    $rootType = null;
-                    $rootId = null;
-                    $rootModel = null;
-
-                    if (str_starts_with($groupKey, 'entity:')) {
-                        $entityId = (int) substr($groupKey, 7);
-                        foreach ($entries as $entry) {
-                            $key = ($entry->context_type ?? '') . ':' . ($entry->context_id ?? 0);
-                            $entity = $entityMap[$key] ?? null;
-                            if ($entity && $entity->id === $entityId) {
-                                $rootName = $entity->name;
-                                $rootType = 'OrganizationEntity';
-                                $rootId = $entity->id;
-                                $rootModel = $entity;
-                                break;
-                            }
-                        }
-                    } else {
-                        $firstEntry = $entries->first();
-                        if ($firstEntry && $firstEntry->context_type && $firstEntry->context_id && class_exists($firstEntry->context_type)) {
-                            $ctxModel = $firstEntry->context_type::find($firstEntry->context_id);
-                            if ($ctxModel) {
-                                if ($ctxModel instanceof \Platform\Core\Contracts\HasDisplayName) {
-                                    $rootName = $ctxModel->getDisplayName() ?? 'Unbekannt';
-                                } else {
-                                    $rootName = $ctxModel->name ?? $ctxModel->title ?? 'Unbekannt';
-                                }
-                                $rootType = $firstEntry->context_type;
-                                $rootId = $firstEntry->context_id;
-                                $rootModel = $ctxModel;
-                            }
-                        }
-                    }
-
-                    $sourceModules = $entries->map(fn($e) => $e->source_module)->filter()->unique()->values();
-                    $sourceModuleTitle = null;
-                    if ($sourceModules->count() === 1) {
-                        $moduleKey = $sourceModules->first();
-                        $module = \Platform\Core\PlatformCore::getModule($moduleKey);
-                        $sourceModuleTitle = ($module && isset($module['title'])) ? $module['title'] : ucfirst($moduleKey);
-                    }
-
+                // Kontext-Details für jede Entry innerhalb der Entity-Gruppe
+                $info['context_details'] = $groupEntries->map(function($entry) {
+                    if (!$entry->context) return null;
+                    $contextName = $entry->context instanceof \Platform\Core\Contracts\HasDisplayName
+                        ? $entry->context->getDisplayName()
+                        : ($entry->context->name ?? $entry->context->title ?? null);
                     return [
-                        'root_type' => $rootType,
-                        'root_id' => $rootId,
-                        'root_name' => $rootName,
-                        'root_model' => $rootModel,
-                        'entries' => $entries,
-                        'source_module_title' => $sourceModuleTitle,
-                        'total_minutes' => $entries->sum('minutes'),
-                        'total_amount_cents' => $entries->sum('amount_cents'),
+                        'type' => class_basename($entry->context_type),
+                        'name' => $contextName,
+                        'id' => $entry->context_id,
                     ];
-                })->sortBy('root_name')->values();
+                })->filter()->unique(fn($item) => ($item['type'] ?? '') . ':' . ($item['id'] ?? 0))->values();
 
-                return [
-                    'team' => $team,
-                    'team_name' => $team->name ?? 'Unbekanntes Team',
-                    'root_groups' => $rootGroups,
-                    'total_minutes' => $teamEntries->sum('minutes'),
-                    'total_amount_cents' => $teamEntries->sum('amount_cents'),
-                ];
-            })->sortBy('team_name')->values();
+                $sourceModules = $groupEntries->map(fn($e) => $e->source_module)->filter()->unique()->values();
+                $info['source_module_title'] = null;
+                if ($sourceModules->count() === 1) {
+                    $moduleKey = $sourceModules->first();
+                    $module = \Platform\Core\PlatformCore::getModule($moduleKey);
+                    $info['source_module_title'] = ($module && isset($module['title'])) ? $module['title'] : ucfirst($moduleKey);
+                }
+
+                return $info;
+            })->sortBy('entity_name')->values();
 
             return [
                 'date' => $workDate,
                 'date_key' => $dateKey,
-                'team_groups' => $teamGroups,
+                'entity_groups' => $entityGroups,
                 'total_minutes' => $dateEntries->sum('minutes'),
                 'total_amount_cents' => $dateEntries->sum('amount_cents'),
             ];
@@ -379,17 +342,23 @@ class Index extends Component
     }
 
     #[Computed]
-    public function availableTeams()
+    public function availableEntityTypes()
     {
-        $teamIds = $this->relevantTeamIds;
+        return OrganizationEntityType::active()->ordered()->get();
+    }
 
-        if (empty($teamIds)) {
-            return collect();
+    #[Computed]
+    public function availableEntities()
+    {
+        $query = OrganizationEntity::active()
+            ->with('type')
+            ->orderBy('name');
+
+        if ($this->selectedEntityTypeId) {
+            $query->where('entity_type_id', $this->selectedEntityTypeId);
         }
 
-        return Team::whereIn('id', $teamIds)
-            ->orderBy('name')
-            ->get();
+        return $query->get();
     }
 
     #[Computed]
@@ -411,25 +380,25 @@ class Index extends Component
     #[Computed]
     public function totalMinutes()
     {
-        return $this->timeEntries->sum('minutes');
+        return $this->filteredTimeEntries->sum('minutes');
     }
 
     #[Computed]
     public function totalBilledMinutes()
     {
-        return $this->timeEntries->where('is_billed', true)->sum('minutes');
+        return $this->filteredTimeEntries->where('is_billed', true)->sum('minutes');
     }
 
     #[Computed]
     public function totalAmountCents()
     {
-        return $this->timeEntries->sum('amount_cents');
+        return $this->filteredTimeEntries->sum('amount_cents');
     }
 
     #[Computed]
     public function totalBilledAmountCents()
     {
-        return $this->timeEntries->where('is_billed', true)->sum('amount_cents');
+        return $this->filteredTimeEntries->where('is_billed', true)->sum('amount_cents');
     }
 
     #[Computed]
@@ -445,7 +414,11 @@ class Index extends Component
     }
 
     public function updatedSearch() {}
-    public function updatedSelectedTeamId() {}
+    public function updatedSelectedEntityTypeId()
+    {
+        $this->selectedEntityId = null;
+    }
+    public function updatedSelectedEntityId() {}
     public function updatedSelectedUserId() {}
     public function updatedDateFrom() {}
     public function updatedDateTo() {}

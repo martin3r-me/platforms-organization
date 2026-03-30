@@ -39,6 +39,22 @@
             <x-heroicon-o-building-office class="w-6 h-6 flex-shrink-0"/>
             <span x-show="!collapsed" class="truncate">Organisationseinheiten</span>
         </a>
+
+        {{-- Interlinks --}}
+        <a href="{{ route('organization.interlinks.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/interlinks') ||
+               window.location.pathname.endsWith('/interlinks') ||
+               window.location.pathname.endsWith('/interlinks/')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-puzzle-piece class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Interlinks</span>
+        </a>
     </div>
 
     {{-- Abschnitt: Dimensionen --}}

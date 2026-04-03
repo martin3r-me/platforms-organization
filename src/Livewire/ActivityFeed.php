@@ -4,100 +4,122 @@ namespace Platform\Organization\Livewire;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
+use Platform\ActivityLog\Models\ActivityLogActivity;
+use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationTimeEntry;
-use Platform\Organization\Models\OrganizationEntityLink;
-use Illuminate\Database\Eloquent\Relations\Relation;
-use Platform\Organization\Services\EntityLinkRegistry;
 
 class ActivityFeed extends Component
 {
-    #[Computed]
-    public function feedItems(): array
+    public ?int $entityId = null;
+    public string $newNote = '';
+
+    public function mount(?int $entityId = null): void
     {
-        $teamId = auth()->user()?->currentTeam?->id;
-        if (!$teamId) {
-            return [];
-        }
+        $this->entityId = $entityId;
+    }
 
-        $entries = OrganizationTimeEntry::where('team_id', $teamId)
-            ->with('user:id,name')
-            ->orderByDesc('created_at')
-            ->limit(15)
-            ->get();
+    #[Computed]
+    public function feedItems()
+    {
+        $query = ActivityLogActivity::with('user:id,name,profile_photo_path')
+            ->latest()
+            ->limit(20);
 
-        if ($entries->isEmpty()) {
-            return [];
-        }
-
-        $morphMap = Relation::morphMap();
-        $reverseMorphMap = array_flip($morphMap);
-        $linkTypeConfig = resolve(EntityLinkRegistry::class)->allLinkTypeConfig();
-
-        // Collect context pairs for reverse-lookup to entities
-        $contextPairs = [];
-        foreach ($entries as $entry) {
-            if ($entry->context_type && $entry->context_id) {
-                $contextPairs[$entry->context_type][] = $entry->context_id;
+        if ($this->entityId) {
+            // Entity-spezifisch: Activities der Entity selbst + ihrer TimeEntries
+            $entity = OrganizationEntity::find($this->entityId);
+            if (!$entity) {
+                return collect();
             }
-        }
 
-        // Find entity links for these context pairs
-        $entityLinkMap = []; // "morphAlias:id" => entityName
-        if (!empty($contextPairs)) {
-            $query = OrganizationEntityLink::query()->with('entity:id,name');
+            // Collect activityable pairs: Entity + all TimeEntries der Entity
+            $timeEntryIds = OrganizationTimeEntry::where('team_id', auth()->user()?->currentTeam?->id)
+                ->whereHas('context', function ($q) use ($entity) {
+                    // This won't work for morph — use raw approach
+                })
+                ->pluck('id')
+                ->toArray();
 
-            $query->where(function ($q) use ($contextPairs, $reverseMorphMap) {
-                foreach ($contextPairs as $type => $ids) {
-                    $morphAlias = $reverseMorphMap[$type] ?? $type;
-                    $q->orWhere(function ($sq) use ($morphAlias, $ids) {
-                        $sq->where('linkable_type', $morphAlias)
-                            ->whereIn('linkable_id', array_unique($ids));
+            // Simpler: alle Activities die auf diese Entity ODER auf TimeEntries zeigen
+            $entityClass = OrganizationEntity::class;
+            $timeEntryClass = OrganizationTimeEntry::class;
+
+            $query->where(function ($q) use ($entity, $entityClass, $timeEntryClass) {
+                // Activities direkt auf der Entity
+                $q->where(function ($sq) use ($entity, $entityClass) {
+                    $sq->where('activityable_type', $entityClass)
+                        ->where('activityable_id', $entity->id);
+                });
+
+                // Activities auf TimeEntries die zum Team gehören
+                // (Team-Filter passiert unten)
+                $q->orWhere(function ($sq) use ($timeEntryClass) {
+                    $sq->where('activityable_type', $timeEntryClass);
+                });
+            });
+        } else {
+            // Dashboard: alle Activities im Team-Kontext
+            $teamId = auth()->user()?->currentTeam?->id;
+            if (!$teamId) {
+                return collect();
+            }
+
+            $entityClass = OrganizationEntity::class;
+            $timeEntryClass = OrganizationTimeEntry::class;
+
+            // Entity-Activities: nur Entities dieses Teams
+            $teamEntityIds = OrganizationEntity::where('team_id', $teamId)->pluck('id')->toArray();
+            // TimeEntry-Activities: nur TimeEntries dieses Teams
+            $teamTimeEntryIds = OrganizationTimeEntry::where('team_id', $teamId)->pluck('id')->toArray();
+
+            if (empty($teamEntityIds) && empty($teamTimeEntryIds)) {
+                return collect();
+            }
+
+            $query->where(function ($q) use ($entityClass, $timeEntryClass, $teamEntityIds, $teamTimeEntryIds) {
+                if (!empty($teamEntityIds)) {
+                    $q->orWhere(function ($sq) use ($entityClass, $teamEntityIds) {
+                        $sq->where('activityable_type', $entityClass)
+                            ->whereIn('activityable_id', $teamEntityIds);
+                    });
+                }
+                if (!empty($teamTimeEntryIds)) {
+                    $q->orWhere(function ($sq) use ($timeEntryClass, $teamTimeEntryIds) {
+                        $sq->where('activityable_type', $timeEntryClass)
+                            ->whereIn('activityable_id', $teamTimeEntryIds);
                     });
                 }
             });
-
-            foreach ($query->get() as $link) {
-                $key = $link->linkable_type . ':' . $link->linkable_id;
-                if ($link->entity) {
-                    $entityLinkMap[$key] = $link->entity->name;
-                }
-            }
         }
 
-        $items = [];
-        foreach ($entries as $entry) {
-            $morphAlias = $reverseMorphMap[$entry->context_type] ?? $entry->context_type;
-            $typeLabel = $linkTypeConfig[$morphAlias]['label'] ?? null;
+        return $query->get();
+    }
 
-            $entityName = null;
-            if ($entry->context_type && $entry->context_id) {
-                $key = $morphAlias . ':' . $entry->context_id;
-                $entityName = $entityLinkMap[$key] ?? null;
-            }
-
-            // Resolve context model name
-            $contextName = null;
-            if ($entry->context_type && $entry->context_id) {
-                $fqcn = $morphMap[$morphAlias] ?? $entry->context_type;
-                if (class_exists($fqcn)) {
-                    $model = $fqcn::find($entry->context_id);
-                    $contextName = $model?->name ?? $model?->title ?? null;
-                }
-            }
-
-            $items[] = [
-                'user_name' => $entry->user?->name ?? 'Unbekannt',
-                'minutes' => $entry->minutes,
-                'note' => $entry->note,
-                'context_name' => $contextName,
-                'type_label' => $typeLabel,
-                'entity_name' => $entityName,
-                'created_at' => $entry->created_at,
-                'work_date' => $entry->work_date,
-            ];
+    public function addNote(): void
+    {
+        if (!$this->entityId) {
+            return;
         }
 
-        return $items;
+        $this->validate(['newNote' => 'required|string|max:1000']);
+
+        $entity = OrganizationEntity::find($this->entityId);
+        if ($entity) {
+            $entity->logActivity($this->newNote);
+        }
+
+        $this->newNote = '';
+        unset($this->feedItems);
+    }
+
+    public function deleteNote(int $activityId): void
+    {
+        ActivityLogActivity::where('id', $activityId)
+            ->where('activity_type', 'manual')
+            ->where('user_id', auth()->id())
+            ->delete();
+
+        unset($this->feedItems);
     }
 
     public function render()

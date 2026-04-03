@@ -7,13 +7,16 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
+use Platform\ActivityLog\Traits\LogsActivity;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
 use Symfony\Component\Uid\UuidV7;
 
 class OrganizationTimeEntry extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, LogsActivity;
+
+    protected static array $recordEvents = ['created'];
 
     protected $table = 'organization_time_entries';
 

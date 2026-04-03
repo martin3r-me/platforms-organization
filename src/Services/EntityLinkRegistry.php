@@ -91,11 +91,11 @@ class EntityLinkRegistry
 
     /**
      * Resolve zusaetzliche Activity-relevante Child-Models ueber alle Provider.
-     * Input:  [FQCN => [ids]] (direkt verlinkte Models)
-     * Output: [FQCN => [ids]] (zusaetzliche Child-Models, gemerged)
+     * Input:  [morphKey => [ids]] (direkt verlinkte Models, Keys sind Morph-Aliases oder FQCNs)
+     * Output: [morphKey => [ids]] (zusaetzliche Child-Models, Keys wie in DB gespeichert)
      *
-     * @param array<class-string, int[]> $directPairs
-     * @return array<class-string, int[]>
+     * @param array<string, int[]> $directPairs
+     * @return array<string, int[]>
      */
     public function resolveActivityChildren(array $directPairs): array
     {
@@ -103,12 +103,13 @@ class EntityLinkRegistry
         $fqcnToAlias = array_flip($morphMap);
         $result = [];
 
-        foreach ($directPairs as $fqcn => $ids) {
+        foreach ($directPairs as $morphKey => $ids) {
             if (empty($ids)) {
                 continue;
             }
 
-            $alias = $fqcnToAlias[$fqcn] ?? null;
+            // morphKey kann Alias ('project') oder FQCN sein
+            $alias = isset($this->aliasMap[$morphKey]) ? $morphKey : ($fqcnToAlias[$morphKey] ?? null);
             if (!$alias) {
                 continue;
             }
@@ -118,36 +119,36 @@ class EntityLinkRegistry
                 continue;
             }
 
+            // Provider gibt [FQCN => [ids]] zurück, wir konvertieren zu Morph-Keys
             $children = $provider->activityChildren($alias, $ids);
             foreach ($children as $childFqcn => $childIds) {
-                $result[$childFqcn] = array_merge($result[$childFqcn] ?? [], $childIds);
+                $childMorphKey = $fqcnToAlias[$childFqcn] ?? $childFqcn;
+                $result[$childMorphKey] = array_merge($result[$childMorphKey] ?? [], $childIds);
             }
         }
 
         // Deduplizieren
-        foreach ($result as $fqcn => $ids) {
-            $result[$fqcn] = array_values(array_unique($ids));
+        foreach ($result as $key => $ids) {
+            $result[$key] = array_values(array_unique($ids));
         }
 
         return $result;
     }
 
     /**
-     * Label-Map fuer Activity Feed: FQCN => singular Label.
-     * Leitet sich aus linkTypeConfig()['singular'] + morphMap ab.
+     * Label-Map fuer Activity Feed: morphKey => singular Label.
+     * Keys sind Morph-Aliases (wie in der DB gespeichert).
      *
-     * @return array<class-string, string>
+     * @return array<string, string>
      */
     public function activityTypeLabels(): array
     {
-        $morphMap = \Illuminate\Database\Eloquent\Relations\Relation::morphMap();
         $config = $this->allLinkTypeConfig();
         $labels = [];
 
         foreach ($config as $alias => $cfg) {
-            $fqcn = $morphMap[$alias] ?? null;
-            if ($fqcn && isset($cfg['singular'])) {
-                $labels[$fqcn] = $cfg['singular'];
+            if (isset($cfg['singular'])) {
+                $labels[$alias] = $cfg['singular'];
             }
         }
 

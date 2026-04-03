@@ -56,12 +56,20 @@ class ActivityFeed extends Component
     }
 
     /**
-     * Resolve alle activityable (FQCN => [ids]) Paare für den Feed.
-     * - OrganizationEntity IDs des Teams
-     * - OrganizationTimeEntry IDs des Teams
-     * - Alle über entity_links verknüpften Models (FQCN aus Morph-Map)
-     * - Child-Models via Provider activityChildren() (z.B. Project → Tasks)
+     * Resolve FQCN => morph key.
+     * Wenn FQCN in der Morph-Map steht, kommt der Alias zurück,
+     * sonst der FQCN selbst (Laravel-Default für nicht-gemappte Models).
      */
+    protected function getMorphKey(string $fqcn): string
+    {
+        static $fqcnToAlias = null;
+        if ($fqcnToAlias === null) {
+            $fqcnToAlias = array_flip(Relation::morphMap());
+        }
+
+        return $fqcnToAlias[$fqcn] ?? $fqcn;
+    }
+
     protected function resolveActivityablePairs(int $teamId): array
     {
         $pairs = [];
@@ -69,30 +77,28 @@ class ActivityFeed extends Component
 
         if ($this->entityId) {
             // Entity-spezifisch
-            $pairs[OrganizationEntity::class] = [$this->entityId];
+            $pairs[$this->getMorphKey(OrganizationEntity::class)][] = $this->entityId;
 
-            // Verknüpfte Models über entity_links
+            // Verknüpfte Models über entity_links (linkable_type IST bereits der Morph-Alias)
             $links = OrganizationEntityLink::where('entity_id', $this->entityId)->get();
             foreach ($links as $link) {
                 $fqcn = $morphMap[$link->linkable_type] ?? $link->linkable_type;
                 if (class_exists($fqcn)) {
-                    $pairs[$fqcn][] = $link->linkable_id;
+                    $pairs[$link->linkable_type][] = $link->linkable_id;
                 }
             }
 
             // TimeEntries des Teams
             $timeEntryIds = OrganizationTimeEntry::where('team_id', $teamId)->pluck('id')->toArray();
             if (!empty($timeEntryIds)) {
-                $pairs[OrganizationTimeEntry::class] = array_merge(
-                    $pairs[OrganizationTimeEntry::class] ?? [],
-                    $timeEntryIds
-                );
+                $key = $this->getMorphKey(OrganizationTimeEntry::class);
+                $pairs[$key] = array_merge($pairs[$key] ?? [], $timeEntryIds);
             }
         } else {
             // Dashboard: Team-weit
             $teamEntityIds = OrganizationEntity::where('team_id', $teamId)->pluck('id')->toArray();
             if (!empty($teamEntityIds)) {
-                $pairs[OrganizationEntity::class] = $teamEntityIds;
+                $pairs[$this->getMorphKey(OrganizationEntity::class)] = $teamEntityIds;
             }
 
             // Alle verknüpften Models über entity_links dieses Teams
@@ -100,25 +106,23 @@ class ActivityFeed extends Component
             foreach ($links as $link) {
                 $fqcn = $morphMap[$link->linkable_type] ?? $link->linkable_type;
                 if (class_exists($fqcn)) {
-                    $pairs[$fqcn][] = $link->linkable_id;
+                    $pairs[$link->linkable_type][] = $link->linkable_id;
                 }
             }
 
             // TimeEntries des Teams
             $timeEntryIds = OrganizationTimeEntry::where('team_id', $teamId)->pluck('id')->toArray();
             if (!empty($timeEntryIds)) {
-                $pairs[OrganizationTimeEntry::class] = array_merge(
-                    $pairs[OrganizationTimeEntry::class] ?? [],
-                    $timeEntryIds
-                );
+                $key = $this->getMorphKey(OrganizationTimeEntry::class);
+                $pairs[$key] = array_merge($pairs[$key] ?? [], $timeEntryIds);
             }
         }
 
         // Cascade: Child-Models über Provider resolven (z.B. Project → Tasks)
         $registry = app(EntityLinkRegistry::class);
         $childPairs = $registry->resolveActivityChildren($pairs);
-        foreach ($childPairs as $fqcn => $ids) {
-            $pairs[$fqcn] = array_merge($pairs[$fqcn] ?? [], $ids);
+        foreach ($childPairs as $morphKey => $ids) {
+            $pairs[$morphKey] = array_merge($pairs[$morphKey] ?? [], $ids);
         }
 
         // Deduplizieren

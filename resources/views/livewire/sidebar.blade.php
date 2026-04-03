@@ -55,6 +55,22 @@
             <x-heroicon-o-puzzle-piece class="w-6 h-6 flex-shrink-0"/>
             <span x-show="!collapsed" class="truncate">Interlinks</span>
         </a>
+
+        {{-- SLA-Verträge --}}
+        <a href="{{ route('organization.sla-contracts.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/sla-contracts') ||
+               window.location.pathname.endsWith('/sla-contracts') ||
+               window.location.pathname.endsWith('/sla-contracts/')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-shield-check class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">SLA-Verträge</span>
+        </a>
     </div>
 
     {{-- Abschnitt: Dimensionen --}}

@@ -16,7 +16,12 @@ class OrganizationTimeEntry extends Model
 {
     use SoftDeletes, LogsActivity;
 
-    protected static array $recordEvents = ['created'];
+    public static function bootLogsActivity(): void
+    {
+        static::created(function ($model) {
+            $model->recordActivity('created', 'system');
+        });
+    }
 
     protected $table = 'organization_time_entries';
 

@@ -88,4 +88,39 @@ class EntityLinkRegistry
 
         return $this->cachedTimeTrackableCascades;
     }
+
+    /**
+     * Ruft metrics() aller Provider auf und merged Ergebnisse per Entity.
+     *
+     * @param array<int, array<string, int[]>> $linksByEntityAndType [entityId => [morphAlias => [linkable_ids]]]
+     * @return array<int, array> [entityId => merged metrics]
+     */
+    public function computeMetricsBatch(array $linksByEntityAndType): array
+    {
+        // Regroup: [morphAlias => [entityId => [linkable_ids]]]
+        $byAlias = [];
+        foreach ($linksByEntityAndType as $entityId => $typeMap) {
+            foreach ($typeMap as $morphAlias => $ids) {
+                $byAlias[$morphAlias][$entityId] = $ids;
+            }
+        }
+
+        $result = [];
+        foreach ($byAlias as $morphAlias => $linksByEntity) {
+            $provider = $this->getProvider($morphAlias);
+            if (!$provider) {
+                continue;
+            }
+
+            $metrics = $provider->metrics($morphAlias, $linksByEntity);
+
+            foreach ($metrics as $entityId => $entityMetrics) {
+                foreach ($entityMetrics as $key => $value) {
+                    $result[$entityId][$key] = ($result[$entityId][$key] ?? 0) + $value;
+                }
+            }
+        }
+
+        return $result;
+    }
 }

@@ -16,6 +16,7 @@ use Platform\Core\Models\Team;
 use Platform\Core\Enums\TeamRole;
 use Platform\Organization\Services\EntityTimeResolver;
 use Platform\Organization\Services\EntityLinkRegistry;
+use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -331,6 +332,49 @@ class Show extends Component
                 'max_minutes' => 0,
             ];
         }
+    }
+
+    #[Computed]
+    public function snapshotTrend(): array
+    {
+        $snapshots = OrganizationEntitySnapshot::where('entity_id', $this->entity->id)
+            ->forDateRange(now()->subDays(14), now())
+            ->orderBy('snapshot_date')
+            ->orderBy('snapshot_period')
+            ->get();
+
+        if ($snapshots->isEmpty()) {
+            return [];
+        }
+
+        $maxItemsTotal = 0;
+        $maxMinutes = 0;
+        $data = [];
+
+        foreach ($snapshots as $snap) {
+            $metrics = $snap->metrics;
+            $itemsTotal = $metrics['items_total'] ?? 0;
+            $totalMin = $metrics['time_total_minutes'] ?? 0;
+
+            if ($itemsTotal > $maxItemsTotal) $maxItemsTotal = $itemsTotal;
+            if ($totalMin > $maxMinutes) $maxMinutes = $totalMin;
+
+            $data[] = [
+                'date' => $snap->snapshot_date->format('d.m.'),
+                'period' => $snap->snapshot_period,
+                'items_total' => $itemsTotal,
+                'items_done' => $metrics['items_done'] ?? 0,
+                'links_count' => $metrics['links_count'] ?? 0,
+                'time_total_minutes' => $totalMin,
+                'time_billed_minutes' => $metrics['time_billed_minutes'] ?? 0,
+            ];
+        }
+
+        return [
+            'snapshots' => $data,
+            'max_items_total' => $maxItemsTotal,
+            'max_minutes' => $maxMinutes,
+        ];
     }
 
     #[Computed]

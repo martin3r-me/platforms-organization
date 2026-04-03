@@ -4,10 +4,12 @@ namespace Platform\Organization;
 
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Schema;
+use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Platform\Organization\Console\Commands\GenerateReportsCommand;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
+use Platform\Organization\Console\Commands\SnapshotEntitiesCommand;
 use Platform\Core\PlatformCore;
 use Platform\Core\Routing\ModuleRouter;
 use RecursiveDirectoryIterator;
@@ -22,6 +24,7 @@ class OrganizationServiceProvider extends ServiceProvider
             $this->commands([
                 SeedOrganizationData::class,
                 GenerateReportsCommand::class,
+                SnapshotEntitiesCommand::class,
             ]);
         }
 
@@ -83,6 +86,9 @@ class OrganizationServiceProvider extends ServiceProvider
 
         // Tools registrieren (loose gekoppelt - für AI/Chat)
         $this->registerTools();
+
+        // Scheduler registrieren
+        $this->registerSchedule();
     }
 
     protected function registerLivewireComponents(): void
@@ -118,6 +124,17 @@ class OrganizationServiceProvider extends ServiceProvider
 
             Livewire::component($alias, $class);
         }
+    }
+
+    protected function registerSchedule(): void
+    {
+        Schedule::command('organization:snapshot-entities --period=morning')
+            ->dailyAt('08:00')
+            ->withoutOverlapping();
+
+        Schedule::command('organization:snapshot-entities --period=evening')
+            ->dailyAt('18:00')
+            ->withoutOverlapping();
     }
 
     /**

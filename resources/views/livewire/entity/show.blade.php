@@ -169,6 +169,69 @@
                     </div>
                 </div>
 
+                {{-- Snapshot Trend (14 Tage) --}}
+                @php $trend = $this->snapshotTrend; @endphp
+                @if(!empty($trend) && count($trend['snapshots'] ?? []) >= 2)
+                    <div class="mt-6 pt-6 border-t border-[var(--ui-border)]/40">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-xs font-medium text-[var(--ui-muted)]">Trend (14 Tage)</span>
+                            <div class="flex items-center gap-3">
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                                    <span class="text-[10px] text-[var(--ui-muted)]">Items erledigt</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-blue-200"></span>
+                                    <span class="text-[10px] text-[var(--ui-muted)]">Items gesamt</span>
+                                </div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="w-2 h-2 rounded-full bg-violet-400"></span>
+                                    <span class="text-[10px] text-[var(--ui-muted)]">Stunden</span>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="flex items-end gap-1" style="height: 80px;">
+                            @foreach($trend['snapshots'] as $idx => $snap)
+                                @php
+                                    $maxItems = max($trend['max_items_total'], 1);
+                                    $maxMin = max($trend['max_minutes'], 1);
+                                    $totalH = round(($snap['items_total'] / $maxItems) * 64);
+                                    $doneH = $snap['items_total'] > 0 ? max(1, round(($snap['items_done'] / $maxItems) * 64)) : 0;
+                                    $timeH = $snap['time_total_minutes'] > 0 ? max(2, round(($snap['time_total_minutes'] / $maxMin) * 64)) : 0;
+                                @endphp
+                                <div class="flex-1 flex flex-col items-center h-full justify-end gap-px group relative"
+                                     title="{{ $snap['date'] }} {{ $snap['period'] }}: {{ $snap['items_done'] }}/{{ $snap['items_total'] }} Items, {{ intdiv($snap['time_total_minutes'], 60) }}:{{ str_pad($snap['time_total_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h">
+                                    <div class="w-full flex gap-px justify-center flex-1 items-end">
+                                        {{-- Items bar --}}
+                                        <div class="flex-1 flex flex-col justify-end">
+                                            @if($snap['items_total'] > 0)
+                                                <div class="w-full bg-blue-200 rounded-t" style="height: {{ $totalH }}px;">
+                                                    <div class="w-full bg-blue-500 rounded-t" style="height: {{ $doneH }}px;"></div>
+                                                </div>
+                                            @else
+                                                <div class="w-full bg-[var(--ui-border)]/20 rounded-t" style="height: 1px;"></div>
+                                            @endif
+                                        </div>
+                                        {{-- Time bar --}}
+                                        <div class="flex-1 flex flex-col justify-end">
+                                            @if($snap['time_total_minutes'] > 0)
+                                                <div class="w-full bg-violet-400 rounded-t" style="height: {{ $timeH }}px;"></div>
+                                            @else
+                                                <div class="w-full bg-[var(--ui-border)]/20 rounded-t" style="height: 1px;"></div>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    @if($idx === 0 || $idx === count($trend['snapshots']) - 1 || $idx % 4 === 0)
+                                        <div class="text-[9px] text-[var(--ui-muted)] mt-0.5 leading-none">{{ $snap['date'] }}</div>
+                                    @else
+                                        <div class="h-[11px]"></div>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 {{-- Monthly Time Chart --}}
                 @php
                     $monthlyData = $this->monthlyTimeData;

@@ -47,4 +47,13 @@ interface EntityLinkProvider
      * Nur Typen mit Zeiterfassung. Leeres Array wenn keine.
      */
     public function timeTrackableCascades(): array;
+
+    /**
+     * Batch-compute KPIs fuer Snapshot-Speicherung.
+     *
+     * @param string $morphAlias Der Morph-Alias (z.B. 'project')
+     * @param array<int, int[]> $linksByEntity [entityId => [linkable_id, ...]]
+     * @return array<int, array> [entityId => ['items_total' => X, 'items_done' => Y]]
+     */
+    public function metrics(string $morphAlias, array $linksByEntity): array;
 }

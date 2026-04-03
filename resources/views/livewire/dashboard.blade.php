@@ -35,7 +35,7 @@
 
     <x-slot name="activity">
         <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <div class="p-6 text-sm text-[var(--ui-muted)]">Keine Aktivitäten verfügbar</div>
+            <livewire:organization-activity-feed />
         </x-ui-page-sidebar>
     </x-slot>
 

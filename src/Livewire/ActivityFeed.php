@@ -13,6 +13,12 @@ class ActivityFeed extends Component
     public ?int $entityId = null;
     public string $newNote = '';
 
+    /** Only query activities for these known model types */
+    protected static array $allowedTypes = [
+        OrganizationEntity::class,
+        OrganizationTimeEntry::class,
+    ];
+
     public function mount(?int $entityId = null): void
     {
         $this->entityId = $entityId;
@@ -21,57 +27,40 @@ class ActivityFeed extends Component
     #[Computed]
     public function feedItems()
     {
+        $teamId = auth()->user()?->currentTeam?->id;
+        if (!$teamId) {
+            return collect();
+        }
+
+        $entityClass = OrganizationEntity::class;
+        $timeEntryClass = OrganizationTimeEntry::class;
+
+        // Pre-fetch IDs scoped to this team
+        $teamEntityIds = OrganizationEntity::where('team_id', $teamId)->pluck('id')->toArray();
+        $teamTimeEntryIds = OrganizationTimeEntry::where('team_id', $teamId)->pluck('id')->toArray();
+
         $query = ActivityLogActivity::with('user:id,name,profile_photo_path')
+            ->whereIn('activityable_type', static::$allowedTypes)
             ->latest()
             ->limit(20);
 
         if ($this->entityId) {
-            // Entity-spezifisch: Activities der Entity selbst + ihrer TimeEntries
-            $entity = OrganizationEntity::find($this->entityId);
-            if (!$entity) {
-                return collect();
-            }
-
-            // Collect activityable pairs: Entity + all TimeEntries der Entity
-            $timeEntryIds = OrganizationTimeEntry::where('team_id', auth()->user()?->currentTeam?->id)
-                ->whereHas('context', function ($q) use ($entity) {
-                    // This won't work for morph — use raw approach
-                })
-                ->pluck('id')
-                ->toArray();
-
-            // Simpler: alle Activities die auf diese Entity ODER auf TimeEntries zeigen
-            $entityClass = OrganizationEntity::class;
-            $timeEntryClass = OrganizationTimeEntry::class;
-
-            $query->where(function ($q) use ($entity, $entityClass, $timeEntryClass) {
+            $query->where(function ($q) use ($entityClass, $timeEntryClass, $teamTimeEntryIds) {
                 // Activities direkt auf der Entity
-                $q->where(function ($sq) use ($entity, $entityClass) {
+                $q->where(function ($sq) use ($entityClass) {
                     $sq->where('activityable_type', $entityClass)
-                        ->where('activityable_id', $entity->id);
+                        ->where('activityable_id', $this->entityId);
                 });
 
-                // Activities auf TimeEntries die zum Team gehören
-                // (Team-Filter passiert unten)
-                $q->orWhere(function ($sq) use ($timeEntryClass) {
-                    $sq->where('activityable_type', $timeEntryClass);
-                });
+                // Activities auf TimeEntries dieses Teams
+                if (!empty($teamTimeEntryIds)) {
+                    $q->orWhere(function ($sq) use ($timeEntryClass, $teamTimeEntryIds) {
+                        $sq->where('activityable_type', $timeEntryClass)
+                            ->whereIn('activityable_id', $teamTimeEntryIds);
+                    });
+                }
             });
         } else {
-            // Dashboard: alle Activities im Team-Kontext
-            $teamId = auth()->user()?->currentTeam?->id;
-            if (!$teamId) {
-                return collect();
-            }
-
-            $entityClass = OrganizationEntity::class;
-            $timeEntryClass = OrganizationTimeEntry::class;
-
-            // Entity-Activities: nur Entities dieses Teams
-            $teamEntityIds = OrganizationEntity::where('team_id', $teamId)->pluck('id')->toArray();
-            // TimeEntry-Activities: nur TimeEntries dieses Teams
-            $teamTimeEntryIds = OrganizationTimeEntry::where('team_id', $teamId)->pluck('id')->toArray();
-
             if (empty($teamEntityIds) && empty($teamTimeEntryIds)) {
                 return collect();
             }

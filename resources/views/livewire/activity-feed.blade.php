@@ -2,7 +2,7 @@
     {{-- Timeline --}}
     <div class="flex-1 overflow-y-auto p-4 space-y-3">
         @forelse($this->feedItems as $activity)
-            <div class="flex gap-3">
+            <div class="flex gap-3 group">
                 <div class="flex-shrink-0 mt-0.5">
                     @if($activity->activity_type === 'manual')
                         <div class="w-6 h-6 rounded-full bg-[var(--ui-primary-10)] flex items-center justify-center">
@@ -27,10 +27,16 @@
                     @endif
                 </div>
                 <div class="flex-grow min-w-0">
+                    @php
+                        $isTimeEntry = $activity->activityable_type === \Platform\Organization\Models\OrganizationTimeEntry::class;
+                        $isEntity = $activity->activityable_type === \Platform\Organization\Models\OrganizationEntity::class;
+                        $shortType = class_basename($activity->activityable_type ?? '');
+                    @endphp
+
                     @if($activity->activity_type === 'manual')
                         <p class="text-sm text-[var(--ui-secondary)]">{{ $activity->message }}</p>
                     @elseif($activity->name === 'created')
-                        @if($activity->activityable_type === \Platform\Organization\Models\OrganizationTimeEntry::class)
+                        @if($isTimeEntry)
                             @php
                                 $props = $activity->properties ?? [];
                                 $minutes = $props['minutes'] ?? 0;
@@ -42,15 +48,27 @@
                                     — <span class="italic">"{{ \Illuminate\Support\Str::limit($props['note'], 60) }}"</span>
                                 @endif
                             </p>
+                        @elseif($isEntity)
+                            <p class="text-sm text-[var(--ui-muted)]">Entity erstellt</p>
                         @else
-                            <p class="text-sm text-[var(--ui-muted)]">Erstellt</p>
+                            <p class="text-sm text-[var(--ui-muted)]">
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $shortType }}</span> erstellt
+                            </p>
                         @endif
                     @elseif($activity->name === 'updated' && is_array($activity->properties))
                         <p class="text-sm text-[var(--ui-muted)]">
+                            @if(!$isEntity && !$isTimeEntry)
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $shortType }}:</span>
+                            @endif
                             {{ collect($activity->properties)->keys()->map(fn($k) => ucfirst(str_replace('_', ' ', $k)))->implode(', ') }} geändert
                         </p>
                     @elseif($activity->name === 'deleted')
-                        <p class="text-sm text-[var(--ui-muted)]">Gelöscht</p>
+                        <p class="text-sm text-[var(--ui-muted)]">
+                            @if(!$isEntity && !$isTimeEntry)
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $shortType }}</span>
+                            @endif
+                            gelöscht
+                        </p>
                     @endif
 
                     <div class="flex items-center gap-2 mt-0.5">

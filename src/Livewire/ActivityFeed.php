@@ -4,20 +4,16 @@ namespace Platform\Organization\Livewire;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Platform\ActivityLog\Models\ActivityLogActivity;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationTimeEntry;
 
 class ActivityFeed extends Component
 {
     public ?int $entityId = null;
     public string $newNote = '';
-
-    /** Only query activities for these known model types */
-    protected static array $allowedTypes = [
-        OrganizationEntity::class,
-        OrganizationTimeEntry::class,
-    ];
 
     public function mount(?int $entityId = null): void
     {
@@ -32,56 +28,98 @@ class ActivityFeed extends Component
             return collect();
         }
 
-        $entityClass = OrganizationEntity::class;
-        $timeEntryClass = OrganizationTimeEntry::class;
+        // Sammle alle activityable-Paare (FQCN => [ids]) die relevant sind
+        $activityablePairs = $this->resolveActivityablePairs($teamId);
 
-        // Pre-fetch IDs scoped to this team
-        $teamEntityIds = OrganizationEntity::where('team_id', $teamId)->pluck('id')->toArray();
-        $teamTimeEntryIds = OrganizationTimeEntry::where('team_id', $teamId)->pluck('id')->toArray();
+        if (empty($activityablePairs)) {
+            return collect();
+        }
 
         $query = ActivityLogActivity::with('user:id,name,profile_photo_path')
-            ->whereIn('activityable_type', static::$allowedTypes)
             ->latest()
             ->limit(20);
 
-        if ($this->entityId) {
-            $query->where(function ($q) use ($entityClass, $timeEntryClass, $teamTimeEntryIds) {
-                // Activities direkt auf der Entity
-                $q->where(function ($sq) use ($entityClass) {
-                    $sq->where('activityable_type', $entityClass)
-                        ->where('activityable_id', $this->entityId);
+        // Filter: nur Activities für bekannte (type, id) Paare
+        $query->where(function ($q) use ($activityablePairs) {
+            foreach ($activityablePairs as $type => $ids) {
+                $q->orWhere(function ($sq) use ($type, $ids) {
+                    $sq->where('activityable_type', $type);
+                    if ($ids !== null) {
+                        $sq->whereIn('activityable_id', $ids);
+                    }
                 });
-
-                // Activities auf TimeEntries dieses Teams
-                if (!empty($teamTimeEntryIds)) {
-                    $q->orWhere(function ($sq) use ($timeEntryClass, $teamTimeEntryIds) {
-                        $sq->where('activityable_type', $timeEntryClass)
-                            ->whereIn('activityable_id', $teamTimeEntryIds);
-                    });
-                }
-            });
-        } else {
-            if (empty($teamEntityIds) && empty($teamTimeEntryIds)) {
-                return collect();
             }
-
-            $query->where(function ($q) use ($entityClass, $timeEntryClass, $teamEntityIds, $teamTimeEntryIds) {
-                if (!empty($teamEntityIds)) {
-                    $q->orWhere(function ($sq) use ($entityClass, $teamEntityIds) {
-                        $sq->where('activityable_type', $entityClass)
-                            ->whereIn('activityable_id', $teamEntityIds);
-                    });
-                }
-                if (!empty($teamTimeEntryIds)) {
-                    $q->orWhere(function ($sq) use ($timeEntryClass, $teamTimeEntryIds) {
-                        $sq->where('activityable_type', $timeEntryClass)
-                            ->whereIn('activityable_id', $teamTimeEntryIds);
-                    });
-                }
-            });
-        }
+        });
 
         return $query->get();
+    }
+
+    /**
+     * Resolve alle activityable (FQCN => [ids]) Paare für den Feed.
+     * - OrganizationEntity IDs des Teams
+     * - OrganizationTimeEntry IDs des Teams
+     * - Alle über entity_links verknüpften Models (FQCN aus Morph-Map)
+     */
+    protected function resolveActivityablePairs(int $teamId): array
+    {
+        $pairs = [];
+        $morphMap = Relation::morphMap();
+
+        if ($this->entityId) {
+            // Entity-spezifisch
+            $pairs[OrganizationEntity::class] = [$this->entityId];
+
+            // Verknüpfte Models über entity_links
+            $links = OrganizationEntityLink::where('entity_id', $this->entityId)->get();
+            foreach ($links as $link) {
+                $fqcn = $morphMap[$link->linkable_type] ?? $link->linkable_type;
+                if (class_exists($fqcn)) {
+                    $pairs[$fqcn][] = $link->linkable_id;
+                }
+            }
+
+            // TimeEntries des Teams
+            $timeEntryIds = OrganizationTimeEntry::where('team_id', $teamId)->pluck('id')->toArray();
+            if (!empty($timeEntryIds)) {
+                $pairs[OrganizationTimeEntry::class] = array_merge(
+                    $pairs[OrganizationTimeEntry::class] ?? [],
+                    $timeEntryIds
+                );
+            }
+        } else {
+            // Dashboard: Team-weit
+            $teamEntityIds = OrganizationEntity::where('team_id', $teamId)->pluck('id')->toArray();
+            if (!empty($teamEntityIds)) {
+                $pairs[OrganizationEntity::class] = $teamEntityIds;
+            }
+
+            // Alle verknüpften Models über entity_links dieses Teams
+            $links = OrganizationEntityLink::whereIn('entity_id', $teamEntityIds)->get();
+            foreach ($links as $link) {
+                $fqcn = $morphMap[$link->linkable_type] ?? $link->linkable_type;
+                if (class_exists($fqcn)) {
+                    $pairs[$fqcn][] = $link->linkable_id;
+                }
+            }
+
+            // TimeEntries des Teams
+            $timeEntryIds = OrganizationTimeEntry::where('team_id', $teamId)->pluck('id')->toArray();
+            if (!empty($timeEntryIds)) {
+                $pairs[OrganizationTimeEntry::class] = array_merge(
+                    $pairs[OrganizationTimeEntry::class] ?? [],
+                    $timeEntryIds
+                );
+            }
+        }
+
+        // Deduplizieren
+        foreach ($pairs as $type => $ids) {
+            if (is_array($ids)) {
+                $pairs[$type] = array_values(array_unique($ids));
+            }
+        }
+
+        return $pairs;
     }
 
     public function addNote(): void

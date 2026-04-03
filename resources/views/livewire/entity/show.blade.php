@@ -286,7 +286,8 @@
                 {{-- Tab: Hierarchie --}}
                 <div x-show="tab === 'hierarchy'" x-cloak x-data="{
                     linkConfig: {{ Js::from(collect($this->linkTypeConfig)->map(fn($c) => ['label' => $c['label'], 'icon' => $c['icon']])) }},
-                    linkIconSvgs: {{ Js::from($this->linkTypeIconSvgs) }}
+                    linkIconSvgs: {{ Js::from($this->linkTypeIconSvgs) }},
+                    displayRules: {{ Js::from($this->displayRules) }}
                 }">
                     <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                         @if(count($this->rootEntityLinks) > 0 || count($this->treeNodes) > 0)
@@ -626,6 +627,7 @@
         Alpine.store('treeConfig', {
             linkConfig: @js(collect($this->linkTypeConfig)->map(fn($c) => ['label' => $c['label'], 'icon' => $c['icon']])),
             linkIconSvgs: @js($this->linkTypeIconSvgs),
+            displayRules: @js($this->displayRules),
         });
         const escHtml = (s) => s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : '';
 
@@ -645,53 +647,62 @@
             return Math.floor(open / 60) + ':' + String(open % 60).padStart(2, '0') + 'h offen';
         }
 
-        // Render rich metadata for a link item
+        // Generic rule-based metadata renderer
         function renderLinkMeta(link, type) {
+            const rules = Alpine.store('treeConfig').displayRules[type];
+            if (!rules) return '';
             let parts = [];
-            if (type === 'project') {
-                if (link.task_count > 0) parts.push(`${link.done_task_count || 0}/${link.task_count} Tasks`);
-                if (link.logged_minutes > 0) parts.push(formatTime(link.logged_minutes));
-                if (link.done) parts.push('<span class="text-green-600">erledigt</span>');
-            } else if (type === 'planner_task') {
-                if (link.priority) parts.push(escHtml(link.priority));
-                if (link.logged_minutes > 0) parts.push(formatTime(link.logged_minutes));
-                if (link.due_date) parts.push(escHtml(link.due_date));
-                if (link.is_done) parts.push('<span class="text-green-600">erledigt</span>');
-            } else if (type === 'helpdesk_ticket') {
-                if (link.priority) parts.push(escHtml(link.priority));
-                if (link.escalation_level) parts.push('<span class="text-red-600">' + escHtml(link.escalation_level) + '</span>');
-                if (link.story_points) parts.push(escHtml(link.story_points) + ' SP');
-                if (link.due_date) parts.push(escHtml(link.due_date));
-                if (link.escalation_count > 0) parts.push(link.escalation_count + ' Eskalation' + (link.escalation_count > 1 ? 'en' : ''));
-                if (link.is_done) parts.push('<span class="text-green-600">erledigt</span>');
-            } else if (type === 'helpdesk_board') {
-                if (link.ticket_count > 0) parts.push(link.ticket_count + ' Tickets');
-            } else if (type === 'canvas' || type === 'bmc_canvas' || type === 'pc_canvas') {
-                if (link.status) parts.push(escHtml(link.status));
-                if (link.block_count > 0) parts.push(link.block_count + ' Blocks');
-            } else if (type === 'okr') {
-                if (link.objective_count > 0) parts.push(link.objective_count + ' Objectives');
-                if (link.cycle_count > 0) parts.push(link.cycle_count + ' Zyklen');
-                if (link.performance_score != null) parts.push(link.performance_score + '%');
-            } else if (type === 'notes_note') {
-                if (link.is_pinned) parts.push('angepinnt');
-                if (link.is_done) parts.push('<span class="text-green-600">erledigt</span>');
-            } else if (type === 'slides_presentation') {
-                if (link.slide_count > 0) parts.push(link.slide_count + ' Folien');
-                if (link.is_published) parts.push('<span class="text-green-600">veröffentlicht</span>');
-            } else if (type === 'sheets_spreadsheet') {
-                if (link.worksheet_count > 0) parts.push(link.worksheet_count + ' Blätter');
-            } else if (type === 'rec_applicant') {
-                if (link.applied_at) parts.push('beworben ' + escHtml(link.applied_at));
-                if (link.posting_count > 0) parts.push(link.posting_count + ' Stellen');
-                if (link.progress > 0) parts.push(link.progress + '% Fortschritt');
-                if (link.is_active === false) parts.push('<span class="text-amber-600">inaktiv</span>');
-            } else if (type === 'rec_position') {
-                if (link.posting_count > 0) parts.push(link.posting_count + ' Ausschreibungen');
-                if (link.is_active === false) parts.push('<span class="text-amber-600">inaktiv</span>');
-            } else if (type === 'hcm_employee') {
-                if (link.employee_number) parts.push('#' + escHtml(link.employee_number));
-                if (link.is_active === false) parts.push('<span class="text-amber-600">inaktiv</span>');
+            for (const rule of rules) {
+                if (rule.format === 'expandable_children') continue;
+                const val = link[rule.field];
+                if (val === null || val === undefined) continue;
+                switch (rule.format) {
+                    case 'text':
+                        if (!val) break;
+                        let text = escHtml(String(val));
+                        if (rule.suffix) text += ' ' + escHtml(rule.suffix);
+                        if (rule.css_class) text = `<span class="${escHtml(rule.css_class)}">${text}</span>`;
+                        parts.push(text);
+                        break;
+                    case 'prefixed_text':
+                        if (!val) break;
+                        parts.push((rule.prefix ? escHtml(rule.prefix) + ' ' : '') + escHtml(String(val)));
+                        break;
+                    case 'time':
+                        if (val > 0) parts.push(formatTime(val));
+                        break;
+                    case 'count':
+                        if (val > 0) {
+                            let suffix = rule.suffix || '';
+                            if (rule.suffix_plural && val > 1) suffix = rule.suffix_plural;
+                            parts.push(val + (suffix ? ' ' + suffix : ''));
+                        }
+                        break;
+                    case 'count_ratio':
+                        if (val > 0) {
+                            const done = link[rule.done_field] || 0;
+                            parts.push(`${done}/${val}` + (rule.suffix ? ' ' + rule.suffix : ''));
+                        }
+                        break;
+                    case 'percentage':
+                        if (val > 0) parts.push(val + '%' + (rule.suffix ? ' ' + rule.suffix : ''));
+                        break;
+                    case 'boolean_done':
+                        if (val) parts.push('<span class="text-green-600">erledigt</span>');
+                        break;
+                    case 'boolean_active':
+                        if (val === false) parts.push('<span class="text-amber-600">inaktiv</span>');
+                        break;
+                    case 'boolean_published':
+                        if (val) parts.push('<span class="text-green-600">veröffentlicht</span>');
+                        break;
+                    case 'boolean_pinned':
+                        if (val) parts.push('angepinnt');
+                        break;
+                    case 'badge':
+                        if (val) parts.push(escHtml(String(val)));
+                        break;
+                }
             }
             if (parts.length === 0) return '';
             return `<span class="inline-flex items-center gap-1.5 text-[10px] text-[var(--ui-muted)] flex-shrink-0">${parts.join(' · ')}</span>`;
@@ -771,6 +782,13 @@
             return html;
         };
 
+        // Find expandable_children rule for a type
+        function getExpandableRule(type) {
+            const rules = Alpine.store('treeConfig').displayRules[type];
+            if (!rules) return null;
+            return rules.find(r => r.format === 'expandable_children') || null;
+        }
+
         // Shared render function for link groups (used at all Alpine levels)
         window._treeRenderLinkGroups = function(node, linkConfig, linkIconSvgs) {
             if (!node.own_links_grouped || node.own_links_grouped.length === 0) return '';
@@ -778,6 +796,7 @@
             let html = '';
             for (const group of node.own_links_grouped) {
                 const iconSvg = linkIconSvgs[group.type] || '';
+                const expandRule = getExpandableRule(group.type);
                 html += `<div x-data="{ gOpen: $store.tree.allExpanded, init() { this.$watch('$store.tree.allExpanded', v => this.gOpen = v); } }" class="ml-6 border-l-2 border-[var(--ui-border)]/20">`;
                 // Group header
                 html += `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3 cursor-pointer" @click.stop="gOpen = !gOpen">`;
@@ -794,19 +813,22 @@
                 // Group items
                 html += `<div x-show="gOpen" x-collapse x-cloak>`;
                 for (const link of group.items) {
-                    const hasTasks = link.has_tasks && link.task_items && link.task_items.length > 0;
+                    // Generic expandable_children detection
+                    const childrenField = expandRule ? expandRule.field : null;
+                    const hasChildren = childrenField && link[childrenField] && link[childrenField].length > 0;
                     const linkId = 'link_' + link.id;
+                    const doneField = expandRule ? expandRule.done_field : 'is_done';
                     const linkIsDone = link.done || link.is_done;
                     const doneShowAttr = linkIsDone ? ' x-show="$store.tree.showDone" x-transition' : '';
                     const doneNameClass = linkIsDone ? ' line-through opacity-60' : '';
 
-                    html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20"${hasTasks ? ` x-data="{ ${linkId}: $store.tree.allExpanded, init() { this.$watch('$store.tree.allExpanded', v => this.${linkId} = v); } }"` : ''}${doneShowAttr}>`;
+                    html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20"${hasChildren ? ` x-data="{ ${linkId}: $store.tree.allExpanded, init() { this.$watch('$store.tree.allExpanded', v => this.${linkId} = v); } }"` : ''}${doneShowAttr}>`;
                     html += `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">`;
-                    html += `<div class="flex items-center gap-2${hasTasks ? ' cursor-pointer' : ''}"${hasTasks ? ` @click="${linkId} = !${linkId}"` : ''}>`;
+                    html += `<div class="flex items-center gap-2${hasChildren ? ' cursor-pointer' : ''}"${hasChildren ? ` @click="${linkId} = !${linkId}"` : ''}>`;
 
-                    // Chevron for expandable projects
+                    // Chevron for expandable items
                     html += `<div class="w-5 h-5 flex items-center justify-center flex-shrink-0">`;
-                    if (hasTasks) {
+                    if (hasChildren) {
                         html += `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200" :class="{ 'rotate-90': ${linkId} }"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>`;
                     }
                     html += `</div>`;
@@ -826,23 +848,26 @@
                     }
                     html += `</div></div>`;
 
-                    // Task children for projects
-                    if (hasTasks) {
-                        const taskIconSvg = linkIconSvgs['planner_task'] || '';
+                    // Generic expandable children
+                    if (hasChildren) {
+                        const childType = expandRule.child_type;
+                        const childIconSvg = linkIconSvgs[childType] || '';
+                        const childRules = Alpine.store('treeConfig').displayRules[childType];
                         html += `<div x-show="${linkId}" x-collapse x-cloak>`;
-                        for (const task of link.task_items) {
-                            const taskDoneClass = task.is_done ? 'line-through opacity-60' : '';
-                            const taskDoneShow = task.is_done ? ' x-show="$store.tree.showDone" x-transition' : '';
-                            html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20"${taskDoneShow}>`;
+                        for (const child of link[childrenField]) {
+                            const childDoneField = expandRule.done_field || 'is_done';
+                            const childIsDone = child[childDoneField];
+                            const childDoneClass = childIsDone ? 'line-through opacity-60' : '';
+                            const childDoneShow = childIsDone ? ' x-show="$store.tree.showDone" x-transition' : '';
+                            const childName = child[expandRule.name_field || 'name'] || '—';
+                            html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20"${childDoneShow}>`;
                             html += `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">`;
                             html += `<div class="flex items-center gap-2">`;
                             html += `<div class="w-5 h-5 flex-shrink-0"></div>`;
-                            html += taskIconSvg;
-                            html += `<span class="text-sm font-medium text-[var(--ui-secondary)] truncate ${taskDoneClass}">${escHtml(task.name)}</span>`;
-                            if (task.priority) html += `<span class="text-[10px] text-[var(--ui-muted)]">${escHtml(task.priority)}</span>`;
-                            if (task.logged_minutes > 0) html += `<span class="text-[10px] text-[var(--ui-muted)]">${formatTime(task.logged_minutes)}</span>`;
-                            if (task.due_date) html += `<span class="text-[10px] text-[var(--ui-muted)]">${escHtml(task.due_date)}</span>`;
-                            if (task.is_done) html += `<span class="text-[10px] text-green-600">erledigt</span>`;
+                            html += childIconSvg;
+                            html += `<span class="text-sm font-medium text-[var(--ui-secondary)] truncate ${childDoneClass}">${escHtml(childName)}</span>`;
+                            // Render child metadata using its own display rules
+                            html += renderLinkMeta(child, childType);
                             html += `</div></div></div>`;
                         }
                         html += `</div>`;

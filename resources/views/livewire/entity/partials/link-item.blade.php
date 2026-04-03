@@ -1,26 +1,41 @@
-{{-- Link item (leaf node) - optionally expandable for projects with tasks --}}
+{{-- Link item (leaf node) - optionally expandable via display rules --}}
 {{-- Variables: $link (array), $group (array with type, icon, label) --}}
 @php
-    $hasChildren = ($link['has_tasks'] ?? false) && !empty($link['task_items'] ?? []);
     $groupIcon = $group['icon'] ?? 'link';
     $linkType = $group['type'] ?? '';
     $isDone = $link['done'] ?? $link['is_done'] ?? false;
+
+    // Generic expandable_children detection from display rules
+    $expandRule = null;
+    $rules = resolve(\Platform\Organization\Services\EntityLinkRegistry::class)->allMetadataDisplayRules()[$linkType] ?? [];
+    foreach ($rules as $r) {
+        if (($r['format'] ?? '') === 'expandable_children') {
+            $expandRule = $r;
+            break;
+        }
+    }
+
+    $childrenField = $expandRule['field'] ?? null;
+    $hasChildren = $childrenField && !empty($link[$childrenField] ?? []);
+    $childType = $expandRule['child_type'] ?? null;
+    $nameField = $expandRule['name_field'] ?? 'name';
+    $doneField = $expandRule['done_field'] ?? 'is_done';
 @endphp
 
 <div class="ml-6 border-l-2 border-[var(--ui-border)]/20"
-    @if($hasChildren) x-data="{ taskOpen: false, init() { this.$watch('$store.tree.allExpanded', v => this.taskOpen = v); } }" @endif
+    @if($hasChildren) x-data="{ childOpen: false, init() { this.$watch('$store.tree.allExpanded', v => this.childOpen = v); } }" @endif
     @if($isDone) x-show="$store.tree.showDone" x-transition @endif
 >
     <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">
         <div class="flex items-center gap-2 {{ $hasChildren ? 'cursor-pointer' : '' }}"
-            @if($hasChildren) @click="taskOpen = !taskOpen" @endif
+            @if($hasChildren) @click="childOpen = !childOpen" @endif
         >
-            {{-- Chevron for expandable projects --}}
+            {{-- Chevron for expandable items --}}
             <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
                 @if($hasChildren)
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
                         class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200"
-                        :class="{ 'rotate-90': taskOpen }">
+                        :class="{ 'rotate-90': childOpen }">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                     </svg>
                 @endif
@@ -45,34 +60,25 @@
         </div>
     </div>
 
-    {{-- Task children (for projects) --}}
+    {{-- Generic expandable children --}}
     @if($hasChildren)
-        <div x-show="taskOpen" x-collapse x-cloak>
-            @foreach($link['task_items'] as $task)
+        @php
+            $childIconName = resolve(\Platform\Organization\Services\EntityLinkRegistry::class)->allLinkTypeConfig()[$childType]['icon'] ?? 'link';
+        @endphp
+        <div x-show="childOpen" x-collapse x-cloak>
+            @foreach($link[$childrenField] as $child)
+                @php $childIsDone = $child[$doneField] ?? false; @endphp
                 <div class="ml-6 border-l-2 border-[var(--ui-border)]/20"
-                    @if($task['is_done'] ?? false) x-show="$store.tree.showDone" x-transition @endif
+                    @if($childIsDone) x-show="$store.tree.showDone" x-transition @endif
                 >
                     <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">
                         <div class="flex items-center gap-2">
                             <div class="w-5 h-5 flex-shrink-0"></div>
-                            @svg('heroicon-o-clipboard-document-check', 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
-                            <span class="text-sm font-medium text-[var(--ui-secondary)] truncate {{ ($task['is_done'] ?? false) ? 'line-through opacity-60' : '' }}">
-                                {{ $task['name'] }}
+                            @svg('heroicon-o-' . $childIconName, 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
+                            <span class="text-sm font-medium text-[var(--ui-secondary)] truncate {{ $childIsDone ? 'line-through opacity-60' : '' }}">
+                                {{ $child[$nameField] ?? '—' }}
                             </span>
-                            @if($task['priority'] ?? null)
-                                <span class="text-[10px] text-[var(--ui-muted)]">{{ $task['priority'] }}</span>
-                            @endif
-                            @if(($task['logged_minutes'] ?? 0) > 0)
-                                <span class="text-[10px] text-[var(--ui-muted)]">
-                                    {{ intdiv($task['logged_minutes'], 60) }}:{{ str_pad($task['logged_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h
-                                </span>
-                            @endif
-                            @if($task['due_date'] ?? null)
-                                <span class="text-[10px] text-[var(--ui-muted)]">{{ $task['due_date'] }}</span>
-                            @endif
-                            @if($task['is_done'] ?? false)
-                                <span class="text-[10px] text-green-600">erledigt</span>
-                            @endif
+                            @include('organization::livewire.entity.partials.link-meta', ['link' => $child, 'linkType' => $childType])
                         </div>
                     </div>
                 </div>

@@ -14,15 +14,15 @@ class EntityTimeResolver
      * Cascade-Registry: Welche linkable_types haben zeitrelevante Kinder?
      *
      * Format: morph_alias => [FQCN, [child-relation-paths]]
-     * Nur Typen mit Zeiterfassung. Canvas, BMC, Notes, Slides etc. sind nicht enthalten.
+     * Delegiert an EntityLinkRegistry (jedes Modul registriert seine Cascades selbst).
      */
     public static function getTimeTrackableCascades(): array
     {
-        return [
-            'project' => [\Platform\Planner\Models\PlannerProject::class, ['tasks', 'projectSlots.tasks']],
-            'planner_task' => [\Platform\Planner\Models\PlannerTask::class, []],
-            'helpdesk_ticket' => [\Platform\Helpdesk\Models\HelpdeskTicket::class, []],
-        ];
+        try {
+            return resolve(EntityLinkRegistry::class)->allTimeTrackableCascades();
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     /**

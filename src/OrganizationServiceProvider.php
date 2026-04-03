@@ -24,7 +24,8 @@ class OrganizationServiceProvider extends ServiceProvider
                 GenerateReportsCommand::class,
             ]);
         }
-        // Keine Services in Drip vorhanden
+
+        $this->app->singleton(\Platform\Organization\Services\EntityLinkRegistry::class);
     }
 
     public function boot(): void
@@ -41,6 +42,7 @@ class OrganizationServiceProvider extends ServiceProvider
             PlatformCore::registerModule([
                 'key'        => 'organization',
                 'title'      => 'Organization',
+                'group'      => 'planning',
                 'routing'    => config('organization.routing'),
                 'guard'      => config('organization.guard'),
                 'navigation' => config('organization.navigation'),

@@ -15,6 +15,7 @@ use Platform\Organization\Models\OrganizationContext;
 use Platform\Core\Models\Team;
 use Platform\Core\Enums\TeamRole;
 use Platform\Organization\Services\EntityTimeResolver;
+use Platform\Organization\Services\EntityLinkRegistry;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -29,22 +30,11 @@ class Show extends Component
         'parent_team_id' => null,
     ];
 
-    public array $linkTypeConfig = [
-        'project' => ['label' => 'Projekte', 'icon' => 'folder', 'route' => 'planner.projects.show'],
-        'planner_task' => ['label' => 'Aufgaben', 'icon' => 'clipboard-document-check', 'route' => null],
-        'helpdesk_ticket' => ['label' => 'Tickets', 'icon' => 'ticket', 'route' => null],
-        'helpdesk_board' => ['label' => 'Helpdesk Boards', 'icon' => 'view-columns', 'route' => null],
-        'hcm_employee' => ['label' => 'Mitarbeiter', 'icon' => 'user', 'route' => null],
-        'rec_applicant' => ['label' => 'Bewerber', 'icon' => 'user-plus', 'route' => null],
-        'rec_position' => ['label' => 'Positionen', 'icon' => 'briefcase', 'route' => null],
-        'sheets_spreadsheet' => ['label' => 'Spreadsheets', 'icon' => 'table-cells', 'route' => null],
-        'canvas' => ['label' => 'Canvas', 'icon' => 'squares-2x2', 'route' => null],
-        'bmc_canvas' => ['label' => 'BMC', 'icon' => 'squares-2x2', 'route' => null],
-        'pc_canvas' => ['label' => 'Project Canvas', 'icon' => 'clipboard-document-list', 'route' => null],
-        'notes_note' => ['label' => 'Notizen', 'icon' => 'document-text', 'route' => null],
-        'slides_presentation' => ['label' => 'Präsentationen', 'icon' => 'presentation-chart-bar', 'route' => null],
-        'okr' => ['label' => 'OKR', 'icon' => 'chart-bar', 'route' => null],
-    ];
+    #[Computed]
+    public function linkTypeConfig(): array
+    {
+        return resolve(EntityLinkRegistry::class)->allLinkTypeConfig();
+    }
 
     public function mount(OrganizationEntity $entity)
     {
@@ -241,6 +231,12 @@ class Show extends Component
         ->whereNull('parent_team_id')
         ->orderBy('name')
         ->get();
+    }
+
+    #[Computed]
+    public function displayRules(): array
+    {
+        return resolve(EntityLinkRegistry::class)->allMetadataDisplayRules();
     }
 
     #[Computed]
@@ -684,136 +680,14 @@ class Show extends Component
 
     protected function applyTypeEagerLoading($query, string $morphAlias, string $fqcn): void
     {
-        match ($morphAlias) {
-            'project' => $query
-                ->with(['tasks' => fn($q) => $q
-                    ->selectRaw("planner_tasks.*, ({$this->timeMinutesSubquery('planner_tasks', \Platform\Planner\Models\PlannerTask::class)}) as logged_minutes_sum")
-                    ->orderBy('order')
-                ])
-                ->withCount([
-                    'tasks',
-                    'tasks as done_tasks_count' => fn($q) => $q->where('is_done', true),
-                ]),
-            'planner_task' => $query
-                ->selectRaw("planner_tasks.*, ({$this->timeMinutesSubquery('planner_tasks', $fqcn)}) as logged_minutes_sum"),
-            'helpdesk_ticket' => $query
-                ->withCount('escalations'),
-            'helpdesk_board' => $query
-                ->withCount('tickets'),
-            'canvas' => $query
-                ->withCount('buildingBlocks'),
-            'bmc_canvas' => $query
-                ->withCount('buildingBlocks'),
-            'pc_canvas' => $query
-                ->withCount('buildingBlocks'),
-            'okr' => $query
-                ->withCount(['objectives', 'cycles']),
-            'slides_presentation' => $query
-                ->withCount('slides'),
-            'sheets_spreadsheet' => $query
-                ->withCount('worksheets'),
-            'rec_position' => $query
-                ->withCount('postings'),
-            'rec_applicant' => $query
-                ->withCount('postings'),
-            default => null,
-        };
+        $provider = resolve(EntityLinkRegistry::class)->getProvider($morphAlias);
+        $provider?->applyEagerLoading($query, $morphAlias, $fqcn);
     }
 
     protected function extractLinkMetadata(string $type, $linkable): array
     {
-        return match ($type) {
-            'project' => $this->extractProjectMetadata($linkable),
-            'planner_task' => [
-                'is_done' => $linkable->is_done ?? false,
-                'priority' => $linkable->priority?->value ?? null,
-                'due_date' => $linkable->due_date?->format('d.m.Y'),
-                'story_points' => $linkable->story_points?->value ?? null,
-                'logged_minutes' => (int) ($linkable->logged_minutes_sum ?? 0),
-            ],
-            'helpdesk_ticket' => [
-                'is_done' => $linkable->is_done ?? false,
-                'priority' => $linkable->priority?->value ?? null,
-                'escalation_level' => $linkable->escalation_level?->value ?? null,
-                'story_points' => $linkable->story_points?->value ?? null,
-                'due_date' => $linkable->due_date?->format('d.m.Y') ?? null,
-                'escalation_count' => (int) ($linkable->escalations_count ?? 0),
-            ],
-            'helpdesk_board' => [
-                'ticket_count' => (int) ($linkable->tickets_count ?? 0),
-            ],
-            'canvas', 'bmc_canvas', 'pc_canvas' => [
-                'status' => $linkable->status ?? null,
-                'block_count' => (int) ($linkable->building_blocks_count ?? 0),
-            ],
-            'okr' => [
-                'objective_count' => (int) ($linkable->objectives_count ?? 0),
-                'cycle_count' => (int) ($linkable->cycles_count ?? 0),
-                'performance_score' => $linkable->performance_score ? round((float) $linkable->performance_score * 100) : null,
-            ],
-            'notes_note' => [
-                'is_done' => (bool) ($linkable->done ?? false),
-                'is_pinned' => (bool) ($linkable->is_pinned ?? false),
-            ],
-            'slides_presentation' => [
-                'is_published' => (bool) ($linkable->is_published ?? false),
-                'slide_count' => (int) ($linkable->slides_count ?? 0),
-            ],
-            'sheets_spreadsheet' => [
-                'worksheet_count' => (int) ($linkable->worksheets_count ?? 0),
-            ],
-            'rec_applicant' => [
-                'is_active' => (bool) ($linkable->is_active ?? false),
-                'progress' => (int) ($linkable->progress ?? 0),
-                'posting_count' => (int) ($linkable->postings_count ?? 0),
-                'applied_at' => $linkable->applied_at?->format('d.m.Y'),
-            ],
-            'rec_position' => [
-                'is_active' => (bool) ($linkable->is_active ?? false),
-                'posting_count' => (int) ($linkable->postings_count ?? 0),
-            ],
-            'hcm_employee' => [
-                'is_active' => (bool) ($linkable->is_active ?? false),
-                'employee_number' => $linkable->employee_number ?? null,
-            ],
-            default => [],
-        };
-    }
-
-    protected function timeMinutesSubquery(string $table, string $fqcn): string
-    {
-        $quoted = DB::getPdo()->quote($fqcn);
-        return "SELECT COALESCE(SUM(minutes), 0) FROM organization_time_entries WHERE context_id = {$table}.id AND context_type = {$quoted} AND deleted_at IS NULL";
-    }
-
-    protected function extractProjectMetadata($project): array
-    {
-        $tasks = $project->tasks ?? collect();
-        $loggedMinutes = $tasks->sum(fn($t) => (int) ($t->logged_minutes_sum ?? 0));
-
-        $taskItems = [];
-        foreach ($tasks as $task) {
-            $taskMinutes = (int) ($task->logged_minutes_sum ?? 0);
-            $taskItems[] = [
-                'id' => $task->id,
-                'name' => $task->title ?? '—',
-                'is_done' => (bool) $task->is_done,
-                'priority' => $task->priority?->value ?? null,
-                'due_date' => $task->due_date?->format('d.m.Y'),
-                'story_points' => $task->story_points?->value ?? null,
-                'logged_minutes' => $taskMinutes,
-            ];
-        }
-
-        return [
-            'done' => $project->done ?? false,
-            'task_count' => $project->tasks_count ?? 0,
-            'done_task_count' => $project->done_tasks_count ?? 0,
-            'logged_minutes' => $loggedMinutes,
-            'budget_amount' => $project->budget_amount,
-            'has_tasks' => count($taskItems) > 0,
-            'task_items' => $taskItems,
-        ];
+        $provider = resolve(EntityLinkRegistry::class)->getProvider($type);
+        return $provider?->extractMetadata($type, $linkable) ?? [];
     }
 
     public function loadEntireTree(): array

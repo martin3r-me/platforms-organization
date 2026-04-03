@@ -45,7 +45,7 @@ class OrganizationServiceProvider extends ServiceProvider
             PlatformCore::registerModule([
                 'key'        => 'organization',
                 'title'      => 'Organization',
-                'group'      => 'planning',
+                'group'      => 'admin',
                 'routing'    => config('organization.routing'),
                 'guard'      => config('organization.guard'),
                 'navigation' => config('organization.navigation'),

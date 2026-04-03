@@ -699,6 +699,9 @@
                     case 'boolean_pinned':
                         if (val) parts.push('angepinnt');
                         break;
+                    case 'boolean_frog':
+                        if (val) parts.push('<span class="text-green-700">🐸</span>');
+                        break;
                     case 'badge':
                         if (val) parts.push(escHtml(String(val)));
                         break;

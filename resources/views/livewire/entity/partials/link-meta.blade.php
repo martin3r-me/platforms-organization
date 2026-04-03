@@ -67,6 +67,10 @@
                 if ($val) $metaParts[] = 'angepinnt';
                 break;
 
+            case 'boolean_frog':
+                if ($val) $metaParts[] = '<span class="text-green-700">🐸</span>';
+                break;
+
             case 'badge':
                 if ($val) $metaParts[] = e($val);
                 break;

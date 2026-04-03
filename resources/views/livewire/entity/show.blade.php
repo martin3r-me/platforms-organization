@@ -171,7 +171,7 @@
 
                 {{-- Snapshot Trend (14 Tage) --}}
                 @php $trend = $this->snapshotTrend; @endphp
-                @if(!empty($trend) && count($trend['snapshots'] ?? []) >= 2)
+                @if(!empty($trend) && count($trend['snapshots'] ?? []) >= 1)
                     <div class="mt-6 pt-6 border-t border-[var(--ui-border)]/40">
                         <div class="flex items-center justify-between mb-4">
                             <span class="text-xs font-medium text-[var(--ui-muted)]">Trend (14 Tage)</span>

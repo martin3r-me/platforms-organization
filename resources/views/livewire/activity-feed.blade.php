@@ -1,3 +1,6 @@
+@php
+    $typeLabels = app(\Platform\Organization\Services\EntityLinkRegistry::class)->activityTypeLabels();
+@endphp
 <div class="h-full flex flex-col">
     {{-- Timeline --}}
     <div class="flex-1 overflow-y-auto p-4 space-y-3">
@@ -30,7 +33,7 @@
                     @php
                         $isTimeEntry = $activity->activityable_type === \Platform\Organization\Models\OrganizationTimeEntry::class;
                         $isEntity = $activity->activityable_type === \Platform\Organization\Models\OrganizationEntity::class;
-                        $shortType = class_basename($activity->activityable_type ?? '');
+                        $shortType = $typeLabels[$activity->activityable_type] ?? class_basename($activity->activityable_type ?? '');
                     @endphp
 
                     @if($activity->activity_type === 'manual')

@@ -9,6 +9,7 @@ use Platform\ActivityLog\Models\ActivityLogActivity;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationTimeEntry;
+use Platform\Organization\Services\EntityLinkRegistry;
 
 class ActivityFeed extends Component
 {
@@ -59,6 +60,7 @@ class ActivityFeed extends Component
      * - OrganizationEntity IDs des Teams
      * - OrganizationTimeEntry IDs des Teams
      * - Alle über entity_links verknüpften Models (FQCN aus Morph-Map)
+     * - Child-Models via Provider activityChildren() (z.B. Project → Tasks)
      */
     protected function resolveActivityablePairs(int $teamId): array
     {
@@ -110,6 +112,13 @@ class ActivityFeed extends Component
                     $timeEntryIds
                 );
             }
+        }
+
+        // Cascade: Child-Models über Provider resolven (z.B. Project → Tasks)
+        $registry = app(EntityLinkRegistry::class);
+        $childPairs = $registry->resolveActivityChildren($pairs);
+        foreach ($childPairs as $fqcn => $ids) {
+            $pairs[$fqcn] = array_merge($pairs[$fqcn] ?? [], $ids);
         }
 
         // Deduplizieren

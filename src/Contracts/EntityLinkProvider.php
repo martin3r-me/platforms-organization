@@ -56,4 +56,16 @@ interface EntityLinkProvider
      * @return array<int, array> [entityId => ['items_total' => X, 'items_done' => Y]]
      */
     public function metrics(string $morphAlias, array $linksByEntity): array;
+
+    /**
+     * Zusaetzliche Activity-relevante Models fuer den Feed resolven.
+     * Wird aufgerufen mit den direkt verlinkten IDs pro Alias.
+     * Provider gibt zusaetzliche FQCN => [ids] Paare zurueck
+     * (z.B. Project-IDs rein → PlannerTask-IDs + FQCN raus).
+     *
+     * @param string $morphAlias Der Morph-Alias (z.B. 'project')
+     * @param int[] $linkableIds Die direkt verlinkten IDs
+     * @return array<class-string, int[]> [FQCN => [child-ids]]
+     */
+    public function activityChildren(string $morphAlias, array $linkableIds): array;
 }

@@ -90,6 +90,71 @@ class EntityLinkRegistry
     }
 
     /**
+     * Resolve zusaetzliche Activity-relevante Child-Models ueber alle Provider.
+     * Input:  [FQCN => [ids]] (direkt verlinkte Models)
+     * Output: [FQCN => [ids]] (zusaetzliche Child-Models, gemerged)
+     *
+     * @param array<class-string, int[]> $directPairs
+     * @return array<class-string, int[]>
+     */
+    public function resolveActivityChildren(array $directPairs): array
+    {
+        $morphMap = \Illuminate\Database\Eloquent\Relations\Relation::morphMap();
+        $fqcnToAlias = array_flip($morphMap);
+        $result = [];
+
+        foreach ($directPairs as $fqcn => $ids) {
+            if (empty($ids)) {
+                continue;
+            }
+
+            $alias = $fqcnToAlias[$fqcn] ?? null;
+            if (!$alias) {
+                continue;
+            }
+
+            $provider = $this->getProvider($alias);
+            if (!$provider) {
+                continue;
+            }
+
+            $children = $provider->activityChildren($alias, $ids);
+            foreach ($children as $childFqcn => $childIds) {
+                $result[$childFqcn] = array_merge($result[$childFqcn] ?? [], $childIds);
+            }
+        }
+
+        // Deduplizieren
+        foreach ($result as $fqcn => $ids) {
+            $result[$fqcn] = array_values(array_unique($ids));
+        }
+
+        return $result;
+    }
+
+    /**
+     * Label-Map fuer Activity Feed: FQCN => singular Label.
+     * Leitet sich aus linkTypeConfig()['singular'] + morphMap ab.
+     *
+     * @return array<class-string, string>
+     */
+    public function activityTypeLabels(): array
+    {
+        $morphMap = \Illuminate\Database\Eloquent\Relations\Relation::morphMap();
+        $config = $this->allLinkTypeConfig();
+        $labels = [];
+
+        foreach ($config as $alias => $cfg) {
+            $fqcn = $morphMap[$alias] ?? null;
+            if ($fqcn && isset($cfg['singular'])) {
+                $labels[$fqcn] = $cfg['singular'];
+            }
+        }
+
+        return $labels;
+    }
+
+    /**
      * Ruft metrics() aller Provider auf und merged Ergebnisse per Entity.
      *
      * @param array<int, array<string, int[]>> $linksByEntityAndType [entityId => [morphAlias => [linkable_ids]]]

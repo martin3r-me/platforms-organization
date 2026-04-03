@@ -218,6 +218,12 @@ class OrganizationServiceProvider extends ServiceProvider
             // Report Tools (Berichte)
             $registry->register(new \Platform\Organization\Tools\ListReportsTool());
             $registry->register(new \Platform\Organization\Tools\GenerateReportTool());
+
+            // SLA Contract Tools
+            $registry->register(new \Platform\Organization\Tools\ListSlaContractsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateSlaContractTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateSlaContractTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteSlaContractTool());
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

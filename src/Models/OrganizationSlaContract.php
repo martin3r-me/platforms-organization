@@ -11,57 +11,50 @@ use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
 use Symfony\Component\Uid\UuidV7;
 
-class OrganizationEntityRelationshipInterlink extends Model
+class OrganizationSlaContract extends Model
 {
     use SoftDeletes;
 
-    protected $table = 'organization_entity_relationship_interlinks';
+    protected $table = 'organization_sla_contracts';
 
     protected $fillable = [
         'uuid',
         'team_id',
         'user_id',
-        'entity_relationship_id',
-        'interlink_id',
-        'note',
+        'name',
+        'description',
+        'response_time_hours',
+        'resolution_time_hours',
+        'error_tolerance_percent',
         'is_active',
-        'metadata',
     ];
 
     protected $casts = [
+        'response_time_hours' => 'integer',
+        'resolution_time_hours' => 'integer',
+        'error_tolerance_percent' => 'integer',
         'is_active' => 'boolean',
-        'metadata' => 'array',
     ];
 
     protected static function booted(): void
     {
-        static::creating(function (self $pivot) {
-            if (empty($pivot->uuid)) {
+        static::creating(function (self $sla) {
+            if (empty($sla->uuid)) {
                 do {
                     $uuid = UuidV7::generate();
                 } while (self::where('uuid', $uuid)->exists());
 
-                $pivot->uuid = $uuid;
+                $sla->uuid = $uuid;
             }
 
-            if (! $pivot->user_id) {
-                $pivot->user_id = Auth::id();
+            if (! $sla->user_id) {
+                $sla->user_id = Auth::id();
             }
 
-            if (! $pivot->team_id) {
-                $pivot->team_id = Auth::user()?->currentTeamRelation?->id;
+            if (! $sla->team_id) {
+                $sla->team_id = Auth::user()?->currentTeamRelation?->id;
             }
         });
-    }
-
-    public function entityRelationship(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationEntityRelationship::class, 'entity_relationship_id');
-    }
-
-    public function interlink(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationInterlink::class, 'interlink_id');
     }
 
     public function team(): BelongsTo
@@ -74,13 +67,18 @@ class OrganizationEntityRelationshipInterlink extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function slaContracts(): BelongsToMany
+    public function relationshipInterlinks(): BelongsToMany
     {
         return $this->belongsToMany(
-            OrganizationSlaContract::class,
+            OrganizationEntityRelationshipInterlink::class,
             'organization_eri_sla_contracts',
-            'entity_relationship_interlink_id',
-            'sla_contract_id'
+            'sla_contract_id',
+            'entity_relationship_interlink_id'
         )->withTimestamps();
+    }
+
+    public function scopeActive($query)
+    {
+        return $query->where('is_active', true);
     }
 }

@@ -335,6 +335,149 @@ class Show extends Component
     }
 
     #[Computed]
+    public function snapshotAnalysis(): array
+    {
+        $snapshots = OrganizationEntitySnapshot::where('entity_id', $this->entity->id)
+            ->forDateRange(now()->subDays(30), now())
+            ->orderBy('snapshot_date')
+            ->get();
+
+        if ($snapshots->isEmpty()) {
+            return [];
+        }
+
+        $latest = $snapshots->last();
+        $latestMetrics = $latest->metrics;
+
+        // Find snapshot closest to 7 days ago
+        $sevenDaysAgo = now()->subDays(7)->toDateString();
+        $ago7d = $snapshots->filter(fn($s) => $s->snapshot_date->toDateString() <= $sevenDaysAgo)->last();
+        $ago7dMetrics = $ago7d ? $ago7d->metrics : null;
+
+        $itemsTotal = $latestMetrics['items_total'] ?? 0;
+        $itemsDone = $latestMetrics['items_done'] ?? 0;
+        $completionRate = $itemsTotal > 0 ? round(($itemsDone / $itemsTotal) * 100, 1) : 0;
+
+        $agoItemsDone = $ago7dMetrics ? ($ago7dMetrics['items_done'] ?? 0) : 0;
+        $agoItemsTotal = $ago7dMetrics ? ($ago7dMetrics['items_total'] ?? 0) : 0;
+        $agoCompletionRate = $agoItemsTotal > 0 ? round(($agoItemsDone / $agoItemsTotal) * 100, 1) : 0;
+
+        $itemsCompleted7d = max(0, $itemsDone - $agoItemsDone);
+        $itemsAdded7d = max(0, $itemsTotal - $agoItemsTotal);
+        $netProgress = $itemsCompleted7d - $itemsAdded7d;
+
+        // Velocity: items completed per day over 30 days
+        $oldest = $snapshots->first();
+        $daysDiff = max(1, $oldest->snapshot_date->diffInDays($latest->snapshot_date));
+        $totalCompleted30d = max(0, $itemsDone - ($oldest->metrics['items_done'] ?? 0));
+        $velocityDailyAvg = round($totalCompleted30d / $daysDiff, 1);
+
+        // Estimated days remaining
+        $openItems = max(0, $itemsTotal - $itemsDone);
+        $estimatedDaysRemaining = ($velocityDailyAvg > 0 && $openItems > 0) ? (int) ceil($openItems / $velocityDailyAvg) : null;
+
+        // Billing
+        $timeTotalMin = $latestMetrics['time_total_minutes'] ?? 0;
+        $timeBilledMin = $latestMetrics['time_billed_minutes'] ?? 0;
+        $billingRate = $timeTotalMin > 0 ? round(($timeBilledMin / $timeTotalMin) * 100, 1) : 0;
+
+        $agoTimeTotalMin = $ago7dMetrics ? ($ago7dMetrics['time_total_minutes'] ?? 0) : 0;
+        $agoTimeBilledMin = $ago7dMetrics ? ($ago7dMetrics['time_billed_minutes'] ?? 0) : 0;
+        $agoBillingRate = $agoTimeTotalMin > 0 ? round(($agoTimeBilledMin / $agoTimeTotalMin) * 100, 1) : 0;
+
+        // Health status
+        $healthStatus = $this->classifyHealth($itemsTotal, $itemsDone, $agoItemsTotal, $agoItemsDone);
+
+        // Insight statements
+        $insights = $this->buildSnapshotInsights(
+            $completionRate, $agoCompletionRate, $itemsCompleted7d, $itemsAdded7d,
+            $velocityDailyAvg, $estimatedDaysRemaining, $billingRate, $agoBillingRate, $healthStatus
+        );
+
+        return [
+            'completion_rate' => $completionRate,
+            'trend_completion' => round($completionRate - $agoCompletionRate, 1),
+            'items_completed_7d' => $itemsCompleted7d,
+            'items_added_7d' => $itemsAdded7d,
+            'net_progress' => $netProgress,
+            'velocity_daily_avg' => $velocityDailyAvg,
+            'estimated_days_remaining' => $estimatedDaysRemaining,
+            'billing_rate' => $billingRate,
+            'trend_billing' => round($billingRate - $agoBillingRate, 1),
+            'health_status' => $healthStatus,
+            'insights' => $insights,
+            'items_total' => $itemsTotal,
+            'items_done' => $itemsDone,
+        ];
+    }
+
+    protected function classifyHealth(int $itemsTotal, int $itemsDone, int $agoItemsTotal, int $agoItemsDone): string
+    {
+        if ($itemsDone >= $itemsTotal && $itemsTotal > 0) {
+            return 'completed';
+        }
+        if ($itemsTotal > $agoItemsTotal && $itemsDone <= $agoItemsDone && $itemsTotal > 0) {
+            return 'at_risk';
+        }
+        if ($itemsDone <= $agoItemsDone && ($itemsTotal - $itemsDone) > 0) {
+            return 'stalled';
+        }
+        return 'progressing';
+    }
+
+    protected function buildSnapshotInsights(
+        float $completionRate, float $agoCompletionRate,
+        int $itemsCompleted7d, int $itemsAdded7d,
+        float $velocityDailyAvg, ?int $estimatedDaysRemaining,
+        float $billingRate, float $agoBillingRate,
+        string $healthStatus
+    ): array {
+        $insights = [];
+
+        // Completion trend
+        $diff = round($completionRate - $agoCompletionRate, 1);
+        if ($completionRate > 0) {
+            if ($diff > 0) {
+                $insights[] = ['text' => "Fortschritt bei {$completionRate}% — +{$diff}% in 7 Tagen.", 'type' => 'success'];
+            } elseif ($diff < 0) {
+                $insights[] = ['text' => "Fortschritt bei {$completionRate}% — " . abs($diff) . "% weniger als vor 7 Tagen.", 'type' => 'warning'];
+            } else {
+                $insights[] = ['text' => "Fortschritt bei {$completionRate}%.", 'type' => 'info'];
+            }
+        }
+
+        // Items completed vs added
+        if ($itemsCompleted7d > 0 && $itemsAdded7d > 0) {
+            $insights[] = [
+                'text' => "{$itemsCompleted7d} Items erledigt, {$itemsAdded7d} neue hinzugefügt (7d).",
+                'type' => $itemsCompleted7d >= $itemsAdded7d ? 'success' : 'warning',
+            ];
+        } elseif ($itemsCompleted7d > 0) {
+            $insights[] = ['text' => "{$itemsCompleted7d} Items in 7 Tagen erledigt.", 'type' => 'success'];
+        }
+
+        // Estimated remaining
+        if ($estimatedDaysRemaining !== null && $healthStatus !== 'completed') {
+            $insights[] = [
+                'text' => "Geschätzte Restlaufzeit: {$estimatedDaysRemaining} Tage (bei Ø {$velocityDailyAvg} Items/Tag).",
+                'type' => 'info',
+            ];
+        }
+
+        // Billing trend
+        $billingDiff = round($billingRate - $agoBillingRate, 1);
+        if ($billingRate > 0) {
+            if ($billingDiff < 0) {
+                $insights[] = ['text' => "Abrechnungsquote bei {$billingRate}% — " . abs($billingDiff) . "% unter Vorwoche.", 'type' => 'warning'];
+            } elseif ($billingDiff > 0) {
+                $insights[] = ['text' => "Abrechnungsquote bei {$billingRate}% — +{$billingDiff}% gegenüber Vorwoche.", 'type' => 'success'];
+            }
+        }
+
+        return array_slice($insights, 0, 4);
+    }
+
+    #[Computed]
     public function snapshotTrend(): array
     {
         $snapshots = OrganizationEntitySnapshot::where('entity_id', $this->entity->id)

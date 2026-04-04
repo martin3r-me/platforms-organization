@@ -169,6 +169,86 @@
                     </div>
                 </div>
 
+                {{-- Snapshot Analysis --}}
+                @php $analysis = $this->snapshotAnalysis; @endphp
+                @if(!empty($analysis))
+                    {{-- Health Status Badge + Snapshot KPIs --}}
+                    <div class="mt-6 pt-6 border-t border-[var(--ui-border)]/40">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-xs font-medium text-[var(--ui-muted)]">Snapshot-Analyse</span>
+                            @php
+                                $healthLabels = [
+                                    'progressing' => ['Fortschreitend', 'success'],
+                                    'completed' => ['Abgeschlossen', 'info'],
+                                    'stalled' => ['Stagnierend', 'warning'],
+                                    'at_risk' => ['Gefährdet', 'danger'],
+                                ];
+                                [$healthLabel, $healthVariant] = $healthLabels[$analysis['health_status']] ?? ['—', 'secondary'];
+                            @endphp
+                            <x-ui-badge :variant="$healthVariant" size="sm">{{ $healthLabel }}</x-ui-badge>
+                        </div>
+
+                        {{-- Snapshot KPI Grid --}}
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
+                            <div class="py-2.5 px-3 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 text-center">
+                                <div class="text-lg font-bold text-[var(--ui-secondary)]">
+                                    {{ $analysis['completion_rate'] }}%
+                                    @if($analysis['trend_completion'] > 0)
+                                        <span class="text-xs text-green-600 font-medium ml-1">+{{ $analysis['trend_completion'] }}%</span>
+                                    @elseif($analysis['trend_completion'] < 0)
+                                        <span class="text-xs text-red-600 font-medium ml-1">{{ $analysis['trend_completion'] }}%</span>
+                                    @endif
+                                </div>
+                                <div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Fortschritt</div>
+                            </div>
+                            <div class="py-2.5 px-3 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 text-center">
+                                <div class="text-lg font-bold text-[var(--ui-secondary)]">{{ $analysis['items_completed_7d'] }}</div>
+                                <div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Items erledigt (7d)</div>
+                            </div>
+                            <div class="py-2.5 px-3 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 text-center">
+                                <div class="text-lg font-bold text-[var(--ui-secondary)]">
+                                    {{ $analysis['estimated_days_remaining'] !== null ? $analysis['estimated_days_remaining'] . ' Tage' : '—' }}
+                                </div>
+                                <div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Geschätzte Restlaufzeit</div>
+                            </div>
+                            <div class="py-2.5 px-3 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 text-center">
+                                <div class="text-lg font-bold text-[var(--ui-secondary)]">
+                                    {{ $analysis['billing_rate'] }}%
+                                    @if($analysis['trend_billing'] > 0)
+                                        <span class="text-xs text-green-600 font-medium ml-1">+{{ $analysis['trend_billing'] }}%</span>
+                                    @elseif($analysis['trend_billing'] < 0)
+                                        <span class="text-xs text-red-600 font-medium ml-1">{{ $analysis['trend_billing'] }}%</span>
+                                    @endif
+                                </div>
+                                <div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Abrechnungsquote</div>
+                            </div>
+                        </div>
+
+                        {{-- Insight Statements --}}
+                        @if(!empty($analysis['insights']))
+                            <div class="space-y-1 mb-4">
+                                @foreach($analysis['insights'] as $insight)
+                                    <p class="text-xs
+                                        @if($insight['type'] === 'success') text-green-700
+                                        @elseif($insight['type'] === 'warning') text-amber-700
+                                        @else text-[var(--ui-muted)]
+                                        @endif
+                                    ">
+                                        @if($insight['type'] === 'success')
+                                            @svg('heroicon-o-arrow-trending-up', 'w-3.5 h-3.5 inline-block -mt-0.5 mr-0.5')
+                                        @elseif($insight['type'] === 'warning')
+                                            @svg('heroicon-o-exclamation-triangle', 'w-3.5 h-3.5 inline-block -mt-0.5 mr-0.5')
+                                        @else
+                                            @svg('heroicon-o-information-circle', 'w-3.5 h-3.5 inline-block -mt-0.5 mr-0.5')
+                                        @endif
+                                        {{ $insight['text'] }}
+                                    </p>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                @endif
+
                 {{-- Snapshot Trend (14 Tage) --}}
                 @php $trend = $this->snapshotTrend; @endphp
                 @if(!empty($trend) && count($trend['snapshots'] ?? []) >= 1)
@@ -190,17 +270,25 @@
                                 </div>
                             </div>
                         </div>
-                        <div class="flex items-end gap-1" style="height: 80px;">
+                        <div class="flex items-end gap-1" style="height: 160px;" x-data="{ tooltip: null }">
                             @foreach($trend['snapshots'] as $idx => $snap)
                                 @php
                                     $maxItems = max($trend['max_items_total'], 1);
                                     $maxMin = max($trend['max_minutes'], 1);
-                                    $totalH = round(($snap['items_total'] / $maxItems) * 64);
-                                    $doneH = $snap['items_total'] > 0 ? max(1, round(($snap['items_done'] / $maxItems) * 64)) : 0;
-                                    $timeH = $snap['time_total_minutes'] > 0 ? max(2, round(($snap['time_total_minutes'] / $maxMin) * 64)) : 0;
+                                    $totalH = round(($snap['items_total'] / $maxItems) * 130);
+                                    $doneH = $snap['items_total'] > 0 ? max(1, round(($snap['items_done'] / $maxItems) * 130)) : 0;
+                                    $timeH = $snap['time_total_minutes'] > 0 ? max(2, round(($snap['time_total_minutes'] / $maxMin) * 130)) : 0;
                                 @endphp
-                                <div class="flex-1 flex flex-col items-center h-full justify-end gap-px group relative"
-                                     title="{{ $snap['date'] }} {{ $snap['period'] }}: {{ $snap['items_done'] }}/{{ $snap['items_total'] }} Items, {{ intdiv($snap['time_total_minutes'], 60) }}:{{ str_pad($snap['time_total_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h">
+                                <div class="flex-1 flex flex-col items-center h-full justify-end gap-px relative"
+                                     @mouseenter="tooltip = {{ $idx }}"
+                                     @mouseleave="tooltip = null">
+                                    {{-- Tooltip --}}
+                                    <div x-show="tooltip === {{ $idx }}" x-cloak
+                                         class="absolute bottom-full mb-2 px-2.5 py-1.5 rounded-lg bg-[var(--ui-secondary)] text-white text-[10px] whitespace-nowrap z-10 shadow-lg pointer-events-none"
+                                         x-transition.opacity>
+                                        {{ $snap['date'] }} {{ $snap['period'] }}: {{ $snap['items_done'] }}/{{ $snap['items_total'] }} Items,
+                                        {{ intdiv($snap['time_total_minutes'], 60) }}:{{ str_pad($snap['time_total_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h
+                                    </div>
                                     <div class="w-full flex gap-px justify-center flex-1 items-end">
                                         {{-- Items bar --}}
                                         <div class="flex-1 flex flex-col justify-end">

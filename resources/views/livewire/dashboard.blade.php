@@ -213,7 +213,9 @@
                                     </div>
                                     <div class="flex items-center gap-3">
                                         <div class="flex-1">
-                                            <x-ui-progress-bar :value="$problem['completion_pct']" variant="success" height="xs" />
+                                            <div class="w-full bg-[var(--ui-muted-5)] rounded-full h-1.5">
+                                                <div class="h-1.5 rounded-full {{ $problem['completion_pct'] >= 100 ? 'bg-green-500' : ($problem['completion_pct'] >= 50 ? 'bg-blue-500' : 'bg-amber-500') }}" style="width: {{ min($problem['completion_pct'], 100) }}%"></div>
+                                            </div>
                                         </div>
                                         <span class="text-xs text-[var(--ui-muted)] whitespace-nowrap">
                                             {{ $problem['completion_pct'] }}% ({{ $problem['items_done'] }}/{{ $problem['items_total'] }})

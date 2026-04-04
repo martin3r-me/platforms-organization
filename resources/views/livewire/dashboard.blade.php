@@ -123,7 +123,8 @@
             @if($summary['has_data'])
                 <x-ui-dashboard-tile
                     title="Fortschritt"
-                    :count="$summary['completion_rate'] . '%'"
+                    :count="$summary['completion_rate']"
+                    :description="$summary['completion_rate'] . '% abgeschlossen'"
                     icon="check-circle"
                     :variant="$summary['completion_rate'] >= 50 ? 'success' : 'warning'"
                     :trend="$summary['trend_completion'] > 0 ? 'up' : ($summary['trend_completion'] < 0 ? 'down' : null)"
@@ -132,7 +133,7 @@
             @else
                 <x-ui-dashboard-tile
                     title="Fortschritt"
-                    count="—"
+                    :count="0"
                     icon="check-circle"
                     variant="secondary"
                 />
@@ -150,15 +151,16 @@
 
                 <x-ui-dashboard-tile
                     title="Abrechnung"
-                    :count="$time['billing_rate'] . '%'"
+                    :count="$time['billing_rate']"
+                    :description="$time['billing_rate'] . '% abgerechnet'"
                     icon="banknotes"
                     :variant="$time['billing_rate'] >= 50 ? 'success' : 'warning'"
                     :trend="$time['trend_billing'] > 0 ? 'up' : ($time['trend_billing'] < 0 ? 'down' : null)"
                     :trendValue="$time['trend_billing'] != 0 ? ($time['trend_billing'] > 0 ? '+' : '') . $time['trend_billing'] . '% vs. Vormonat' : null"
                 />
             @else
-                <x-ui-dashboard-tile title="Stunden (Monat)" count="—" icon="clock" variant="secondary" />
-                <x-ui-dashboard-tile title="Abrechnung" count="—" icon="banknotes" variant="secondary" />
+                <x-ui-dashboard-tile title="Stunden (Monat)" :count="0" icon="clock" variant="secondary" />
+                <x-ui-dashboard-tile title="Abrechnung" :count="0" icon="banknotes" variant="secondary" />
             @endif
         </div>
 

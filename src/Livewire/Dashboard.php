@@ -465,64 +465,83 @@ class Dashboard extends Component
     #[Computed]
     public function personOverview(): array
     {
+        $empty = ['persons' => [], 'totals' => [], 'metric_configs' => [], 'person_count' => 0];
+
         $teamId = $this->getTeamId();
         if (!$teamId) {
-            return ['persons' => [], 'totals' => ['open_tasks' => 0, 'overdue_tasks' => 0, 'person_count' => 0]];
+            return $empty;
+        }
+
+        $registry = resolve(PersonActivityRegistry::class);
+        if (!$registry->hasProviders()) {
+            return $empty;
+        }
+
+        $metricConfigs = $registry->allMetricConfigs();
+        if (empty($metricConfigs)) {
+            return $empty;
         }
 
         $personEntities = OrganizationEntity::forTeam($teamId)
             ->whereNotNull('linked_user_id')
-            ->with(['type', 'linkedUser'])
+            ->with('type')
             ->get();
 
         if ($personEntities->isEmpty()) {
-            return ['persons' => [], 'totals' => ['open_tasks' => 0, 'overdue_tasks' => 0, 'person_count' => 0]];
+            return $empty;
         }
 
         $entityIds = $personEntities->pluck('id');
         $latestSnapshots = $this->getLatestSnapshotsForEntities($entityIds);
 
+        // Only consider metrics with type warning or danger for filtering/sorting
+        $relevantKeys = array_keys(array_filter($metricConfigs, fn($c) => in_array($c['type'], ['warning', 'danger'])));
+
         $persons = [];
-        $totalOpen = 0;
-        $totalOverdue = 0;
+        $totals = array_fill_keys(array_keys($metricConfigs), 0);
 
         foreach ($personEntities as $entity) {
             $snap = $latestSnapshots[$entity->id] ?? null;
             if (!$snap) continue;
 
-            $metrics = $snap->metrics;
-            $openTasks = $metrics['person_planner_open_tasks'] ?? 0;
-            $overdueTasks = $metrics['person_planner_overdue_tasks'] ?? 0;
+            $snapshotMetrics = $snap->metrics;
 
-            if ($openTasks <= 0 && $overdueTasks <= 0) continue;
+            // Extract all person_* metrics from snapshot
+            $personMetrics = [];
+            $hasRelevant = false;
+            foreach ($metricConfigs as $snapshotKey => $config) {
+                $value = $snapshotMetrics[$snapshotKey] ?? 0;
+                $personMetrics[$snapshotKey] = $value;
+                $totals[$snapshotKey] += $value;
+                if ($value > 0 && in_array($snapshotKey, $relevantKeys)) {
+                    $hasRelevant = true;
+                }
+            }
 
-            $totalOpen += $openTasks;
-            $totalOverdue += $overdueTasks;
+            if (!$hasRelevant) continue;
+
+            // Compute sort score: weighted sum of relevant metrics
+            $sortScore = 0;
+            foreach ($metricConfigs as $snapshotKey => $config) {
+                $sortScore += ($personMetrics[$snapshotKey] ?? 0) * ($config['sort_weight'] ?? 0);
+            }
 
             $persons[] = [
                 'id' => $entity->id,
                 'name' => $entity->name,
                 'type_name' => $entity->type->name ?? '',
-                'open_tasks' => $openTasks,
-                'overdue_tasks' => $overdueTasks,
+                'metrics' => $personMetrics,
+                'sort_score' => $sortScore,
             ];
         }
 
-        // Sort: overdue first, then by open tasks
-        usort($persons, function ($a, $b) {
-            if ($b['overdue_tasks'] !== $a['overdue_tasks']) {
-                return $b['overdue_tasks'] <=> $a['overdue_tasks'];
-            }
-            return $b['open_tasks'] <=> $a['open_tasks'];
-        });
+        usort($persons, fn($a, $b) => $b['sort_score'] <=> $a['sort_score']);
 
         return [
             'persons' => array_slice($persons, 0, 8),
-            'totals' => [
-                'open_tasks' => $totalOpen,
-                'overdue_tasks' => $totalOverdue,
-                'person_count' => count($persons),
-            ],
+            'totals' => $totals,
+            'metric_configs' => $metricConfigs,
+            'person_count' => count($persons),
         ];
     }
 
@@ -587,15 +606,19 @@ class Dashboard extends Component
             }
         }
 
-        // Person overdue tasks
+        // Person danger metrics (generic)
         $personData = $this->personOverview;
-        if ($personData['totals']['overdue_tasks'] > 0) {
-            $overdueCount = $personData['totals']['overdue_tasks'];
-            $personCount = $personData['totals']['person_count'];
-            $statements[] = [
-                'text' => "{$overdueCount} überfällige " . ($overdueCount === 1 ? 'Aufgabe' : 'Aufgaben') . " bei {$personCount} " . ($personCount === 1 ? 'Person' : 'Personen') . ".",
-                'type' => 'warning',
-            ];
+        if ($personData['person_count'] > 0) {
+            foreach ($personData['metric_configs'] as $snapshotKey => $config) {
+                if ($config['type'] !== 'danger') continue;
+                $total = $personData['totals'][$snapshotKey] ?? 0;
+                if ($total <= 0) continue;
+                $personCount = $personData['person_count'];
+                $statements[] = [
+                    'text' => "{$total}x {$config['label']} bei {$personCount} " . ($personCount === 1 ? 'Person' : 'Personen') . ".",
+                    'type' => 'warning',
+                ];
+            }
         }
 
         return array_slice($statements, 0, 5);

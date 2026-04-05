@@ -27,6 +27,20 @@ interface PersonActivityProvider
     public function vitalSigns(int $userId, int $teamId): array;
 
     /**
+     * Statische Metrik-Definitionen fuer Dashboard-Anzeige.
+     * Beschreibt welche Keys der Provider in vitalSigns liefert und wie sie darzustellen sind.
+     *
+     * Format: [
+     *   'open_tasks' => ['label' => string, 'type' => 'info'|'warning'|'danger', 'sort_weight' => int],
+     *   ...
+     * ]
+     *
+     * type: 'danger' = rot/kritisch, 'warning' = gelb/aufmerksamkeit, 'info' = neutral
+     * sort_weight: hoehere Werte werden bei der Personen-Sortierung staerker gewichtet
+     */
+    public function metricConfig(): array;
+
+    /**
      * Zustaendigkeiten / Responsibilities gruppiert.
      * Gibt Gruppen mit Top-N Items + total_count zurueck.
      *

@@ -241,25 +241,26 @@
 
         {{-- 3b. Personen-Übersicht --}}
         @if(count($personOverview['persons']) > 0)
-            <x-ui-panel title="Personen-Übersicht" subtitle="Offene & überfällige Aufgaben" class="mb-8">
-                {{-- Summary Badges --}}
+            <x-ui-panel title="Personen-Übersicht" subtitle="Metriken aus Snapshots" class="mb-8">
+                {{-- Summary Badges (generic from metric_configs) --}}
                 <div class="flex items-center gap-3 mb-4 flex-wrap">
                     <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
                         @svg('heroicon-o-users', 'w-3.5 h-3.5')
-                        {{ $personOverview['totals']['person_count'] }} {{ $personOverview['totals']['person_count'] === 1 ? 'Person' : 'Personen' }}
+                        {{ $personOverview['person_count'] }} {{ $personOverview['person_count'] === 1 ? 'Person' : 'Personen' }}
                     </span>
-                    @if($personOverview['totals']['open_tasks'] > 0)
-                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
-                            @svg('heroicon-o-clipboard-document-list', 'w-3.5 h-3.5')
-                            {{ $personOverview['totals']['open_tasks'] }} offene Tasks
-                        </span>
-                    @endif
-                    @if($personOverview['totals']['overdue_tasks'] > 0)
-                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
-                            @svg('heroicon-o-exclamation-triangle', 'w-3.5 h-3.5')
-                            {{ $personOverview['totals']['overdue_tasks'] }} überfällig
-                        </span>
-                    @endif
+                    @foreach($personOverview['metric_configs'] as $snapshotKey => $mCfg)
+                        @if(($personOverview['totals'][$snapshotKey] ?? 0) > 0 && in_array($mCfg['type'], ['warning', 'danger']))
+                            <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium
+                                {{ $mCfg['type'] === 'danger' ? 'bg-red-50 text-red-700 border border-red-200' : 'bg-amber-50 text-amber-700 border border-amber-200' }}">
+                                @if($mCfg['type'] === 'danger')
+                                    @svg('heroicon-o-exclamation-triangle', 'w-3.5 h-3.5')
+                                @else
+                                    @svg('heroicon-o-clipboard-document-list', 'w-3.5 h-3.5')
+                                @endif
+                                {{ $personOverview['totals'][$snapshotKey] }} {{ $mCfg['label'] }}
+                            </span>
+                        @endif
+                    @endforeach
                 </div>
 
                 {{-- Person List --}}
@@ -279,12 +280,13 @@
                                 </div>
                             </div>
                             <div class="flex items-center gap-3 flex-shrink-0">
-                                @if($person['overdue_tasks'] > 0)
-                                    <span class="text-xs text-red-600 font-medium">{{ $person['overdue_tasks'] }} überfällig</span>
-                                @endif
-                                @if($person['open_tasks'] > 0)
-                                    <span class="text-xs text-amber-600 font-medium">{{ $person['open_tasks'] }} offen</span>
-                                @endif
+                                @foreach($personOverview['metric_configs'] as $snapshotKey => $mCfg)
+                                    @if(($person['metrics'][$snapshotKey] ?? 0) > 0 && in_array($mCfg['type'], ['warning', 'danger']))
+                                        <span class="text-xs font-medium {{ $mCfg['type'] === 'danger' ? 'text-red-600' : 'text-amber-600' }}">
+                                            {{ $person['metrics'][$snapshotKey] }} {{ $mCfg['label'] }}
+                                        </span>
+                                    @endif
+                                @endforeach
                             </div>
                         </div>
                     @endforeach

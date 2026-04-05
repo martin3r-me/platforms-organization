@@ -71,6 +71,30 @@ class PersonActivityRegistry
         return $result;
     }
 
+    /**
+     * Alle Metrik-Definitionen aller Provider, mit Snapshot-Key als Schluessel.
+     * Returns: ['person_planner_open_tasks' => ['label' => ..., 'type' => ..., 'sort_weight' => ..., 'section' => ...], ...]
+     */
+    public function allMetricConfigs(): array
+    {
+        $result = [];
+        foreach ($this->providers as $sectionKey => $provider) {
+            try {
+                $sectionConfig = $provider->sectionConfig();
+                foreach ($provider->metricConfig() as $metricKey => $config) {
+                    $snapshotKey = "person_{$sectionKey}_{$metricKey}";
+                    $result[$snapshotKey] = array_merge($config, [
+                        'section' => $sectionKey,
+                        'section_label' => $sectionConfig['label'] ?? $sectionKey,
+                    ]);
+                }
+            } catch (\Throwable $e) {
+                \Log::warning("PersonActivityRegistry: metricConfig failed for '{$sectionKey}'", ['error' => $e->getMessage()]);
+            }
+        }
+        return $result;
+    }
+
     public function hasProviders(): bool
     {
         return !empty($this->providers);

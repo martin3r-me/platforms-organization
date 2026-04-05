@@ -10,6 +10,7 @@ use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\EntityLinkRegistry;
+use Platform\Organization\Services\PersonActivityRegistry;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -174,10 +175,10 @@ class Dashboard extends Component
             $currentMetrics = $current->metrics;
             $agoMetrics = $ago ? $ago->metrics : null;
 
-            $itemsTotal = $currentMetrics['items_total'] ?? 0;
-            $itemsDone = $currentMetrics['items_done'] ?? 0;
-            $agoItemsDone = $agoMetrics ? ($agoMetrics['items_done'] ?? 0) : 0;
-            $agoItemsTotal = $agoMetrics ? ($agoMetrics['items_total'] ?? 0) : 0;
+            $itemsTotal = $currentMetrics['items_total_cascaded'] ?? $currentMetrics['items_total'] ?? 0;
+            $itemsDone = $currentMetrics['items_done_cascaded'] ?? $currentMetrics['items_done'] ?? 0;
+            $agoItemsDone = $agoMetrics ? ($agoMetrics['items_done_cascaded'] ?? $agoMetrics['items_done'] ?? 0) : 0;
+            $agoItemsTotal = $agoMetrics ? ($agoMetrics['items_total_cascaded'] ?? $agoMetrics['items_total'] ?? 0) : 0;
 
             $status = $this->classifyEntityHealth($itemsTotal, $itemsDone, $agoItemsTotal, $agoItemsDone);
             $counts[$status]++;
@@ -431,8 +432,14 @@ class Dashboard extends Component
             $cm = $current->metrics;
             $am = $ago ? $ago->metrics : [];
 
-            $itemsCompleted7d = max(0, ($cm['items_done'] ?? 0) - ($am['items_done'] ?? 0));
-            $timeLogged7d = max(0, ($cm['time_total_minutes'] ?? 0) - ($am['time_total_minutes'] ?? 0));
+            $itemsCompleted7d = max(0,
+                ($cm['items_done_cascaded'] ?? $cm['items_done'] ?? 0)
+                - ($am['items_done_cascaded'] ?? $am['items_done'] ?? 0)
+            );
+            $timeLogged7d = max(0,
+                ($cm['time_total_minutes_cascaded'] ?? $cm['time_total_minutes'] ?? 0)
+                - ($am['time_total_minutes_cascaded'] ?? $am['time_total_minutes'] ?? 0)
+            );
             $activityScore = $itemsCompleted7d + ($timeLogged7d / 60); // weight hours equally to items
 
             if ($activityScore <= 0) continue;
@@ -453,6 +460,70 @@ class Dashboard extends Component
         usort($activities, fn($a, $b) => ($b['items_completed_7d'] + $b['hours_7d']) <=> ($a['items_completed_7d'] + $a['hours_7d']));
 
         return array_slice($activities, 0, 5);
+    }
+
+    #[Computed]
+    public function personOverview(): array
+    {
+        $teamId = $this->getTeamId();
+        if (!$teamId) {
+            return ['persons' => [], 'totals' => ['open_tasks' => 0, 'overdue_tasks' => 0, 'person_count' => 0]];
+        }
+
+        $personEntities = OrganizationEntity::forTeam($teamId)
+            ->whereNotNull('linked_user_id')
+            ->with(['type', 'linkedUser'])
+            ->get();
+
+        if ($personEntities->isEmpty()) {
+            return ['persons' => [], 'totals' => ['open_tasks' => 0, 'overdue_tasks' => 0, 'person_count' => 0]];
+        }
+
+        $entityIds = $personEntities->pluck('id');
+        $latestSnapshots = $this->getLatestSnapshotsForEntities($entityIds);
+
+        $persons = [];
+        $totalOpen = 0;
+        $totalOverdue = 0;
+
+        foreach ($personEntities as $entity) {
+            $snap = $latestSnapshots[$entity->id] ?? null;
+            if (!$snap) continue;
+
+            $metrics = $snap->metrics;
+            $openTasks = $metrics['person_planner_open_tasks'] ?? 0;
+            $overdueTasks = $metrics['person_planner_overdue_tasks'] ?? 0;
+
+            if ($openTasks <= 0 && $overdueTasks <= 0) continue;
+
+            $totalOpen += $openTasks;
+            $totalOverdue += $overdueTasks;
+
+            $persons[] = [
+                'id' => $entity->id,
+                'name' => $entity->name,
+                'type_name' => $entity->type->name ?? '',
+                'open_tasks' => $openTasks,
+                'overdue_tasks' => $overdueTasks,
+            ];
+        }
+
+        // Sort: overdue first, then by open tasks
+        usort($persons, function ($a, $b) {
+            if ($b['overdue_tasks'] !== $a['overdue_tasks']) {
+                return $b['overdue_tasks'] <=> $a['overdue_tasks'];
+            }
+            return $b['open_tasks'] <=> $a['open_tasks'];
+        });
+
+        return [
+            'persons' => array_slice($persons, 0, 8),
+            'totals' => [
+                'open_tasks' => $totalOpen,
+                'overdue_tasks' => $totalOverdue,
+                'person_count' => count($persons),
+            ],
+        ];
     }
 
     #[Computed]
@@ -514,6 +585,17 @@ class Dashboard extends Component
                 $text .= ".";
                 $statements[] = ['text' => $text, 'type' => 'info'];
             }
+        }
+
+        // Person overdue tasks
+        $personData = $this->personOverview;
+        if ($personData['totals']['overdue_tasks'] > 0) {
+            $overdueCount = $personData['totals']['overdue_tasks'];
+            $personCount = $personData['totals']['person_count'];
+            $statements[] = [
+                'text' => "{$overdueCount} überfällige " . ($overdueCount === 1 ? 'Aufgabe' : 'Aufgaben') . " bei {$personCount} " . ($personCount === 1 ? 'Person' : 'Personen') . ".",
+                'type' => 'warning',
+            ];
         }
 
         return array_slice($statements, 0, 5);

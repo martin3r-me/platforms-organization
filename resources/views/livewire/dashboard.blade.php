@@ -77,6 +77,7 @@
             $trend = $this->teamSnapshotTrend;
             $linkDist = $this->linkTypeDistribution;
             $topEntities = $this->topEntitiesByActivity;
+            $personOverview = $this->personOverview;
         @endphp
 
         {{-- 1. Insight Banner --}}
@@ -235,6 +236,59 @@
                         @endforeach
                     </div>
                 @endif
+            </x-ui-panel>
+        @endif
+
+        {{-- 3b. Personen-Übersicht --}}
+        @if(count($personOverview['persons']) > 0)
+            <x-ui-panel title="Personen-Übersicht" subtitle="Offene & überfällige Aufgaben" class="mb-8">
+                {{-- Summary Badges --}}
+                <div class="flex items-center gap-3 mb-4 flex-wrap">
+                    <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                        @svg('heroicon-o-users', 'w-3.5 h-3.5')
+                        {{ $personOverview['totals']['person_count'] }} {{ $personOverview['totals']['person_count'] === 1 ? 'Person' : 'Personen' }}
+                    </span>
+                    @if($personOverview['totals']['open_tasks'] > 0)
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                            @svg('heroicon-o-clipboard-document-list', 'w-3.5 h-3.5')
+                            {{ $personOverview['totals']['open_tasks'] }} offene Tasks
+                        </span>
+                    @endif
+                    @if($personOverview['totals']['overdue_tasks'] > 0)
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                            @svg('heroicon-o-exclamation-triangle', 'w-3.5 h-3.5')
+                            {{ $personOverview['totals']['overdue_tasks'] }} überfällig
+                        </span>
+                    @endif
+                </div>
+
+                {{-- Person List --}}
+                <div class="space-y-2">
+                    @foreach($personOverview['persons'] as $person)
+                        <div class="flex items-center justify-between p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-colors">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <div class="w-8 h-8 rounded-full bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/60 flex items-center justify-center">
+                                    @svg('heroicon-o-user', 'w-4 h-4 text-[var(--ui-muted)]')
+                                </div>
+                                <div class="min-w-0">
+                                    <a href="{{ route('organization.entities.show', $person['id']) }}"
+                                       class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate block">
+                                        {{ $person['name'] }}
+                                    </a>
+                                    <div class="text-xs text-[var(--ui-muted)]">{{ $person['type_name'] }}</div>
+                                </div>
+                            </div>
+                            <div class="flex items-center gap-3 flex-shrink-0">
+                                @if($person['overdue_tasks'] > 0)
+                                    <span class="text-xs text-red-600 font-medium">{{ $person['overdue_tasks'] }} überfällig</span>
+                                @endif
+                                @if($person['open_tasks'] > 0)
+                                    <span class="text-xs text-amber-600 font-medium">{{ $person['open_tasks'] }} offen</span>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
             </x-ui-panel>
         @endif
 

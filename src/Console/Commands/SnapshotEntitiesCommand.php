@@ -9,6 +9,8 @@ use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Services\EntityLinkRegistry;
 use Platform\Organization\Services\EntityTimeResolver;
+use Platform\Organization\Services\EntityHierarchyService;
+use Platform\Organization\Services\PersonActivityRegistry;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
@@ -61,23 +63,68 @@ class SnapshotEntitiesCommand extends Command
         $contextPairs = $resolver->resolveContextPairsBatch($entityIds);
         $timeSummaries = $resolver->batchTimeSummaries($contextPairs);
 
-        // 5. Upsert snapshots
-        $upsertData = [];
+        // 5. Compute person metrics for entities with linked_user_id
+        $personMetrics = [];
+        try {
+            $personRegistry = resolve(PersonActivityRegistry::class);
+            if ($personRegistry->hasProviders()) {
+                $entitiesWithUser = $entities->filter(fn($e) => $e->linked_user_id !== null);
+                foreach ($entitiesWithUser as $entity) {
+                    $signs = $personRegistry->allVitalSigns($entity->linked_user_id, $entity->team_id);
+                    $flat = [];
+                    foreach ($signs as $sectionKey => $sectionSigns) {
+                        foreach ($sectionSigns as $sign) {
+                            $flat["person_{$sectionKey}_{$sign['key']}"] = $sign['value'];
+                        }
+                    }
+                    if (!empty($flat)) {
+                        $personMetrics[$entity->id] = $flat;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            \Log::warning('Snapshot: Person metrics failed', ['error' => $e->getMessage()]);
+        }
+
+        // 6. Cascade metrics through entity hierarchy
+        $hierarchyService = new EntityHierarchyService();
+        $childMap = $hierarchyService->buildChildMap($entities);
+
+        $ownMetricsMap = [];
         foreach ($entities as $entity) {
             $items = $itemMetrics[$entity->id] ?? [];
             $time = $timeSummaries[$entity->id] ?? ['total_minutes' => 0, 'billed_minutes' => 0];
+            $ownMetricsMap[$entity->id] = [
+                'links_count' => $linkCountsByEntity[$entity->id] ?? 0,
+                'items_total' => $items['items_total'] ?? 0,
+                'items_done' => $items['items_done'] ?? 0,
+                'time_total_minutes' => $time['total_minutes'],
+                'time_billed_minutes' => $time['billed_minutes'],
+            ];
+        }
+
+        $cascadeKeys = ['links_count', 'items_total', 'items_done', 'time_total_minutes', 'time_billed_minutes'];
+        $cascadedMetrics = $hierarchyService->cascadeMetrics($ownMetricsMap, $childMap, $cascadeKeys);
+
+        // 7. Upsert snapshots
+        $upsertData = [];
+        foreach ($entities as $entity) {
+            $metrics = $ownMetricsMap[$entity->id];
+
+            // Merge cascaded values
+            if (isset($cascadedMetrics[$entity->id])) {
+                $metrics = array_merge($metrics, $cascadedMetrics[$entity->id]);
+            }
+
+            if (isset($personMetrics[$entity->id])) {
+                $metrics = array_merge($metrics, $personMetrics[$entity->id]);
+            }
 
             $upsertData[] = [
                 'entity_id' => $entity->id,
                 'snapshot_date' => $today->toDateString(),
                 'snapshot_period' => $period,
-                'metrics' => json_encode([
-                    'links_count' => $linkCountsByEntity[$entity->id] ?? 0,
-                    'items_total' => $items['items_total'] ?? 0,
-                    'items_done' => $items['items_done'] ?? 0,
-                    'time_total_minutes' => $time['total_minutes'],
-                    'time_billed_minutes' => $time['billed_minutes'],
-                ]),
+                'metrics' => json_encode($metrics),
                 'created_at' => now(),
             ];
         }

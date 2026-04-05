@@ -431,6 +431,18 @@
                             @svg('heroicon-o-link', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
                             Relations
                         </button>
+                        @if($this->hasLinkedUser)
+                            <button
+                                @click="tab = 'person'"
+                                :class="tab === 'person'
+                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
+                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                                class="px-4 py-2.5 text-sm transition-colors"
+                            >
+                                @svg('heroicon-o-user', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
+                                Person
+                            </button>
+                        @endif
                     </nav>
                 </div>
 
@@ -646,6 +658,16 @@
                                     nullLabel="Keine übergeordnete Einheit"
                                     wire:model.live="form.parent_entity_id"
                                 />
+                                <x-ui-input-select
+                                    name="linked_user_id"
+                                    label="Verknüpfter User (optional)"
+                                    :options="$this->teamUsers"
+                                    optionValue="id"
+                                    optionLabel="name"
+                                    :nullable="true"
+                                    nullLabel="Kein User verknüpft"
+                                    wire:model.live="form.linked_user_id"
+                                />
                                 <div class="flex items-center">
                                     <input type="checkbox" wire:model.live="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
                                     <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
@@ -767,6 +789,13 @@
                         </div>
                     </div>
                 </div>
+
+                {{-- Tab: Person --}}
+                @if($this->hasLinkedUser)
+                    <div x-show="tab === 'person'" x-cloak>
+                        <livewire:organization.entity.person-activity :entity="$entity" :key="'person-activity-'.$entity->id" />
+                    </div>
+                @endif
             </div>
         </div>
     </x-ui-page-container>

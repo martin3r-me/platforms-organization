@@ -29,6 +29,7 @@ class OrganizationServiceProvider extends ServiceProvider
         }
 
         $this->app->singleton(\Platform\Organization\Services\EntityLinkRegistry::class);
+        $this->app->singleton(\Platform\Organization\Services\PersonActivityRegistry::class);
     }
 
     public function boot(): void

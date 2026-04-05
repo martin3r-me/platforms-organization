@@ -20,6 +20,7 @@ class OrganizationEntity extends Model
         'code',
         'team_id',
         'user_id',
+        'linked_user_id',
         'description',
         'entity_type_id',
         'vsm_system_id',
@@ -152,6 +153,30 @@ class OrganizationEntity extends Model
     public function user()
     {
         return $this->belongsTo(\Platform\Core\Models\User::class);
+    }
+
+    /**
+     * Beziehung zu verknüpftem User (Person-Entity)
+     */
+    public function linkedUser()
+    {
+        return $this->belongsTo(\Platform\Core\Models\User::class, 'linked_user_id');
+    }
+
+    /**
+     * Scope: Entities mit einem bestimmten linked_user_id
+     */
+    public function scopeLinkedToUser($query, int $userId)
+    {
+        return $query->where('linked_user_id', $userId);
+    }
+
+    /**
+     * Scope: Person-Entities (EntityType mit code 'person')
+     */
+    public function scopePersons($query)
+    {
+        return $query->whereHas('type', fn($q) => $q->where('code', 'person'));
     }
 
     /**

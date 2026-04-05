@@ -16,6 +16,7 @@ use Platform\Core\Models\Team;
 use Platform\Core\Enums\TeamRole;
 use Platform\Organization\Services\EntityTimeResolver;
 use Platform\Organization\Services\EntityLinkRegistry;
+use Platform\Organization\Services\EntityHierarchyService;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -48,6 +49,7 @@ class Show extends Component
             'children.children',
             'team',
             'user',
+            'linkedUser',
             'entityLinks',
             'relationsFrom.toEntity.type',
             'relationsFrom.relationType',
@@ -67,6 +69,7 @@ class Show extends Component
             'vsm_system_id' => $this->entity->vsm_system_id,
             'cost_center_id' => $this->entity->cost_center_id,
             'parent_entity_id' => $this->entity->parent_entity_id,
+            'linked_user_id' => $this->entity->linked_user_id,
             'is_active' => $this->entity->is_active,
         ];
     }
@@ -81,6 +84,7 @@ class Show extends Component
             'form.vsm_system_id' => 'nullable|exists:organization_vsm_systems,id',
             'form.cost_center_id' => 'nullable|exists:organization_cost_centers,id',
             'form.parent_entity_id' => 'nullable|exists:organization_entities,id',
+            'form.linked_user_id' => 'nullable|exists:users,id',
             'form.is_active' => 'boolean',
         ]);
 
@@ -104,6 +108,7 @@ class Show extends Component
                $this->form['vsm_system_id'] != $this->entity->vsm_system_id ||
                $this->form['cost_center_id'] != $this->entity->cost_center_id ||
                $this->form['parent_entity_id'] != $this->entity->parent_entity_id ||
+               $this->form['linked_user_id'] != $this->entity->linked_user_id ||
                $this->form['is_active'] !== $this->entity->is_active;
     }
 
@@ -147,6 +152,22 @@ class Show extends Component
             ->with('type')
             ->orderBy('name')
             ->get();
+    }
+
+    #[Computed]
+    public function hasLinkedUser(): bool
+    {
+        return !is_null($this->entity->linked_user_id);
+    }
+
+    public function getTeamUsersProperty()
+    {
+        $team = auth()->user()->currentTeam;
+        if (!$team) {
+            return collect();
+        }
+
+        return $team->users()->orderBy('name')->get(['users.id', 'users.name', 'users.email']);
     }
 
     public function openCreateTeamModal()
@@ -674,29 +695,7 @@ class Show extends Component
      */
     protected function getAllDescendantMap(array $rootIds): array
     {
-        if (empty($rootIds)) {
-            return [];
-        }
-
-        $placeholders = implode(',', array_fill(0, count($rootIds), '?'));
-        $rows = DB::select("
-            WITH RECURSIVE entity_tree AS (
-                SELECT id, parent_entity_id, parent_entity_id as root_id
-                FROM organization_entities
-                WHERE parent_entity_id IN ({$placeholders})
-                UNION ALL
-                SELECT e.id, e.parent_entity_id, et.root_id
-                FROM organization_entities e
-                INNER JOIN entity_tree et ON e.parent_entity_id = et.id
-            )
-            SELECT root_id, id FROM entity_tree
-        ", $rootIds);
-
-        $result = array_fill_keys($rootIds, []);
-        foreach ($rows as $row) {
-            $result[$row->root_id][] = $row->id;
-        }
-        return $result;
+        return resolve(EntityHierarchyService::class)->getAllDescendantMap($rootIds);
     }
 
     protected function getEntityLinkCountsForIds(array $entityIds): array

@@ -263,6 +263,49 @@
             .d3AlphaDecay(0.015)
             .d3VelocityDecay(0.25);
 
+        // ─── Neighborhood bounding sphere ───
+        function neighborhoodRadius(node) {
+            var nb = neighbors[node.id];
+            if (!nb || nb.size === 0) return 30;
+            var maxDist = 0;
+            var currentNodes = graph.graphData().nodes;
+            var nodeMap = {};
+            currentNodes.forEach(function(n) { nodeMap[n.id] = n; });
+            nb.forEach(function(nid) {
+                var n = nodeMap[nid];
+                if (!n || !n.x) return;
+                var d = Math.sqrt(
+                    Math.pow(n.x - node.x, 2) +
+                    Math.pow(n.y - node.y, 2) +
+                    Math.pow(n.z - node.z, 2)
+                );
+                if (d > maxDist) maxDist = d;
+            });
+            return Math.max(maxDist, 30);
+        }
+
+        function flyToNode(node) {
+            focusedNodeId = node.id;
+            showInfoPanel(node);
+
+            // Distance = neighborhood radius * factor so everything fits in view
+            var nbRadius = neighborhoodRadius(node);
+            var dist = nbRadius * 1.8 + 20;
+            var hyp = Math.hypot(node.x, node.y, node.z);
+            var camPos;
+            if (hyp < 1) {
+                camPos = { x: 0, y: dist * 0.3, z: dist };
+            } else {
+                var distRatio = 1 + dist / hyp;
+                camPos = { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio };
+            }
+            graph.cameraPosition(
+                camPos,
+                { x: node.x, y: node.y, z: node.z },
+                1000
+            );
+        }
+
         // ─── Click / Double-click ───
         var lastClickTime = 0;
         var lastClickNodeId = null;
@@ -277,16 +320,7 @@
             }
             lastClickNodeId = node.id;
             lastClickTime = now;
-            focusedNodeId = node.id;
-            showInfoPanel(node);
-
-            var dist = 30 + (node.__radius || 3) * 5;
-            var distRatio = 1 + dist / Math.hypot(node.x, node.y, node.z);
-            graph.cameraPosition(
-                { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio },
-                { x: node.x, y: node.y, z: node.z },
-                800
-            );
+            flyToNode(node);
         });
 
         graph.onBackgroundClick(function() {

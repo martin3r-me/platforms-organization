@@ -353,9 +353,9 @@
                 return 0.5;
             })
             .linkOpacity(0.4)
-            .linkDirectionalParticles(function(l) { return l.ltype === 'relation' ? 2 : 0; })
-            .linkDirectionalParticleWidth(0.6)
-            .linkDirectionalParticleSpeed(0.003)
+            .linkDirectionalParticles(function(l) { return l.ltype === 'relation' ? 3 : 1; })
+            .linkDirectionalParticleWidth(1.0)
+            .linkDirectionalParticleSpeed(0.004)
             .linkDirectionalParticleColor('color')
             .warmupTicks(80)
             .cooldownTicks(150)

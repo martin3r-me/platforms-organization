@@ -32,7 +32,7 @@
                 });
             }
 
-            loadScript('https://unpkg.com/3d-force-graph@1.77.7/dist/3d-force-graph.min.js').then(function() {
+            loadScript('https://unpkg.com/3d-force-graph@1').then(function() {
                 var container = document.getElementById('3d-graph');
                 if (!container || typeof ForceGraph3D === 'undefined') return;
 

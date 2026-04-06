@@ -73,8 +73,9 @@ class Mindmap extends Component
         $nodes = [];
         $links = [];
 
-        // Build depth map from hierarchy
+        // Build depth map and parent set from hierarchy
         $depthMap = $this->buildDepthMap($entities);
+        $parentIds = $entities->pluck('parent_entity_id')->filter()->unique()->flip();
 
         // Latest snapshots
         $latestSnapshots = OrganizationEntitySnapshot::query()
@@ -115,6 +116,7 @@ class Mindmap extends Component
                 'color'    => $color,
                 'val'      => $baseVal,
                 'depth'    => $depth,
+                'isSun'    => $depth === 0 && $parentIds->has($e->id),
                 'metrics'  => [
                     'items_total'   => $metrics['items_total'] ?? 0,
                     'items_done'    => $metrics['items_done'] ?? 0,

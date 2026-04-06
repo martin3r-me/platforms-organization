@@ -233,34 +233,53 @@
                 var isCenter = node.val > 15;
                 var isLinked = node.category && node.category !== 'entity';
                 var depth = node.depth || 0;
+                var isSun = node.isSun && !isCenter;
                 var m = node.metrics;
                 var hasActivity = m && m.time_h > 0;
 
-                // Size by depth: root=5, depth1=3.5, depth2=2.5, depth3+=2
+                // Size by depth: suns=6, root=5, depth1=3.5, depth2=2.5, depth3+=2
                 var baseRadius;
                 if (isCenter) { baseRadius = 7; }
                 else if (isLinked) { baseRadius = 2.5; }
+                else if (isSun) { baseRadius = 6; }
                 else {
                     baseRadius = depth === 0 ? 5 : (depth === 1 ? 3.5 : (depth === 2 ? 2.5 : 2));
                 }
                 var radius = baseRadius + (m ? Math.min(m.items_total * 0.15, 2) : 0);
                 node.__radius = radius;
 
-                // Core sphere - deeper nodes get less emissive
-                var emissiveIntensity = isCenter ? 0.4 : Math.max(0.05, 0.2 - depth * 0.05);
+                // Core sphere
+                var emissiveIntensity = isCenter ? 0.4 : isSun ? 0.35 : Math.max(0.05, 0.2 - depth * 0.05);
                 var sphere = new THREE.Mesh(
                     new THREE.SphereGeometry(radius, 24, 24),
                     new THREE.MeshPhongMaterial({
                         color: node.color,
                         emissive: node.color,
                         emissiveIntensity: emissiveIntensity,
-                        shininess: 80,
+                        shininess: isSun ? 120 : 80,
                     })
                 );
                 group.add(sphere);
 
-                // Glow aura - only for top-level entities and center
-                if (!isLinked && depth <= 1) {
+                // Sun corona - multiple layered glow shells
+                if (isSun) {
+                    // Inner corona
+                    group.add(new THREE.Mesh(
+                        new THREE.SphereGeometry(radius * 1.6, 16, 16),
+                        new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.12 })
+                    ));
+                    // Mid corona
+                    group.add(new THREE.Mesh(
+                        new THREE.SphereGeometry(radius * 2.4, 12, 12),
+                        new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.06 })
+                    ));
+                    // Outer corona
+                    group.add(new THREE.Mesh(
+                        new THREE.SphereGeometry(radius * 3.5, 8, 8),
+                        new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.025 })
+                    ));
+                } else if (!isLinked && depth <= 1) {
+                    // Regular glow for non-sun top-level
                     var glowSize = radius * (isCenter ? 2.5 : 1.8);
                     var glowIntensity = isCenter ? 0.12 : (hasActivity ? 0.06 + Math.min(m.time_h / 80, 0.1) : 0.03);
                     group.add(new THREE.Mesh(

@@ -16,46 +16,28 @@ class Mindmap extends Component
     public OrganizationEntity $entity;
 
     /**
-     * Farbpalette - wird dynamisch an Gruppen vergeben.
-     * Bekannte Gruppen bekommen stabile Farben, alles andere aus dem Pool.
+     * Maximal unterscheidbare Farben — werden der Reihe nach vergeben.
+     * Kein Hardcoding von Gruppen/Link-Typen, alles dynamisch.
      */
-    protected array $knownColors = [
-        'Organisationseinheiten' => '#3B82F6',
-        'Personen'               => '#8B5CF6',
-        'Rollen'                 => '#F59E0B',
-        'Gruppen'                => '#10B981',
-        'Externe'                => '#EF4444',
-        'Technische Systeme'     => '#6366F1',
-    ];
-
     protected array $colorPool = [
-        '#F97316', '#06B6D4', '#84CC16', '#EC4899', '#A855F7',
-        '#14B8A6', '#F43F5E', '#8B5CF6', '#22D3EE', '#FB923C',
+        '#3B82F6', '#8B5CF6', '#F59E0B', '#10B981', '#EF4444',
+        '#6366F1', '#EC4899', '#22D3EE', '#FB923C', '#84CC16',
+        '#F43F5E', '#A855F7', '#14B8A6', '#FACC15', '#06B6D4',
+        '#F97316', '#E879F9', '#34D399', '#FCA5A5', '#7DD3FC',
     ];
 
+    protected array $assignedColors = [];
     protected int $colorPoolIndex = 0;
 
-    protected function colorForGroup(string $group): string
+    protected function colorFor(string $key): string
     {
-        if (isset($this->knownColors[$group])) {
-            return $this->knownColors[$group];
-        }
-
-        // Dynamisch aus dem Pool vergeben und merken
-        if (!isset($this->knownColors[$group])) {
-            $this->knownColors[$group] = $this->colorPool[$this->colorPoolIndex % count($this->colorPool)];
+        if (!isset($this->assignedColors[$key])) {
+            $this->assignedColors[$key] = $this->colorPool[$this->colorPoolIndex % count($this->colorPool)];
             $this->colorPoolIndex++;
         }
 
-        return $this->knownColors[$group];
+        return $this->assignedColors[$key];
     }
-
-    protected array $linkTypeColors = [
-        'planner_project' => '#22D3EE',
-        'canvas'          => '#EC4899',
-        'planner_task'    => '#FB923C',
-        'helpdesk_ticket' => '#FACC15',
-    ];
 
     public function mount(OrganizationEntity $entity)
     {
@@ -104,7 +86,7 @@ class Mindmap extends Component
             };
 
             // Lighten color by depth
-            $baseColor = $this->colorForGroup($groupName);
+            $baseColor = $this->colorFor($groupName);
             $color = $isCenter ? '#111827' : $this->lightenByDepth($baseColor, $depth);
 
             $nodes[] = [
@@ -197,9 +179,8 @@ class Mindmap extends Component
                 }
             }
 
-            // Dynamische Farbe & Label für unbekannte Typen
-            $typeColor = $this->linkTypeColors[$morphType]
-                ?? $this->colorPool[crc32($morphType) % count($this->colorPool)];
+            // Farbe aus gemeinsamem Pool — keine Duplikate mit Entity-Gruppen
+            $typeColor = $this->colorFor('link:' . $morphType);
             $typeName = $this->humanMorphType($morphType);
 
             foreach ($typeLinks as $link) {
@@ -252,7 +233,7 @@ class Mindmap extends Component
             if (($n['category'] ?? '') !== 'entity') continue;
             $g = $n['group'] ?? 'Sonstige';
             if (!isset($entityGroups[$g])) {
-                $entityGroups[$g] = ['count' => 0, 'color' => $this->colorForGroup($g)];
+                $entityGroups[$g] = ['count' => 0, 'color' => $this->colorFor($g)];
             }
             $entityGroups[$g]['count']++;
         }

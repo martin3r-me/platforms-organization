@@ -365,7 +365,7 @@
 
             // Distance = neighborhood radius * factor so everything fits in view
             var nbRadius = neighborhoodRadius(node);
-            var dist = nbRadius * 1.8 + 20;
+            var dist = nbRadius * 1.3 + 15;
             var hyp = Math.hypot(node.x, node.y, node.z);
             var camPos;
             if (hyp < 1) {

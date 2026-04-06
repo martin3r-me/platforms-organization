@@ -16,43 +16,37 @@
         <div id="3d-graph" class="w-full h-full"></div>
     </div>
 
-    @script
     <script>
-        function loadScript(src) {
-            return new Promise((resolve, reject) => {
-                if (document.querySelector('script[src="' + src + '"]')) {
-                    resolve();
-                    return;
-                }
-                const s = document.createElement('script');
-                s.src = src;
-                s.onload = resolve;
-                s.onerror = reject;
-                document.head.appendChild(s);
+        (function() {
+            function loadScript(src) {
+                return new Promise(function(resolve, reject) {
+                    if (document.querySelector('script[src="' + src + '"]')) {
+                        resolve();
+                        return;
+                    }
+                    var s = document.createElement('script');
+                    s.src = src;
+                    s.onload = resolve;
+                    s.onerror = reject;
+                    document.head.appendChild(s);
+                });
+            }
+
+            loadScript('https://unpkg.com/3d-force-graph@1.77.7/dist/3d-force-graph.min.js').then(function() {
+                var container = document.getElementById('3d-graph');
+                if (!container || typeof ForceGraph3D === 'undefined') return;
+
+                ForceGraph3D()(container)
+                    .graphData({
+                        nodes: [{ id: 'center', name: '{{ $entity->name }}' }],
+                        links: [],
+                    })
+                    .backgroundColor('#0f172a')
+                    .nodeLabel('name')
+                    .nodeColor(function() { return '#3B82F6'; })
+                    .nodeRelSize(8)
+                    .cameraPosition({ x: 0, y: 0, z: 120 });
             });
-        }
-
-        async function boot() {
-            await loadScript('https://unpkg.com/3d-force-graph@1.77.7/dist/3d-force-graph.min.js');
-
-            const container = document.getElementById('3d-graph');
-            if (!container || typeof ForceGraph3D === 'undefined') return;
-
-            const data = {
-                nodes: [{ id: 'center', name: '{{ $entity->name }}' }],
-                links: [],
-            };
-
-            ForceGraph3D()(container)
-                .graphData(data)
-                .backgroundColor('#0f172a')
-                .nodeLabel('name')
-                .nodeColor(() => '#3B82F6')
-                .nodeRelSize(8)
-                .cameraPosition({ x: 0, y: 0, z: 120 });
-        }
-
-        boot();
+        })();
     </script>
-    @endscript
 </x-ui-page>

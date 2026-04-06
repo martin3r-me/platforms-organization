@@ -43,7 +43,7 @@ class Mindmap extends Component
             $nodes[] = [
                 'id'    => 'e' . $e->id,
                 'name'  => $e->name,
-                'color' => $isCenter ? '#FFFFFF' : ($this->groupColors[$groupName] ?? '#9CA3AF'),
+                'color' => $isCenter ? '#111827' : ($this->groupColors[$groupName] ?? '#9CA3AF'),
                 'val'   => $isCenter ? 12 : 4,
             ];
 

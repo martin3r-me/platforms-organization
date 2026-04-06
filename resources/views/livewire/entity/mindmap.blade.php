@@ -39,7 +39,7 @@
 
                 ForceGraph3D()(container)
                     .graphData(data)
-                    .backgroundColor('#0f172a')
+                    .backgroundColor('#ffffff')
                     .nodeLabel('name')
                     .nodeColor('color')
                     .nodeVal('val')

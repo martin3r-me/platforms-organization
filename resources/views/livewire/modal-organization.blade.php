@@ -79,87 +79,76 @@
             <!-- Tab Content: Entry -->
             @if($allowTimeEntry)
             <div x-show="activeTab === 'entry'" x-cloak>
-                <div class="space-y-6">
-                    <!-- Ist-Zeit Form -->
-                    <div class="grid gap-5">
+                <div class="space-y-5">
+                    <!-- Datum & Dauer -->
+                    <div class="grid gap-5 sm:grid-cols-2">
                         <x-ui-input-date-select
                             name="workDate"
                             label="Datum"
                             wire:model.live="workDate"
                             :errorKey="'workDate'"
                         />
-                    </div>
 
-                    <!-- Quick Time Buttons -->
-                    <div>
-                        <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-3">
-                            Dauer
-                        </label>
-                        <div class="flex flex-wrap gap-2">
-                            @foreach([15, 30, 45, 60, 90, 120, 180, 240, 360, 480] as $quickMinutes)
-                                @php
-                                    $isSelected = $minutes === $quickMinutes;
-                                    if ($quickMinutes < 60) {
-                                        $display = $quickMinutes . 'm';
-                                    } else {
-                                        $hours = $quickMinutes / 60;
-                                        if ($hours == floor($hours)) {
-                                            $display = (int)$hours . 'h';
-                                        } else {
-                                            $display = number_format($hours, 1, ',', '.') . 'h';
-                                        }
-                                    }
-                                @endphp
-                                <button
-                                    type="button"
-                                    wire:click="$set('minutes', {{ $quickMinutes }})"
-                                    class="px-3 py-1.5 rounded-lg border-2 font-bold transition-all duration-200 text-xs {{ $isSelected ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
-                                >
-                                    {{ $display }}
-                                </button>
-                            @endforeach
-                        </div>
-                    </div>
-
-                    <div class="grid gap-5 sm:grid-cols-2">
                         <x-ui-input-text
                             name="rate"
-                            label="Stundensatz (optional)"
+                            label="Stundensatz"
+                            hint="Optional"
                             wire:model.live="rate"
                             placeholder="z. B. 95,00"
                             :errorKey="'rate'"
                         />
-
-                        <x-ui-input-textarea
-                            name="note"
-                            label="Notiz"
-                            wire:model.live="note"
-                            rows="3"
-                            placeholder="Optionaler Kommentar zur erfassten Zeit"
-                            :errorKey="'note'"
-                        />
                     </div>
+
+                    <!-- Dauer -->
+                    <x-ui-input-select
+                        name="minutes"
+                        label="Dauer"
+                        wire:model.live="minutes"
+                        displayMode="badges"
+                        badgeSize="sm"
+                        :options="[
+                            15 => '15m',
+                            30 => '30m',
+                            45 => '45m',
+                            60 => '1h',
+                            90 => '1,5h',
+                            120 => '2h',
+                            180 => '3h',
+                            240 => '4h',
+                            360 => '6h',
+                            480 => '8h',
+                        ]"
+                        :errorKey="'minutes'"
+                    />
+
+                    <!-- Notiz -->
+                    <x-ui-input-textarea
+                        name="note"
+                        label="Anmerkung"
+                        wire:model.live="note"
+                        rows="2"
+                        placeholder="Optionaler Kommentar zur erfassten Zeit"
+                        :errorKey="'note'"
+                    />
 
                     <!-- Preview -->
                     @if($rate && $minutes)
                         @php
-                            $normalized = str_replace([' ', "'"], '', $rate);
-                            $normalized = str_replace(',', '.', $normalized);
-                            $rateFloat = is_numeric($normalized) && (float)$normalized > 0 ? (float)$normalized : null;
+                            $normalizedRate = str_replace([' ', "'"], '', $rate);
+                            $normalizedRate = str_replace(',', '.', $normalizedRate);
+                            $rateFloat = is_numeric($normalizedRate) && (float)$normalizedRate > 0 ? (float)$normalizedRate : null;
                             $amountCents = $rateFloat !== null ? (int) round($rateFloat * 100 * ($minutes / 60)) : null;
                         @endphp
                         @if($amountCents)
-                            <div class="p-5 bg-gradient-to-br from-[var(--ui-primary-5)] via-[var(--ui-primary-10)] to-[var(--ui-primary-5)] rounded-xl border-2 border-[var(--ui-primary)]/30 shadow-sm">
-                                <div class="flex items-center justify-between">
-                                    <span class="text-sm font-semibold text-[var(--ui-secondary)]">Geschätzter Betrag:</span>
-                                    <span class="text-2xl font-bold text-[var(--ui-primary)]">{{ number_format($amountCents / 100, 2, ',', '.') }} €</span>
-                                </div>
+                            <div class="flex items-center justify-between px-4 py-3 rounded-lg bg-[var(--ui-primary-5)] border border-[var(--ui-primary)]/20">
+                                <span class="text-sm text-[var(--ui-secondary)]">Geschätzter Betrag</span>
+                                <span class="text-lg font-bold text-[var(--ui-primary)]">{{ number_format($amountCents / 100, 2, ',', '.') }} €</span>
                             </div>
                         @endif
                     @endif
 
                     <!-- Divider -->
-                    <div class="border-t border-[var(--ui-border)]/60"></div>
+                    <div class="border-t border-[var(--ui-border)]/40"></div>
 
                     <!-- Collapsible Budget Section -->
                     <div x-data="{ budgetOpen: false }">
@@ -179,52 +168,41 @@
 
                         <div x-show="budgetOpen" x-collapse x-cloak class="mt-4 space-y-4">
                             <!-- Quick Hour Buttons -->
-                            <div>
-                                <label class="block text-xs font-semibold text-[var(--ui-muted)] uppercase tracking-wide mb-2">Stunden</label>
-                                <div class="grid gap-2" style="grid-template-columns: repeat(8, minmax(0, 1fr));">
-                                    @foreach([1, 2, 3, 4, 5, 6, 7, 8] as $quickHours)
-                                        <button
-                                            type="button"
-                                            wire:click="$set('plannedMinutes', {{ $quickHours * 60 }})"
-                                            class="px-3 py-2 rounded-lg border-2 font-bold transition-all duration-200 hover:scale-105 text-xs {{ $plannedMinutes === ($quickHours * 60) ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
-                                        >
-                                            {{ $quickHours }}h
-                                        </button>
-                                    @endforeach
-                                </div>
-                            </div>
+                            <x-ui-input-select
+                                name="plannedMinutes"
+                                label="Stunden"
+                                wire:model.live="plannedMinutes"
+                                displayMode="badges"
+                                badgeSize="xs"
+                                :options="[
+                                    60 => '1h', 120 => '2h', 180 => '3h', 240 => '4h',
+                                    300 => '5h', 360 => '6h', 420 => '7h', 480 => '8h',
+                                ]"
+                            />
                             <!-- Quick Day Buttons -->
-                            <div>
-                                <label class="block text-xs font-semibold text-[var(--ui-muted)] uppercase tracking-wide mb-2">Tage (à 8h)</label>
-                                <div class="grid gap-2" style="grid-template-columns: repeat(5, minmax(0, 1fr));">
-                                    @foreach([1, 2, 5, 10, 20] as $quickDays)
-                                        <button
-                                            type="button"
-                                            wire:click="$set('plannedMinutes', {{ $quickDays * 8 * 60 }})"
-                                            class="px-3 py-2 rounded-lg border-2 font-bold transition-all duration-200 hover:scale-105 text-xs {{ $plannedMinutes === ($quickDays * 8 * 60) ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
-                                        >
-                                            {{ $quickDays }}d
-                                        </button>
-                                    @endforeach
-                                </div>
-                            </div>
+                            <x-ui-input-select
+                                name="plannedMinutesDays"
+                                label="Tage (à 8h)"
+                                wire:model.live="plannedMinutes"
+                                displayMode="badges"
+                                badgeSize="xs"
+                                :options="[
+                                    480 => '1d', 960 => '2d', 2400 => '5d', 4800 => '10d', 9600 => '20d',
+                                ]"
+                            />
                             <!-- Minutes Input -->
                             <div>
-                                <input
-                                    type="number"
+                                <x-ui-input-number
+                                    name="plannedMinutesManual"
+                                    label="Oder Minuten eingeben"
                                     wire:model.live="plannedMinutes"
-                                    min="1"
-                                    step="15"
-                                    placeholder="Minuten eingeben (z. B. 120 für 2 Stunden)"
-                                    class="w-full px-4 py-3 text-sm rounded-xl border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]/20 focus:border-[var(--ui-primary)]"
+                                    placeholder="z. B. 120 für 2 Stunden"
+                                    :errorKey="'plannedMinutes'"
                                 />
-                                @error('plannedMinutes')
-                                    <p class="mt-2 text-xs text-[var(--ui-danger)]">{{ $message }}</p>
-                                @enderror
                                 @if($plannedMinutes)
-                                    <p class="mt-2 text-xs font-medium text-[var(--ui-secondary)]">
-                                        {{ number_format($plannedMinutes / 60, 2, ',', '.') }} Stunden
-                                        <span class="text-[var(--ui-muted)]">({{ number_format($plannedMinutes / 480, 2, ',', '.') }} Tage à 8h)</span>
+                                    <p class="mt-1.5 text-xs text-[var(--ui-muted)]">
+                                        = {{ number_format($plannedMinutes / 60, 2, ',', '.') }} Stunden
+                                        ({{ number_format($plannedMinutes / 480, 2, ',', '.') }} Tage)
                                     </p>
                                 @endif
                             </div>

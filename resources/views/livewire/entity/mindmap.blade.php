@@ -12,18 +12,17 @@
         ]" />
     </x-slot>
 
-    <div class="relative w-full" style="height: calc(100vh - 100px);" id="mindmap-wrapper">
+    <div class="relative w-full" style="height: calc(100vh - 100px);">
         <div id="3d-graph" class="w-full h-full"></div>
     </div>
+
+    <script id="mindmap-data" type="application/json">@json($this->graphData)</script>
 
     <script>
         (function() {
             function loadScript(src) {
                 return new Promise(function(resolve, reject) {
-                    if (document.querySelector('script[src="' + src + '"]')) {
-                        resolve();
-                        return;
-                    }
+                    if (document.querySelector('script[src="' + src + '"]')) { resolve(); return; }
                     var s = document.createElement('script');
                     s.src = src;
                     s.onload = resolve;
@@ -36,16 +35,17 @@
                 var container = document.getElementById('3d-graph');
                 if (!container || typeof ForceGraph3D === 'undefined') return;
 
+                var data = JSON.parse(document.getElementById('mindmap-data').textContent);
+
                 ForceGraph3D()(container)
-                    .graphData({
-                        nodes: [{ id: 'center', name: '{{ $entity->name }}' }],
-                        links: [],
-                    })
+                    .graphData(data)
                     .backgroundColor('#0f172a')
                     .nodeLabel('name')
-                    .nodeColor(function() { return '#3B82F6'; })
-                    .nodeRelSize(8)
-                    .cameraPosition({ x: 0, y: 0, z: 120 });
+                    .nodeColor('color')
+                    .nodeVal('val')
+                    .linkColor(function() { return 'rgba(156,163,175,0.4)'; })
+                    .linkWidth(1)
+                    .cameraPosition({ x: 0, y: 0, z: 300 });
             });
         })();
     </script>

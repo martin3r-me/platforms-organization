@@ -61,8 +61,8 @@
             </div>
 
             {{-- Timeline Slider --}}
-            @if(count($this->availableDates) > 0)
             <div id="timeline-slider" class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl w-[calc(2.25rem*3+2px)] px-2 py-2 text-xs">
+                @if(count($this->availableDates) > 0)
                 <div class="flex items-center justify-between mb-1.5">
                     <span class="text-gray-500 font-medium uppercase tracking-wider" style="font-size:9px">Timeline</span>
                     <button id="btn-timeline-live" class="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider transition-colors {{ !$snapshotDate ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/5 text-gray-500 border border-gray-700/50 hover:text-gray-300' }}">
@@ -73,8 +73,13 @@
                 <div class="text-center mt-1">
                     <span id="timeline-date" class="text-gray-300 font-medium tabular-nums" style="font-size:9px">{{ $snapshotDate ?? 'Live' }}</span>
                 </div>
+                @else
+                <div class="flex items-center justify-center gap-1.5 text-gray-600">
+                    @svg('heroicon-o-clock', 'w-3 h-3')
+                    <span style="font-size:9px">Keine Snapshots</span>
+                </div>
+                @endif
             </div>
-            @endif
         </div>
 
         {{-- Legend --}}
@@ -218,13 +223,13 @@
             .enableNodeDrag(true)
             .enableNavigationControls(true);
 
-        // Forces - entity_links get shorter distance to stay near parent
-        graph.d3Force('charge').strength(-500);
+        // Forces - tighter layout, entity_links stay near parent
+        graph.d3Force('charge').strength(-300);
         graph.d3Force('link').distance(function(link) {
             var ltype = link.ltype || '';
-            if (ltype === 'entity_link') return 30;
-            if (ltype === 'hierarchy') return 70;
-            return 90;
+            if (ltype === 'entity_link') return 20;
+            if (ltype === 'hierarchy') return 45;
+            return 60;
         });
 
         // Clustering force
@@ -343,11 +348,11 @@
             .linkColor('color')
             .linkWidth(function(l) {
                 var ltype = l.ltype || '';
-                if (ltype === 'hierarchy') return 0.4;
-                if (ltype === 'relation') return 0.6;
-                return 0.3;
+                if (ltype === 'hierarchy') return 0.8;
+                if (ltype === 'relation') return 1.0;
+                return 0.5;
             })
-            .linkOpacity(0.25)
+            .linkOpacity(0.4)
             .linkDirectionalParticles(function(l) { return l.ltype === 'relation' ? 2 : 0; })
             .linkDirectionalParticleWidth(0.6)
             .linkDirectionalParticleSpeed(0.003)

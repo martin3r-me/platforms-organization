@@ -22,8 +22,182 @@
     </x-slot>
 
     <div class="relative w-full" style="height: calc(100vh - 100px);" id="mindmap-wrapper"
-         x-data="entityMindmap()"
-         x-init="init()">
+         x-data="{
+            graph: null,
+            graphData: @js($this->graphData),
+            selectedNode: null,
+            centerNodeId: 'entity-{{ $entity->id }}',
+            depth: 3,
+            filters: { entity: true, linked: true, relation: true },
+            scriptsLoaded: false,
+
+            loadScripts() {
+                const scripts = [
+                    'https://unpkg.com/three@0.160.0/build/three.min.js',
+                    'https://unpkg.com/three-spritetext@1',
+                    'https://unpkg.com/3d-force-graph@1',
+                ];
+                let loaded = 0;
+                const total = scripts.length;
+                const loadNext = () => {
+                    if (loaded >= total) {
+                        this.scriptsLoaded = true;
+                        this.buildGraph();
+                        return;
+                    }
+                    const s = document.createElement('script');
+                    s.src = scripts[loaded];
+                    s.onload = () => { loaded++; loadNext(); };
+                    document.head.appendChild(s);
+                };
+                loadNext();
+            },
+
+            init() {
+                this.loadScripts();
+
+                document.getElementById('btn-fullscreen')?.addEventListener('click', () => {
+                    const el = document.getElementById('mindmap-wrapper');
+                    if (el.requestFullscreen) el.requestFullscreen();
+                });
+
+                document.getElementById('btn-reset-camera')?.addEventListener('click', () => {
+                    this.resetCamera();
+                });
+            },
+
+            buildGraph() {
+                const container = document.getElementById('3d-graph');
+                if (!container || typeof ForceGraph3D === 'undefined') return;
+
+                const filtered = this.getFilteredData();
+
+                this.graph = ForceGraph3D()(container)
+                    .graphData(filtered)
+                    .backgroundColor('rgba(0,0,0,0)')
+                    .nodeLabel(n => `<div style=&quot;background:rgba(0,0,0,0.85);color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;max-width:200px;&quot;>
+                        <strong>${n.label}</strong><br/>
+                        <span style=&quot;color:${n.color};font-size:10px;&quot;>${n.typeName}</span>
+                        ${n.group ? `<br/><span style=&quot;opacity:0.6;font-size:10px;&quot;>${n.group}</span>` : ''}
+                    </div>`)
+                    .nodeThreeObject(node => {
+                        const group = new THREE.Group();
+
+                        const geometry = new THREE.SphereGeometry(node.size || 5);
+                        const material = new THREE.MeshLambertMaterial({
+                            color: node.color,
+                            transparent: !node.isCenter,
+                            opacity: node.isCenter ? 1.0 : 0.85,
+                        });
+                        const sphere = new THREE.Mesh(geometry, material);
+
+                        if (node.isCenter) {
+                            const glowGeo = new THREE.SphereGeometry((node.size || 5) * 1.6);
+                            const glowMat = new THREE.MeshBasicMaterial({
+                                color: node.color,
+                                transparent: true,
+                                opacity: 0.15,
+                            });
+                            group.add(new THREE.Mesh(glowGeo, glowMat));
+                        }
+
+                        group.add(sphere);
+
+                        const sprite = new SpriteText(node.label);
+                        sprite.color = node.isCenter ? '#FFFFFF' : 'rgba(255,255,255,0.8)';
+                        sprite.textHeight = node.isCenter ? 4 : 2.5;
+                        sprite.position.y = -(node.size || 5) - 3;
+                        sprite.backgroundColor = 'rgba(0,0,0,0.4)';
+                        sprite.padding = 1.5;
+                        sprite.borderRadius = 3;
+                        group.add(sprite);
+
+                        return group;
+                    })
+                    .linkColor(l => l.color)
+                    .linkWidth(l => l.width || 1)
+                    .linkOpacity(0.6)
+                    .linkDirectionalParticles(l => l.type === 'relation' ? 2 : 0)
+                    .linkDirectionalParticleWidth(1.5)
+                    .linkDirectionalParticleSpeed(0.005)
+                    .linkDirectionalParticleColor(l => l.color)
+                    .onNodeClick((node) => {
+                        this.selectedNode = { ...node };
+                        this.animateCameraToNode(node);
+                    })
+                    .onBackgroundClick(() => {
+                        this.selectedNode = null;
+                    })
+                    .warmupTicks(80)
+                    .cooldownTicks(120)
+                    .d3AlphaDecay(0.02)
+                    .d3VelocityDecay(0.3);
+
+                setTimeout(() => this.resetCamera(), 500);
+            },
+
+            getFilteredData() {
+                let nodes = [...this.graphData.nodes];
+                let links = [...this.graphData.links];
+
+                if (!this.filters.linked) {
+                    const linkedIds = new Set(nodes.filter(n => n.type === 'linked').map(n => n.id));
+                    nodes = nodes.filter(n => n.type !== 'linked');
+                    links = links.filter(l => !linkedIds.has(l.source?.id || l.source) && !linkedIds.has(l.target?.id || l.target));
+                }
+
+                if (!this.filters.relation) {
+                    links = links.filter(l => l.type !== 'relation');
+                }
+
+                if (!this.filters.entity) {
+                    const entityIds = new Set(nodes.filter(n => n.type === 'entity' && !n.isCenter).map(n => n.id));
+                    nodes = nodes.filter(n => n.type !== 'entity' || n.isCenter);
+                    links = links.filter(l => !entityIds.has(l.source?.id || l.source) && !entityIds.has(l.target?.id || l.target));
+                }
+
+                return { nodes, links };
+            },
+
+            toggleFilter(key) {
+                this.filters[key] = !this.filters[key];
+                if (this.graph) {
+                    this.graph.graphData(this.getFilteredData());
+                }
+            },
+
+            setDepth(d) {
+                this.depth = d;
+                if (this.graph) {
+                    this.graph.graphData(this.getFilteredData());
+                }
+            },
+
+            animateCameraToNode(node) {
+                if (!this.graph) return;
+                const distance = 120;
+                const distRatio = 1 + distance / Math.hypot(node.x, node.y, node.z);
+                this.graph.cameraPosition(
+                    { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio },
+                    { x: node.x, y: node.y, z: node.z },
+                    1500
+                );
+            },
+
+            focusNode(node) {
+                if (node) this.animateCameraToNode(node);
+            },
+
+            resetCamera() {
+                if (!this.graph) return;
+                const centerNode = this.graphData.nodes.find(n => n.id === this.centerNodeId);
+                if (centerNode && centerNode.x !== undefined) {
+                    this.animateCameraToNode(centerNode);
+                } else {
+                    this.graph.cameraPosition({ x: 0, y: 0, z: 400 }, { x: 0, y: 0, z: 0 }, 1500);
+                }
+            },
+         }">
 
         {{-- Toolbar --}}
         <div class="absolute top-4 left-4 z-20 flex items-center gap-2">
@@ -110,181 +284,4 @@
         {{-- 3D Graph Container --}}
         <div id="3d-graph" class="w-full h-full rounded-lg overflow-hidden"></div>
     </div>
-
-    @push('scripts')
-    <script src="https://unpkg.com/3d-force-graph@1"></script>
-    <script src="https://unpkg.com/three@0.160.0/build/three.min.js"></script>
-    <script src="https://unpkg.com/three-spritetext@1"></script>
-    <script>
-        function entityMindmap() {
-            return {
-                graph: null,
-                graphData: @json($this->graphData),
-                selectedNode: null,
-                centerNodeId: 'entity-{{ $entity->id }}',
-                depth: 3,
-                filters: { entity: true, linked: true, relation: true },
-
-                init() {
-                    this.$nextTick(() => this.buildGraph());
-
-                    // Fullscreen button
-                    document.getElementById('btn-fullscreen')?.addEventListener('click', () => {
-                        const el = document.getElementById('mindmap-wrapper');
-                        if (el.requestFullscreen) el.requestFullscreen();
-                    });
-
-                    // Reset camera
-                    document.getElementById('btn-reset-camera')?.addEventListener('click', () => {
-                        this.resetCamera();
-                    });
-                },
-
-                buildGraph() {
-                    const container = document.getElementById('3d-graph');
-                    if (!container) return;
-
-                    const filtered = this.getFilteredData();
-
-                    this.graph = ForceGraph3D()(container)
-                        .graphData(filtered)
-                        .backgroundColor('rgba(0,0,0,0)')
-                        .nodeLabel(n => `<div style="background:rgba(0,0,0,0.85);color:#fff;padding:8px 12px;border-radius:8px;font-size:12px;max-width:200px;">
-                            <strong>${n.label}</strong><br/>
-                            <span style="color:${n.color};font-size:10px;">${n.typeName}</span>
-                            ${n.group ? `<br/><span style="opacity:0.6;font-size:10px;">${n.group}</span>` : ''}
-                        </div>`)
-                        .nodeThreeObject(node => {
-                            const group = new THREE.Group();
-
-                            // Sphere
-                            const geometry = new THREE.SphereGeometry(node.size || 5);
-                            const material = new THREE.MeshLambertMaterial({
-                                color: node.color,
-                                transparent: !node.isCenter,
-                                opacity: node.isCenter ? 1.0 : 0.85,
-                            });
-                            const sphere = new THREE.Mesh(geometry, material);
-
-                            // Glow for center node
-                            if (node.isCenter) {
-                                const glowGeo = new THREE.SphereGeometry((node.size || 5) * 1.6);
-                                const glowMat = new THREE.MeshBasicMaterial({
-                                    color: node.color,
-                                    transparent: true,
-                                    opacity: 0.15,
-                                });
-                                const glow = new THREE.Mesh(glowGeo, glowMat);
-                                group.add(glow);
-                            }
-
-                            group.add(sphere);
-
-                            // Text label
-                            const sprite = new SpriteText(node.label);
-                            sprite.color = node.isCenter ? '#FFFFFF' : 'rgba(255,255,255,0.8)';
-                            sprite.textHeight = node.isCenter ? 4 : 2.5;
-                            sprite.position.y = -(node.size || 5) - 3;
-                            sprite.backgroundColor = 'rgba(0,0,0,0.4)';
-                            sprite.padding = 1.5;
-                            sprite.borderRadius = 3;
-                            group.add(sprite);
-
-                            return group;
-                        })
-                        .linkColor(l => l.color)
-                        .linkWidth(l => l.width || 1)
-                        .linkOpacity(0.6)
-                        .linkDirectionalParticles(l => l.type === 'relation' ? 2 : 0)
-                        .linkDirectionalParticleWidth(1.5)
-                        .linkDirectionalParticleSpeed(0.005)
-                        .linkDirectionalParticleColor(l => l.color)
-                        .onNodeClick(node => {
-                            this.selectedNode = node;
-                            this.animateCameraToNode(node);
-                        })
-                        .onBackgroundClick(() => {
-                            this.selectedNode = null;
-                        })
-                        .warmupTicks(80)
-                        .cooldownTicks(120)
-                        .d3AlphaDecay(0.02)
-                        .d3VelocityDecay(0.3);
-
-                    // Initial camera position
-                    setTimeout(() => {
-                        this.resetCamera();
-                    }, 500);
-                },
-
-                getFilteredData() {
-                    let nodes = [...this.graphData.nodes];
-                    let links = [...this.graphData.links];
-
-                    // Filter nodes by type
-                    if (!this.filters.linked) {
-                        const linkedIds = new Set(nodes.filter(n => n.type === 'linked').map(n => n.id));
-                        nodes = nodes.filter(n => n.type !== 'linked');
-                        links = links.filter(l => !linkedIds.has(l.source) && !linkedIds.has(l.target));
-                    }
-
-                    // Filter links by type
-                    if (!this.filters.relation) {
-                        links = links.filter(l => l.type !== 'relation');
-                    }
-
-                    if (!this.filters.entity) {
-                        // Keep center node always
-                        const entityIds = new Set(nodes.filter(n => n.type === 'entity' && !n.isCenter).map(n => n.id));
-                        nodes = nodes.filter(n => n.type !== 'entity' || n.isCenter);
-                        links = links.filter(l => !entityIds.has(l.source) && !entityIds.has(l.target));
-                    }
-
-                    return { nodes, links };
-                },
-
-                toggleFilter(key) {
-                    this.filters[key] = !this.filters[key];
-                    if (this.graph) {
-                        this.graph.graphData(this.getFilteredData());
-                    }
-                },
-
-                setDepth(d) {
-                    this.depth = d;
-                    // Depth filtering: only show nodes within N hops of center
-                    // For now re-render with full data (depth logic can be added server-side)
-                    if (this.graph) {
-                        this.graph.graphData(this.getFilteredData());
-                    }
-                },
-
-                animateCameraToNode(node) {
-                    if (!this.graph) return;
-                    const distance = 120;
-                    const distRatio = 1 + distance / Math.hypot(node.x, node.y, node.z);
-                    this.graph.cameraPosition(
-                        { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio },
-                        { x: node.x, y: node.y, z: node.z },
-                        1500
-                    );
-                },
-
-                focusNode(node) {
-                    if (node) this.animateCameraToNode(node);
-                },
-
-                resetCamera() {
-                    if (!this.graph) return;
-                    const centerNode = this.graphData.nodes.find(n => n.id === this.centerNodeId);
-                    if (centerNode && centerNode.x !== undefined) {
-                        this.animateCameraToNode(centerNode);
-                    } else {
-                        this.graph.cameraPosition({ x: 0, y: 0, z: 400 }, { x: 0, y: 0, z: 0 }, 1500);
-                    }
-                },
-            };
-        }
-    </script>
-    @endpush
 </x-ui-page>

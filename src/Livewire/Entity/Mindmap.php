@@ -73,6 +73,9 @@ class Mindmap extends Component
         $nodes = [];
         $links = [];
 
+        // Build depth map from hierarchy
+        $depthMap = $this->buildDepthMap($entities);
+
         // Latest snapshots
         $latestSnapshots = OrganizationEntitySnapshot::query()
             ->whereIn('entity_id', $entities->pluck('id'))
@@ -88,6 +91,20 @@ class Mindmap extends Component
             $isCenter = $e->id === $this->entity->id;
             $snap = $latestSnapshots[$e->id] ?? null;
             $metrics = $snap?->metrics ?? [];
+            $depth = $depthMap[$e->id] ?? 0;
+
+            // Scale val by depth: root=12, depth1=8, depth2=5, depth3+=4
+            $baseVal = match(true) {
+                $isCenter => 25,
+                $depth === 0 => 12,
+                $depth === 1 => 8,
+                $depth === 2 => 5,
+                default => 4,
+            };
+
+            // Lighten color by depth
+            $baseColor = $this->colorForGroup($groupName);
+            $color = $isCenter ? '#111827' : $this->lightenByDepth($baseColor, $depth);
 
             $nodes[] = [
                 'id'       => 'e' . $e->id,
@@ -95,8 +112,9 @@ class Mindmap extends Component
                 'group'    => $groupName,
                 'category' => 'entity',
                 'parentId' => $e->parent_entity_id ? 'e' . $e->parent_entity_id : null,
-                'color'    => $isCenter ? '#111827' : $this->colorForGroup($groupName),
-                'val'      => $isCenter ? 25 : 8,
+                'color'    => $color,
+                'val'      => $baseVal,
+                'depth'    => $depth,
                 'metrics'  => [
                     'items_total'   => $metrics['items_total'] ?? 0,
                     'items_done'    => $metrics['items_done'] ?? 0,
@@ -229,6 +247,48 @@ class Mindmap extends Component
         }
 
         return compact('nodes', 'links', 'categories', 'entityGroups');
+    }
+
+    protected function buildDepthMap($entities): array
+    {
+        $parentMap = [];
+        foreach ($entities as $e) {
+            $parentMap[$e->id] = $e->parent_entity_id;
+        }
+
+        $depths = [];
+        foreach ($entities as $e) {
+            $depth = 0;
+            $current = $e->id;
+            $visited = [];
+            while (isset($parentMap[$current]) && $parentMap[$current] !== null) {
+                if (in_array($current, $visited)) break; // cycle guard
+                $visited[] = $current;
+                $current = $parentMap[$current];
+                $depth++;
+            }
+            $depths[$e->id] = $depth;
+        }
+
+        return $depths;
+    }
+
+    protected function lightenByDepth(string $hex, int $depth): string
+    {
+        if ($depth <= 0) return $hex;
+
+        $hex = ltrim($hex, '#');
+        $r = hexdec(substr($hex, 0, 2));
+        $g = hexdec(substr($hex, 2, 2));
+        $b = hexdec(substr($hex, 4, 2));
+
+        // Each depth level blends 20% toward white (max 60% blend at depth 3+)
+        $factor = min($depth * 0.20, 0.60);
+        $r = (int) round($r + (255 - $r) * $factor);
+        $g = (int) round($g + (255 - $g) * $factor);
+        $b = (int) round($b + (255 - $b) * $factor);
+
+        return sprintf('#%02X%02X%02X', $r, $g, $b);
     }
 
     protected function humanMorphType(string $type): string

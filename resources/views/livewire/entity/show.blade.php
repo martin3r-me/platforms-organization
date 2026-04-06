@@ -23,6 +23,10 @@
                     @svg('heroicon-o-pencil', 'w-4 h-4')
                     <span>Bearbeiten</span>
                 </x-ui-button>
+                <x-ui-button variant="ghost" size="sm" href="{{ route('organization.entities.mindmap', $entity) }}">
+                    @svg('heroicon-o-globe-alt', 'w-4 h-4')
+                    <span>Mindmap</span>
+                </x-ui-button>
                 <x-ui-button variant="primary" size="sm" wire:click="openCreateTeamModal">
                     @svg('heroicon-o-user-group', 'w-4 h-4')
                     <span>Team erstellen</span>

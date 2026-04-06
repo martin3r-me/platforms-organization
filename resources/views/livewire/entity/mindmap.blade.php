@@ -231,27 +231,35 @@
                 var group = new THREE.Group();
                 var isCenter = node.val > 15;
                 var isLinked = node.category && node.category !== 'entity';
+                var depth = node.depth || 0;
                 var m = node.metrics;
                 var hasActivity = m && m.time_h > 0;
 
-                var baseRadius = isCenter ? 7 : (isLinked ? 2.5 : 3.5);
-                var radius = baseRadius + (m ? Math.min(m.items_total * 0.2, 3) : 0);
+                // Size by depth: root=5, depth1=3.5, depth2=2.5, depth3+=2
+                var baseRadius;
+                if (isCenter) { baseRadius = 7; }
+                else if (isLinked) { baseRadius = 2.5; }
+                else {
+                    baseRadius = depth === 0 ? 5 : (depth === 1 ? 3.5 : (depth === 2 ? 2.5 : 2));
+                }
+                var radius = baseRadius + (m ? Math.min(m.items_total * 0.15, 2) : 0);
                 node.__radius = radius;
 
-                // Core sphere
+                // Core sphere - deeper nodes get less emissive
+                var emissiveIntensity = isCenter ? 0.4 : Math.max(0.05, 0.2 - depth * 0.05);
                 var sphere = new THREE.Mesh(
                     new THREE.SphereGeometry(radius, 24, 24),
                     new THREE.MeshPhongMaterial({
                         color: node.color,
                         emissive: node.color,
-                        emissiveIntensity: isCenter ? 0.4 : 0.15,
+                        emissiveIntensity: emissiveIntensity,
                         shininess: 80,
                     })
                 );
                 group.add(sphere);
 
-                // Glow aura
-                if (!isLinked) {
+                // Glow aura - only for top-level entities and center
+                if (!isLinked && depth <= 1) {
                     var glowSize = radius * (isCenter ? 2.5 : 1.8);
                     var glowIntensity = isCenter ? 0.12 : (hasActivity ? 0.06 + Math.min(m.time_h / 80, 0.1) : 0.03);
                     group.add(new THREE.Mesh(
@@ -260,12 +268,16 @@
                     ));
                 }
 
-                // Label
+                // Label - bigger for root/depth1, smaller for deeper
                 var labelText = node.type ? node.type + '  ' + node.name : node.name;
-                var fontSize = isCenter ? 38 : (isLinked ? 24 : 28);
+                var fontSize;
+                if (isCenter) { fontSize = 38; }
+                else if (isLinked) { fontSize = 24; }
+                else { fontSize = depth === 0 ? 32 : (depth === 1 ? 26 : 22); }
                 var label = makeLabel(isLinked ? node.name : labelText, fontSize, isCenter ? '#ffffff' : node.color);
                 label.position.y = -(radius + 2.5);
-                label.visible = false;
+                // Top-level labels (depth 0-1) start visible
+                label.visible = (!isLinked && depth <= 1) || isCenter;
                 label.name = 'label';
                 group.add(label);
 
@@ -411,8 +423,8 @@
             var actions = '';
             if (node.id && node.id.startsWith('e')) {
                 var eid = node.id.substring(1);
-                actions += '<a href="/organization/entities/' + eid + '" class="px-2.5 py-1 bg-white/10 text-white rounded hover:bg-white/20 transition-colors">Details</a>';
-                actions += '<a href="/organization/entities/' + eid + '/mindmap" class="px-2.5 py-1 bg-white/5 text-gray-400 rounded hover:bg-white/10 transition-colors">Hierhin fliegen</a>';
+                actions += '<a href="/organization/entities/' + eid + '" class="px-2.5 py-1 bg-white/10 text-white rounded hover:bg-white/20 transition-colors flex items-center gap-1"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12H9m12 0a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Details</a>';
+                actions += '<a href="/organization/entities/' + eid + '/mindmap" class="px-2.5 py-1 bg-white/5 text-gray-400 rounded hover:bg-white/10 transition-colors flex items-center gap-1"><svg class="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg> Hierhin fliegen</a>';
             }
             document.getElementById('info-actions').innerHTML = actions;
             panel.classList.remove('hidden');
@@ -438,7 +450,9 @@
 
                 var isLinked = node.category && node.category !== 'entity';
                 var isCenter = node.val > 15;
-                var threshold = isCenter ? 9999 : (isLinked ? 80 : 160);
+                var depth = node.depth || 0;
+                // Top-level entities (depth 0-1) always show labels
+                var threshold = isCenter ? 9999 : (!isLinked && depth <= 1) ? 9999 : (isLinked ? 80 : 160);
 
                 if (focusedNodeId) {
                     var nb = neighbors[focusedNodeId];

@@ -82,7 +82,7 @@
                 <div class="space-y-6">
                     <!-- Ist-Zeit Form -->
                     <div class="grid gap-5">
-                        <x-ui-input-date
+                        <x-ui-input-date-select
                             name="workDate"
                             label="Datum"
                             wire:model.live="workDate"
@@ -95,8 +95,8 @@
                         <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-3">
                             Dauer
                         </label>
-                        <div class="grid gap-3" style="grid-template-columns: repeat(auto-fill, minmax(5rem, 1fr));">
-                            @foreach($this->minuteOptions as $quickMinutes)
+                        <div class="flex flex-wrap gap-2">
+                            @foreach([15, 30, 45, 60, 90, 120, 180, 240, 360, 480] as $quickMinutes)
                                 @php
                                     $isSelected = $minutes === $quickMinutes;
                                     if ($quickMinutes < 60) {
@@ -113,7 +113,7 @@
                                 <button
                                     type="button"
                                     wire:click="$set('minutes', {{ $quickMinutes }})"
-                                    class="px-4 py-3 rounded-xl border-2 font-bold transition-all duration-200 hover:scale-105 text-sm {{ $isSelected ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md scale-105' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
+                                    class="px-3 py-1.5 rounded-lg border-2 font-bold transition-all duration-200 text-xs {{ $isSelected ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
                                 >
                                     {{ $display }}
                                 </button>
@@ -197,7 +197,7 @@
                             <div>
                                 <label class="block text-xs font-semibold text-[var(--ui-muted)] uppercase tracking-wide mb-2">Tage (à 8h)</label>
                                 <div class="grid gap-2" style="grid-template-columns: repeat(5, minmax(0, 1fr));">
-                                    @foreach([1, 2, 3, 4, 5, 10, 15, 20, 30, 40] as $quickDays)
+                                    @foreach([1, 2, 5, 10, 20] as $quickDays)
                                         <button
                                             type="button"
                                             wire:click="$set('plannedMinutes', {{ $quickDays * 8 * 60 }})"

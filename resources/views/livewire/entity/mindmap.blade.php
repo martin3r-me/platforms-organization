@@ -16,28 +16,28 @@
         <div id="3d-graph" class="w-full h-full"></div>
 
         {{-- Sidebar --}}
-        <div id="sidebar" class="absolute top-3 left-3 z-20 w-56 bg-white/95 backdrop-blur border border-gray-200 rounded-xl shadow-xl text-xs overflow-hidden">
-            <div class="px-3 py-2 bg-gray-50 border-b border-gray-200 font-bold text-gray-700 text-sm flex items-center gap-2">
-                @svg('heroicon-o-funnel', 'w-4 h-4') Filter
+        <div id="sidebar" class="absolute top-3 left-3 z-20 w-52 bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-xl shadow-2xl text-xs overflow-hidden">
+            <div class="px-3 py-2 border-b border-gray-700/50 font-bold text-gray-300 text-sm flex items-center gap-2">
+                @svg('heroicon-o-funnel', 'w-4 h-4 text-gray-500') Layer
             </div>
-            <div id="filter-list" class="p-2 space-y-1 max-h-[60vh] overflow-y-auto"></div>
+            <div id="filter-list" class="p-2 space-y-0.5 max-h-[55vh] overflow-y-auto"></div>
         </div>
 
         {{-- Info panel --}}
-        <div id="info-panel" class="absolute bottom-3 left-3 z-20 w-72 bg-white/95 backdrop-blur border border-gray-200 rounded-xl shadow-xl text-xs hidden">
+        <div id="info-panel" class="absolute bottom-3 left-3 z-20 w-72 bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-xl shadow-2xl text-xs hidden">
             <div class="p-3">
                 <div class="flex items-center gap-2 mb-2">
-                    <div id="info-dot" class="w-3 h-3 rounded-full shrink-0"></div>
-                    <span id="info-name" class="font-bold text-sm text-gray-900 truncate"></span>
+                    <div id="info-dot" class="w-3 h-3 rounded-full shrink-0 ring-2 ring-white/20"></div>
+                    <span id="info-name" class="font-bold text-sm text-white truncate"></span>
                 </div>
-                <div id="info-meta" class="text-gray-500 space-y-0.5"></div>
+                <div id="info-meta" class="text-gray-400 space-y-0.5"></div>
                 <div id="info-actions" class="mt-2 flex gap-2"></div>
             </div>
         </div>
 
         {{-- Nav hint --}}
-        <div id="nav-hint" class="absolute bottom-3 right-3 bg-black/60 text-white text-xs px-3 py-2 rounded-lg pointer-events-none transition-opacity duration-1000">
-            Klick = Fokus &middot; Doppelklick = Details &middot; Hintergrund = Zurück
+        <div id="nav-hint" class="absolute bottom-3 right-3 bg-black/70 text-gray-400 text-xs px-3 py-2 rounded-lg pointer-events-none transition-opacity duration-1000">
+            Drag = Rotieren &middot; Rechtsklick = Verschieben &middot; Scroll = Zoom &middot; Klick = Fokus
         </div>
     </div>
 
@@ -82,84 +82,63 @@
             var el = document.getElementById('filter-list');
             el.innerHTML = '';
 
-            // Categories
             Object.keys(categories).forEach(function(key) {
                 var cat = categories[key];
                 var row = document.createElement('label');
-                row.className = 'flex items-center gap-2 px-2 py-1.5 rounded hover:bg-gray-50 cursor-pointer select-none';
+                row.className = 'flex items-center gap-2 px-2 py-1.5 rounded hover:bg-white/5 cursor-pointer select-none';
                 row.innerHTML =
-                    '<input type="checkbox" ' + (filters[key] ? 'checked' : '') + ' class="rounded border-gray-300 text-blue-500 w-3.5 h-3.5" data-cat="' + key + '">' +
-                    '<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:' + cat.color + '"></span>' +
-                    '<span class="flex-1 text-gray-700">' + cat.label + '</span>' +
-                    '<span class="text-gray-400 tabular-nums">' + cat.count + '</span>';
+                    '<input type="checkbox" ' + (filters[key] ? 'checked' : '') + ' class="rounded border-gray-600 bg-gray-800 text-blue-500 w-3.5 h-3.5" data-cat="' + key + '">' +
+                    '<span class="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style="background:' + cat.color + ';box-shadow:0 0 6px ' + cat.color + '50"></span>' +
+                    '<span class="flex-1 text-gray-300">' + cat.label + '</span>' +
+                    '<span class="text-gray-600 tabular-nums">' + cat.count + '</span>';
                 el.appendChild(row);
             });
 
-            // Separator + entity sub-groups
             if (Object.keys(entityGroups).length > 0) {
                 var sep = document.createElement('div');
-                sep.className = 'border-t border-gray-100 my-1.5 mx-2';
+                sep.className = 'border-t border-gray-700/50 my-1';
                 el.appendChild(sep);
-
-                var subHead = document.createElement('div');
-                subHead.className = 'px-2 py-1 text-gray-400 font-medium uppercase tracking-wider';
-                subHead.style.fontSize = '10px';
-                subHead.textContent = 'Entity-Gruppen';
-                el.appendChild(subHead);
 
                 Object.keys(entityGroups).forEach(function(key) {
                     var g = entityGroups[key];
                     var row = document.createElement('label');
-                    row.className = 'flex items-center gap-2 px-2 py-1 rounded hover:bg-gray-50 cursor-pointer select-none ml-2';
+                    row.className = 'flex items-center gap-2 px-2 py-1 rounded hover:bg-white/5 cursor-pointer select-none ml-1';
                     row.innerHTML =
-                        '<input type="checkbox" ' + (groupFilters[key] ? 'checked' : '') + ' class="rounded border-gray-300 text-blue-500 w-3 h-3" data-group="' + key + '">' +
-                        '<span class="w-2 h-2 rounded-full shrink-0" style="background:' + g.color + '"></span>' +
-                        '<span class="flex-1 text-gray-600">' + key + '</span>' +
-                        '<span class="text-gray-400 tabular-nums">' + g.count + '</span>';
+                        '<input type="checkbox" ' + (groupFilters[key] ? 'checked' : '') + ' class="rounded border-gray-600 bg-gray-800 text-blue-500 w-3 h-3" data-group="' + key + '">' +
+                        '<span class="w-2 h-2 rounded-full shrink-0" style="background:' + g.color + ';box-shadow:0 0 4px ' + g.color + '40"></span>' +
+                        '<span class="flex-1 text-gray-400">' + key + '</span>' +
+                        '<span class="text-gray-600 tabular-nums">' + g.count + '</span>';
                     el.appendChild(row);
                 });
             }
 
-            // Bind events
             el.querySelectorAll('[data-cat]').forEach(function(cb) {
-                cb.addEventListener('change', function() {
-                    filters[cb.dataset.cat] = cb.checked;
-                    applyFilters();
-                });
+                cb.addEventListener('change', function() { filters[cb.dataset.cat] = cb.checked; graph.graphData(getFilteredData()); });
             });
             el.querySelectorAll('[data-group]').forEach(function(cb) {
-                cb.addEventListener('change', function() {
-                    groupFilters[cb.dataset.group] = cb.checked;
-                    applyFilters();
-                });
+                cb.addEventListener('change', function() { groupFilters[cb.dataset.group] = cb.checked; graph.graphData(getFilteredData()); });
             });
-        }
-
-        function applyFilters() {
-            graph.graphData(getFilteredData());
         }
 
         // ─── Label factory ───
-        function makeLabel(text, fontSize) {
+        function makeLabel(text, fontSize, color) {
             var canvas = document.createElement('canvas');
             var ctx = canvas.getContext('2d');
-            var bold = fontSize > 36;
-            ctx.font = (bold ? 'bold ' : '') + fontSize + 'px -apple-system, system-ui, sans-serif';
+            var bold = fontSize > 34;
+            ctx.font = (bold ? '600 ' : '400 ') + fontSize + 'px -apple-system, system-ui, sans-serif';
             var tw = ctx.measureText(text).width;
             var pad = 10;
             canvas.width = tw + pad * 2;
             canvas.height = fontSize + pad * 2;
-            ctx.font = (bold ? 'bold ' : '') + fontSize + 'px -apple-system, system-ui, sans-serif';
-            ctx.fillStyle = 'rgba(15,23,42,0.8)';
-            ctx.beginPath();
-            ctx.roundRect(0, 0, canvas.width, canvas.height, 5);
-            ctx.fill();
-            ctx.fillStyle = '#fff';
+            // Transparent bg, colored text
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            ctx.font = (bold ? '600 ' : '400 ') + fontSize + 'px -apple-system, system-ui, sans-serif';
+            ctx.fillStyle = color || '#ffffff';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
             ctx.fillText(text, canvas.width / 2, canvas.height / 2);
             var tex = new THREE.CanvasTexture(canvas);
-            var mat = new THREE.SpriteMaterial({ map: tex, depthTest: false });
+            var mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
             var sprite = new THREE.Sprite(mat);
             sprite.scale.set(canvas.width / 22, canvas.height / 22, 1);
             return sprite;
@@ -179,13 +158,18 @@
         // ─── Graph ───
         var container = document.getElementById('3d-graph');
         var focusedNodeId = null;
+
         var graph = ForceGraph3D()(container)
-            .backgroundColor('#ffffff');
+            .backgroundColor('#080c18')
+            .showNavInfo(false)
+            .enableNodeDrag(true)
+            .enableNavigationControls(true);
 
-        graph.d3Force('charge').strength(-400);
-        graph.d3Force('link').distance(70);
+        // Forces
+        graph.d3Force('charge').strength(-600);
+        graph.d3Force('link').distance(90);
 
-        // Add clustering force: same-group nodes attract slightly
+        // Clustering force
         graph.d3Force('cluster', function(alpha) {
             var centroids = {};
             var counts = {};
@@ -193,25 +177,21 @@
                 if (!n.x) return;
                 var g = n.group || n.category || 'x';
                 if (!centroids[g]) { centroids[g] = { x: 0, y: 0, z: 0 }; counts[g] = 0; }
-                centroids[g].x += n.x;
-                centroids[g].y += n.y;
-                centroids[g].z += n.z;
+                centroids[g].x += n.x; centroids[g].y += n.y; centroids[g].z += n.z;
                 counts[g]++;
             });
             Object.keys(centroids).forEach(function(g) {
-                centroids[g].x /= counts[g];
-                centroids[g].y /= counts[g];
-                centroids[g].z /= counts[g];
+                centroids[g].x /= counts[g]; centroids[g].y /= counts[g]; centroids[g].z /= counts[g];
             });
-            var strength = alpha * 0.3;
             allNodes.forEach(function(n) {
                 if (!n.x) return;
                 var g = n.group || n.category || 'x';
                 var c = centroids[g];
                 if (!c) return;
-                n.vx += (c.x - n.x) * strength;
-                n.vy += (c.y - n.y) * strength;
-                n.vz += (c.z - n.z) * strength;
+                var s = alpha * 0.25;
+                n.vx += (c.x - n.x) * s;
+                n.vy += (c.y - n.y) * s;
+                n.vz += (c.z - n.z) * s;
             });
         });
 
@@ -223,28 +203,37 @@
                 var m = node.metrics;
                 var hasActivity = m && m.time_h > 0;
 
-                var baseRadius = isCenter ? 8 : (isLinked ? 2 : 4);
-                var radius = baseRadius + (m ? Math.min(m.items_total * 0.3, 4) : 0);
+                var baseRadius = isCenter ? 7 : (isLinked ? 1.5 : 3);
+                var radius = baseRadius + (m ? Math.min(m.items_total * 0.2, 3) : 0);
                 node.__radius = radius;
 
+                // Core sphere
                 var sphere = new THREE.Mesh(
-                    new THREE.SphereGeometry(radius, 20, 20),
-                    new THREE.MeshLambertMaterial({ color: node.color })
+                    new THREE.SphereGeometry(radius, 24, 24),
+                    new THREE.MeshPhongMaterial({
+                        color: node.color,
+                        emissive: node.color,
+                        emissiveIntensity: isCenter ? 0.4 : 0.15,
+                        shininess: 80,
+                    })
                 );
                 group.add(sphere);
 
-                if (hasActivity && !isLinked) {
-                    var intensity = Math.min(m.time_h / 50, 1);
+                // Glow aura
+                if (!isLinked) {
+                    var glowSize = radius * (isCenter ? 2.5 : 1.8);
+                    var glowIntensity = isCenter ? 0.12 : (hasActivity ? 0.06 + Math.min(m.time_h / 80, 0.1) : 0.03);
                     group.add(new THREE.Mesh(
-                        new THREE.SphereGeometry(radius * 1.8, 12, 12),
-                        new THREE.MeshBasicMaterial({ color: '#EF4444', transparent: true, opacity: 0.08 + intensity * 0.15 })
+                        new THREE.SphereGeometry(glowSize, 12, 12),
+                        new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: glowIntensity })
                     ));
                 }
 
-                var labelText = node.type ? node.type + ': ' + node.name : node.name;
-                var fontSize = isCenter ? 40 : (isLinked ? 22 : 30);
-                var label = makeLabel(isLinked ? node.name : labelText, fontSize);
-                label.position.y = -(radius + 3);
+                // Label
+                var labelText = node.type ? node.type + '  ' + node.name : node.name;
+                var fontSize = isCenter ? 38 : (isLinked ? 20 : 28);
+                var label = makeLabel(isLinked ? node.name : labelText, fontSize, isCenter ? '#ffffff' : node.color);
+                label.position.y = -(radius + 2.5);
                 label.visible = false;
                 label.name = 'label';
                 group.add(label);
@@ -252,21 +241,29 @@
                 return group;
             })
             .nodeLabel(function(node) {
-                if (!node.metrics) return '<b>' + node.name + '</b>' + (node.type ? '<br/><span style="color:#888">' + node.type + '</span>' : '');
+                var lines = ['<b style="color:' + node.color + '">' + node.name + '</b>'];
+                if (node.group) lines.push(node.group);
+                if (node.type) lines.push(node.type);
                 var m = node.metrics;
-                var lines = ['<b>' + node.name + '</b>'];
-                if (node.group) lines.push('<span style="color:#888">' + node.group + '</span>');
-                if (m.items_total > 0) lines.push('Items: ' + m.items_done + '/' + m.items_total + ' (' + Math.round(m.items_done / m.items_total * 100) + '%)');
-                if (m.time_h > 0) lines.push('Zeit: ' + m.time_h + 'h');
-                return '<div style="text-align:left;line-height:1.5">' + lines.join('<br/>') + '</div>';
+                if (m) {
+                    if (m.items_total > 0) lines.push('Items: ' + m.items_done + '/' + m.items_total);
+                    if (m.time_h > 0) lines.push('Zeit: ' + m.time_h + 'h');
+                }
+                return '<div style="background:rgba(0,0,0,0.85);color:#ccc;padding:6px 10px;border-radius:6px;font-size:11px;line-height:1.6;text-align:left">' + lines.join('<br/>') + '</div>';
             })
             .linkColor('color')
-            .linkWidth('width')
-            .linkOpacity(0.4)
-            .warmupTicks(60)
-            .cooldownTicks(100);
+            .linkWidth(function(l) { return (l.width || 1) * 0.6; })
+            .linkOpacity(0.35)
+            .linkDirectionalParticles(function(l) { return l.width > 1 ? 3 : 1; })
+            .linkDirectionalParticleWidth(1.2)
+            .linkDirectionalParticleSpeed(0.004)
+            .linkDirectionalParticleColor('color')
+            .warmupTicks(80)
+            .cooldownTicks(150)
+            .d3AlphaDecay(0.015)
+            .d3VelocityDecay(0.25);
 
-        // ─── Click: fly to node ───
+        // ─── Click / Double-click ───
         var lastClickTime = 0;
         var lastClickNodeId = null;
 
@@ -280,11 +277,10 @@
             }
             lastClickNodeId = node.id;
             lastClickTime = now;
-
             focusedNodeId = node.id;
             showInfoPanel(node);
 
-            var dist = 40 + (node.__radius || 4) * 4;
+            var dist = 30 + (node.__radius || 3) * 5;
             var distRatio = 1 + dist / Math.hypot(node.x, node.y, node.z);
             graph.cameraPosition(
                 { x: node.x * distRatio, y: node.y * distRatio, z: node.z * distRatio },
@@ -296,31 +292,62 @@
         graph.onBackgroundClick(function() {
             focusedNodeId = null;
             hideInfoPanel();
-            graph.cameraPosition({ x: 0, y: 0, z: 400 }, { x: 0, y: 0, z: 0 }, 800);
+            graph.cameraPosition({ x: 0, y: 0, z: 350 }, { x: 0, y: 0, z: 0 }, 800);
         });
 
-        graph.cameraPosition({ x: 0, y: 0, z: 400 });
+        graph.cameraPosition({ x: 0, y: 0, z: 350 });
+
+        // ─── Add starfield ───
+        (function() {
+            var starsGeo = new THREE.BufferGeometry();
+            var positions = new Float32Array(3000 * 3);
+            for (var i = 0; i < 3000; i++) {
+                positions[i * 3] = (Math.random() - 0.5) * 2000;
+                positions[i * 3 + 1] = (Math.random() - 0.5) * 2000;
+                positions[i * 3 + 2] = (Math.random() - 0.5) * 2000;
+            }
+            starsGeo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            var starsMat = new THREE.PointsMaterial({ color: 0x888899, size: 0.5, transparent: true, opacity: 0.6 });
+            graph.scene().add(new THREE.Points(starsGeo, starsMat));
+        })();
+
+        // ─── Better lighting for space ───
+        (function() {
+            var scene = graph.scene();
+            // Add subtle ambient
+            scene.add(new THREE.AmbientLight(0x334466, 0.6));
+            // Directional for depth
+            var dir = new THREE.DirectionalLight(0xffffff, 0.8);
+            dir.position.set(100, 200, 150);
+            scene.add(dir);
+        })();
 
         // ─── Info panel ───
         function showInfoPanel(node) {
             var panel = document.getElementById('info-panel');
             document.getElementById('info-dot').style.background = node.color;
+            document.getElementById('info-dot').style.boxShadow = '0 0 8px ' + node.color;
             document.getElementById('info-name').textContent = node.name;
 
             var meta = '';
-            if (node.group) meta += '<div>' + node.group + '</div>';
-            if (node.type) meta += '<div>' + node.type + '</div>';
+            if (node.group) meta += '<div class="text-gray-500">' + node.group + '</div>';
+            if (node.type) meta += '<div class="text-gray-500">' + node.type + '</div>';
             var m = node.metrics;
             if (m) {
-                if (m.items_total > 0) meta += '<div>Items: ' + m.items_done + ' / ' + m.items_total + '</div>';
-                if (m.time_h > 0) meta += '<div>Zeit: ' + m.time_h + 'h (abger. ' + m.time_billed_h + 'h)</div>';
+                if (m.items_total > 0) {
+                    var pct = Math.round(m.items_done / m.items_total * 100);
+                    meta += '<div class="mt-1">Items: <span class="text-white">' + m.items_done + '/' + m.items_total + '</span> <span class="text-gray-600">(' + pct + '%)</span></div>';
+                }
+                if (m.time_h > 0) meta += '<div>Zeit: <span class="text-white">' + m.time_h + 'h</span> <span class="text-gray-600">(abger. ' + m.time_billed_h + 'h)</span></div>';
+                if (m.links_count > 0) meta += '<div>Links: <span class="text-white">' + m.links_count + '</span></div>';
             }
             document.getElementById('info-meta').innerHTML = meta;
 
             var actions = '';
             if (node.id && node.id.startsWith('e')) {
-                actions += '<a href="/organization/entities/' + node.id.substring(1) + '" class="px-2 py-1 bg-gray-900 text-white rounded text-xs hover:bg-gray-700">Details</a>';
-                actions += '<a href="/organization/entities/' + node.id.substring(1) + '/mindmap" class="px-2 py-1 bg-gray-100 text-gray-700 rounded text-xs hover:bg-gray-200">Mindmap ab hier</a>';
+                var eid = node.id.substring(1);
+                actions += '<a href="/organization/entities/' + eid + '" class="px-2.5 py-1 bg-white/10 text-white rounded hover:bg-white/20 transition-colors">Details</a>';
+                actions += '<a href="/organization/entities/' + eid + '/mindmap" class="px-2.5 py-1 bg-white/5 text-gray-400 rounded hover:bg-white/10 transition-colors">Hierhin fliegen</a>';
             }
             document.getElementById('info-actions').innerHTML = actions;
             panel.classList.remove('hidden');
@@ -330,10 +357,10 @@
             document.getElementById('info-panel').classList.add('hidden');
         }
 
-        // ─── LOD: label visibility ───
+        // ─── LOD ───
         var tick = 0;
         graph.onEngineTick(function() {
-            if (++tick % 8 !== 0) return;
+            if (++tick % 6 !== 0) return;
             var cam = graph.camera().position;
             var currentData = graph.graphData();
             currentData.nodes.forEach(function(node) {
@@ -341,14 +368,12 @@
                 var label = node.__threeObj.getObjectByName('label');
                 if (!label) return;
 
-                var dx = cam.x - (node.x || 0);
-                var dy = cam.y - (node.y || 0);
-                var dz = cam.z - (node.z || 0);
+                var dx = cam.x - (node.x || 0), dy = cam.y - (node.y || 0), dz = cam.z - (node.z || 0);
                 var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
                 var isLinked = node.val < 5;
                 var isCenter = node.val > 15;
-                var threshold = isCenter ? 9999 : (isLinked ? 60 : 160);
+                var threshold = isCenter ? 9999 : (isLinked ? 50 : 140);
 
                 if (focusedNodeId) {
                     var nb = neighbors[focusedNodeId];
@@ -357,22 +382,22 @@
 
                 label.visible = dist < threshold;
 
-                // Fade sphere opacity based on distance (far = more transparent)
+                // Fade opacity
                 var sphere = node.__threeObj.children[0];
                 if (sphere && sphere.material) {
-                    sphere.material.transparent = true;
-                    sphere.material.opacity = dist < 200 ? 1.0 : Math.max(0.3, 1.0 - (dist - 200) / 400);
+                    var op = dist < 150 ? 1.0 : Math.max(0.15, 1.0 - (dist - 150) / 300);
+                    sphere.material.opacity = op;
+                    sphere.material.transparent = op < 1;
                 }
             });
         });
 
-        // ─── Init sidebar ───
+        // ─── Sidebar ───
         buildSidebar();
 
-        // Fade hint
         setTimeout(function() {
             var h = document.getElementById('nav-hint');
             if (h) h.style.opacity = '0';
-        }, 5000);
+        }, 6000);
     </script>
 </x-ui-page>

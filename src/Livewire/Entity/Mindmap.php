@@ -45,7 +45,7 @@ class Mindmap extends Component
                 'id'    => 'e' . $e->id,
                 'name'  => $e->name,
                 'color' => $isCenter ? '#111827' : ($this->groupColors[$groupName] ?? '#9CA3AF'),
-                'val'   => $isCenter ? 12 : 4,
+                'val'   => $isCenter ? 25 : 8,
             ];
 
             if ($e->parent_entity_id) {

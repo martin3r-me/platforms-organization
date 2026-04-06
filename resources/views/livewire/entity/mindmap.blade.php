@@ -25,7 +25,7 @@
         function makeLabel(text, isCenter) {
             var canvas = document.createElement('canvas');
             var ctx = canvas.getContext('2d');
-            var fontSize = isCenter ? 32 : 18;
+            var fontSize = isCenter ? 48 : 32;
             ctx.font = (isCenter ? 'bold ' : '') + fontSize + 'px -apple-system, system-ui, sans-serif';
             var tw = ctx.measureText(text).width;
             var pad = 14;
@@ -45,7 +45,7 @@
             var texture = new THREE.CanvasTexture(canvas);
             var material = new THREE.SpriteMaterial({ map: texture, depthTest: false });
             var sprite = new THREE.Sprite(material);
-            var scale = isCenter ? 0.5 : 0.35;
+            var scale = isCenter ? 0.7 : 0.5;
             sprite.scale.set(canvas.width * scale / 10, canvas.height * scale / 10, 1);
             return sprite;
         }
@@ -54,18 +54,22 @@
         var data = JSON.parse(document.getElementById('mindmap-data').textContent);
 
         var graph = ForceGraph3D()(container)
-            .graphData(data)
-            .backgroundColor('#ffffff')
+            .backgroundColor('#ffffff');
+
+        graph.d3Force('charge').strength(-300);
+        graph.d3Force('link').distance(60);
+
+        graph.graphData(data)
             .nodeThreeObject(function(node) {
                 var group = new THREE.Group();
-                var radius = node.val > 8 ? 6 : 3;
+                var radius = node.val > 15 ? 8 : 4;
                 var sphere = new THREE.Mesh(
                     new THREE.SphereGeometry(radius, 20, 20),
                     new THREE.MeshLambertMaterial({ color: node.color })
                 );
                 group.add(sphere);
 
-                var label = makeLabel(node.name, node.val > 8);
+                var label = makeLabel(node.name, node.val > 15);
                 label.position.y = -(radius + 4);
                 group.add(label);
 
@@ -83,6 +87,6 @@
                     1500
                 );
             })
-            .cameraPosition({ x: 0, y: 0, z: 300 });
+            .cameraPosition({ x: 0, y: 0, z: 500 });
     </script>
 </x-ui-page>

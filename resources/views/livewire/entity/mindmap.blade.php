@@ -406,6 +406,17 @@
 
         graph.cameraPosition({ x: 0, y: 0, z: 350 });
 
+        // ─── Fly to center entity once graph stabilizes ───
+        var hasFocusedInitial = false;
+        graph.onEngineStop(function() {
+            if (hasFocusedInitial) return;
+            hasFocusedInitial = true;
+            var centerNode = graph.graphData().nodes.find(function(n) { return n.val > 15; });
+            if (centerNode) {
+                setTimeout(function() { flyToNode(centerNode); }, 300);
+            }
+        });
+
         // ─── Add starfield ───
         (function() {
             var starsGeo = new THREE.BufferGeometry();

@@ -36,11 +36,16 @@
         </div>
 
         {{-- Navigation controls (Google Maps style) --}}
-        <div class="absolute top-3 right-3 z-20 flex flex-col gap-2">
-            {{-- Zoom --}}
-            <div class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl overflow-hidden">
-                <button id="btn-zoom-in" class="block w-9 h-9 flex items-center justify-center text-gray-300 hover:bg-white/10 hover:text-white transition-colors text-lg font-light border-b border-gray-700/50">+</button>
-                <button id="btn-zoom-out" class="block w-9 h-9 flex items-center justify-center text-gray-300 hover:bg-white/10 hover:text-white transition-colors text-lg font-light">&minus;</button>
+        <div class="absolute top-3 right-3 z-20 flex flex-col items-end gap-2">
+            {{-- Zoom + Fullscreen row --}}
+            <div class="flex gap-1">
+                <div class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl flex overflow-hidden">
+                    <button id="btn-zoom-in" class="w-9 h-9 flex items-center justify-center text-gray-300 hover:bg-white/10 hover:text-white transition-colors text-lg font-light border-r border-gray-700/50">+</button>
+                    <button id="btn-zoom-out" class="w-9 h-9 flex items-center justify-center text-gray-300 hover:bg-white/10 hover:text-white transition-colors text-lg font-light">&minus;</button>
+                </div>
+                <button id="btn-fullscreen" class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl w-9 h-9 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
+                    @svg('heroicon-o-arrows-pointing-out', 'w-4 h-4')
+                </button>
             </div>
             {{-- Directional pad --}}
             <div class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl grid grid-cols-3 w-[calc(2.25rem*3+2px)]">
@@ -54,10 +59,6 @@
                 <button data-pan="down" class="h-8 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors">@svg('heroicon-s-chevron-down', 'w-3.5 h-3.5')</button>
                 <div></div>
             </div>
-            {{-- Fullscreen --}}
-            <button id="btn-fullscreen" class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl w-9 h-9 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
-                @svg('heroicon-o-arrows-pointing-out', 'w-4 h-4')
-            </button>
         </div>
 
         {{-- Legend --}}

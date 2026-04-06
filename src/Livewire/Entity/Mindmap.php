@@ -4,7 +4,10 @@ namespace Platform\Organization\Livewire\Entity;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\DB;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 
 class Mindmap extends Component
@@ -84,6 +87,71 @@ class Mindmap extends Component
                 'color'  => $relationColors[$code] ?? '#F59E0B',
                 'width'  => 2,
             ];
+        }
+
+        // EntityLinks (Projekte, Canvases, Tasks, Tickets)
+        $linkTypeColors = [
+            'planner_project' => '#10B981',
+            'canvas'          => '#EC4899',
+            'planner_task'    => '#14B8A6',
+            'helpdesk_ticket' => '#F59E0B',
+        ];
+
+        $linkTypeNames = [
+            'planner_project' => 'Projekt',
+            'canvas'          => 'Canvas',
+            'planner_task'    => 'Task',
+            'helpdesk_ticket' => 'Ticket',
+        ];
+
+        $entityLinks = OrganizationEntityLink::query()
+            ->whereIn('entity_id', $entityIds)
+            ->where('team_id', $this->entity->team_id)
+            ->get();
+
+        $linkedNodes = [];
+        $grouped = $entityLinks->groupBy('linkable_type');
+
+        foreach ($grouped as $morphType => $typeLinks) {
+            $ids = $typeLinks->pluck('linkable_id')->unique()->values()->all();
+            $modelClass = Relation::getMorphedModel($morphType) ?? $morphType;
+            $labelMap = [];
+
+            if (class_exists($modelClass)) {
+                $table = (new $modelClass)->getTable();
+                $columns = collect(DB::getSchemaBuilder()->getColumnListing($table));
+                $nameCol = $columns->first(fn ($c) => in_array($c, ['name', 'title']));
+                $labelExpr = $nameCol
+                    ? DB::raw("COALESCE({$nameCol}, CONCAT('#', id)) as label")
+                    : DB::raw("CONCAT('#', id) as label");
+
+                $rows = DB::table($table)->whereIn('id', $ids)->select('id', $labelExpr)->get();
+                foreach ($rows as $row) {
+                    $labelMap[$row->id] = $row->label;
+                }
+            }
+
+            foreach ($typeLinks as $link) {
+                $nodeId = $morphType . '-' . $link->linkable_id;
+
+                if (!isset($linkedNodes[$nodeId])) {
+                    $linkedNodes[$nodeId] = true;
+                    $nodes[] = [
+                        'id'    => $nodeId,
+                        'name'  => $labelMap[$link->linkable_id] ?? "#{$link->linkable_id}",
+                        'color' => $linkTypeColors[$morphType] ?? '#9CA3AF',
+                        'val'   => 3,
+                        'type'  => $linkTypeNames[$morphType] ?? $morphType,
+                    ];
+                }
+
+                $links[] = [
+                    'source' => 'e' . $link->entity_id,
+                    'target' => $nodeId,
+                    'color'  => $linkTypeColors[$morphType] ?? 'rgba(156,163,175,0.4)',
+                    'width'  => 1,
+                ];
+            }
         }
 
         return compact('nodes', 'links');

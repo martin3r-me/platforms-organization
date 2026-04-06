@@ -62,15 +62,19 @@
         graph.graphData(data)
             .nodeThreeObject(function(node) {
                 var group = new THREE.Group();
-                var radius = node.val > 15 ? 8 : 4;
+                var isCenter = node.val > 15;
+                var isLinked = node.val < 5;
+                var radius = isCenter ? 8 : (isLinked ? 2 : 4);
+
                 var sphere = new THREE.Mesh(
                     new THREE.SphereGeometry(radius, 20, 20),
                     new THREE.MeshLambertMaterial({ color: node.color })
                 );
                 group.add(sphere);
 
-                var label = makeLabel(node.name, node.val > 15);
-                label.position.y = -(radius + 4);
+                var labelText = node.type ? node.type + ': ' + node.name : node.name;
+                var label = makeLabel(isLinked ? node.name : labelText, isCenter);
+                label.position.y = -(radius + 3);
                 group.add(label);
 
                 return group;

@@ -173,7 +173,7 @@
                                 label="Stunden"
                                 wire:model.live="plannedMinutes"
                                 displayMode="badges"
-                                badgeSize="xs"
+                                badgeSize="sm"
                                 :options="[
                                     60 => '1h', 120 => '2h', 180 => '3h', 240 => '4h',
                                     300 => '5h', 360 => '6h', 420 => '7h', 480 => '8h',
@@ -185,7 +185,7 @@
                                 label="Tage (à 8h)"
                                 wire:model.live="plannedMinutes"
                                 displayMode="badges"
-                                badgeSize="xs"
+                                badgeSize="sm"
                                 :options="[
                                     480 => '1d', 960 => '2d', 2400 => '5d', 4800 => '10d', 9600 => '20d',
                                 ]"

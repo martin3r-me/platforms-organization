@@ -87,7 +87,7 @@ class Mindmap extends Component
 
             // Lighten color by depth
             $baseColor = $this->colorFor($groupName);
-            $color = $isCenter ? '#111827' : $this->lightenByDepth($baseColor, $depth);
+            $color = $this->lightenByDepth($baseColor, $depth);
 
             $nodes[] = [
                 'id'       => 'e' . $e->id,

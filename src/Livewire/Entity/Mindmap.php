@@ -148,9 +148,16 @@ class Mindmap extends Component
             if (class_exists($modelClass)) {
                 $table = (new $modelClass)->getTable();
                 // Name oder Title als Label holen
+                // Prüfen welche Spalten existieren
+                $columns = collect(DB::getSchemaBuilder()->getColumnListing($table));
+                $nameCol = $columns->first(fn ($c) => in_array($c, ['name', 'title'])) ?? null;
+                $labelExpr = $nameCol
+                    ? DB::raw("COALESCE({$nameCol}, CONCAT('#', id)) as label")
+                    : DB::raw("CONCAT('#', id) as label");
+
                 $rows = DB::table($table)
                     ->whereIn('id', $ids)
-                    ->select('id', DB::raw("COALESCE(name, title, CONCAT('#', id)) as label"))
+                    ->select('id', $labelExpr)
                     ->get();
                 foreach ($rows as $row) {
                     $labelMap[$row->id] = $row->label;

@@ -43,8 +43,9 @@
                     .nodeLabel('name')
                     .nodeColor('color')
                     .nodeVal('val')
-                    .linkColor(function() { return 'rgba(156,163,175,0.4)'; })
-                    .linkWidth(1)
+                    .linkColor('color')
+                    .linkWidth('width')
+                    .linkOpacity(0.7)
                     .cameraPosition({ x: 0, y: 0, z: 300 });
             });
         })();

@@ -64,7 +64,12 @@
                 var group = new THREE.Group();
                 var isCenter = node.val > 15;
                 var isLinked = node.val < 5;
-                var radius = isCenter ? 8 : (isLinked ? 2 : 4);
+                var m = node.metrics;
+                var hasActivity = m && m.time_h > 0;
+
+                // Radius: bigger if more items linked
+                var baseRadius = isCenter ? 8 : (isLinked ? 2 : 4);
+                var radius = baseRadius + (m ? Math.min(m.items_total * 0.3, 4) : 0);
 
                 var sphere = new THREE.Mesh(
                     new THREE.SphereGeometry(radius, 20, 20),
@@ -72,12 +77,37 @@
                 );
                 group.add(sphere);
 
+                // Activity glow ring for entities with time booked
+                if (hasActivity && !isLinked) {
+                    var glowRadius = radius * 1.8;
+                    var intensity = Math.min(m.time_h / 50, 1);
+                    var glow = new THREE.Mesh(
+                        new THREE.SphereGeometry(glowRadius, 16, 16),
+                        new THREE.MeshBasicMaterial({
+                            color: '#EF4444',
+                            transparent: true,
+                            opacity: 0.08 + intensity * 0.15,
+                        })
+                    );
+                    group.add(glow);
+                }
+
                 var labelText = node.type ? node.type + ': ' + node.name : node.name;
                 var label = makeLabel(isLinked ? node.name : labelText, isCenter);
                 label.position.y = -(radius + 3);
                 group.add(label);
 
                 return group;
+            })
+            .nodeLabel(function(node) {
+                if (!node.metrics) return node.name;
+                var m = node.metrics;
+                var lines = ['<b>' + node.name + '</b>'];
+                if (node.group) lines.push(node.group);
+                if (m.items_total > 0) lines.push('Items: ' + m.items_done + '/' + m.items_total);
+                if (m.time_h > 0) lines.push('Zeit: ' + m.time_h + 'h (davon ' + m.time_billed_h + 'h abgerechnet)');
+                if (m.links_count > 0) lines.push('Links: ' + m.links_count);
+                return lines.join('<br/>');
             })
             .linkColor('color')
             .linkWidth('width')

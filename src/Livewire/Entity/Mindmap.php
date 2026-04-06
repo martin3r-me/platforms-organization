@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationEntityRelationship;
+use Platform\Organization\Models\OrganizationEntitySnapshot;
 
 class Mindmap extends Component
 {
@@ -40,15 +41,35 @@ class Mindmap extends Component
         $nodes = [];
         $links = [];
 
+        // Latest snapshots per entity
+        $latestSnapshots = OrganizationEntitySnapshot::query()
+            ->whereIn('entity_id', $entities->pluck('id'))
+            ->where('snapshot_date', '>=', now()->subDays(3))
+            ->orderByDesc('snapshot_date')
+            ->orderByDesc('snapshot_period')
+            ->get()
+            ->unique('entity_id')
+            ->keyBy('entity_id');
+
         foreach ($entities as $e) {
             $groupName = $e->type?->group?->name ?? 'Sonstige';
             $isCenter = $e->id === $this->entity->id;
+            $snap = $latestSnapshots[$e->id] ?? null;
+            $metrics = $snap?->metrics ?? [];
 
             $nodes[] = [
-                'id'    => 'e' . $e->id,
-                'name'  => $e->name,
-                'color' => $isCenter ? '#111827' : ($this->groupColors[$groupName] ?? '#9CA3AF'),
-                'val'   => $isCenter ? 25 : 8,
+                'id'      => 'e' . $e->id,
+                'name'    => $e->name,
+                'group'   => $groupName,
+                'color'   => $isCenter ? '#111827' : ($this->groupColors[$groupName] ?? '#9CA3AF'),
+                'val'     => $isCenter ? 25 : 8,
+                'metrics' => [
+                    'items_total'   => $metrics['items_total'] ?? 0,
+                    'items_done'    => $metrics['items_done'] ?? 0,
+                    'links_count'   => $metrics['links_count'] ?? 0,
+                    'time_h'        => round(($metrics['time_total_minutes'] ?? 0) / 60, 1),
+                    'time_billed_h' => round(($metrics['time_billed_minutes'] ?? 0) / 60, 1),
+                ],
             ];
 
             if ($e->parent_entity_id) {

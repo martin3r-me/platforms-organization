@@ -25,20 +25,15 @@ class ModalOrganization extends Component
 
     public array $linkedContexts = [];
     
-    // Verfügbare Relations für Children-Cascade (aus Dispatch)
-    public array $availableChildRelations = [];
-
     // Flags für erlaubte Aktionen (granular)
     public bool $allowTimeEntry = true;
-    public bool $allowEntities = true; // Entitäten-Verknüpfung
-    public bool $allowDimensions = true; // Cost Centers und VSM-Systeme
 
     public string $workDate;
     public int $minutes = 60;
     public ?string $rate = null;
     public ?string $note = null;
 
-    public string $activeTab = 'entry'; // 'entry', 'overview', 'planned', 'team', 'organization', 'cost-centers', or 'vsm-systems'
+    public string $activeTab = 'entry'; // 'entry', 'overview'
     public string $timeRange = 'current_month'; // 'current_week', 'current_month', 'current_year', 'last_week', 'last_month'
 
     // Filter für Übersicht-Tab
@@ -55,24 +50,6 @@ class ModalOrganization extends Component
     public ?int $cachedUnbilledAmountCents = null;
     public $cachedAvailableUsers = null;
     
-    // Organization Context Management
-    public $organizationContext = null;
-    public $availableOrganizationEntities;
-    public $selectedOrganizationEntityId = null;
-    public array $selectedChildRelations = [];
-
-    // Cost Center Management
-    public $availableCostCenters = [];
-    public $linkedCostCenters = [];
-    public ?int $selectedCostCenterId = null;
-    public string $costCenterSearch = '';
-
-    // VSM System Management
-    public $availableVsmSystems = [];
-    public $linkedVsmSystems = [];
-    public ?int $selectedVsmSystemId = null;
-    public string $vsmSystemSearch = '';
-
     public ?int $plannedMinutes = null;
     public ?string $plannedNote = null;
 
@@ -154,14 +131,6 @@ class ModalOrganization extends Component
 
     public function mount(): void
     {
-        // Initialisiere Collections für Organization Context Management
-        $this->organizationContext = null;
-        $this->availableOrganizationEntities = collect();
-        $this->availableCostCenters = collect();
-        $this->linkedCostCenters = collect();
-        $this->availableVsmSystems = collect();
-        $this->linkedVsmSystems = collect();
-        
         \Log::info('ModalOrganization: mount() called', [
             'component_id' => $this->getId(),
         ]);
@@ -179,41 +148,15 @@ class ModalOrganization extends Component
         $this->contextType = $payload['context_type'] ?? null;
         $this->contextId = isset($payload['context_id']) ? (int) $payload['context_id'] : null;
         $this->linkedContexts = $payload['linked_contexts'] ?? [];
-        
-        // Verfügbare Relations für Children-Cascade (z.B. ['tasks', 'projectSlots.tasks'])
-        $this->availableChildRelations = $payload['include_children_relations'] ?? [];
 
         // Flags setzen (defaults: alle true für Rückwärtskompatibilität)
         $this->allowTimeEntry = $payload['allow_time_entry'] ?? true;
-        
-        // Neue granular Flags (mit Fallback auf alte Flags für Rückwärtskompatibilität)
-        $this->allowEntities = $payload['allow_entities'] 
-            ?? $payload['allow_context_management'] 
-            ?? $payload['can_link_to_entity'] 
-            ?? true;
-        
-        $this->allowDimensions = $payload['allow_dimensions'] 
-            ?? $payload['allow_context_management'] 
-            ?? true;
 
         // Wenn Modal bereits offen ist, Daten neu laden
         if ($this->open && $this->contextType && $this->contextId) {
             if ($this->allowTimeEntry && class_exists($this->contextType) && $this->contextSupportsTimeEntries($this->contextType)) {
                 $this->loadEntries();
                 $this->loadPlannedEntries();
-                $this->loadCurrentPlanned();
-            }
-            
-            // Organization Contexts laden wenn erlaubt
-            if ($this->allowEntities) {
-                $this->loadOrganizationContexts();
-                $this->loadAvailableOrganizationEntities();
-            }
-            if ($this->allowDimensions) {
-                $this->loadCostCenters();
-                $this->loadLinkedCostCenters();
-                $this->loadVsmSystems();
-                $this->loadLinkedVsmSystems();
             }
         }
     }
@@ -236,15 +179,7 @@ class ModalOrganization extends Component
         $this->selectedUserId = null;
         
         // Tab basierend auf erlaubten Aktionen setzen
-        if ($this->allowTimeEntry) {
-            $this->activeTab = 'entry';
-        } elseif ($this->allowEntities) {
-            $this->activeTab = 'organization';
-        } elseif ($this->allowDimensions) {
-            $this->activeTab = 'cost-centers';
-        } else {
-            $this->activeTab = 'overview';
-        }
+        $this->activeTab = $this->allowTimeEntry ? 'entry' : 'overview';
 
         // Cache zurücksetzen beim Öffnen
         $this->cachedTotalMinutes = null;
@@ -257,7 +192,6 @@ class ModalOrganization extends Component
             if (class_exists($this->contextType) && $this->contextSupportsTimeEntries($this->contextType)) {
                 $this->loadEntries();
                 $this->loadPlannedEntries();
-                $this->loadCurrentPlanned();
             }
         }
         
@@ -266,35 +200,15 @@ class ModalOrganization extends Component
             $this->loadTeamEntries();
         }
         
-        // Organization Contexts laden wenn erlaubt
-        if ($this->contextType && $this->contextId) {
-            if ($this->allowEntities) {
-                $this->loadOrganizationContexts();
-                $this->loadAvailableOrganizationEntities();
-            }
-            if ($this->allowDimensions) {
-                $this->loadCostCenters();
-                $this->loadLinkedCostCenters();
-                $this->loadVsmSystems();
-                $this->loadLinkedVsmSystems();
-            }
-        }
-
         $this->open = true;
     }
 
     public function close(): void
     {
         $this->resetValidation();
-        $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote', 'allowTimeEntry', 'allowEntities', 'allowDimensions', 'availableChildRelations', 'selectedOrganizationEntityId', 'selectedChildRelations', 'overviewTimeRange', 'selectedUserId', 'costCenterSearch', 'vsmSystemSearch');
-        
-        // Collections und Cache zurücksetzen
-        $this->organizationContext = null;
-        $this->availableOrganizationEntities = collect();
-        $this->availableCostCenters = collect();
-        $this->linkedCostCenters = collect();
-        $this->availableVsmSystems = collect();
-        $this->linkedVsmSystems = collect();
+        $this->reset('open', 'workDate', 'minutes', 'rate', 'note', 'activeTab', 'entries', 'plannedEntries', 'plannedMinutes', 'plannedNote', 'allowTimeEntry', 'overviewTimeRange', 'selectedUserId');
+
+        // Cache zurücksetzen
         $this->cachedTotalMinutes = null;
         $this->cachedBilledMinutes = null;
         $this->cachedUnbilledAmountCents = null;
@@ -711,34 +625,47 @@ class ModalOrganization extends Component
             ->get();
     }
 
-    protected function loadCurrentPlanned(): void
-    {
-        if (! $this->contextType || ! $this->contextId) {
-            $this->plannedMinutes = null;
-            return;
-        }
-
-        $current = OrganizationTimePlanned::query()
-            ->forContextKey($this->contextType, $this->contextId)
-            ->active()
-            ->first();
-
-        $this->plannedMinutes = $current?->planned_minutes;
-        $this->plannedNote = $current?->note;
-    }
-
-    public function getCurrentPlannedMinutesProperty(): ?int
+    public function getTotalPlannedMinutesProperty(): ?int
     {
         if (! $this->contextType || ! $this->contextId) {
             return null;
         }
 
-        $current = OrganizationTimePlanned::query()
+        $sum = OrganizationTimePlanned::query()
             ->forContextKey($this->contextType, $this->contextId)
             ->active()
-            ->first();
+            ->sum('planned_minutes');
 
-        return $current?->planned_minutes;
+        return $sum > 0 ? (int) $sum : null;
+    }
+
+    public function deletePlannedEntry(int $id): void
+    {
+        $entry = OrganizationTimePlanned::query()
+            ->forContextKey($this->contextType, $this->contextId)
+            ->where('id', $id)
+            ->where('is_active', true)
+            ->firstOrFail();
+
+        $user = Auth::user();
+        $team = $user?->currentTeamRelation;
+
+        if (! $team || $entry->team_id !== $team->id) {
+            $this->dispatch('notify', [
+                'type' => 'error',
+                'message' => 'Sie haben keine Berechtigung für diesen Eintrag.',
+            ]);
+            return;
+        }
+
+        $entry->update(['is_active' => false]);
+
+        $this->loadPlannedEntries();
+
+        $this->dispatch('notify', [
+            'type' => 'success',
+            'message' => 'Budget-Eintrag deaktiviert.',
+        ]);
     }
 
     public function savePlanned(): void
@@ -782,13 +709,14 @@ class ModalOrganization extends Component
             'is_active' => true,
         ]);
 
+        $this->plannedMinutes = null;
+        $this->plannedNote = null;
         $this->loadPlannedEntries();
-        $this->loadCurrentPlanned();
         $this->resetValidation();
 
         $this->dispatch('notify', [
             'type' => 'success',
-            'message' => 'Soll-Zeit aktualisiert.',
+            'message' => 'Budget hinzugefügt.',
         ]);
     }
 
@@ -941,100 +869,6 @@ class ModalOrganization extends Component
         return in_array(HasTimeEntries::class, class_uses_recursive($class));
     }
 
-    /**
-     * Gibt das Root-Team für Organization zurück (da Organization root-scoped ist)
-     */
-    protected function getOrganizationTeam()
-    {
-        $user = Auth::user();
-        $baseTeam = $user?->currentTeamRelation;
-        
-        if (! $baseTeam) {
-            return null;
-        }
-
-        // Organization ist root-scoped, daher immer Root-Team verwenden
-        // Prüfe explizit ob Organization root-scoped ist (analog zu OKR)
-        $organizationModule = \Platform\Core\Models\Module::where('key', 'organization')->first();
-        
-        // Wenn Organization ein Parent Tool ist, verwende das Root-Team
-        if ($organizationModule && $organizationModule->isRootScoped()) {
-            return $baseTeam->getRootTeam();
-        }
-        
-        // Fallback: Basis-Team
-        return $baseTeam;
-    }
-
-    /**
-     * Debug-Informationen für das Modal
-     */
-    public function getDebugInfoProperty(): array
-    {
-        $user = Auth::user();
-        $baseTeam = $user?->currentTeamRelation;
-        $organizationTeam = $this->getOrganizationTeam();
-        $organizationModule = \Platform\Core\Models\Module::where('key', 'organization')->first();
-
-        // Zähle Entities und Cost Centers
-        $entitiesCount = 0;
-        $costCentersCount = 0;
-        if ($organizationTeam) {
-            $entitiesCount = \Platform\Organization\Models\OrganizationEntity::query()
-                ->where('team_id', $organizationTeam->id)
-                ->where('is_active', true)
-                ->count();
-            
-            $costCentersCount = \Platform\Organization\Models\OrganizationCostCenter::query()
-                ->where('team_id', $organizationTeam->id)
-                ->where('is_active', true)
-                ->count();
-        }
-
-        // Zähle alle Entities/Cost Centers (ohne Team-Filter)
-        $allEntitiesCount = \Platform\Organization\Models\OrganizationEntity::query()
-            ->where('is_active', true)
-            ->count();
-        
-        $allCostCentersCount = \Platform\Organization\Models\OrganizationCostCenter::query()
-            ->where('is_active', true)
-            ->count();
-
-        return [
-            'user_id' => $user?->id,
-            'user_name' => $user?->name,
-            'base_team' => [
-                'id' => $baseTeam?->id,
-                'name' => $baseTeam?->name,
-                'is_root' => $baseTeam?->isRootTeam() ?? false,
-                'parent_team_id' => $baseTeam?->parent_team_id,
-            ],
-            'organization_team' => [
-                'id' => $organizationTeam?->id,
-                'name' => $organizationTeam?->name,
-                'is_root' => $organizationTeam?->isRootTeam() ?? false,
-            ],
-            'organization_module' => [
-                'exists' => $organizationModule !== null,
-                'key' => $organizationModule?->key,
-                'scope_type' => $organizationModule?->scope_type,
-                'is_root_scoped' => $organizationModule?->isRootScoped() ?? false,
-            ],
-            'counts' => [
-                'entities_in_team' => $entitiesCount,
-                'cost_centers_in_team' => $costCentersCount,
-                'all_entities' => $allEntitiesCount,
-                'all_cost_centers' => $allCostCentersCount,
-            ],
-            'available_entities_count' => is_countable($this->availableOrganizationEntities) ? count($this->availableOrganizationEntities) : 0,
-            'available_cost_centers_count' => is_countable($this->availableCostCenters) ? count($this->availableCostCenters) : 0,
-            'context' => [
-                'type' => $this->contextType,
-                'id' => $this->contextId,
-            ],
-        ];
-    }
-
     protected function rateToCents(?string $value): ?int
     {
         if ($value === null || trim($value) === '') {
@@ -1054,536 +888,6 @@ class ModalOrganization extends Component
         }
 
         return (int) round($float * 100);
-    }
-
-    protected function loadOrganizationContexts(): void
-    {
-        if (! $this->contextType || ! $this->contextId) {
-            $this->organizationContext = null;
-            return;
-        }
-
-        $this->organizationContext = \Platform\Organization\Models\OrganizationContext::query()
-            ->where('contextable_type', $this->contextType)
-            ->where('contextable_id', $this->contextId)
-            ->where('is_active', true)
-            ->with('organizationEntity.type')
-            ->first();
-    }
-
-    protected function loadAvailableOrganizationEntities(): void
-    {
-        $team = $this->getOrganizationTeam();
-        
-        if (! $team) {
-            $this->availableOrganizationEntities = collect();
-            return;
-        }
-
-        $query = \Platform\Organization\Models\OrganizationEntity::query()
-            ->where('team_id', $team->id)
-            ->where('is_active', true)
-            ->with('type')
-            ->orderBy('name');
-
-        // Alle Entities anzeigen (auch bereits verknüpfte)
-        $this->availableOrganizationEntities = $query->get();
-    }
-
-    public function attachOrganizationContext(): void
-    {
-        if (! $this->contextType || ! $this->contextId || ! $this->selectedOrganizationEntityId) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Bitte wählen Sie eine Organization Entity aus.',
-            ]);
-            return;
-        }
-
-        $entity = \Platform\Organization\Models\OrganizationEntity::find($this->selectedOrganizationEntityId);
-        if (! $entity) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Organization Entity nicht gefunden.',
-            ]);
-            return;
-        }
-
-        $contextClass = $this->contextType;
-        $contextModel = $contextClass::find($this->contextId);
-        if (! $contextModel) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Kontext nicht gefunden.',
-            ]);
-            return;
-        }
-
-        // Prüfe ob Trait vorhanden
-        if (! in_array(\Platform\Organization\Traits\HasOrganizationContexts::class, class_uses_recursive($contextClass))) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Dieser Kontext unterstützt keine Organization-Verknüpfungen.',
-            ]);
-            return;
-        }
-
-        try {
-            // Verknüpfe mit ausgewählten Relations (falls vorhanden)
-            $includeRelations = !empty($this->selectedChildRelations) ? $this->selectedChildRelations : null;
-            
-            $wasLinked = $this->organizationContext && $this->organizationContext->organizationEntity;
-            $contextModel->attachOrganizationContext($entity, $includeRelations);
-
-            $this->loadOrganizationContexts();
-            $this->loadAvailableOrganizationEntities(); // Neu laden damit die Liste aktualisiert wird
-            $this->selectedOrganizationEntityId = null;
-            $this->selectedChildRelations = [];
-
-            $this->dispatch('notify', [
-                'type' => 'success',
-                'message' => $wasLinked ? 'Verknüpfung aktualisiert.' : 'Verknüpfung erstellt.',
-            ]);
-        } catch (\Exception $e) {
-            \Log::error('Fehler beim Verknüpfen der Organization Entity', [
-                'error' => $e->getMessage(),
-                'trace' => $e->getTraceAsString(),
-                'context_type' => $this->contextType,
-                'context_id' => $this->contextId,
-                'entity_id' => $entity->id,
-            ]);
-            
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Fehler beim Verknüpfen: ' . $e->getMessage(),
-            ]);
-        }
-    }
-
-    public function detachOrganizationContext(): void
-    {
-        if (! $this->contextType || ! $this->contextId) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Kontext nicht gefunden.',
-            ]);
-            return;
-        }
-
-        $contextClass = $this->contextType;
-        $contextModel = $contextClass::find($this->contextId);
-        if (! $contextModel) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Kontext nicht gefunden.',
-            ]);
-            return;
-        }
-
-        // Prüfe ob Trait vorhanden
-        if (! in_array(\Platform\Organization\Traits\HasOrganizationContexts::class, class_uses_recursive($contextClass))) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Dieser Kontext unterstützt keine Organization-Verknüpfungen.',
-            ]);
-            return;
-        }
-
-        $contextModel->detachOrganizationContext();
-        $this->loadOrganizationContexts();
-        $this->loadAvailableOrganizationEntities();
-
-        $this->dispatch('notify', [
-            'type' => 'success',
-            'message' => 'Verknüpfung entfernt.',
-        ]);
-    }
-
-    // Cost Center Management Methods
-    protected function loadCostCenters(): void
-    {
-        $team = $this->getOrganizationTeam();
-        
-        if (! $team) {
-            $this->availableCostCenters = collect();
-            return;
-        }
-
-        $query = \Platform\Organization\Models\OrganizationCostCenter::query()
-            ->where('team_id', $team->id)
-            ->where('is_active', true)
-            ->orderBy('name');
-
-        // Suche
-        if (!empty($this->costCenterSearch)) {
-            $query->where(function ($q) {
-                $q->where('name', 'like', '%' . $this->costCenterSearch . '%')
-                  ->orWhere('code', 'like', '%' . $this->costCenterSearch . '%');
-            });
-        }
-
-        $this->availableCostCenters = $query->get();
-    }
-
-    protected function loadLinkedCostCenters(): void
-    {
-        if (! $this->contextType || ! $this->contextId) {
-            $this->linkedCostCenters = collect();
-            return;
-        }
-
-        // Prüfe ob das Model das HasCostCenterLinksTrait verwendet
-        if (! class_exists($this->contextType)) {
-            $this->linkedCostCenters = collect();
-            return;
-        }
-
-        $model = $this->contextType::find($this->contextId);
-        if (! $model) {
-            $this->linkedCostCenters = collect();
-            return;
-        }
-
-        // Prüfe ob Trait vorhanden
-        if (! in_array(\Platform\Organization\Traits\HasCostCenterLinksTrait::class, class_uses_recursive($this->contextType))) {
-            $this->linkedCostCenters = collect();
-            return;
-        }
-
-        // Lade verknüpfte Cost Centers
-        $links = \Platform\Organization\Models\OrganizationCostCenterLink::query()
-            ->where('linkable_type', $this->contextType)
-            ->where('linkable_id', $this->contextId)
-            ->with('costCenter')
-            ->get();
-
-        $this->linkedCostCenters = $links->map(function ($link) {
-            return $link->costCenter;
-        })->filter();
-    }
-
-    public function updatedCostCenterSearch(): void
-    {
-        $this->loadCostCenters();
-    }
-
-    public function attachCostCenter(int $costCenterId): void
-    {
-        if (! $this->contextType || ! $this->contextId) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Kein Kontext gesetzt.',
-            ]);
-            return;
-        }
-
-        $costCenter = \Platform\Organization\Models\OrganizationCostCenter::find($costCenterId);
-        if (! $costCenter) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Kostenstelle nicht gefunden.',
-            ]);
-            return;
-        }
-
-        $contextClass = $this->contextType;
-        $contextModel = $contextClass::find($this->contextId);
-        if (! $contextModel) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Kontext nicht gefunden.',
-            ]);
-            return;
-        }
-
-        // Prüfe ob Trait vorhanden
-        if (! in_array(\Platform\Organization\Traits\HasCostCenterLinksTrait::class, class_uses_recursive($contextClass))) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Dieser Kontext unterstützt keine Kostenstellen-Verknüpfungen.',
-            ]);
-            return;
-        }
-
-        try {
-            // Verknüpfe Cost Center direkt über die Link-Tabelle
-            // (Das Trait verwendet entity_id, aber wir brauchen cost_center_id)
-            $team = $this->getOrganizationTeam();
-            
-            \Platform\Organization\Models\OrganizationCostCenterLink::create([
-                'cost_center_id' => $costCenter->id,
-                'linkable_type' => $this->contextType,
-                'linkable_id' => $this->contextId,
-                'team_id' => $team?->id,
-                'created_by_user_id' => Auth::id(),
-                'is_primary' => false,
-            ]);
-
-            $this->loadLinkedCostCenters();
-            $this->loadCostCenters();
-
-            $this->dispatch('notify', [
-                'type' => 'success',
-                'message' => 'Kostenstelle verknüpft.',
-            ]);
-        } catch (\Exception $e) {
-            \Log::error('Fehler beim Verknüpfen der Kostenstelle', [
-                'error' => $e->getMessage(),
-                'context_type' => $this->contextType,
-                'context_id' => $this->contextId,
-                'cost_center_id' => $costCenter->id,
-            ]);
-            
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Fehler beim Verknüpfen: ' . $e->getMessage(),
-            ]);
-        }
-    }
-
-    public function detachCostCenter(int $costCenterId): void
-    {
-        if (! $this->contextType || ! $this->contextId) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Kein Kontext gesetzt.',
-            ]);
-            return;
-        }
-
-        $costCenter = \Platform\Organization\Models\OrganizationCostCenter::find($costCenterId);
-        if (! $costCenter) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Kostenstelle nicht gefunden.',
-            ]);
-            return;
-        }
-
-        $contextClass = $this->contextType;
-        $contextModel = $contextClass::find($this->contextId);
-        if (! $contextModel) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Kontext nicht gefunden.',
-            ]);
-            return;
-        }
-
-        // Prüfe ob Trait vorhanden
-        if (! in_array(\Platform\Organization\Traits\HasCostCenterLinksTrait::class, class_uses_recursive($contextClass))) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Dieser Kontext unterstützt keine Kostenstellen-Verknüpfungen.',
-            ]);
-            return;
-        }
-
-        try {
-            // Entferne Verknüpfung direkt über die Link-Tabelle
-            \Platform\Organization\Models\OrganizationCostCenterLink::query()
-                ->where('cost_center_id', $costCenter->id)
-                ->where('linkable_type', $this->contextType)
-                ->where('linkable_id', $this->contextId)
-                ->delete();
-
-            $this->loadLinkedCostCenters();
-            $this->loadCostCenters();
-
-            $this->dispatch('notify', [
-                'type' => 'success',
-                'message' => 'Verknüpfung entfernt.',
-            ]);
-        } catch (\Exception $e) {
-            \Log::error('Fehler beim Entfernen der Kostenstellen-Verknüpfung', [
-                'error' => $e->getMessage(),
-                'context_type' => $this->contextType,
-                'context_id' => $this->contextId,
-                'cost_center_id' => $costCenter->id,
-            ]);
-            
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Fehler beim Entfernen: ' . $e->getMessage(),
-            ]);
-        }
-    }
-
-    // VSM System Management Methods
-    protected function loadVsmSystems(): void
-    {
-        // VSM-Systeme sind global (kein team_id), daher keine Team-Filterung nötig
-        $query = \Platform\Organization\Models\OrganizationVsmSystem::query()
-            ->where('is_active', true)
-            ->orderBy('sort_order')
-            ->orderBy('name');
-
-        // Suche
-        if (!empty($this->vsmSystemSearch)) {
-            $query->where(function ($q) {
-                $q->where('name', 'like', '%' . $this->vsmSystemSearch . '%')
-                  ->orWhere('code', 'like', '%' . $this->vsmSystemSearch . '%');
-            });
-        }
-
-        $this->availableVsmSystems = $query->get();
-    }
-
-    protected function loadLinkedVsmSystems(): void
-    {
-        if (! $this->contextType || ! $this->contextId) {
-            $this->linkedVsmSystems = collect();
-            return;
-        }
-
-        // VSM-Systeme werden über Entities verknüpft
-        // Wenn der Kontext eine Entity hat, zeige das VSM-System dieser Entity
-        if (! class_exists($this->contextType)) {
-            $this->linkedVsmSystems = collect();
-            return;
-        }
-
-        $model = $this->contextType::find($this->contextId);
-        if (! $model) {
-            $this->linkedVsmSystems = collect();
-            return;
-        }
-
-        // Prüfe ob der Kontext eine Organization Entity hat
-        if (in_array(\Platform\Organization\Traits\HasOrganizationContexts::class, class_uses_recursive($this->contextType))) {
-            $organizationEntity = $model->getOrganizationEntity();
-            if ($organizationEntity && $organizationEntity->vsmSystem) {
-                $this->linkedVsmSystems = collect([$organizationEntity->vsmSystem]);
-                return;
-            }
-        }
-
-        // Alternative: Direkte Verknüpfung über Entity (z.B. wenn der Kontext selbst eine Entity ist)
-        if ($this->contextType === \Platform\Organization\Models\OrganizationEntity::class) {
-            if ($model->vsmSystem) {
-                $this->linkedVsmSystems = collect([$model->vsmSystem]);
-                return;
-            }
-        }
-
-        $this->linkedVsmSystems = collect();
-    }
-
-    public function updatedVsmSystemSearch(): void
-    {
-        $this->loadVsmSystems();
-    }
-
-    public function attachVsmSystem(int $vsmSystemId): void
-    {
-        if (! $this->contextType || ! $this->contextId) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Kein Kontext gesetzt.',
-            ]);
-            return;
-        }
-
-        $vsmSystem = \Platform\Organization\Models\OrganizationVsmSystem::find($vsmSystemId);
-        if (! $vsmSystem) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'VSM-System nicht gefunden.',
-            ]);
-            return;
-        }
-
-        $contextClass = $this->contextType;
-        $contextModel = $contextClass::find($this->contextId);
-        if (! $contextModel) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Kontext nicht gefunden.',
-            ]);
-            return;
-        }
-
-        // VSM-Systeme werden über Organization Entities verknüpft
-        // Prüfe ob der Kontext eine Organization Entity hat oder erstelle/verknüpfe eine
-        if (in_array(\Platform\Organization\Traits\HasOrganizationContexts::class, class_uses_recursive($contextClass))) {
-            $organizationEntity = $contextModel->getOrganizationEntity();
-            
-            if (! $organizationEntity) {
-                $this->dispatch('notify', [
-                    'type' => 'error',
-                    'message' => 'Bitte verknüpfen Sie zuerst eine Organization Entity.',
-                ]);
-                return;
-            }
-
-            // Aktualisiere das VSM-System der Entity
-            $organizationEntity->vsm_system_id = $vsmSystemId;
-            $organizationEntity->save();
-
-            $this->loadLinkedVsmSystems();
-            $this->loadVsmSystems();
-
-            $this->dispatch('notify', [
-                'type' => 'success',
-                'message' => 'VSM-System verknüpft.',
-            ]);
-        } else {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Dieser Kontext unterstützt keine VSM-System-Verknüpfungen.',
-            ]);
-        }
-    }
-
-    public function detachVsmSystem(int $vsmSystemId): void
-    {
-        if (! $this->contextType || ! $this->contextId) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Kein Kontext gesetzt.',
-            ]);
-            return;
-        }
-
-        $contextClass = $this->contextType;
-        $contextModel = $contextClass::find($this->contextId);
-        if (! $contextModel) {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Kontext nicht gefunden.',
-            ]);
-            return;
-        }
-
-        // VSM-Systeme werden über Organization Entities verknüpft
-        if (in_array(\Platform\Organization\Traits\HasOrganizationContexts::class, class_uses_recursive($contextClass))) {
-            $organizationEntity = $contextModel->getOrganizationEntity();
-            
-            if (! $organizationEntity) {
-                $this->dispatch('notify', [
-                    'type' => 'error',
-                    'message' => 'Keine Organization Entity verknüpft.',
-                ]);
-                return;
-            }
-
-            // Entferne VSM-System
-            $organizationEntity->vsm_system_id = null;
-            $organizationEntity->save();
-
-            $this->loadLinkedVsmSystems();
-            $this->loadVsmSystems();
-
-            $this->dispatch('notify', [
-                'type' => 'success',
-                'message' => 'Verknüpfung entfernt.',
-            ]);
-        } else {
-            $this->dispatch('notify', [
-                'type' => 'error',
-                'message' => 'Dieser Kontext unterstützt keine VSM-System-Verknüpfungen.',
-            ]);
-        }
     }
 
     public function render()

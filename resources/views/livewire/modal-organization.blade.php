@@ -30,155 +30,15 @@
         </div>
     </x-slot>
 
-    <!-- Debug Information -->
-    @if(config('app.debug'))
-    <div class="mb-4 p-4 bg-yellow-50 border border-yellow-200 rounded-lg text-xs">
-        <div class="font-bold mb-2 text-yellow-800">🐛 Debug Information</div>
-        <div class="space-y-1 text-yellow-700">
-            <div><strong>User:</strong> {{ $this->debugInfo['user_name'] ?? 'N/A' }} (ID: {{ $this->debugInfo['user_id'] ?? 'N/A' }})</div>
-            <div><strong>Base Team:</strong> {{ $this->debugInfo['base_team']['name'] ?? 'N/A' }} (ID: {{ $this->debugInfo['base_team']['id'] ?? 'N/A' }}) - Root: {{ $this->debugInfo['base_team']['is_root'] ? 'Ja' : 'Nein' }}</div>
-            <div><strong>Organization Team:</strong> {{ $this->debugInfo['organization_team']['name'] ?? 'N/A' }} (ID: {{ $this->debugInfo['organization_team']['id'] ?? 'N/A' }}) - Root: {{ $this->debugInfo['organization_team']['is_root'] ? 'Ja' : 'Nein' }}</div>
-            <div><strong>Module:</strong> {{ $this->debugInfo['organization_module']['key'] ?? 'N/A' }} - Scope: {{ $this->debugInfo['organization_module']['scope_type'] ?? 'N/A' }} - Root-Scoped: {{ $this->debugInfo['organization_module']['is_root_scoped'] ? 'Ja' : 'Nein' }}</div>
-            <div class="mt-2 pt-2 border-t border-yellow-300">
-                <div><strong>Entities:</strong> {{ $this->debugInfo['counts']['entities_in_team'] ?? 0 }} im Team / {{ $this->debugInfo['counts']['all_entities'] ?? 0 }} gesamt / {{ $this->debugInfo['available_entities_count'] ?? 0 }} geladen</div>
-                <div><strong>Cost Centers:</strong> {{ $this->debugInfo['counts']['cost_centers_in_team'] ?? 0 }} im Team / {{ $this->debugInfo['counts']['all_cost_centers'] ?? 0 }} gesamt / {{ $this->debugInfo['available_cost_centers_count'] ?? 0 }} geladen</div>
-            </div>
-            @if($this->debugInfo['context']['type'] ?? null)
-            <div class="mt-2 pt-2 border-t border-yellow-300">
-                <div><strong>Context:</strong> {{ class_basename($this->debugInfo['context']['type']) }} (ID: {{ $this->debugInfo['context']['id'] }})</div>
-            </div>
-            @endif
-        </div>
-    </div>
-    @endif
-
     <div>
         @if(!$contextType || !$contextId)
-            <!-- Team-Übersicht: Kein Kontext -->
-            <div class="space-y-6">
-                <!-- Statistics -->
-                <div class="grid grid-cols-2 lg:grid-cols-3 gap-4">
-                    <div class="p-5 bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 shadow-sm">
-                        <div class="text-xs font-semibold text-[var(--ui-muted)] uppercase tracking-wide mb-2">Gesamt</div>
-                        <div class="text-3xl font-bold text-[var(--ui-secondary)]">{{ number_format($this->teamTotalMinutes / 60, 2, ',', '.') }} <span class="text-lg text-[var(--ui-muted)]">h</span></div>
-                    </div>
-                    <div class="p-5 bg-gradient-to-br from-[var(--ui-success-5)] to-[var(--ui-success-10)] rounded-xl border border-[var(--ui-success)]/30 shadow-sm">
-                        <div class="text-xs font-semibold text-[var(--ui-success)] uppercase tracking-wide mb-2">Abgerechnet</div>
-                        <div class="text-3xl font-bold text-[var(--ui-success)]">{{ number_format($this->teamBilledMinutes / 60, 2, ',', '.') }} <span class="text-lg text-[var(--ui-success)]/70">h</span></div>
-                    </div>
-                    <div class="p-5 bg-gradient-to-br from-[var(--ui-warning-5)] to-[var(--ui-warning-10)] rounded-xl border border-[var(--ui-warning)]/30 shadow-sm">
-                        <div class="text-xs font-semibold text-[var(--ui-warning)] uppercase tracking-wide mb-2">Offen</div>
-                        <div class="text-3xl font-bold text-[var(--ui-warning)]">{{ number_format($this->teamUnbilledMinutes / 60, 2, ',', '.') }} <span class="text-lg text-[var(--ui-warning)]/70">h</span></div>
-                    </div>
+            <!-- Kein Kontext -->
+            <div class="px-6 py-16 text-center">
+                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-muted-5)] flex items-center justify-center">
+                    @svg('heroicon-o-information-circle', 'w-8 h-8 text-[var(--ui-muted)]')
                 </div>
-
-                <!-- Team Entries Table -->
-                <div class="flow-root">
-                    <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                        <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-                            <div class="overflow-hidden rounded-xl border border-[var(--ui-border)]/60 shadow-sm">
-                                <table class="min-w-full divide-y divide-[var(--ui-border)]/40">
-                                    <thead class="bg-[var(--ui-muted-5)]">
-                                        <tr>
-                                            <th scope="col" class="py-4 pl-6 pr-3 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                                Datum
-                                            </th>
-                                            <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                                Kontext
-                                            </th>
-                                            <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                                Dauer
-                                            </th>
-                                            <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                                Betrag
-                                            </th>
-                                            <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                                Benutzer
-                                            </th>
-                                            <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                                Status
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody class="divide-y divide-[var(--ui-border)]/40 bg-[var(--ui-surface)]">
-                                        @forelse($teamEntries ?? [] as $entry)
-                                            @php
-                                                $resolver = app(\Platform\Organization\Services\TimeContextResolver::class);
-                                                $contextLabel = ($entry->context_type && $entry->context_id) ? ($resolver->resolveLabel($entry->context_type, $entry->context_id) ?? 'Unbekannt') : 'Freie Zeiterfassung';
-                                                $contextType = $entry->context_type ? class_basename($entry->context_type) : '';
-                                            @endphp
-                                            <tr class="hover:bg-[var(--ui-muted-5)]/50 transition-colors">
-                                                <td class="whitespace-nowrap py-5 pl-6 pr-3 text-sm">
-                                                    <div class="font-semibold text-[var(--ui-secondary)]">{{ $entry->work_date?->format('d.m.Y') }}</div>
-                                                    <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ $entry->work_date?->format('l') }}</div>
-                                                </td>
-                                                <td class="whitespace-nowrap px-3 py-5 text-sm">
-                                                    <div class="font-medium text-[var(--ui-secondary)]">{{ $contextLabel }}</div>
-                                                    @if($contextType)
-                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ $contextType }}</div>
-                                                    @endif
-                                                </td>
-                                                <td class="whitespace-nowrap px-3 py-5 text-sm">
-                                                    <div class="font-medium text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($entry->minutes) }}</div>
-                                                    @if($entry->rate_cents)
-                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ number_format($entry->rate_cents / 100, 2, ',', '.') }} €/h</div>
-                                                    @endif
-                                                </td>
-                                                <td class="whitespace-nowrap px-3 py-5 text-sm">
-                                                    @if($entry->amount_cents)
-                                                        <div class="font-semibold text-[var(--ui-secondary)]">{{ number_format($entry->amount_cents / 100, 2, ',', '.') }} €</div>
-                                                    @else
-                                                        <span class="text-[var(--ui-muted)]">–</span>
-                                                    @endif
-                                                </td>
-                                                <td class="whitespace-nowrap px-3 py-5 text-sm">
-                                                    <div class="flex items-center">
-                                                        <div class="size-9 shrink-0 rounded-full bg-gradient-to-br from-[var(--ui-primary-10)] to-[var(--ui-primary-5)] flex items-center justify-center border border-[var(--ui-border)]/40">
-                                                            <span class="text-xs font-bold text-[var(--ui-primary)]">
-                                                                {{ strtoupper(substr($entry->user?->name ?? 'U', 0, 1)) }}
-                                                            </span>
-                                                        </div>
-                                                        <div class="ml-3">
-                                                            <div class="font-medium text-[var(--ui-secondary)]">{{ $entry->user?->name ?? 'Unbekannt' }}</div>
-                                                        </div>
-                                                    </div>
-                                                </td>
-                                                <td class="whitespace-nowrap px-3 py-5 text-sm">
-                                                    <span class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset {{ $entry->is_billed ? 'bg-[var(--ui-success-10)] text-[var(--ui-success)] ring-[var(--ui-success)]/20' : 'bg-[var(--ui-warning-10)] text-[var(--ui-warning)] ring-[var(--ui-warning)]/20' }}">
-                                                        @if($entry->is_billed)
-                                                            @svg('heroicon-o-check-circle', 'w-3.5 h-3.5')
-                                                            Abgerechnet
-                                                        @else
-                                                            @svg('heroicon-o-exclamation-circle', 'w-3.5 h-3.5')
-                                                            Offen
-                                                        @endif
-                                                    </span>
-                                                </td>
-                                            </tr>
-                                            @if($entry->note)
-                                                <tr>
-                                                    <td colspan="6" class="px-6 py-2 bg-[var(--ui-muted-5)]/30">
-                                                        <div class="text-xs text-[var(--ui-muted)] italic">{{ $entry->note }}</div>
-                                                    </td>
-                                                </tr>
-                                            @endif
-                                        @empty
-                                            <tr>
-                                                <td colspan="6" class="px-6 py-12 text-center">
-                                                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-muted-5)] flex items-center justify-center">
-                                                        @svg('heroicon-o-clock', 'w-8 h-8 text-[var(--ui-muted)]')
-                                                    </div>
-                                                    <p class="text-sm font-medium text-[var(--ui-secondary)]">Noch keine Zeiten erfasst</p>
-                                                    <p class="text-xs text-[var(--ui-muted)] mt-1">Öffnen Sie eine Aufgabe oder ein Projekt, um Zeiten zu erfassen.</p>
-                                                </td>
-                                            </tr>
-                                        @endforelse
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <p class="text-sm font-medium text-[var(--ui-secondary)]">Kein Kontext ausgewählt</p>
+                <p class="text-xs text-[var(--ui-muted)] mt-2 max-w-sm mx-auto">In diesem Kontext stehen keine Funktionen zur Verfügung. Öffnen Sie eine Aufgabe oder ein Projekt, um Zeiten zu erfassen und Budgets zu verwalten.</p>
             </div>
         @else
             <!-- Tabs -->
@@ -186,20 +46,20 @@
                 @if($allowTimeEntry)
                 <button
                     @click="activeTab = 'entry'"
-                    :class="activeTab === 'entry' 
-                        ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] font-semibold bg-[var(--ui-primary-5)]/30' 
+                    :class="activeTab === 'entry'
+                        ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] font-semibold bg-[var(--ui-primary-5)]/30'
                         : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
                     class="px-5 py-3 text-sm transition-all duration-200 rounded-t-lg"
                 >
                     <span class="inline-flex items-center gap-2">
                         @svg('heroicon-o-plus-circle', 'w-4 h-4')
-                        Neue Zeit erfassen
+                        Erfassen
                     </span>
                 </button>
                 <button
                     @click="activeTab = 'overview'"
-                    :class="activeTab === 'overview' 
-                        ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] font-semibold bg-[var(--ui-primary-5)]/30' 
+                    :class="activeTab === 'overview'
+                        ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] font-semibold bg-[var(--ui-primary-5)]/30'
                         : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
                     class="px-5 py-3 text-sm transition-all duration-200 rounded-t-lg"
                 >
@@ -213,92 +73,6 @@
                         @endif
                     </span>
                 </button>
-                <button
-                    @click="activeTab = 'planned'"
-                    :class="activeTab === 'planned' 
-                        ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] font-semibold bg-[var(--ui-primary-5)]/30' 
-                        : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
-                    class="px-5 py-3 text-sm transition-all duration-200 rounded-t-lg"
-                >
-                    <span class="inline-flex items-center gap-2">
-                        @svg('heroicon-o-calendar-days', 'w-4 h-4')
-                        Soll-Zeit
-                    </span>
-                </button>
-                @endif
-                @if($allowTimeEntry)
-                <button
-                    @click="activeTab = 'team'"
-                    :class="activeTab === 'team' 
-                        ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] font-semibold bg-[var(--ui-primary-5)]/30' 
-                        : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
-                    class="px-5 py-3 text-sm transition-all duration-200 rounded-t-lg"
-                >
-                    <span class="inline-flex items-center gap-2">
-                        @svg('heroicon-o-users', 'w-4 h-4')
-                        Team
-                        @if($teamEntries && $teamEntries->count() > 0)
-                            <span class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)]">
-                                {{ $teamEntries->count() }}
-                            </span>
-                        @endif
-                    </span>
-                </button>
-                @endif
-                @if($allowEntities)
-                <button
-                    @click="activeTab = 'organization'"
-                    :class="activeTab === 'organization' 
-                        ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] font-semibold bg-[var(--ui-primary-5)]/30' 
-                        : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
-                    class="px-5 py-3 text-sm transition-all duration-200 rounded-t-lg"
-                >
-                    <span class="inline-flex items-center gap-2">
-                        @svg('heroicon-o-building-office', 'w-4 h-4')
-                        Entitäten
-                        @if($organizationContext)
-                            <span class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)]">
-                                1
-                            </span>
-                        @endif
-                    </span>
-                </button>
-                @endif
-                @if($allowDimensions)
-                <button
-                    @click="activeTab = 'cost-centers'"
-                    :class="activeTab === 'cost-centers' 
-                        ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] font-semibold bg-[var(--ui-primary-5)]/30' 
-                        : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
-                    class="px-5 py-3 text-sm transition-all duration-200 rounded-t-lg"
-                >
-                    <span class="inline-flex items-center gap-2">
-                        @svg('heroicon-o-currency-dollar', 'w-4 h-4')
-                        Kostenstellen
-                        @if($linkedCostCenters && $linkedCostCenters->count() > 0)
-                            <span class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)]">
-                                {{ $linkedCostCenters->count() }}
-                            </span>
-                        @endif
-                    </span>
-                </button>
-                <button
-                    @click="activeTab = 'vsm-systems'"
-                    :class="activeTab === 'vsm-systems' 
-                        ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)] font-semibold bg-[var(--ui-primary-5)]/30' 
-                        : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
-                    class="px-5 py-3 text-sm transition-all duration-200 rounded-t-lg"
-                >
-                    <span class="inline-flex items-center gap-2">
-                        @svg('heroicon-o-rectangle-group', 'w-4 h-4')
-                        VSM Systeme
-                        @if($linkedVsmSystems && $linkedVsmSystems->count() > 0)
-                            <span class="ml-1 px-2 py-0.5 text-xs font-semibold rounded-full bg-[var(--ui-primary-10)] text-[var(--ui-primary)]">
-                                {{ $linkedVsmSystems->count() }}
-                            </span>
-                        @endif
-                    </span>
-                </button>
                 @endif
             </div>
 
@@ -306,7 +80,7 @@
             @if($allowTimeEntry)
             <div x-show="activeTab === 'entry'" x-cloak>
                 <div class="space-y-6">
-                    <!-- Form Fields -->
+                    <!-- Ist-Zeit Form -->
                     <div class="grid gap-5">
                         <x-ui-input-date
                             name="workDate"
@@ -325,12 +99,10 @@
                             @foreach($this->minuteOptions as $quickMinutes)
                                 @php
                                     $isSelected = $minutes === $quickMinutes;
-                                    // Format: Minuten für < 1h, Stunden für >= 1h
                                     if ($quickMinutes < 60) {
                                         $display = $quickMinutes . 'm';
                                     } else {
                                         $hours = $quickMinutes / 60;
-                                        // Nur ganze Stunden oder .5 Stunden (keine .3 oder .8)
                                         if ($hours == floor($hours)) {
                                             $display = (int)$hours . 'h';
                                         } else {
@@ -385,6 +157,101 @@
                             </div>
                         @endif
                     @endif
+
+                    <!-- Divider -->
+                    <div class="border-t border-[var(--ui-border)]/60"></div>
+
+                    <!-- Collapsible Budget Section -->
+                    <div x-data="{ budgetOpen: false }">
+                        <button
+                            type="button"
+                            @click="budgetOpen = !budgetOpen"
+                            class="flex items-center justify-between w-full px-5 py-3 rounded-xl border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]/50 hover:bg-[var(--ui-muted-5)] transition-colors"
+                        >
+                            <span class="inline-flex items-center gap-2 text-sm font-semibold text-[var(--ui-secondary)]">
+                                @svg('heroicon-o-calculator', 'w-4 h-4 text-[var(--ui-primary)]')
+                                Budget hinzufügen
+                            </span>
+                            <span :class="budgetOpen ? 'rotate-180' : ''" class="transition-transform duration-200">
+                                @svg('heroicon-o-chevron-down', 'w-4 h-4 text-[var(--ui-muted)]')
+                            </span>
+                        </button>
+
+                        <div x-show="budgetOpen" x-collapse x-cloak class="mt-4 space-y-4">
+                            <!-- Quick Hour Buttons -->
+                            <div>
+                                <label class="block text-xs font-semibold text-[var(--ui-muted)] uppercase tracking-wide mb-2">Stunden</label>
+                                <div class="grid gap-2" style="grid-template-columns: repeat(8, minmax(0, 1fr));">
+                                    @foreach([1, 2, 3, 4, 5, 6, 7, 8] as $quickHours)
+                                        <button
+                                            type="button"
+                                            wire:click="$set('plannedMinutes', {{ $quickHours * 60 }})"
+                                            class="px-3 py-2 rounded-lg border-2 font-bold transition-all duration-200 hover:scale-105 text-xs {{ $plannedMinutes === ($quickHours * 60) ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
+                                        >
+                                            {{ $quickHours }}h
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+                            <!-- Quick Day Buttons -->
+                            <div>
+                                <label class="block text-xs font-semibold text-[var(--ui-muted)] uppercase tracking-wide mb-2">Tage (à 8h)</label>
+                                <div class="grid gap-2" style="grid-template-columns: repeat(5, minmax(0, 1fr));">
+                                    @foreach([1, 2, 3, 4, 5, 10, 15, 20, 30, 40] as $quickDays)
+                                        <button
+                                            type="button"
+                                            wire:click="$set('plannedMinutes', {{ $quickDays * 8 * 60 }})"
+                                            class="px-3 py-2 rounded-lg border-2 font-bold transition-all duration-200 hover:scale-105 text-xs {{ $plannedMinutes === ($quickDays * 8 * 60) ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
+                                        >
+                                            {{ $quickDays }}d
+                                        </button>
+                                    @endforeach
+                                </div>
+                            </div>
+                            <!-- Minutes Input -->
+                            <div>
+                                <input
+                                    type="number"
+                                    wire:model.live="plannedMinutes"
+                                    min="1"
+                                    step="15"
+                                    placeholder="Minuten eingeben (z. B. 120 für 2 Stunden)"
+                                    class="w-full px-4 py-3 text-sm rounded-xl border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]/20 focus:border-[var(--ui-primary)]"
+                                />
+                                @error('plannedMinutes')
+                                    <p class="mt-2 text-xs text-[var(--ui-danger)]">{{ $message }}</p>
+                                @enderror
+                                @if($plannedMinutes)
+                                    <p class="mt-2 text-xs font-medium text-[var(--ui-secondary)]">
+                                        {{ number_format($plannedMinutes / 60, 2, ',', '.') }} Stunden
+                                        <span class="text-[var(--ui-muted)]">({{ number_format($plannedMinutes / 480, 2, ',', '.') }} Tage à 8h)</span>
+                                    </p>
+                                @endif
+                            </div>
+                            <!-- Note -->
+                            <div>
+                                <x-ui-input-textarea
+                                    name="plannedNote"
+                                    label="Grund für Budget"
+                                    wire:model.live="plannedNote"
+                                    rows="2"
+                                    placeholder="z. B. Initiales Budget, Nachverhandlung, ..."
+                                    :errorKey="'plannedNote'"
+                                />
+                            </div>
+                            <!-- Inline Save Button -->
+                            <x-ui-button variant="primary" wire:click="savePlanned" wire:loading.attr="disabled" class="w-full">
+                                <span wire:loading.remove wire:target="savePlanned" class="inline-flex items-center gap-2">
+                                    @svg('heroicon-o-plus', 'w-4 h-4')
+                                    Budget hinzufügen
+                                </span>
+                                <span wire:loading wire:target="savePlanned" class="inline-flex items-center gap-2">
+                                    @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
+                                    Speichern…
+                                </span>
+                            </x-ui-button>
+                        </div>
+                    </div>
                 </div>
             </div>
             @endif
@@ -393,6 +260,37 @@
             @if($allowTimeEntry)
             <div x-show="activeTab === 'overview'" x-cloak>
                 <div class="space-y-6">
+                    <!-- Progress Bar: Ist vs Soll -->
+                    @php
+                        $totalPlanned = $this->totalPlannedMinutes;
+                        $totalActual = $this->totalMinutes;
+                    @endphp
+                    @if($totalPlanned)
+                        <div class="p-5 bg-gradient-to-br from-[var(--ui-primary-5)] via-[var(--ui-primary-10)] to-[var(--ui-primary-5)] rounded-xl border-2 border-[var(--ui-primary)]/30 shadow-sm">
+                            <div class="flex items-center justify-between mb-3">
+                                <span class="text-sm font-semibold text-[var(--ui-secondary)] uppercase tracking-wide">Budget-Auslastung</span>
+                                <span class="text-2xl font-bold text-[var(--ui-primary)]">{{ number_format($totalPlanned / 60, 2, ',', '.') }} <span class="text-base">h</span></span>
+                            </div>
+                            @php
+                                $progress = min(100, ($totalActual / $totalPlanned) * 100);
+                                $isOver = $totalActual > $totalPlanned;
+                                $diff = $totalActual - $totalPlanned;
+                            @endphp
+                            <div class="flex items-center justify-between text-xs font-medium text-[var(--ui-secondary)] mb-2">
+                                <span>Erfasst: {{ number_format($totalActual / 60, 2, ',', '.') }} h / Budget: {{ number_format($totalPlanned / 60, 2, ',', '.') }} h</span>
+                                <span class="font-bold {{ $isOver ? 'text-[var(--ui-danger)]' : 'text-[var(--ui-success)]' }}">
+                                    {{ $isOver ? '+' : '' }}{{ number_format($diff / 60, 2, ',', '.') }} h
+                                </span>
+                            </div>
+                            <div class="w-full bg-[var(--ui-muted-5)] rounded-full h-3 overflow-hidden shadow-inner">
+                                <div
+                                    class="h-3 rounded-full transition-all duration-500 {{ $isOver ? 'bg-gradient-to-r from-[var(--ui-danger)] to-[var(--ui-danger)]' : 'bg-gradient-to-r from-[var(--ui-primary)] to-[var(--ui-primary)]' }}"
+                                    style="width: {{ min(100, $progress) }}%"
+                                ></div>
+                            </div>
+                        </div>
+                    @endif
+
                     <!-- Filter -->
                     <div class="flex flex-col sm:flex-row gap-4 items-start sm:items-center">
                         <!-- Personen-Filter -->
@@ -409,71 +307,30 @@
                                 @endforeach
                             </select>
                         </div>
-                        
+
                         <!-- Zeitraum-Filter -->
                         <div class="flex-1 min-w-0 w-full sm:w-auto">
                             <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">Zeitraum:</label>
                             <div class="flex gap-2 flex-wrap">
-                                <button
-                                    wire:click="$set('overviewTimeRange', 'all')"
-                                    wire:loading.attr="disabled"
-                                    :class="$wire.overviewTimeRange === 'all'
-                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
-                                        : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
-                                    class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
-                                >
-                                    Alle
-                                </button>
-                                <button
-                                    wire:click="$set('overviewTimeRange', 'current_week')"
-                                    wire:loading.attr="disabled"
-                                    :class="$wire.overviewTimeRange === 'current_week'
-                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
-                                        : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
-                                    class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
-                                >
-                                    Diese Woche
-                                </button>
-                                <button
-                                    wire:click="$set('overviewTimeRange', 'current_month')"
-                                    wire:loading.attr="disabled"
-                                    :class="$wire.overviewTimeRange === 'current_month'
-                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
-                                        : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
-                                    class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
-                                >
-                                    Dieser Monat
-                                </button>
-                                <button
-                                    wire:click="$set('overviewTimeRange', 'current_year')"
-                                    wire:loading.attr="disabled"
-                                    :class="$wire.overviewTimeRange === 'current_year'
-                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
-                                        : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
-                                    class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
-                                >
-                                    Dieses Jahr
-                                </button>
-                                <button
-                                    wire:click="$set('overviewTimeRange', 'last_week')"
-                                    wire:loading.attr="disabled"
-                                    :class="$wire.overviewTimeRange === 'last_week'
-                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
-                                        : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
-                                    class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
-                                >
-                                    Letzte Woche
-                                </button>
-                                <button
-                                    wire:click="$set('overviewTimeRange', 'last_month')"
-                                    wire:loading.attr="disabled"
-                                    :class="$wire.overviewTimeRange === 'last_month'
-                                        ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
-                                        : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
-                                    class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
-                                >
-                                    Letzter Monat
-                                </button>
+                                @foreach([
+                                    'all' => 'Alle',
+                                    'current_week' => 'Diese Woche',
+                                    'current_month' => 'Dieser Monat',
+                                    'current_year' => 'Dieses Jahr',
+                                    'last_week' => 'Letzte Woche',
+                                    'last_month' => 'Letzter Monat',
+                                ] as $rangeKey => $rangeLabel)
+                                    <button
+                                        wire:click="$set('overviewTimeRange', '{{ $rangeKey }}')"
+                                        wire:loading.attr="disabled"
+                                        :class="$wire.overviewTimeRange === '{{ $rangeKey }}'
+                                            ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
+                                            : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
+                                        class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
+                                    >
+                                        {{ $rangeLabel }}
+                                    </button>
+                                @endforeach
                             </div>
                         </div>
                     </div>
@@ -499,6 +356,57 @@
                             </div>
                         @endif
                     </div>
+
+                    <!-- Budget List -->
+                    @if($plannedEntries && count($plannedEntries) > 0)
+                        <div class="rounded-xl border border-[var(--ui-border)]/60 overflow-hidden shadow-sm">
+                            <div class="px-6 py-3 bg-[var(--ui-muted-5)] border-b border-[var(--ui-border)]/60 flex items-center justify-between">
+                                <h4 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wide">Budgets</h4>
+                                @if($totalPlanned)
+                                    <span class="text-xs font-semibold text-[var(--ui-primary)]">Gesamt: {{ number_format($totalPlanned / 60, 2, ',', '.') }} h</span>
+                                @endif
+                            </div>
+                            <div class="divide-y divide-[var(--ui-border)]/40 bg-[var(--ui-surface)]">
+                                @foreach($plannedEntries as $planned)
+                                    <div class="flex flex-col gap-2 px-6 py-3 {{ $planned->is_active ? 'hover:bg-[var(--ui-muted-5)]/50' : 'opacity-50' }} transition-colors sm:flex-row sm:items-center sm:justify-between">
+                                        <div class="flex-1 flex flex-col gap-1">
+                                            <div class="flex items-center gap-3">
+                                                <span class="text-base font-bold text-[var(--ui-secondary)]">{{ number_format($planned->planned_minutes / 60, 2, ',', '.') }} h</span>
+                                                @if($planned->is_active)
+                                                    <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold bg-[var(--ui-success-10)] text-[var(--ui-success)] ring-1 ring-inset ring-[var(--ui-success)]/20">
+                                                        Aktiv
+                                                    </span>
+                                                @else
+                                                    <span class="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[10px] font-semibold bg-[var(--ui-muted-5)] text-[var(--ui-muted)] ring-1 ring-inset ring-[var(--ui-border)]/20">
+                                                        Deaktiviert
+                                                    </span>
+                                                @endif
+                                            </div>
+                                            <div class="text-xs text-[var(--ui-muted)] flex flex-wrap items-center gap-2">
+                                                <span>{{ $planned->created_at?->format('d.m.Y H:i') }}</span>
+                                                <span>·</span>
+                                                <span class="font-medium">{{ $planned->user?->name ?? 'Unbekannt' }}</span>
+                                            </div>
+                                            @if($planned->note)
+                                                <div class="text-xs text-[var(--ui-muted)] italic pl-4 border-l-2 border-[var(--ui-border)]/40">{{ $planned->note }}</div>
+                                            @endif
+                                        </div>
+                                        @if($planned->is_active)
+                                            <button
+                                                wire:click="deletePlannedEntry({{ $planned->id }})"
+                                                wire:loading.attr="disabled"
+                                                wire:target="deletePlannedEntry({{ $planned->id }})"
+                                                class="p-1.5 text-[var(--ui-danger)] hover:bg-[var(--ui-danger-5)] rounded-lg transition-colors shrink-0"
+                                                title="Budget deaktivieren"
+                                            >
+                                                @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                            </button>
+                                        @endif
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
 
                     <!-- Entries Table -->
                     <div class="flow-root">
@@ -607,7 +515,7 @@
                                                             @svg('heroicon-o-clock', 'w-8 h-8 text-[var(--ui-muted)]')
                                                         </div>
                                                         <p class="text-sm font-medium text-[var(--ui-secondary)]">Noch keine Zeiten erfasst</p>
-                                                        <p class="text-xs text-[var(--ui-muted)] mt-1">Wechsle zum Tab "Neue Zeit erfassen" um zu beginnen.</p>
+                                                        <p class="text-xs text-[var(--ui-muted)] mt-1">Wechsle zum Tab "Erfassen" um zu beginnen.</p>
                                                     </td>
                                                 </tr>
                                             @endforelse
@@ -621,772 +529,6 @@
             </div>
             @endif
 
-            <!-- Tab Content: Planned -->
-            @if($allowTimeEntry)
-            <div x-show="activeTab === 'planned'" x-cloak>
-                <div class="space-y-6">
-                    <!-- Current Planned Time -->
-                    <div class="p-6 bg-gradient-to-br from-[var(--ui-primary-5)] via-[var(--ui-primary-10)] to-[var(--ui-primary-5)] rounded-xl border-2 border-[var(--ui-primary)]/30 shadow-sm">
-                        <div class="flex items-center justify-between mb-3">
-                            <span class="text-sm font-semibold text-[var(--ui-secondary)] uppercase tracking-wide">Aktuelle Soll-Zeit</span>
-                            @if($this->currentPlannedMinutes)
-                                <span class="text-3xl font-bold text-[var(--ui-primary)]">{{ number_format($this->currentPlannedMinutes / 60, 2, ',', '.') }} <span class="text-xl">h</span></span>
-                            @else
-                                <span class="text-xl font-semibold text-[var(--ui-muted)]">Nicht gesetzt</span>
-                            @endif
-                        </div>
-                        @if($this->currentPlannedMinutes && $this->totalMinutes)
-                            @php
-                                $progress = min(100, ($this->totalMinutes / $this->currentPlannedMinutes) * 100);
-                                $isOver = $this->totalMinutes > $this->currentPlannedMinutes;
-                            @endphp
-                            <div class="mt-4">
-                                <div class="flex items-center justify-between text-xs font-medium text-[var(--ui-secondary)] mb-2">
-                                    <span>Erfasst: {{ number_format($this->totalMinutes / 60, 2, ',', '.') }} h</span>
-                                    <span class="font-bold {{ $isOver ? 'text-[var(--ui-danger)]' : 'text-[var(--ui-success)]' }}">
-                                        {{ $isOver ? '+' : '' }}{{ number_format(($this->totalMinutes - $this->currentPlannedMinutes) / 60, 2, ',', '.') }} h
-                                    </span>
-                                </div>
-                                <div class="w-full bg-[var(--ui-muted-5)] rounded-full h-3 overflow-hidden shadow-inner">
-                                    <div 
-                                        class="h-3 rounded-full transition-all duration-500 {{ $isOver ? 'bg-gradient-to-r from-[var(--ui-danger)] to-[var(--ui-danger)]' : 'bg-gradient-to-r from-[var(--ui-primary)] to-[var(--ui-primary)]' }}"
-                                        style="width: {{ min(100, $progress) }}%"
-                                    ></div>
-                                </div>
-                            </div>
-                        @endif
-                    </div>
-
-                    <!-- Update Form -->
-                    <div class="rounded-xl border border-[var(--ui-border)]/60 p-6 bg-[var(--ui-surface)] shadow-sm">
-                        <h4 class="text-base font-bold text-[var(--ui-secondary)] mb-5">Soll-Zeit aktualisieren</h4>
-                        <div class="space-y-5">
-                            <div>
-                                <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-3">
-                                    Geplante Zeit
-                                </label>
-                                <div class="grid gap-3 mb-3" style="grid-template-columns: repeat(8, minmax(0, 1fr));">
-                                    @foreach([1, 2, 3, 4, 5, 6, 7, 8] as $quickHours)
-                                        <button
-                                            type="button"
-                                            wire:click="$set('plannedMinutes', {{ $quickHours * 60 }})"
-                                            class="px-4 py-3 rounded-xl border-2 font-bold transition-all duration-200 hover:scale-105 text-sm {{ $plannedMinutes === ($quickHours * 60) ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md scale-105' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
-                                        >
-                                            {{ $quickHours }}h
-                                        </button>
-                                    @endforeach
-                                </div>
-                                <div class="grid gap-3 mb-3" style="grid-template-columns: repeat(5, minmax(0, 1fr));">
-                                    @foreach([1, 2, 3, 4, 5, 10, 15, 20, 30, 40] as $quickDays)
-                                        <button
-                                            type="button"
-                                            wire:click="$set('plannedMinutes', {{ $quickDays * 8 * 60 }})"
-                                            class="px-4 py-3 rounded-xl border-2 font-bold transition-all duration-200 hover:scale-105 text-sm {{ $plannedMinutes === ($quickDays * 8 * 60) ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md scale-105' : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)]' }}"
-                                        >
-                                            {{ $quickDays }} Tag{{ $quickDays > 1 ? 'e' : '' }} (à 8h)
-                                        </button>
-                                    @endforeach
-                                </div>
-                                <input
-                                    type="number"
-                                    wire:model.live="plannedMinutes"
-                                    min="1"
-                                    step="15"
-                                    placeholder="Minuten eingeben (z. B. 120 für 2 Stunden)"
-                                    class="w-full px-4 py-3 text-sm rounded-xl border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] focus:outline-none focus:ring-2 focus:ring-[var(--ui-primary)]/20 focus:border-[var(--ui-primary)]"
-                                />
-                                @error('plannedMinutes')
-                                    <p class="mt-2 text-xs text-[var(--ui-danger)]">{{ $message }}</p>
-                                @enderror
-                                @if($plannedMinutes)
-                                    <p class="mt-2 text-xs font-medium text-[var(--ui-secondary)]">
-                                        {{ number_format($plannedMinutes / 60, 2, ',', '.') }} Stunden
-                                        <span class="text-[var(--ui-muted)]">({{ number_format($plannedMinutes / 480, 2, ',', '.') }} Tage à 8h)</span>
-                                    </p>
-                                @endif
-                            </div>
-
-                            <div>
-                                <x-ui-input-textarea
-                                    name="plannedNote"
-                                    label="Notiz (optional)"
-                                    wire:model.live="plannedNote"
-                                    rows="3"
-                                    placeholder="Grund für die Änderung der Soll-Zeit"
-                                    :errorKey="'plannedNote'"
-                                />
-                            </div>
-
-                            <x-ui-button variant="primary" wire:click="savePlanned" wire:loading.attr="disabled" class="w-full">
-                                <span wire:loading.remove wire:target="savePlanned">Soll-Zeit speichern</span>
-                                <span wire:loading wire:target="savePlanned" class="inline-flex items-center gap-2">
-                                    @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
-                                    Speichern…
-                                </span>
-                            </x-ui-button>
-                        </div>
-                    </div>
-
-                    <!-- History -->
-                    <div class="rounded-xl border border-[var(--ui-border)]/60 overflow-hidden shadow-sm">
-                        <div class="px-6 py-4 bg-[var(--ui-muted-5)] border-b border-[var(--ui-border)]/60">
-                            <h4 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wide">Verlauf</h4>
-                        </div>
-                        <div class="divide-y divide-[var(--ui-border)]/40 bg-[var(--ui-surface)]">
-                            @forelse($plannedEntries ?? [] as $planned)
-                                <div class="flex flex-col gap-2 px-6 py-4 hover:bg-[var(--ui-muted-5)]/50 transition-colors sm:flex-row sm:items-center sm:justify-between">
-                                    <div class="flex-1 flex flex-col gap-1">
-                                        <div class="flex items-center gap-3">
-                                            <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ number_format($planned->planned_minutes / 60, 2, ',', '.') }} h</span>
-                                            @if($planned->is_active)
-                                                <span class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold bg-[var(--ui-success-10)] text-[var(--ui-success)] ring-1 ring-inset ring-[var(--ui-success)]/20">
-                                                    @svg('heroicon-o-check-circle', 'w-3.5 h-3.5')
-                                                    Aktuell
-                                                </span>
-                                            @endif
-                                        </div>
-                                        <div class="text-xs text-[var(--ui-muted)] flex flex-wrap items-center gap-2 mt-1">
-                                            <span>{{ $planned->created_at?->format('d.m.Y H:i') }}</span>
-                                            <span>•</span>
-                                            <span class="font-medium">{{ $planned->user?->name ?? 'Unbekannt' }}</span>
-                                        </div>
-                                        @if($planned->note)
-                                            <div class="text-xs text-[var(--ui-muted)] italic mt-2 pl-4 border-l-2 border-[var(--ui-border)]/40">{{ $planned->note }}</div>
-                                        @endif
-                                    </div>
-                                </div>
-                            @empty
-                                <div class="px-6 py-12 text-center">
-                                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-muted-5)] flex items-center justify-center">
-                                        @svg('heroicon-o-calendar-days', 'w-8 h-8 text-[var(--ui-muted)]')
-                                    </div>
-                                    <p class="text-sm font-medium text-[var(--ui-secondary)]">Noch keine Soll-Zeit gesetzt</p>
-                                </div>
-                            @endforelse
-                        </div>
-                    </div>
-                </div>
-            </div>
-            @endif
-
-            <!-- Tab Content: Team -->
-            @if($allowTimeEntry)
-            <div x-show="activeTab === 'team'" x-cloak>
-                <div class="space-y-6">
-                    <!-- Zeitraum-Filter -->
-                    <div class="flex items-center gap-3 mb-4">
-                        <label class="text-sm font-semibold text-[var(--ui-secondary)] whitespace-nowrap">Zeitraum:</label>
-                        <div class="flex gap-2 flex-wrap">
-                            <button
-                                wire:click="$set('timeRange', 'current_week')"
-                                wire:loading.attr="disabled"
-                                :class="$wire.timeRange === 'current_week'
-                                    ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
-                                    : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
-                                class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
-                            >
-                                Diese Woche
-                            </button>
-                            <button
-                                wire:click="$set('timeRange', 'current_month')"
-                                wire:loading.attr="disabled"
-                                :class="$wire.timeRange === 'current_month'
-                                    ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
-                                    : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
-                                class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
-                            >
-                                Dieser Monat
-                            </button>
-                            <button
-                                wire:click="$set('timeRange', 'current_year')"
-                                wire:loading.attr="disabled"
-                                :class="$wire.timeRange === 'current_year'
-                                    ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
-                                    : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
-                                class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
-                            >
-                                Dieses Jahr
-                            </button>
-                            <button
-                                wire:click="$set('timeRange', 'last_week')"
-                                wire:loading.attr="disabled"
-                                :class="$wire.timeRange === 'last_week'
-                                    ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
-                                    : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
-                                class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
-                            >
-                                Letzte Woche
-                            </button>
-                            <button
-                                wire:click="$set('timeRange', 'last_month')"
-                                wire:loading.attr="disabled"
-                                :class="$wire.timeRange === 'last_month'
-                                    ? 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] border-[var(--ui-primary)] shadow-md'
-                                    : 'bg-[var(--ui-surface)] text-[var(--ui-secondary)] border-[var(--ui-border)]/60 hover:border-[var(--ui-primary)]/60'"
-                                class="px-3 py-1.5 rounded-lg border-2 text-xs font-semibold transition-all"
-                            >
-                                Letzter Monat
-                            </button>
-                        </div>
-                    </div>
-
-                    <!-- Statistics -->
-                    <div class="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                        <div class="p-5 bg-gradient-to-br from-[var(--ui-surface)] to-[var(--ui-muted-5)] rounded-xl border border-[var(--ui-border)]/60 shadow-sm">
-                            <div class="text-xs font-semibold text-[var(--ui-muted)] uppercase tracking-wide mb-2">Gesamt</div>
-                            <div class="text-3xl font-bold text-[var(--ui-secondary)]">{{ number_format($this->teamTotalMinutes / 60, 2, ',', '.') }} <span class="text-lg text-[var(--ui-muted)]">h</span></div>
-                        </div>
-                        <div class="p-5 bg-gradient-to-br from-[var(--ui-success-5)] to-[var(--ui-success-10)] rounded-xl border border-[var(--ui-success)]/30 shadow-sm">
-                            <div class="text-xs font-semibold text-[var(--ui-success)] uppercase tracking-wide mb-2">Abgerechnet</div>
-                            <div class="text-3xl font-bold text-[var(--ui-success)]">{{ number_format($this->teamBilledMinutes / 60, 2, ',', '.') }} <span class="text-lg text-[var(--ui-success)]/70">h</span></div>
-                        </div>
-                        <div class="p-5 bg-gradient-to-br from-[var(--ui-warning-5)] to-[var(--ui-warning-10)] rounded-xl border border-[var(--ui-warning)]/30 shadow-sm">
-                            <div class="text-xs font-semibold text-[var(--ui-warning)] uppercase tracking-wide mb-2">Offen</div>
-                            <div class="text-3xl font-bold text-[var(--ui-warning)]">{{ number_format($this->teamUnbilledMinutes / 60, 2, ',', '.') }} <span class="text-lg text-[var(--ui-warning)]/70">h</span></div>
-                        </div>
-                        @if($this->teamPlannedMinutes)
-                            <div class="p-5 bg-gradient-to-br from-[var(--ui-primary-5)] to-[var(--ui-primary-10)] rounded-xl border border-[var(--ui-primary)]/30 shadow-sm">
-                                <div class="text-xs font-semibold text-[var(--ui-primary)] uppercase tracking-wide mb-2">Soll-Zeit</div>
-                                <div class="text-3xl font-bold text-[var(--ui-primary)]">{{ number_format($this->teamPlannedMinutes / 60, 2, ',', '.') }} <span class="text-lg text-[var(--ui-primary)]/70">h</span></div>
-                            </div>
-                        @endif
-                    </div>
-
-                    <!-- Team Entries Table -->
-                    <div class="flow-root">
-                        <div class="-mx-4 -my-2 overflow-x-auto sm:-mx-6 lg:-mx-8">
-                            <div class="inline-block min-w-full py-2 align-middle sm:px-6 lg:px-8">
-                                <div class="overflow-hidden rounded-xl border border-[var(--ui-border)]/60 shadow-sm">
-                                    <table class="min-w-full divide-y divide-[var(--ui-border)]/40">
-                                        <thead class="bg-[var(--ui-muted-5)]">
-                                            <tr>
-                                                <th scope="col" class="py-4 pl-6 pr-3 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                                    Datum
-                                                </th>
-                                                <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                                    Kontext
-                                                </th>
-                                                <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                                    Dauer
-                                                </th>
-                                                <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                                    Betrag
-                                                </th>
-                                                <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                                    Benutzer
-                                                </th>
-                                                <th scope="col" class="px-3 py-4 text-left text-xs font-bold uppercase tracking-wider text-[var(--ui-secondary)]">
-                                                    Status
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody class="divide-y divide-[var(--ui-border)]/40 bg-[var(--ui-surface)]">
-                                            @forelse($teamEntries ?? [] as $entry)
-                                                @php
-                                                    $resolver = app(\Platform\Organization\Services\TimeContextResolver::class);
-                                                    $contextLabel = ($entry->context_type && $entry->context_id) ? ($resolver->resolveLabel($entry->context_type, $entry->context_id) ?? 'Unbekannt') : 'Freie Zeiterfassung';
-                                                    $contextType = $entry->context_type ? class_basename($entry->context_type) : '';
-                                                @endphp
-                                                <tr class="hover:bg-[var(--ui-muted-5)]/50 transition-colors">
-                                                    <td class="whitespace-nowrap py-5 pl-6 pr-3 text-sm">
-                                                        <div class="font-semibold text-[var(--ui-secondary)]">{{ $entry->work_date?->format('d.m.Y') }}</div>
-                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ $entry->work_date?->format('l') }}</div>
-                                                    </td>
-                                                    <td class="whitespace-nowrap px-3 py-5 text-sm">
-                                                        <div class="font-medium text-[var(--ui-secondary)]">{{ $contextLabel }}</div>
-                                                        @if($contextType)
-                                                            <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ $contextType }}</div>
-                                                        @endif
-                                                    </td>
-                                                    <td class="whitespace-nowrap px-3 py-5 text-sm">
-                                                        <div class="font-medium text-[var(--ui-secondary)]">{{ \Platform\Organization\Models\OrganizationTimeEntry::formatMinutes($entry->minutes) }}</div>
-                                                        @if($entry->rate_cents)
-                                                            <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ number_format($entry->rate_cents / 100, 2, ',', '.') }} €/h</div>
-                                                        @endif
-                                                    </td>
-                                                    <td class="whitespace-nowrap px-3 py-5 text-sm">
-                                                        @if($entry->amount_cents)
-                                                            <div class="font-semibold text-[var(--ui-secondary)]">{{ number_format($entry->amount_cents / 100, 2, ',', '.') }} €</div>
-                                                        @else
-                                                            <span class="text-[var(--ui-muted)]">–</span>
-                                                        @endif
-                                                    </td>
-                                                    <td class="whitespace-nowrap px-3 py-5 text-sm">
-                                                        <div class="flex items-center">
-                                                            <div class="size-9 shrink-0 rounded-full bg-gradient-to-br from-[var(--ui-primary-10)] to-[var(--ui-primary-5)] flex items-center justify-center border border-[var(--ui-border)]/40">
-                                                                <span class="text-xs font-bold text-[var(--ui-primary)]">
-                                                                    {{ strtoupper(substr($entry->user?->name ?? 'U', 0, 1)) }}
-                                                                </span>
-                                                            </div>
-                                                            <div class="ml-3">
-                                                                <div class="font-medium text-[var(--ui-secondary)]">{{ $entry->user?->name ?? 'Unbekannt' }}</div>
-                                                            </div>
-                                                        </div>
-                                                    </td>
-                                                    <td class="whitespace-nowrap px-3 py-5 text-sm">
-                                                        <span class="inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold ring-1 ring-inset {{ $entry->is_billed ? 'bg-[var(--ui-success-10)] text-[var(--ui-success)] ring-[var(--ui-success)]/20' : 'bg-[var(--ui-warning-10)] text-[var(--ui-warning)] ring-[var(--ui-warning)]/20' }}">
-                                                            @if($entry->is_billed)
-                                                                @svg('heroicon-o-check-circle', 'w-3.5 h-3.5')
-                                                                Abgerechnet
-                                                            @else
-                                                                @svg('heroicon-o-exclamation-circle', 'w-3.5 h-3.5')
-                                                                Offen
-                                                            @endif
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                                @if($entry->note)
-                                                    <tr>
-                                                        <td colspan="6" class="px-6 py-2 bg-[var(--ui-muted-5)]/30">
-                                                            <div class="text-xs text-[var(--ui-muted)] italic">{{ $entry->note }}</div>
-                                                        </td>
-                                                    </tr>
-                                                @endif
-                                            @empty
-                                                <tr>
-                                                    <td colspan="6" class="px-6 py-12 text-center">
-                                                        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-muted-5)] flex items-center justify-center">
-                                                            @svg('heroicon-o-clock', 'w-8 h-8 text-[var(--ui-muted)]')
-                                                        </div>
-                                                        <p class="text-sm font-medium text-[var(--ui-secondary)]">Noch keine Zeiten erfasst</p>
-                                                        <p class="text-xs text-[var(--ui-muted)] mt-1">Für den ausgewählten Zeitraum wurden noch keine Zeiten erfasst.</p>
-                                                    </td>
-                                                </tr>
-                                            @endforelse
-                                        </tbody>
-                                    </table>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-            @endif
-
-            <!-- Tab Content: Organisation -->
-            @if($allowEntities)
-            <div x-show="activeTab === 'organization'" x-cloak>
-                <div class="space-y-6">
-                    <!-- Bestehende Verknüpfung -->
-                    <div>
-                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">Verknüpfte Organization Entity</h4>
-                        <div class="space-y-2">
-                            @if($organizationContext && $organizationContext->organizationEntity)
-                                <div class="flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)]">
-                                    <div class="flex-1">
-                                        <div class="flex items-center gap-3">
-                                            <div class="flex-shrink-0">
-                                                <div class="w-10 h-10 rounded-lg bg-[var(--ui-primary-5)] flex items-center justify-center">
-                                                    @svg('heroicon-o-building-office', 'w-5 h-5 text-[var(--ui-primary)]')
-                                                </div>
-                                            </div>
-                                            <div class="flex-1 min-w-0">
-                                                <div class="font-semibold text-[var(--ui-secondary)]">{{ $organizationContext->organizationEntity->name }}</div>
-                                                <div class="text-xs text-[var(--ui-muted)] mt-0.5">
-                                                    {{ $organizationContext->organizationEntity->type->name ?? 'Unbekannt' }}
-                                                    @if($organizationContext->include_children_relations && count($organizationContext->include_children_relations) > 0)
-                                                        • Mit Relations: {{ implode(', ', $organizationContext->include_children_relations) }}
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                    <div class="flex-shrink-0 ml-4">
-                                        <x-ui-button 
-                                            variant="danger-outline" 
-                                            size="sm"
-                                            wire:click="detachOrganizationContext"
-                                            wire:loading.attr="disabled"
-                                            wire:target="detachOrganizationContext"
-                                        >
-                                            <span wire:loading.remove wire:target="detachOrganizationContext">
-                                                @svg('heroicon-o-trash', 'w-4 h-4')
-                                            </span>
-                                            <span wire:loading wire:target="detachOrganizationContext">
-                                                @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
-                                            </span>
-                                        </x-ui-button>
-                                    </div>
-                                </div>
-                            @else
-                                <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
-                                        @svg('heroicon-o-building-office', 'w-8 h-8 text-[var(--ui-muted)]')
-                                    </div>
-                                    <p class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Noch keine Verknüpfung</p>
-                                    <p class="text-xs text-[var(--ui-muted)]">Verknüpfen Sie dieses Element mit einer Organization Entity</p>
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-
-                    <!-- Organization Entity auswählen -->
-                    <div class="pt-6 {{ $organizationContext && $organizationContext->organizationEntity ? 'border-t border-[var(--ui-border)]/60' : '' }}">
-                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">Organization Entity verknüpfen</h4>
-                        
-                        <!-- Verfügbare Organization Entities -->
-                        @if($availableOrganizationEntities && $availableOrganizationEntities->count() > 0)
-                            <div class="space-y-2 max-h-96 overflow-y-auto">
-                                @foreach($availableOrganizationEntities as $entity)
-                                    @php
-                                        $isLinked = $organizationContext && $organizationContext->organizationEntity && $organizationContext->organizationEntity->id === $entity->id;
-                                    @endphp
-                                    <div class="flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:bg-[var(--ui-muted-5)] transition-colors {{ $isLinked ? 'opacity-50' : '' }}">
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex items-center gap-3">
-                                                <div class="flex-shrink-0">
-                                                    <div class="w-10 h-10 rounded-lg bg-[var(--ui-primary-5)] flex items-center justify-center">
-                                                        @svg('heroicon-o-building-office', 'w-5 h-5 text-[var(--ui-primary)]')
-                                                    </div>
-                                                </div>
-                                                <div class="flex-1 min-w-0">
-                                                    <div class="font-semibold text-[var(--ui-secondary)] truncate">{{ $entity->name }}</div>
-                                                    @if($entity->type)
-                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">{{ $entity->type->name }}</div>
-                                                    @endif
-                                                    @if($entity->code)
-                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">Code: {{ $entity->code }}</div>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="flex-shrink-0 ml-4">
-                                            @if($isLinked)
-                                                <span class="text-xs font-medium text-[var(--ui-muted)]">Bereits verknüpft</span>
-                                            @else
-                                                <x-ui-button 
-                                                    variant="primary" 
-                                                    size="sm"
-                                                    wire:click="$set('selectedOrganizationEntityId', {{ $entity->id }})"
-                                                >
-                                                    Auswählen
-                                                </x-ui-button>
-                                            @endif
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-
-                            <!-- Child Relations Checkboxes (nur wenn verfügbar und Entity ausgewählt) -->
-                            @if(!empty($availableChildRelations) && $selectedOrganizationEntityId)
-                            <div class="mt-4 pt-4 border-t border-[var(--ui-border)]/60">
-                                <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">
-                                    Relations inkludieren (optional)
-                                </label>
-                                <div class="space-y-2">
-                                    @foreach($availableChildRelations as $relation)
-                                        <label class="flex items-center gap-2 p-2 rounded-lg border border-[var(--ui-border)]/60 hover:bg-[var(--ui-muted-5)] cursor-pointer">
-                                            <input 
-                                                type="checkbox" 
-                                                wire:model="selectedChildRelations"
-                                                value="{{ $relation }}"
-                                                class="rounded border-[var(--ui-border)]/60 text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]"
-                                            >
-                                            <span class="text-sm text-[var(--ui-secondary)]">{{ $relation }}</span>
-                                        </label>
-                                    @endforeach
-                                </div>
-                                <p class="mt-2 text-xs text-[var(--ui-muted)]">
-                                    Wenn ausgewählt, werden auch die Children über diese Relations mit der Organization Entity verknüpft.
-                                </p>
-                            </div>
-                            @endif
-
-                            <!-- Button -->
-                            @if($selectedOrganizationEntityId)
-                            <div class="mt-4">
-                                <x-ui-button 
-                                    variant="primary" 
-                                    wire:click="attachOrganizationContext"
-                                    wire:loading.attr="disabled"
-                                    class="w-full"
-                                >
-                                    <span wire:loading.remove wire:target="attachOrganizationContext">
-                                        Verknüpfung erstellen
-                                    </span>
-                                    <span wire:loading wire:target="attachOrganizationContext" class="inline-flex items-center gap-2">
-                                        @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
-                                        Erstellen…
-                                    </span>
-                                </x-ui-button>
-                            </div>
-                            @endif
-                        @else
-                            <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
-                                    @svg('heroicon-o-building-office', 'w-8 h-8 text-[var(--ui-muted)]')
-                                </div>
-                                <p class="text-sm font-medium text-[var(--ui-secondary)]">Keine Organization Entities gefunden</p>
-                                <p class="text-xs text-[var(--ui-muted)] mt-1">Erstellen Sie zuerst eine Organization Entity im Organization-Modul.</p>
-                            </div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-            @endif
-
-            <!-- Tab Content: Cost Centers -->
-            @if($allowDimensions)
-            <div x-show="activeTab === 'cost-centers'" x-cloak>
-                <div class="space-y-6">
-                    <!-- Verknüpfte Cost Centers -->
-                    @if($linkedCostCenters && $linkedCostCenters->count() > 0)
-                        <div>
-                            <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">Verknüpfte Kostenstellen</h4>
-                            <div class="space-y-2">
-                                @foreach($linkedCostCenters as $costCenter)
-                                    <div class="flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:bg-[var(--ui-muted-5)] transition-colors">
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex items-center gap-3">
-                                                <div class="flex-shrink-0">
-                                                    <div class="w-10 h-10 rounded-lg bg-[var(--ui-primary-5)] flex items-center justify-center">
-                                                        @svg('heroicon-o-currency-dollar', 'w-5 h-5 text-[var(--ui-primary)]')
-                                                    </div>
-                                                </div>
-                                                <div class="flex-1 min-w-0">
-                                                    <div class="font-semibold text-[var(--ui-secondary)]">{{ $costCenter->name }}</div>
-                                                    @if($costCenter->code)
-                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">Code: {{ $costCenter->code }}</div>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="flex-shrink-0 ml-4">
-                                            <x-ui-button 
-                                                variant="danger-outline" 
-                                                size="sm"
-                                                wire:click="detachCostCenter({{ $costCenter->id }})"
-                                                wire:loading.attr="disabled"
-                                                wire:target="detachCostCenter({{ $costCenter->id }})"
-                                            >
-                                                <span wire:loading.remove wire:target="detachCostCenter({{ $costCenter->id }})">
-                                                    @svg('heroicon-o-trash', 'w-4 h-4')
-                                                </span>
-                                                <span wire:loading wire:target="detachCostCenter({{ $costCenter->id }})">
-                                                    @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
-                                                </span>
-                                            </x-ui-button>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-
-                    <!-- Cost Center auswählen -->
-                    <div class="pt-6 {{ $linkedCostCenters && $linkedCostCenters->count() > 0 ? 'border-t border-[var(--ui-border)]/60' : '' }}">
-                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">Kostenstelle verknüpfen</h4>
-                        
-                        <!-- Suche -->
-                        <div class="mb-4">
-                            <x-ui-input-text
-                                name="costCenterSearch"
-                                label="Suchen"
-                                wire:model.live.debounce.300ms="costCenterSearch"
-                                placeholder="Kostenstelle suchen..."
-                            />
-                        </div>
-
-                        <!-- Verfügbare Cost Centers -->
-                        @if($availableCostCenters && $availableCostCenters->count() > 0)
-                            <div class="space-y-2 max-h-96 overflow-y-auto">
-                                @foreach($availableCostCenters as $costCenter)
-                                    @php
-                                        $isLinked = $linkedCostCenters && $linkedCostCenters->contains('id', $costCenter->id);
-                                    @endphp
-                                    <div class="flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:bg-[var(--ui-muted-5)] transition-colors {{ $isLinked ? 'opacity-50' : '' }}">
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex items-center gap-3">
-                                                <div class="flex-shrink-0">
-                                                    <div class="w-10 h-10 rounded-lg bg-[var(--ui-primary-5)] flex items-center justify-center">
-                                                        @svg('heroicon-o-currency-dollar', 'w-5 h-5 text-[var(--ui-primary)]')
-                                                    </div>
-                                                </div>
-                                                <div class="flex-1 min-w-0">
-                                                    <div class="font-semibold text-[var(--ui-secondary)] truncate">{{ $costCenter->name }}</div>
-                                                    @if($costCenter->code)
-                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">Code: {{ $costCenter->code }}</div>
-                                                    @endif
-                                                    @if($costCenter->description)
-                                                        <div class="text-xs text-[var(--ui-muted)] mt-1 line-clamp-2">{{ $costCenter->description }}</div>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="flex-shrink-0 ml-4">
-                                            @if($isLinked)
-                                                <span class="text-xs font-medium text-[var(--ui-muted)]">Bereits verknüpft</span>
-                                            @else
-                                                <x-ui-button 
-                                                    variant="primary" 
-                                                    size="sm"
-                                                    wire:click="attachCostCenter({{ $costCenter->id }})"
-                                                    wire:loading.attr="disabled"
-                                                    wire:target="attachCostCenter({{ $costCenter->id }})"
-                                                >
-                                                    <span wire:loading.remove wire:target="attachCostCenter({{ $costCenter->id }})">
-                                                        Verknüpfen
-                                                    </span>
-                                                    <span wire:loading wire:target="attachCostCenter({{ $costCenter->id }})" class="inline-flex items-center gap-2">
-                                                        @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
-                                                    </span>
-                                                </x-ui-button>
-                                            @endif
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @else
-                            <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
-                                    @svg('heroicon-o-currency-dollar', 'w-8 h-8 text-[var(--ui-muted)]')
-                                </div>
-                                <p class="text-sm font-medium text-[var(--ui-secondary)]">Keine Kostenstellen gefunden</p>
-                                <p class="text-xs text-[var(--ui-muted)] mt-1">
-                                    @if(!empty($costCenterSearch))
-                                        Keine Kostenstellen für "{{ $costCenterSearch }}" gefunden.
-                                    @else
-                                        Erstellen Sie zuerst eine Kostenstelle im Organization-Modul.
-                                    @endif
-                                </p>
-                            </div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-            @endif
-
-            <!-- Tab Content: VSM Systems -->
-            @if($allowDimensions)
-            <div x-show="activeTab === 'vsm-systems'" x-cloak>
-                <div class="space-y-6">
-                    <!-- Verknüpfte VSM Systems -->
-                    @if($linkedVsmSystems && $linkedVsmSystems->count() > 0)
-                        <div>
-                            <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">Verknüpfte VSM-Systeme</h4>
-                            <div class="space-y-2">
-                                @foreach($linkedVsmSystems as $vsmSystem)
-                                    <div class="flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:bg-[var(--ui-muted-5)] transition-colors">
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex items-center gap-3">
-                                                <div class="flex-shrink-0">
-                                                    <div class="w-10 h-10 rounded-lg bg-[var(--ui-primary-5)] flex items-center justify-center">
-                                                        @svg('heroicon-o-rectangle-group', 'w-5 h-5 text-[var(--ui-primary)]')
-                                                    </div>
-                                                </div>
-                                                <div class="flex-1 min-w-0">
-                                                    <div class="font-semibold text-[var(--ui-secondary)]">{{ $vsmSystem->name }}</div>
-                                                    @if($vsmSystem->code)
-                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">Code: {{ $vsmSystem->code }}</div>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="flex-shrink-0 ml-4">
-                                            <x-ui-button 
-                                                variant="danger-outline" 
-                                                size="sm"
-                                                wire:click="detachVsmSystem({{ $vsmSystem->id }})"
-                                                wire:loading.attr="disabled"
-                                                wire:target="detachVsmSystem({{ $vsmSystem->id }})"
-                                            >
-                                                <span wire:loading.remove wire:target="detachVsmSystem({{ $vsmSystem->id }})">
-                                                    @svg('heroicon-o-trash', 'w-4 h-4')
-                                                </span>
-                                                <span wire:loading wire:target="detachVsmSystem({{ $vsmSystem->id }})">
-                                                    @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
-                                                </span>
-                                            </x-ui-button>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-
-                    <!-- VSM System auswählen -->
-                    <div class="pt-6 {{ $linkedVsmSystems && $linkedVsmSystems->count() > 0 ? 'border-t border-[var(--ui-border)]/60' : '' }}">
-                        <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">VSM-System verknüpfen</h4>
-                        <p class="text-xs text-[var(--ui-muted)] mb-4">VSM-Systeme werden über Organization Entities verknüpft. Bitte verknüpfen Sie zuerst eine Organization Entity.</p>
-                        
-                        <!-- Suche -->
-                        <div class="mb-4">
-                            <x-ui-input-text
-                                name="vsmSystemSearch"
-                                label="Suchen"
-                                wire:model.live.debounce.300ms="vsmSystemSearch"
-                                placeholder="VSM-System suchen..."
-                            />
-                        </div>
-
-                        <!-- Verfügbare VSM Systems -->
-                        @if($availableVsmSystems && $availableVsmSystems->count() > 0)
-                            <div class="space-y-2 max-h-96 overflow-y-auto">
-                                @foreach($availableVsmSystems as $vsmSystem)
-                                    @php
-                                        $isLinked = $linkedVsmSystems && $linkedVsmSystems->contains('id', $vsmSystem->id);
-                                    @endphp
-                                    <div class="flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:bg-[var(--ui-muted-5)] transition-colors {{ $isLinked ? 'opacity-50' : '' }}">
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex items-center gap-3">
-                                                <div class="flex-shrink-0">
-                                                    <div class="w-10 h-10 rounded-lg bg-[var(--ui-primary-5)] flex items-center justify-center">
-                                                        @svg('heroicon-o-rectangle-group', 'w-5 h-5 text-[var(--ui-primary)]')
-                                                    </div>
-                                                </div>
-                                                <div class="flex-1 min-w-0">
-                                                    <div class="font-semibold text-[var(--ui-secondary)] truncate">{{ $vsmSystem->name }}</div>
-                                                    @if($vsmSystem->code)
-                                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">Code: {{ $vsmSystem->code }}</div>
-                                                    @endif
-                                                    @if($vsmSystem->description)
-                                                        <div class="text-xs text-[var(--ui-muted)] mt-1 line-clamp-2">{{ $vsmSystem->description }}</div>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div class="flex-shrink-0 ml-4">
-                                            @if($isLinked)
-                                                <span class="text-xs font-medium text-[var(--ui-muted)]">Bereits verknüpft</span>
-                                            @else
-                                                <x-ui-button 
-                                                    variant="primary" 
-                                                    size="sm"
-                                                    wire:click="attachVsmSystem({{ $vsmSystem->id }})"
-                                                    wire:loading.attr="disabled"
-                                                    wire:target="attachVsmSystem({{ $vsmSystem->id }})"
-                                                >
-                                                    <span wire:loading.remove wire:target="attachVsmSystem({{ $vsmSystem->id }})">
-                                                        Verknüpfen
-                                                    </span>
-                                                    <span wire:loading wire:target="attachVsmSystem({{ $vsmSystem->id }})" class="inline-flex items-center gap-2">
-                                                        @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
-                                                    </span>
-                                                </x-ui-button>
-                                            @endif
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @else
-                            <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
-                                    @svg('heroicon-o-rectangle-group', 'w-8 h-8 text-[var(--ui-muted)]')
-                                </div>
-                                <p class="text-sm font-medium text-[var(--ui-secondary)]">Keine VSM-Systeme gefunden</p>
-                                <p class="text-xs text-[var(--ui-muted)] mt-1">
-                                    @if(!empty($vsmSystemSearch))
-                                        Keine VSM-Systeme für "{{ $vsmSystemSearch }}" gefunden.
-                                    @else
-                                        Erstellen Sie zuerst ein VSM-System im Organization-Modul.
-                                    @endif
-                                </p>
-                            </div>
-                        @endif
-                    </div>
-                </div>
-            </div>
-            @endif
         @endif
     </div>
 
@@ -1406,26 +548,14 @@
                     Schließen
                 </x-ui-button>
                 @if($contextType && $contextId)
-                    <x-ui-button 
-                        variant="primary" 
-                        wire:click="save" 
+                    <x-ui-button
+                        variant="primary"
+                        wire:click="save"
                         wire:loading.attr="disabled"
                         x-show="activeTab === 'entry'"
                     >
                         <span wire:loading.remove wire:target="save">Zeit erfassen</span>
                         <span wire:loading wire:target="save" class="inline-flex items-center gap-2">
-                            @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
-                            Speichern…
-                        </span>
-                    </x-ui-button>
-                    <x-ui-button 
-                        variant="primary" 
-                        wire:click="savePlanned" 
-                        wire:loading.attr="disabled"
-                        x-show="activeTab === 'planned'"
-                    >
-                        <span wire:loading.remove wire:target="savePlanned">Soll-Zeit speichern</span>
-                        <span wire:loading wire:target="savePlanned" class="inline-flex items-center gap-2">
                             @svg('heroicon-o-arrow-path', 'w-4 h-4 animate-spin')
                             Speichern…
                         </span>

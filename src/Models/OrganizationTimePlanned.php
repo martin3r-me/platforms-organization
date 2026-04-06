@@ -46,12 +46,6 @@ class OrganizationTimePlanned extends Model
             if (! $planned->user_id && Auth::user()) {
                 $planned->user_id = Auth::user()->id;
             }
-
-            // Deaktiviere alle vorherigen aktiven Einträge für diesen Kontext
-            self::where('context_type', $planned->context_type)
-                ->where('context_id', $planned->context_id)
-                ->where('is_active', true)
-                ->update(['is_active' => false]);
         });
     }
 

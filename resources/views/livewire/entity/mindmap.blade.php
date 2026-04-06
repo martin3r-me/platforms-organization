@@ -297,22 +297,22 @@
                     // Inner corona
                     group.add(new THREE.Mesh(
                         new THREE.SphereGeometry(radius * 1.6, 16, 16),
-                        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 })
+                        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.22 })
                     ));
                     // Mid corona — uses node color but brighter
                     group.add(new THREE.Mesh(
                         new THREE.SphereGeometry(radius * 2.4, 12, 12),
-                        new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.12 })
+                        new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.18 })
                     ));
                     // Outer corona
                     group.add(new THREE.Mesh(
                         new THREE.SphereGeometry(radius * 3.5, 8, 8),
-                        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.08 })
+                        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.12 })
                     ));
                 } else if (!isLinked && depth <= 1) {
                     // Regular glow for non-sun top-level
                     var glowSize = radius * (isCenter ? 2.5 : 1.8);
-                    var glowIntensity = isCenter ? 0.18 : (hasActivity ? 0.12 + Math.min(m.time_h / 80, 0.1) : 0.08);
+                    var glowIntensity = isCenter ? 0.25 : (hasActivity ? 0.16 + Math.min(m.time_h / 80, 0.1) : 0.12);
                     group.add(new THREE.Mesh(
                         new THREE.SphereGeometry(glowSize, 12, 12),
                         new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: glowIntensity * 0.5 })
@@ -352,9 +352,9 @@
             .linkColor('color')
             .linkWidth(function(l) {
                 var ltype = l.ltype || '';
-                if (ltype === 'hierarchy') return 0.7;
-                if (ltype === 'relation') return 0.85;
-                return 0.4;
+                if (ltype === 'hierarchy') return 0.6;
+                if (ltype === 'relation') return 0.7;
+                return 0.35;
             })
             .linkOpacity(0.4)
             .linkDirectionalParticles(function(l) { return l.ltype === 'relation' ? 3 : 1; })

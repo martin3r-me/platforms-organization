@@ -151,15 +151,23 @@
         function makeLabel(text, fontSize, color) {
             var canvas = document.createElement('canvas');
             var ctx = canvas.getContext('2d');
-            var bold = fontSize > 34;
-            ctx.font = (bold ? '600 ' : '400 ') + fontSize + 'px -apple-system, system-ui, sans-serif';
+            var bold = fontSize > 30;
+            var fontStr = (bold ? '600 ' : '500 ') + fontSize + 'px -apple-system, system-ui, sans-serif';
+            ctx.font = fontStr;
             var tw = ctx.measureText(text).width;
-            var pad = 10;
-            canvas.width = tw + pad * 2;
-            canvas.height = fontSize + pad * 2;
-            // Transparent bg, colored text
+            var padX = 16;
+            var padY = 10;
+            canvas.width = tw + padX * 2;
+            canvas.height = fontSize + padY * 2;
+            // Dark pill background for contrast
             ctx.clearRect(0, 0, canvas.width, canvas.height);
-            ctx.font = (bold ? '600 ' : '400 ') + fontSize + 'px -apple-system, system-ui, sans-serif';
+            var r = canvas.height / 2;
+            ctx.fillStyle = 'rgba(8, 12, 24, 0.75)';
+            ctx.beginPath();
+            ctx.roundRect(0, 0, canvas.width, canvas.height, r);
+            ctx.fill();
+            // Text
+            ctx.font = fontStr;
             ctx.fillStyle = color || '#ffffff';
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
@@ -167,7 +175,7 @@
             var tex = new THREE.CanvasTexture(canvas);
             var mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
             var sprite = new THREE.Sprite(mat);
-            sprite.scale.set(canvas.width / 18, canvas.height / 18, 1);
+            sprite.scale.set(canvas.width / 14, canvas.height / 14, 1);
             return sprite;
         }
 

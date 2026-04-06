@@ -183,11 +183,15 @@ class Mindmap extends Component
             if (class_exists($modelClass)) {
                 $table = (new $modelClass)->getTable();
                 $columns = collect(DB::getSchemaBuilder()->getColumnListing($table));
-                $nameCol = $columns->first(fn ($c) => in_array($c, ['name', 'title']));
+                $nameCol = $columns->first(fn ($c) => in_array($c, ['name', 'title', 'subject', 'label']));
                 $labelExpr = $nameCol
                     ? DB::raw("COALESCE({$nameCol}, CONCAT('#', id)) as label")
                     : DB::raw("CONCAT('#', id) as label");
-                $rows = DB::table($table)->whereIn('id', $ids)->select('id', $labelExpr)->get();
+                $query = DB::table($table)->whereIn('id', $ids);
+                if ($columns->contains('deleted_at')) {
+                    $query->whereNull('deleted_at');
+                }
+                $rows = $query->select('id', $labelExpr)->get();
                 foreach ($rows as $row) {
                     $labelMap[$row->id] = $row->label;
                 }
@@ -199,6 +203,11 @@ class Mindmap extends Component
             $typeName = $this->humanMorphType($morphType);
 
             foreach ($typeLinks as $link) {
+                // Skip if row doesn't exist (deleted/missing)
+                if (class_exists($modelClass) && !isset($labelMap[$link->linkable_id])) {
+                    continue;
+                }
+
                 $nodeId = $morphType . '-' . $link->linkable_id;
 
                 if (!isset($linkedNodes[$nodeId])) {

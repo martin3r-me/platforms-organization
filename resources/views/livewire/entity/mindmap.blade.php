@@ -19,6 +19,7 @@
     @script
     <script>
         const scripts = [
+            'https://unpkg.com/three@0.175.0/build/three.min.js',
             'https://unpkg.com/3d-force-graph@1',
             'https://unpkg.com/three-spritetext@1',
         ];

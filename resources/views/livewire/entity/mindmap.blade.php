@@ -312,9 +312,13 @@
                 } else if (!isLinked && depth <= 1) {
                     // Regular glow for non-sun top-level
                     var glowSize = radius * (isCenter ? 2.5 : 1.8);
-                    var glowIntensity = isCenter ? 0.12 : (hasActivity ? 0.06 + Math.min(m.time_h / 80, 0.1) : 0.03);
+                    var glowIntensity = isCenter ? 0.18 : (hasActivity ? 0.12 + Math.min(m.time_h / 80, 0.1) : 0.08);
                     group.add(new THREE.Mesh(
                         new THREE.SphereGeometry(glowSize, 12, 12),
+                        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: glowIntensity * 0.5 })
+                    ));
+                    group.add(new THREE.Mesh(
+                        new THREE.SphereGeometry(glowSize * 0.85, 12, 12),
                         new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: glowIntensity })
                     ));
                 }

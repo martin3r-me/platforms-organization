@@ -32,10 +32,10 @@
             scriptsLoaded: false,
 
             loadScripts() {
+                // 3d-force-graph bringt Three.js bereits mit - NICHT separat laden
                 const scripts = [
-                    'https://unpkg.com/three@0.160.0/build/three.min.js',
-                    'https://unpkg.com/three-spritetext@1',
                     'https://unpkg.com/3d-force-graph@1',
+                    'https://unpkg.com/three-spritetext@1',
                 ];
                 let loaded = 0;
                 const total = scripts.length;
@@ -45,8 +45,13 @@
                         this.buildGraph();
                         return;
                     }
+                    // Nicht doppelt laden
+                    const src = scripts[loaded];
+                    if (document.querySelector(`script[src="${src}"]`)) {
+                        loaded++; loadNext(); return;
+                    }
                     const s = document.createElement('script');
-                    s.src = scripts[loaded];
+                    s.src = src;
                     s.onload = () => { loaded++; loadNext(); };
                     document.head.appendChild(s);
                 };

@@ -16,7 +16,7 @@
         <div id="3d-graph" class="w-full h-full"></div>
 
         {{-- Sidebar --}}
-        <div id="sidebar" class="absolute top-3 left-3 z-20 w-52 bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-xl shadow-2xl text-xs overflow-hidden">
+        <div id="sidebar" class="absolute top-3 left-3 z-20 w-72 bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-xl shadow-2xl text-xs overflow-hidden">
             <div class="px-3 py-2 border-b border-gray-700/50 font-bold text-gray-300 text-sm flex items-center gap-2">
                 @svg('heroicon-o-funnel', 'w-4 h-4 text-gray-500') Layer
             </div>
@@ -83,7 +83,7 @@
         </div>
 
         {{-- Legend --}}
-        <div class="absolute bottom-3 right-3 z-20 bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl p-2.5 text-xs">
+        <div class="absolute bottom-3 right-3 z-20 w-72 bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl p-2.5 text-xs">
             <div class="text-gray-500 font-medium uppercase tracking-wider mb-1.5" style="font-size:9px">Legende</div>
             <div class="space-y-1" id="legend"></div>
         </div>

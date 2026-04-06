@@ -307,7 +307,7 @@
                     // Outer corona
                     group.add(new THREE.Mesh(
                         new THREE.SphereGeometry(radius * 3.5, 8, 8),
-                        new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.06 })
+                        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.08 })
                     ));
                 } else if (!isLinked && depth <= 1) {
                     // Regular glow for non-sun top-level
@@ -352,9 +352,9 @@
             .linkColor('color')
             .linkWidth(function(l) {
                 var ltype = l.ltype || '';
-                if (ltype === 'hierarchy') return 0.8;
-                if (ltype === 'relation') return 1.0;
-                return 0.5;
+                if (ltype === 'hierarchy') return 0.7;
+                if (ltype === 'relation') return 0.85;
+                return 0.4;
             })
             .linkOpacity(0.4)
             .linkDirectionalParticles(function(l) { return l.ltype === 'relation' ? 3 : 1; })

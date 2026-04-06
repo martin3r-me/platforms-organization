@@ -58,12 +58,14 @@ class Mindmap extends Component
             $metrics = $snap?->metrics ?? [];
 
             $nodes[] = [
-                'id'      => 'e' . $e->id,
-                'name'    => $e->name,
-                'group'   => $groupName,
-                'color'   => $isCenter ? '#111827' : ($this->groupColors[$groupName] ?? '#9CA3AF'),
-                'val'     => $isCenter ? 25 : 8,
-                'metrics' => [
+                'id'       => 'e' . $e->id,
+                'name'     => $e->name,
+                'group'    => $groupName,
+                'category' => 'entity',
+                'parentId' => $e->parent_entity_id ? 'e' . $e->parent_entity_id : null,
+                'color'    => $isCenter ? '#111827' : ($this->groupColors[$groupName] ?? '#9CA3AF'),
+                'val'      => $isCenter ? 25 : 8,
+                'metrics'  => [
                     'items_total'   => $metrics['items_total'] ?? 0,
                     'items_done'    => $metrics['items_done'] ?? 0,
                     'links_count'   => $metrics['links_count'] ?? 0,
@@ -158,11 +160,12 @@ class Mindmap extends Component
                 if (!isset($linkedNodes[$nodeId])) {
                     $linkedNodes[$nodeId] = true;
                     $nodes[] = [
-                        'id'    => $nodeId,
-                        'name'  => $labelMap[$link->linkable_id] ?? "#{$link->linkable_id}",
-                        'color' => $linkTypeColors[$morphType] ?? '#9CA3AF',
-                        'val'   => 3,
-                        'type'  => $linkTypeNames[$morphType] ?? $morphType,
+                        'id'       => $nodeId,
+                        'name'     => $labelMap[$link->linkable_id] ?? "#{$link->linkable_id}",
+                        'color'    => $linkTypeColors[$morphType] ?? '#9CA3AF',
+                        'val'      => 3,
+                        'type'     => $linkTypeNames[$morphType] ?? $morphType,
+                        'category' => $morphType,
                     ];
                 }
 
@@ -175,7 +178,41 @@ class Mindmap extends Component
             }
         }
 
-        return compact('nodes', 'links');
+        // Build filter categories with counts
+        $categories = [];
+        foreach ($nodes as $n) {
+            $cat = $n['category'] ?? 'entity';
+            if (!isset($categories[$cat])) {
+                $label = match($cat) {
+                    'entity'          => 'Entities',
+                    'planner_project' => 'Projekte',
+                    'canvas'          => 'Canvases',
+                    'planner_task'    => 'Tasks',
+                    'helpdesk_ticket' => 'Tickets',
+                    default           => ucfirst($cat),
+                };
+                $categories[$cat] = ['label' => $label, 'count' => 0, 'color' => $n['color']];
+            }
+            $categories[$cat]['count']++;
+        }
+
+        // Entity sub-groups
+        $entityGroups = [];
+        foreach ($nodes as $n) {
+            if (($n['category'] ?? '') !== 'entity') continue;
+            $g = $n['group'] ?? 'Sonstige';
+            if (!isset($entityGroups[$g])) {
+                $entityGroups[$g] = ['count' => 0, 'color' => $this->groupColors[$g] ?? '#9CA3AF'];
+            }
+            $entityGroups[$g]['count']++;
+        }
+
+        return [
+            'nodes' => $nodes,
+            'links' => $links,
+            'categories' => $categories,
+            'entityGroups' => $entityGroups,
+        ];
     }
 
     public function render()

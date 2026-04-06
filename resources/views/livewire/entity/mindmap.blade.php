@@ -292,22 +292,22 @@
                 );
                 group.add(sphere);
 
-                // Sun corona - multiple layered glow shells
+                // Sun corona - bright layered glow shells
                 if (isSun) {
                     // Inner corona
                     group.add(new THREE.Mesh(
                         new THREE.SphereGeometry(radius * 1.6, 16, 16),
-                        new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.12 })
+                        new THREE.MeshBasicMaterial({ color: 0xffffff, transparent: true, opacity: 0.15 })
                     ));
-                    // Mid corona
+                    // Mid corona — uses node color but brighter
                     group.add(new THREE.Mesh(
                         new THREE.SphereGeometry(radius * 2.4, 12, 12),
-                        new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.06 })
+                        new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.12 })
                     ));
                     // Outer corona
                     group.add(new THREE.Mesh(
                         new THREE.SphereGeometry(radius * 3.5, 8, 8),
-                        new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.025 })
+                        new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.06 })
                     ));
                 } else if (!isLinked && depth <= 1) {
                     // Regular glow for non-sun top-level

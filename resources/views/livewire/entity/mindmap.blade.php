@@ -19,8 +19,8 @@
     <script id="mindmap-data" type="application/json">@json($this->graphData)</script>
 
     <script type="module">
-        import * as THREE from 'https://esm.sh/three@0.175.0';
-        import ForceGraph3D from 'https://esm.sh/3d-force-graph@1.80.0?deps=three@0.175.0';
+        import * as THREE from 'https://esm.sh/three@0.179.0';
+        import ForceGraph3D from 'https://esm.sh/3d-force-graph@1.80.0?deps=three@0.179.0';
 
         function makeLabel(text, isCenter) {
             var canvas = document.createElement('canvas');

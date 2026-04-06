@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Platform\Organization\Livewire\Entity\Index as EntityIndex;
 use Platform\Organization\Livewire\Entity\Show as EntityShow;
+use Platform\Organization\Livewire\Entity\Mindmap as EntityMindmap;
 use Platform\Organization\Livewire\CostCenter\Index as CostCenterIndex;
 use Platform\Organization\Livewire\CostCenter\Show as CostCenterShow;
 use Platform\Organization\Livewire\VsmSystem\Index as VsmSystemIndex;
@@ -28,6 +29,7 @@ Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organiza
 
 Route::get('/entities', EntityIndex::class)->name('organization.entities.index');
 Route::get('/entities/{entity}', EntityShow::class)->name('organization.entities.show');
+Route::get('/entities/{entity}/mindmap', EntityMindmap::class)->name('organization.entities.mindmap');
 
 // Dimensionen: Kostenstellen
 Route::get('/cost-centers', CostCenterIndex::class)->name('organization.cost-centers.index');

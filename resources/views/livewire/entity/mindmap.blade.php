@@ -35,9 +35,35 @@
             </div>
         </div>
 
-        {{-- Nav hint --}}
-        <div id="nav-hint" class="absolute bottom-3 right-3 bg-black/70 text-gray-400 text-xs px-3 py-2 rounded-lg pointer-events-none transition-opacity duration-1000">
-            Drag = Rotieren &middot; Rechtsklick = Verschieben &middot; Scroll = Zoom &middot; Klick = Fokus
+        {{-- Navigation controls (Google Maps style) --}}
+        <div class="absolute top-3 right-3 z-20 flex flex-col gap-2">
+            {{-- Zoom --}}
+            <div class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl overflow-hidden">
+                <button id="btn-zoom-in" class="block w-9 h-9 flex items-center justify-center text-gray-300 hover:bg-white/10 hover:text-white transition-colors text-lg font-light border-b border-gray-700/50">+</button>
+                <button id="btn-zoom-out" class="block w-9 h-9 flex items-center justify-center text-gray-300 hover:bg-white/10 hover:text-white transition-colors text-lg font-light">&minus;</button>
+            </div>
+            {{-- Directional pad --}}
+            <div class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl grid grid-cols-3 w-[calc(2.25rem*3+2px)]">
+                <div></div>
+                <button data-pan="up" class="h-8 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors">@svg('heroicon-s-chevron-up', 'w-3.5 h-3.5')</button>
+                <div></div>
+                <button data-pan="left" class="h-8 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors">@svg('heroicon-s-chevron-left', 'w-3.5 h-3.5')</button>
+                <button id="btn-home" class="h-8 flex items-center justify-center text-gray-500 hover:bg-white/10 hover:text-white transition-colors">@svg('heroicon-s-stop', 'w-2.5 h-2.5')</button>
+                <button data-pan="right" class="h-8 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors">@svg('heroicon-s-chevron-right', 'w-3.5 h-3.5')</button>
+                <div></div>
+                <button data-pan="down" class="h-8 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors">@svg('heroicon-s-chevron-down', 'w-3.5 h-3.5')</button>
+                <div></div>
+            </div>
+            {{-- Fullscreen --}}
+            <button id="btn-fullscreen" class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl w-9 h-9 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
+                @svg('heroicon-o-arrows-pointing-out', 'w-4 h-4')
+            </button>
+        </div>
+
+        {{-- Legend --}}
+        <div class="absolute bottom-3 right-3 z-20 bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl p-2.5 text-xs">
+            <div class="text-gray-500 font-medium uppercase tracking-wider mb-1.5" style="font-size:9px">Legende</div>
+            <div class="space-y-1" id="legend"></div>
         </div>
     </div>
 
@@ -426,12 +452,121 @@
             });
         });
 
-        // ─── Sidebar ───
+        // ─── Sidebar + Legend ───
         buildSidebar();
+        buildLegend();
 
-        setTimeout(function() {
-            var h = document.getElementById('nav-hint');
-            if (h) h.style.opacity = '0';
-        }, 6000);
+        function buildLegend() {
+            var el = document.getElementById('legend');
+            var items = [];
+            // Entity groups
+            Object.keys(entityGroups).forEach(function(key) {
+                items.push({ label: key, color: entityGroups[key].color });
+            });
+            // Linked types
+            Object.keys(categories).forEach(function(key) {
+                if (key !== 'entity') items.push({ label: categories[key].label, color: categories[key].color });
+            });
+            items.forEach(function(item) {
+                var row = document.createElement('div');
+                row.className = 'flex items-center gap-2';
+                row.innerHTML = '<span class="w-2 h-2 rounded-full shrink-0" style="background:' + item.color + ';box-shadow:0 0 4px ' + item.color + '60"></span><span class="text-gray-400">' + item.label + '</span>';
+                el.appendChild(row);
+            });
+        }
+
+        // ─── Zoom buttons ───
+        document.getElementById('btn-zoom-in').addEventListener('click', function() {
+            var cam = graph.camera().position;
+            var lookAt = graph.controls().target || { x: 0, y: 0, z: 0 };
+            var factor = 0.7;
+            graph.cameraPosition(
+                { x: lookAt.x + (cam.x - lookAt.x) * factor, y: lookAt.y + (cam.y - lookAt.y) * factor, z: lookAt.z + (cam.z - lookAt.z) * factor },
+                lookAt, 400
+            );
+        });
+        document.getElementById('btn-zoom-out').addEventListener('click', function() {
+            var cam = graph.camera().position;
+            var lookAt = graph.controls().target || { x: 0, y: 0, z: 0 };
+            var factor = 1.4;
+            graph.cameraPosition(
+                { x: lookAt.x + (cam.x - lookAt.x) * factor, y: lookAt.y + (cam.y - lookAt.y) * factor, z: lookAt.z + (cam.z - lookAt.z) * factor },
+                lookAt, 400
+            );
+        });
+
+        // ─── Home button ───
+        document.getElementById('btn-home').addEventListener('click', function() {
+            focusedNodeId = null;
+            hideInfoPanel();
+            graph.cameraPosition({ x: 0, y: 0, z: 350 }, { x: 0, y: 0, z: 0 }, 800);
+        });
+
+        // ─── Pan buttons ───
+        document.querySelectorAll('[data-pan]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var cam = graph.camera().position;
+                var lookAt = graph.controls().target || { x: 0, y: 0, z: 0 };
+                var step = 40;
+                var dx = 0, dy = 0;
+                switch (btn.dataset.pan) {
+                    case 'up': dy = step; break;
+                    case 'down': dy = -step; break;
+                    case 'left': dx = -step; break;
+                    case 'right': dx = step; break;
+                }
+                graph.cameraPosition(
+                    { x: cam.x + dx, y: cam.y + dy, z: cam.z },
+                    { x: lookAt.x + dx, y: lookAt.y + dy, z: lookAt.z },
+                    300
+                );
+            });
+        });
+
+        // ─── Fullscreen ───
+        document.getElementById('btn-fullscreen').addEventListener('click', function() {
+            var el = document.getElementById('3d-graph').parentElement;
+            if (document.fullscreenElement) {
+                document.exitFullscreen();
+            } else if (el.requestFullscreen) {
+                el.requestFullscreen();
+            }
+        });
+
+        // ─── Keyboard navigation ───
+        document.addEventListener('keydown', function(e) {
+            if (e.target.tagName === 'INPUT') return;
+            var cam = graph.camera().position;
+            var lookAt = graph.controls().target || { x: 0, y: 0, z: 0 };
+            var step = 30;
+            var handled = true;
+
+            switch (e.key) {
+                case 'ArrowUp': case 'w': case 'W':
+                    graph.cameraPosition({ x: cam.x, y: cam.y + step, z: cam.z }, { x: lookAt.x, y: lookAt.y + step, z: lookAt.z }, 200);
+                    break;
+                case 'ArrowDown': case 's': case 'S':
+                    graph.cameraPosition({ x: cam.x, y: cam.y - step, z: cam.z }, { x: lookAt.x, y: lookAt.y - step, z: lookAt.z }, 200);
+                    break;
+                case 'ArrowLeft': case 'a': case 'A':
+                    graph.cameraPosition({ x: cam.x - step, y: cam.y, z: cam.z }, { x: lookAt.x - step, y: lookAt.y, z: lookAt.z }, 200);
+                    break;
+                case 'ArrowRight': case 'd': case 'D':
+                    graph.cameraPosition({ x: cam.x + step, y: cam.y, z: cam.z }, { x: lookAt.x + step, y: lookAt.y, z: lookAt.z }, 200);
+                    break;
+                case '+': case '=':
+                    document.getElementById('btn-zoom-in').click();
+                    break;
+                case '-':
+                    document.getElementById('btn-zoom-out').click();
+                    break;
+                case 'Escape':
+                    document.getElementById('btn-home').click();
+                    break;
+                default:
+                    handled = false;
+            }
+            if (handled) e.preventDefault();
+        });
     </script>
 </x-ui-page>

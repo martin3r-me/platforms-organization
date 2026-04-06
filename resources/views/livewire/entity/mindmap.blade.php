@@ -59,6 +59,22 @@
                 <button data-pan="down" class="h-8 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors">@svg('heroicon-s-chevron-down', 'w-3.5 h-3.5')</button>
                 <div></div>
             </div>
+
+            {{-- Timeline Slider --}}
+            @if(count($this->availableDates) > 0)
+            <div id="timeline-slider" class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl w-[calc(2.25rem*3+2px)] px-2 py-2 text-xs">
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-gray-500 font-medium uppercase tracking-wider" style="font-size:9px">Timeline</span>
+                    <button id="btn-timeline-live" class="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider transition-colors {{ !$snapshotDate ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/5 text-gray-500 border border-gray-700/50 hover:text-gray-300' }}">
+                        Live
+                    </button>
+                </div>
+                <input type="range" id="timeline-range" min="0" max="{{ max(count($this->availableDates) - 1, 0) }}" value="{{ $snapshotDate ? array_search($snapshotDate, $this->availableDates) : count($this->availableDates) - 1 }}" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:appearance-none">
+                <div class="text-center mt-1">
+                    <span id="timeline-date" class="text-gray-300 font-medium tabular-nums" style="font-size:9px">{{ $snapshotDate ?? 'Live' }}</span>
+                </div>
+            </div>
+            @endif
         </div>
 
         {{-- Legend --}}
@@ -66,9 +82,11 @@
             <div class="text-gray-500 font-medium uppercase tracking-wider mb-1.5" style="font-size:9px">Legende</div>
             <div class="space-y-1" id="legend"></div>
         </div>
+
     </div>
 
     <script id="mindmap-data" type="application/json">@json($this->graphData)</script>
+    <script id="timeline-dates" type="application/json">@json($this->availableDates)</script>
 
     <script type="module">
         import * as THREE from 'https://esm.sh/three@0.179.0';
@@ -325,13 +343,14 @@
             .linkColor('color')
             .linkWidth(function(l) {
                 var ltype = l.ltype || '';
-                if (ltype === 'hierarchy') return 1.5;
-                return (l.width || 1) * 0.8;
+                if (ltype === 'hierarchy') return 0.4;
+                if (ltype === 'relation') return 0.6;
+                return 0.3;
             })
-            .linkOpacity(0.5)
-            .linkDirectionalParticles(function(l) { return l.width > 1 ? 3 : 1; })
-            .linkDirectionalParticleWidth(1.2)
-            .linkDirectionalParticleSpeed(0.004)
+            .linkOpacity(0.25)
+            .linkDirectionalParticles(function(l) { return l.ltype === 'relation' ? 2 : 0; })
+            .linkDirectionalParticleWidth(0.6)
+            .linkDirectionalParticleSpeed(0.003)
             .linkDirectionalParticleColor('color')
             .warmupTicks(80)
             .cooldownTicks(150)
@@ -635,5 +654,74 @@
         new ResizeObserver(function() {
             graph.width(container.clientWidth).height(container.clientHeight);
         }).observe(container);
+
+        // ─── Timeline slider ───
+        var timelineDates = JSON.parse(document.getElementById('timeline-dates').textContent || '[]');
+        var timelineRange = document.getElementById('timeline-range');
+        var timelineDate = document.getElementById('timeline-date');
+        var timelineLive = document.getElementById('btn-timeline-live');
+
+        function applyGraphUpdate(newData) {
+            allNodes = newData.nodes;
+            allLinks = newData.links;
+            categories = newData.categories;
+            entityGroups = newData.entityGroups;
+
+            neighbors = {};
+            allLinks.forEach(function(l) {
+                var s = typeof l.source === 'object' ? l.source.id : l.source;
+                var t = typeof l.target === 'object' ? l.target.id : l.target;
+                if (!neighbors[s]) neighbors[s] = new Set();
+                if (!neighbors[t]) neighbors[t] = new Set();
+                neighbors[s].add(t);
+                neighbors[t].add(s);
+            });
+
+            filters = {};
+            Object.keys(categories).forEach(function(k) { filters[k] = true; });
+            groupFilters = {};
+            Object.keys(entityGroups).forEach(function(k) { groupFilters[k] = true; });
+
+            graph.graphData(getFilteredData());
+            buildSidebar();
+            document.getElementById('legend').innerHTML = '';
+            buildLegend();
+        }
+
+        Livewire.on('graph-data-updated', function(event) {
+            applyGraphUpdate(event.data);
+        });
+
+        if (timelineRange && timelineDates.length > 0) {
+            timelineRange.addEventListener('input', function() {
+                var idx = parseInt(timelineRange.value);
+                var date = timelineDates[idx];
+                if (timelineDate) timelineDate.textContent = date || 'Live';
+            });
+
+            timelineRange.addEventListener('change', function() {
+                var idx = parseInt(timelineRange.value);
+                var date = timelineDates[idx];
+                if (date) {
+                    @this.set('snapshotDate', date);
+                    updateLiveButton(false, date);
+                }
+            });
+
+            if (timelineLive) {
+                timelineLive.addEventListener('click', function() {
+                    @this.set('snapshotDate', null);
+                    updateLiveButton(true, 'Live');
+                });
+            }
+
+            function updateLiveButton(isLive, label) {
+                if (timelineLive) {
+                    timelineLive.className = 'shrink-0 px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-wider transition-colors ' +
+                        (isLive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/5 text-gray-500 border border-gray-700/50 hover:text-gray-300');
+                }
+                if (timelineDate) timelineDate.textContent = label;
+            }
+        }
     </script>
 </x-ui-page>

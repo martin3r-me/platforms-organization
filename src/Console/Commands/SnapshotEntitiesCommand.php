@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\DB;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
+use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Services\EntityLinkRegistry;
 use Platform\Organization\Services\EntityTimeResolver;
 use Platform\Organization\Services\EntityHierarchyService;
@@ -32,7 +33,7 @@ class SnapshotEntitiesCommand extends Command
         $this->info("Creating {$period} snapshots for {$today->toDateString()}...");
 
         // 1. Load all active entities (across all teams)
-        $entities = OrganizationEntity::active()->get();
+        $entities = OrganizationEntity::active()->with(['type.group'])->get();
 
         if ($entities->isEmpty()) {
             $this->info('No active entities found.');
@@ -138,8 +139,107 @@ class SnapshotEntitiesCommand extends Command
             );
         }
 
-        $this->info("Created/updated " . count($upsertData) . " snapshots.");
+        $this->info("Created/updated " . count($upsertData) . " entity snapshots.");
+
+        // 8. Structure snapshots per team
+        $this->createTeamStructureSnapshots($entities, $links, $today, $period);
 
         return self::SUCCESS;
+    }
+
+    protected function createTeamStructureSnapshots($entities, $links, $today, string $period): void
+    {
+        $reverseMorphMap = array_flip(Relation::morphMap());
+        $entitiesByTeam = $entities->groupBy('team_id');
+
+        foreach ($entitiesByTeam as $teamId => $teamEntities) {
+            $entityIds = $teamEntities->pluck('id')->toArray();
+
+            // Entities
+            $structureEntities = $teamEntities->map(fn($e) => [
+                'id' => $e->id,
+                'name' => $e->name,
+                'code' => $e->code,
+                'parent_entity_id' => $e->parent_entity_id,
+                'entity_type_id' => $e->entity_type_id,
+                'type_name' => $e->type?->name,
+                'group_name' => $e->type?->group?->name,
+                'is_active' => $e->is_active,
+                'linked_user_id' => $e->linked_user_id,
+            ])->values()->all();
+
+            // Relationships
+            $relationships = OrganizationEntityRelationship::query()
+                ->where(function ($q) use ($entityIds) {
+                    $q->whereIn('from_entity_id', $entityIds)
+                      ->whereIn('to_entity_id', $entityIds);
+                })
+                ->with('relationType')
+                ->get()
+                ->map(fn($rel) => [
+                    'from_entity_id' => $rel->from_entity_id,
+                    'to_entity_id' => $rel->to_entity_id,
+                    'relation_type_code' => $rel->relationType?->code,
+                ])
+                ->values()
+                ->all();
+
+            // Entity links with resolved names
+            $teamLinks = $links->whereIn('entity_id', $entityIds);
+            $entityLinksData = [];
+
+            $grouped = $teamLinks->groupBy('linkable_type');
+            foreach ($grouped as $morphType => $typeLinks) {
+                $ids = $typeLinks->pluck('linkable_id')->unique()->values()->all();
+                $morphAlias = $reverseMorphMap[$morphType] ?? $morphType;
+                $modelClass = Relation::getMorphedModel($morphAlias) ?? $morphType;
+                $labelMap = [];
+
+                if (class_exists($modelClass)) {
+                    $table = (new $modelClass)->getTable();
+                    $columns = collect(DB::getSchemaBuilder()->getColumnListing($table));
+                    $nameCol = $columns->first(fn($c) => in_array($c, ['name', 'title', 'subject', 'label']));
+                    $labelExpr = $nameCol
+                        ? DB::raw("COALESCE({$nameCol}, CONCAT('#', id)) as label")
+                        : DB::raw("CONCAT('#', id) as label");
+                    $query = DB::table($table)->whereIn('id', $ids);
+                    if ($columns->contains('deleted_at')) {
+                        $query->whereNull('deleted_at');
+                    }
+                    foreach ($query->select('id', $labelExpr)->get() as $row) {
+                        $labelMap[$row->id] = $row->label;
+                    }
+                }
+
+                foreach ($typeLinks as $link) {
+                    $entityLinksData[] = [
+                        'entity_id' => $link->entity_id,
+                        'linkable_type' => $morphAlias,
+                        'linkable_id' => $link->linkable_id,
+                        'linkable_name' => $labelMap[$link->linkable_id] ?? "#{$link->linkable_id}",
+                    ];
+                }
+            }
+
+            $structure = [
+                'entities' => $structureEntities,
+                'relationships' => $relationships,
+                'entity_links' => $entityLinksData,
+            ];
+
+            DB::table('organization_team_snapshots')->upsert(
+                [[
+                    'team_id' => $teamId,
+                    'snapshot_date' => $today->toDateString(),
+                    'snapshot_period' => $period,
+                    'structure' => json_encode($structure),
+                    'created_at' => now(),
+                ]],
+                ['team_id', 'snapshot_date', 'snapshot_period'],
+                ['structure', 'created_at']
+            );
+        }
+
+        $this->info("Created/updated " . $entitiesByTeam->count() . " team structure snapshots.");
     }
 }

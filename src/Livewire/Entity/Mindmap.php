@@ -51,10 +51,10 @@ class Mindmap extends Component
     }
 
     protected array $linkTypeColors = [
-        'planner_project' => '#10B981',
+        'planner_project' => '#22D3EE',
         'canvas'          => '#EC4899',
-        'planner_task'    => '#14B8A6',
-        'helpdesk_ticket' => '#F59E0B',
+        'planner_task'    => '#FB923C',
+        'helpdesk_ticket' => '#FACC15',
     ];
 
     public function mount(OrganizationEntity $entity)

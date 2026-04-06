@@ -483,8 +483,8 @@
                 var isLinked = node.category && node.category !== 'entity';
                 var isCenter = node.val > 15;
                 var depth = node.depth || 0;
-                // Top-level entities (depth 0-1) always show labels
-                var threshold = isCenter ? 9999 : (!isLinked && depth <= 1) ? 9999 : (isLinked ? 80 : 160);
+                // Top-level always visible, all others show when camera is close
+                var threshold = isCenter ? 9999 : (!isLinked && depth <= 1) ? 9999 : 120;
 
                 if (focusedNodeId) {
                     var nb = neighbors[focusedNodeId];

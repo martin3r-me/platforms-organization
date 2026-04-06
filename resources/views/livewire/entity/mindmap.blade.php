@@ -12,7 +12,7 @@
         ]" />
     </x-slot>
 
-    <div class="relative w-full" style="height: calc(100vh - 100px);">
+    <div class="relative w-full flex-1 min-h-0">
         <div id="3d-graph" class="w-full h-full"></div>
 
         {{-- Sidebar --}}
@@ -166,7 +166,7 @@
             var tex = new THREE.CanvasTexture(canvas);
             var mat = new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true });
             var sprite = new THREE.Sprite(mat);
-            sprite.scale.set(canvas.width / 22, canvas.height / 22, 1);
+            sprite.scale.set(canvas.width / 18, canvas.height / 18, 1);
             return sprite;
         }
 
@@ -271,9 +271,9 @@
                 // Label - bigger for root/depth1, smaller for deeper
                 var labelText = node.type ? node.type + '  ' + node.name : node.name;
                 var fontSize;
-                if (isCenter) { fontSize = 38; }
+                if (isCenter) { fontSize = 42; }
                 else if (isLinked) { fontSize = 24; }
-                else { fontSize = depth === 0 ? 32 : (depth === 1 ? 26 : 22); }
+                else { fontSize = depth === 0 ? 40 : (depth === 1 ? 34 : 24); }
                 var label = makeLabel(isLinked ? node.name : labelText, fontSize, isCenter ? '#ffffff' : node.color);
                 label.position.y = -(radius + 2.5);
                 // Top-level labels (depth 0-1) start visible
@@ -295,8 +295,12 @@
                 return '<div style="background:rgba(0,0,0,0.85);color:#ccc;padding:6px 10px;border-radius:6px;font-size:11px;line-height:1.6;text-align:left">' + lines.join('<br/>') + '</div>';
             })
             .linkColor('color')
-            .linkWidth(function(l) { return (l.width || 1) * 0.6; })
-            .linkOpacity(0.35)
+            .linkWidth(function(l) {
+                var ltype = l.ltype || '';
+                if (ltype === 'hierarchy') return 1.5;
+                return (l.width || 1) * 0.8;
+            })
+            .linkOpacity(0.5)
             .linkDirectionalParticles(function(l) { return l.width > 1 ? 3 : 1; })
             .linkDirectionalParticleWidth(1.2)
             .linkDirectionalParticleSpeed(0.004)
@@ -587,5 +591,10 @@
             }
             if (handled) e.preventDefault();
         });
+
+        // ─── Resize when terminal/sidebar changes ───
+        new ResizeObserver(function() {
+            graph.width(container.clientWidth).height(container.clientHeight);
+        }).observe(container);
     </script>
 </x-ui-page>

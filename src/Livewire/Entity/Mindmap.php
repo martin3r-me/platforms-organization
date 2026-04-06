@@ -128,7 +128,7 @@ class Mindmap extends Component
                 $links[] = [
                     'source' => 'e' . $e->parent_entity_id,
                     'target' => 'e' . $e->id,
-                    'color'  => 'rgba(156,163,175,0.3)',
+                    'color'  => 'rgba(156,163,175,0.7)',
                     'width'  => 1,
                     'ltype'  => 'hierarchy',
                 ];

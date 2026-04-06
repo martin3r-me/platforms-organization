@@ -15,14 +15,46 @@ class Mindmap extends Component
 {
     public OrganizationEntity $entity;
 
-    protected array $groupColors = [
+    /**
+     * Farbpalette - wird dynamisch an Gruppen vergeben.
+     * Bekannte Gruppen bekommen stabile Farben, alles andere aus dem Pool.
+     */
+    protected array $knownColors = [
         'Organisationseinheiten' => '#3B82F6',
         'Personen'               => '#8B5CF6',
         'Rollen'                 => '#F59E0B',
         'Gruppen'                => '#10B981',
         'Externe'                => '#EF4444',
         'Technische Systeme'     => '#6366F1',
-        'Erweiterte Kontexte'    => '#F97316',
+    ];
+
+    protected array $colorPool = [
+        '#F97316', '#06B6D4', '#84CC16', '#EC4899', '#A855F7',
+        '#14B8A6', '#F43F5E', '#8B5CF6', '#22D3EE', '#FB923C',
+    ];
+
+    protected int $colorPoolIndex = 0;
+
+    protected function colorForGroup(string $group): string
+    {
+        if (isset($this->knownColors[$group])) {
+            return $this->knownColors[$group];
+        }
+
+        // Dynamisch aus dem Pool vergeben und merken
+        if (!isset($this->knownColors[$group])) {
+            $this->knownColors[$group] = $this->colorPool[$this->colorPoolIndex % count($this->colorPool)];
+            $this->colorPoolIndex++;
+        }
+
+        return $this->knownColors[$group];
+    }
+
+    protected array $linkTypeColors = [
+        'planner_project' => '#10B981',
+        'canvas'          => '#EC4899',
+        'planner_task'    => '#14B8A6',
+        'helpdesk_ticket' => '#F59E0B',
     ];
 
     public function mount(OrganizationEntity $entity)
@@ -41,7 +73,7 @@ class Mindmap extends Component
         $nodes = [];
         $links = [];
 
-        // Latest snapshots per entity
+        // Latest snapshots
         $latestSnapshots = OrganizationEntitySnapshot::query()
             ->whereIn('entity_id', $entities->pluck('id'))
             ->where('snapshot_date', '>=', now()->subDays(3))
@@ -63,7 +95,7 @@ class Mindmap extends Component
                 'group'    => $groupName,
                 'category' => 'entity',
                 'parentId' => $e->parent_entity_id ? 'e' . $e->parent_entity_id : null,
-                'color'    => $isCenter ? '#111827' : ($this->groupColors[$groupName] ?? '#9CA3AF'),
+                'color'    => $isCenter ? '#111827' : $this->colorForGroup($groupName),
                 'val'      => $isCenter ? 25 : 8,
                 'metrics'  => [
                     'items_total'   => $metrics['items_total'] ?? 0,
@@ -80,11 +112,12 @@ class Mindmap extends Component
                     'target' => 'e' . $e->id,
                     'color'  => 'rgba(156,163,175,0.3)',
                     'width'  => 1,
+                    'ltype'  => 'hierarchy',
                 ];
             }
         }
 
-        // Relationships (manages, works_for, etc.)
+        // Relationships
         $entityIds = $entities->pluck('id');
         $relationships = OrganizationEntityRelationship::query()
             ->where(function ($q) use ($entityIds) {
@@ -109,24 +142,11 @@ class Mindmap extends Component
                 'target' => 'e' . $rel->to_entity_id,
                 'color'  => $relationColors[$code] ?? '#F59E0B',
                 'width'  => 2,
+                'ltype'  => 'relation',
             ];
         }
 
-        // EntityLinks (Projekte, Canvases, Tasks, Tickets)
-        $linkTypeColors = [
-            'planner_project' => '#10B981',
-            'canvas'          => '#EC4899',
-            'planner_task'    => '#14B8A6',
-            'helpdesk_ticket' => '#F59E0B',
-        ];
-
-        $linkTypeNames = [
-            'planner_project' => 'Projekt',
-            'canvas'          => 'Canvas',
-            'planner_task'    => 'Task',
-            'helpdesk_ticket' => 'Ticket',
-        ];
-
+        // EntityLinks - dynamisch, egal welcher Morph-Type kommt
         $entityLinks = OrganizationEntityLink::query()
             ->whereIn('entity_id', $entityIds)
             ->where('team_id', $this->entity->team_id)
@@ -147,12 +167,16 @@ class Mindmap extends Component
                 $labelExpr = $nameCol
                     ? DB::raw("COALESCE({$nameCol}, CONCAT('#', id)) as label")
                     : DB::raw("CONCAT('#', id) as label");
-
                 $rows = DB::table($table)->whereIn('id', $ids)->select('id', $labelExpr)->get();
                 foreach ($rows as $row) {
                     $labelMap[$row->id] = $row->label;
                 }
             }
+
+            // Dynamische Farbe & Label für unbekannte Typen
+            $typeColor = $this->linkTypeColors[$morphType]
+                ?? $this->colorPool[crc32($morphType) % count($this->colorPool)];
+            $typeName = $this->humanMorphType($morphType);
 
             foreach ($typeLinks as $link) {
                 $nodeId = $morphType . '-' . $link->linkable_id;
@@ -162,9 +186,9 @@ class Mindmap extends Component
                     $nodes[] = [
                         'id'       => $nodeId,
                         'name'     => $labelMap[$link->linkable_id] ?? "#{$link->linkable_id}",
-                        'color'    => $linkTypeColors[$morphType] ?? '#9CA3AF',
-                        'val'      => 3,
-                        'type'     => $linkTypeNames[$morphType] ?? $morphType,
+                        'color'    => $typeColor,
+                        'val'      => 6,
+                        'type'     => $typeName,
                         'category' => $morphType,
                     ];
                 }
@@ -172,47 +196,50 @@ class Mindmap extends Component
                 $links[] = [
                     'source' => 'e' . $link->entity_id,
                     'target' => $nodeId,
-                    'color'  => $linkTypeColors[$morphType] ?? 'rgba(156,163,175,0.4)',
+                    'color'  => $typeColor,
                     'width'  => 1,
+                    'ltype'  => 'entity_link',
                 ];
             }
         }
 
-        // Build filter categories with counts
+        // Filter categories - dynamisch aus den Daten
         $categories = [];
         foreach ($nodes as $n) {
             $cat = $n['category'] ?? 'entity';
             if (!isset($categories[$cat])) {
-                $label = match($cat) {
-                    'entity'          => 'Entities',
-                    'planner_project' => 'Projekte',
-                    'canvas'          => 'Canvases',
-                    'planner_task'    => 'Tasks',
-                    'helpdesk_ticket' => 'Tickets',
-                    default           => ucfirst($cat),
-                };
-                $categories[$cat] = ['label' => $label, 'count' => 0, 'color' => $n['color']];
+                $categories[$cat] = [
+                    'label' => $cat === 'entity' ? 'Entities' : $this->humanMorphType($cat),
+                    'count' => 0,
+                    'color' => $n['color'],
+                ];
             }
             $categories[$cat]['count']++;
         }
 
-        // Entity sub-groups
+        // Entity sub-groups - dynamisch
         $entityGroups = [];
         foreach ($nodes as $n) {
             if (($n['category'] ?? '') !== 'entity') continue;
             $g = $n['group'] ?? 'Sonstige';
             if (!isset($entityGroups[$g])) {
-                $entityGroups[$g] = ['count' => 0, 'color' => $this->groupColors[$g] ?? '#9CA3AF'];
+                $entityGroups[$g] = ['count' => 0, 'color' => $this->colorForGroup($g)];
             }
             $entityGroups[$g]['count']++;
         }
 
-        return [
-            'nodes' => $nodes,
-            'links' => $links,
-            'categories' => $categories,
-            'entityGroups' => $entityGroups,
-        ];
+        return compact('nodes', 'links', 'categories', 'entityGroups');
+    }
+
+    protected function humanMorphType(string $type): string
+    {
+        return match ($type) {
+            'planner_project' => 'Projekt',
+            'planner_task'    => 'Task',
+            'canvas'          => 'Canvas',
+            'helpdesk_ticket' => 'Ticket',
+            default           => ucfirst(str_replace('_', ' ', $type)),
+        };
     }
 
     public function render()

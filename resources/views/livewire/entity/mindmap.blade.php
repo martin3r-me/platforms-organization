@@ -191,9 +191,14 @@
             .enableNodeDrag(true)
             .enableNavigationControls(true);
 
-        // Forces
-        graph.d3Force('charge').strength(-600);
-        graph.d3Force('link').distance(90);
+        // Forces - entity_links get shorter distance to stay near parent
+        graph.d3Force('charge').strength(-500);
+        graph.d3Force('link').distance(function(link) {
+            var ltype = link.ltype || '';
+            if (ltype === 'entity_link') return 30;
+            if (ltype === 'hierarchy') return 70;
+            return 90;
+        });
 
         // Clustering force
         graph.d3Force('cluster', function(alpha) {
@@ -225,11 +230,11 @@
             .nodeThreeObject(function(node) {
                 var group = new THREE.Group();
                 var isCenter = node.val > 15;
-                var isLinked = node.val < 5;
+                var isLinked = node.category && node.category !== 'entity';
                 var m = node.metrics;
                 var hasActivity = m && m.time_h > 0;
 
-                var baseRadius = isCenter ? 7 : (isLinked ? 1.5 : 3);
+                var baseRadius = isCenter ? 7 : (isLinked ? 2.5 : 3.5);
                 var radius = baseRadius + (m ? Math.min(m.items_total * 0.2, 3) : 0);
                 node.__radius = radius;
 
@@ -257,7 +262,7 @@
 
                 // Label
                 var labelText = node.type ? node.type + '  ' + node.name : node.name;
-                var fontSize = isCenter ? 38 : (isLinked ? 20 : 28);
+                var fontSize = isCenter ? 38 : (isLinked ? 24 : 28);
                 var label = makeLabel(isLinked ? node.name : labelText, fontSize, isCenter ? '#ffffff' : node.color);
                 label.position.y = -(radius + 2.5);
                 label.visible = false;
@@ -431,9 +436,9 @@
                 var dx = cam.x - (node.x || 0), dy = cam.y - (node.y || 0), dz = cam.z - (node.z || 0);
                 var dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
 
-                var isLinked = node.val < 5;
+                var isLinked = node.category && node.category !== 'entity';
                 var isCenter = node.val > 15;
-                var threshold = isCenter ? 9999 : (isLinked ? 50 : 140);
+                var threshold = isCenter ? 9999 : (isLinked ? 80 : 160);
 
                 if (focusedNodeId) {
                     var nb = neighbors[focusedNodeId];

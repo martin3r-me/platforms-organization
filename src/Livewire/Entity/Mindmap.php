@@ -4,6 +4,8 @@ namespace Platform\Organization\Livewire\Entity;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
+use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\DB;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationEntityRelationship;
@@ -132,41 +134,61 @@ class Mindmap extends Component
             ->where('team_id', $teamId)
             ->get();
 
+        // Linked Items nach Morph-Type gruppieren und per Batch laden
         $linkedItemNodes = [];
-        foreach ($entityLinks as $link) {
-            $morphType = $link->linkable_type;
-            $morphId = $link->linkable_id;
-            $nodeId = $morphType . '-' . $morphId;
+        $groupedLinks = $entityLinks->groupBy('linkable_type');
 
-            // Node nur einmal anlegen
-            if (!isset($linkedItemNodes[$nodeId])) {
-                $linkable = $link->linkable;
-                $label = $linkable?->name ?? $linkable?->title ?? "#{$morphId}";
+        foreach ($groupedLinks as $morphType => $typeLinks) {
+            $ids = $typeLinks->pluck('linkable_id')->unique()->values()->all();
 
-                $linkedItemNodes[$nodeId] = [
-                    'id'        => $nodeId,
-                    'label'     => $label,
-                    'group'     => $this->humanMorphType($morphType),
-                    'type'      => 'linked',
-                    'typeName'  => $this->humanMorphType($morphType),
-                    'typeCode'  => $morphType,
-                    'icon'      => $this->morphTypeIcon($morphType),
-                    'color'     => $this->linkTypeColors[$morphType] ?? '#9CA3AF',
-                    'size'      => 3,
-                    'isCenter'  => false,
-                    'entityId'  => null,
-                    'code'      => null,
-                ];
+            // Morph-Alias zur echten Klasse auflösen
+            $modelClass = Relation::getMorphedModel($morphType) ?? $morphType;
+            $labelMap = [];
+
+            if (class_exists($modelClass)) {
+                $table = (new $modelClass)->getTable();
+                // Name oder Title als Label holen
+                $rows = DB::table($table)
+                    ->whereIn('id', $ids)
+                    ->select('id', DB::raw("COALESCE(name, title, CONCAT('#', id)) as label"))
+                    ->get();
+                foreach ($rows as $row) {
+                    $labelMap[$row->id] = $row->label;
+                }
             }
 
-            $links[] = [
-                'source'   => 'entity-' . $link->entity_id,
-                'target'   => $nodeId,
-                'type'     => 'entity_link',
-                'label'    => '',
-                'color'    => $this->linkTypeColors[$morphType] ?? 'rgba(156,163,175,0.4)',
-                'width'    => 1,
-            ];
+            foreach ($typeLinks as $link) {
+                $morphId = $link->linkable_id;
+                $nodeId = $morphType . '-' . $morphId;
+
+                if (!isset($linkedItemNodes[$nodeId])) {
+                    $label = $labelMap[$morphId] ?? "#{$morphId}";
+
+                    $linkedItemNodes[$nodeId] = [
+                        'id'        => $nodeId,
+                        'label'     => $label,
+                        'group'     => $this->humanMorphType($morphType),
+                        'type'      => 'linked',
+                        'typeName'  => $this->humanMorphType($morphType),
+                        'typeCode'  => $morphType,
+                        'icon'      => $this->morphTypeIcon($morphType),
+                        'color'     => $this->linkTypeColors[$morphType] ?? '#9CA3AF',
+                        'size'      => 3,
+                        'isCenter'  => false,
+                        'entityId'  => null,
+                        'code'      => null,
+                    ];
+                }
+
+                $links[] = [
+                    'source'   => 'entity-' . $link->entity_id,
+                    'target'   => $nodeId,
+                    'type'     => 'entity_link',
+                    'label'    => '',
+                    'color'    => $this->linkTypeColors[$morphType] ?? 'rgba(156,163,175,0.4)',
+                    'width'    => 1,
+                ];
+            }
         }
 
         $nodes = array_merge($nodes, array_values($linkedItemNodes));

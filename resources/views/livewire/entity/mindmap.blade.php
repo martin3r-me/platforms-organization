@@ -21,10 +21,12 @@
         </x-ui-page-actionbar>
     </x-slot>
 
+    <script>window.__mindmapGraphData = @json($this->graphData);</script>
+
     <div class="relative w-full" style="height: calc(100vh - 100px);" id="mindmap-wrapper"
          x-data="{
             graph: null,
-            graphData: @js($this->graphData),
+            graphData: {},
             selectedNode: null,
             centerNodeId: 'entity-{{ $entity->id }}',
             depth: 3,
@@ -59,6 +61,7 @@
             },
 
             init() {
+                this.graphData = window.__mindmapGraphData || { nodes: [], links: [] };
                 this.loadScripts();
 
                 document.getElementById('btn-fullscreen')?.addEventListener('click', () => {

@@ -18,14 +18,8 @@
 
     @script
     <script>
-        const scripts = [
-            'https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js',
-            'https://unpkg.com/3d-force-graph@1',
-            'https://unpkg.com/three-spritetext@1',
-        ];
-
         function loadScript(src) {
-            return new Promise((resolve) => {
+            return new Promise((resolve, reject) => {
                 if (document.querySelector('script[src="' + src + '"]')) {
                     resolve();
                     return;
@@ -33,45 +27,28 @@
                 const s = document.createElement('script');
                 s.src = src;
                 s.onload = resolve;
+                s.onerror = reject;
                 document.head.appendChild(s);
             });
         }
 
         async function boot() {
-            for (const src of scripts) {
-                await loadScript(src);
-            }
+            await loadScript('https://unpkg.com/3d-force-graph@1.77.7/dist/3d-force-graph.min.js');
 
             const container = document.getElementById('3d-graph');
             if (!container || typeof ForceGraph3D === 'undefined') return;
 
             const data = {
-                nodes: [{ id: 'center', label: '{{ $entity->name }}', color: '#3B82F6' }],
+                nodes: [{ id: 'center', name: '{{ $entity->name }}' }],
                 links: [],
             };
 
             ForceGraph3D()(container)
                 .graphData(data)
-                .backgroundColor('rgba(0,0,0,0)')
-                .nodeThreeObject(node => {
-                    const group = new THREE.Group();
-                    const sphere = new THREE.Mesh(
-                        new THREE.SphereGeometry(8),
-                        new THREE.MeshLambertMaterial({ color: node.color })
-                    );
-                    group.add(sphere);
-
-                    const sprite = new SpriteText(node.label);
-                    sprite.color = '#FFFFFF';
-                    sprite.textHeight = 4;
-                    sprite.position.y = -12;
-                    sprite.backgroundColor = 'rgba(0,0,0,0.5)';
-                    sprite.padding = 2;
-                    sprite.borderRadius = 3;
-                    group.add(sprite);
-
-                    return group;
-                })
+                .backgroundColor('#0f172a')
+                .nodeLabel('name')
+                .nodeColor(() => '#3B82F6')
+                .nodeRelSize(8)
                 .cameraPosition({ x: 0, y: 0, z: 120 });
         }
 

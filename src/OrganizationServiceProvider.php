@@ -2,6 +2,7 @@
 
 namespace Platform\Organization;
 
+use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Schedule;
@@ -36,6 +37,14 @@ class OrganizationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // Morph-Map-Aliase für JobProfile- und Role-Modelle
+        Relation::morphMap([
+            'organization_job_profile'        => \Platform\Organization\Models\OrganizationJobProfile::class,
+            'organization_person_job_profile' => \Platform\Organization\Models\OrganizationPersonJobProfile::class,
+            'organization_role'               => \Platform\Organization\Models\OrganizationRole::class,
+            'organization_role_assignment'    => \Platform\Organization\Models\OrganizationRoleAssignment::class,
+        ]);
+
         // Schritt 1: Config laden
         $this->mergeConfigFrom(__DIR__.'/../config/organization.php', 'organization');
         
@@ -246,6 +255,30 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\CreateSlaContractTool());
             $registry->register(new \Platform\Organization\Tools\UpdateSlaContractTool());
             $registry->register(new \Platform\Organization\Tools\DeleteSlaContractTool());
+
+            // JobProfile Tools
+            $registry->register(new \Platform\Organization\Tools\ListJobProfilesTool());
+            $registry->register(new \Platform\Organization\Tools\CreateJobProfileTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateJobProfileTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteJobProfileTool());
+
+            // Person ↔ JobProfile Tools
+            $registry->register(new \Platform\Organization\Tools\ListPersonJobProfilesTool());
+            $registry->register(new \Platform\Organization\Tools\CreatePersonJobProfileTool());
+            $registry->register(new \Platform\Organization\Tools\UpdatePersonJobProfileTool());
+            $registry->register(new \Platform\Organization\Tools\DeletePersonJobProfileTool());
+
+            // Role Tools (Rollen-Katalog)
+            $registry->register(new \Platform\Organization\Tools\ListRolesTool());
+            $registry->register(new \Platform\Organization\Tools\CreateRoleTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateRoleTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteRoleTool());
+
+            // Role Assignment Tools (Person ⇄ Rolle ⇄ Kontext)
+            $registry->register(new \Platform\Organization\Tools\ListRoleAssignmentsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateRoleAssignmentTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateRoleAssignmentTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteRoleAssignmentTool());
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

@@ -46,6 +46,22 @@ return [
                         ],
                     ],
                 ],
+                'people' => [
+                    'title' => 'Personen',
+                    'icon' => 'heroicon-o-user-group',
+                    'items' => [
+                        'job-profiles' => [
+                            'title' => 'JobProfiles',
+                            'route' => 'organization.job-profiles.index',
+                            'icon' => 'heroicon-o-identification',
+                        ],
+                        'roles' => [
+                            'title' => 'Rollen',
+                            'route' => 'organization.roles.index',
+                            'icon' => 'heroicon-o-user-circle',
+                        ],
+                    ],
+                ],
                 'dashboard' => [
                     'title' => 'Dashboard',
                     'route' => 'organization.dashboard',

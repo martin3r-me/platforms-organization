@@ -24,6 +24,8 @@ use Platform\Organization\Livewire\SlaContract\Index as SlaContractIndex;
 use Platform\Organization\Livewire\SlaContract\Show as SlaContractShow;
 use Platform\Organization\Livewire\TimeEntries\Index as TimeEntriesIndex;
 use Platform\Organization\Livewire\PlannedTimes\Index as PlannedTimesIndex;
+use Platform\Organization\Livewire\JobProfile\Index as JobProfileIndex;
+use Platform\Organization\Livewire\Role\Index as RoleIndex;
 
 Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organization.dashboard');
 
@@ -70,3 +72,7 @@ Route::get('/sla-contracts/{slaContract}', SlaContractShow::class)->name('organi
 // Zeiten: Ist-Zeiten und Geplante Zeiten
 Route::get('/time-entries', TimeEntriesIndex::class)->name('organization.time-entries.index');
 Route::get('/planned-times', PlannedTimesIndex::class)->name('organization.planned-times.index');
+
+// Personen-Katalog: JobProfiles und Rollen
+Route::get('/job-profiles', JobProfileIndex::class)->name('organization.job-profiles.index');
+Route::get('/roles', RoleIndex::class)->name('organization.roles.index');

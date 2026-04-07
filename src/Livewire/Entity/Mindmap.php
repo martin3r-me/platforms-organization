@@ -11,6 +11,7 @@ use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationTeamSnapshot;
+use Platform\Organization\Services\EntityLinkRegistry;
 
 class Mindmap extends Component
 {
@@ -203,6 +204,7 @@ class Mindmap extends Component
         foreach ($groupedLinks as $morphAlias => $typeLinks) {
             $typeColor = $this->colorFor('link:' . $morphAlias);
             $typeName = $this->humanMorphType($morphAlias);
+            $meta = $this->linkTypeMeta($morphAlias);
 
             foreach ($typeLinks as $link) {
                 $link = (object) $link;
@@ -217,6 +219,7 @@ class Mindmap extends Component
                         'val'      => 6,
                         'type'     => $typeName,
                         'category' => $morphAlias,
+                        'url'      => $this->buildLinkUrl($meta['route'], (int) $link->linkable_id),
                     ];
                 }
 
@@ -389,10 +392,7 @@ class Mindmap extends Component
             if ($modelClass) {
                 $table = (new $modelClass)->getTable();
                 $columns = collect(DB::getSchemaBuilder()->getColumnListing($table));
-                $nameCol = $columns->first(fn ($c) => in_array($c, ['name', 'title', 'subject', 'label']));
-                $labelExpr = $nameCol
-                    ? DB::raw("COALESCE({$nameCol}, CONCAT('#', id)) as label")
-                    : DB::raw("CONCAT('#', id) as label");
+                $labelExpr = $this->buildLabelExpression($columns, $table);
                 $query = DB::table($table)->whereIn('id', $ids);
                 if ($columns->contains('deleted_at')) {
                     $query->whereNull('deleted_at');
@@ -405,6 +405,7 @@ class Mindmap extends Component
             // Farbe + Name auf Basis des normalisierten Alias
             $typeColor = $this->colorFor('link:' . $morphAlias);
             $typeName = $this->humanMorphType($morphAlias);
+            $meta = $this->linkTypeMeta($morphAlias);
 
             foreach ($typeLinks as $link) {
                 // Skip if row doesn't exist (deleted/missing) when class is resolvable
@@ -423,6 +424,7 @@ class Mindmap extends Component
                         'val'      => 6,
                         'type'     => $typeName,
                         'category' => $morphAlias,
+                        'url'      => $this->buildLinkUrl($meta['route'], (int) $link->linkable_id),
                     ];
                 }
 
@@ -582,6 +584,65 @@ class Mindmap extends Component
             return $type;
         }
         return null;
+    }
+
+    /**
+     * Build a SQL label expression for a table based on common column conventions.
+     * Handles: name/title/subject/label, first_name+last_name, display_name, email.
+     */
+    protected function buildLabelExpression($columns, string $table): \Illuminate\Database\Query\Expression
+    {
+        // Single-column matches (in priority order)
+        foreach (['name', 'title', 'subject', 'label', 'display_name'] as $col) {
+            if ($columns->contains($col)) {
+                return DB::raw("COALESCE(NULLIF({$col}, ''), CONCAT('#', id)) as label");
+            }
+        }
+        // first_name + last_name
+        if ($columns->contains('first_name') && $columns->contains('last_name')) {
+            return DB::raw("COALESCE(NULLIF(TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))), ''), CONCAT('#', id)) as label");
+        }
+        // last fallback: email
+        if ($columns->contains('email')) {
+            return DB::raw("COALESCE(NULLIF(email, ''), CONCAT('#', id)) as label");
+        }
+        return DB::raw("CONCAT('#', id) as label");
+    }
+
+    /**
+     * Returns ['route' => string|null, 'singular' => string|null] for a morph alias,
+     * pulled from the EntityLinkRegistry if available.
+     */
+    protected function linkTypeMeta(string $morphAlias): array
+    {
+        try {
+            $config = resolve(EntityLinkRegistry::class)->allLinkTypeConfig();
+            $cfg = $config[$morphAlias] ?? null;
+            return [
+                'route'    => $cfg['route'] ?? null,
+                'singular' => $cfg['singular'] ?? null,
+            ];
+        } catch (\Throwable $e) {
+            return ['route' => null, 'singular' => null];
+        }
+    }
+
+    /**
+     * Builds a URL for a given linked record using the registered route name.
+     */
+    protected function buildLinkUrl(?string $routeName, int $id): ?string
+    {
+        if (!$routeName) return null;
+        try {
+            return route($routeName, ['id' => $id]);
+        } catch (\Throwable $e) {
+            try {
+                // Some routes use the model parameter name instead of "id"
+                return route($routeName, $id);
+            } catch (\Throwable $e2) {
+                return null;
+            }
+        }
     }
 
     public function render()

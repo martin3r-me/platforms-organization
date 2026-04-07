@@ -215,10 +215,25 @@ class SnapshotEntitiesCommand extends Command
                 if ($modelClass && class_exists($modelClass)) {
                     $table = (new $modelClass)->getTable();
                     $columns = collect(DB::getSchemaBuilder()->getColumnListing($table));
-                    $nameCol = $columns->first(fn($c) => in_array($c, ['name', 'title', 'subject', 'label']));
-                    $labelExpr = $nameCol
-                        ? DB::raw("COALESCE({$nameCol}, CONCAT('#', id)) as label")
-                        : DB::raw("CONCAT('#', id) as label");
+
+                    // Build label expression — supports name/title/.../first_name+last_name/email
+                    $labelExpr = null;
+                    foreach (['name', 'title', 'subject', 'label', 'display_name'] as $col) {
+                        if ($columns->contains($col)) {
+                            $labelExpr = DB::raw("COALESCE(NULLIF({$col}, ''), CONCAT('#', id)) as label");
+                            break;
+                        }
+                    }
+                    if (!$labelExpr && $columns->contains('first_name') && $columns->contains('last_name')) {
+                        $labelExpr = DB::raw("COALESCE(NULLIF(TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))), ''), CONCAT('#', id)) as label");
+                    }
+                    if (!$labelExpr && $columns->contains('email')) {
+                        $labelExpr = DB::raw("COALESCE(NULLIF(email, ''), CONCAT('#', id)) as label");
+                    }
+                    if (!$labelExpr) {
+                        $labelExpr = DB::raw("CONCAT('#', id) as label");
+                    }
+
                     $query = DB::table($table)->whereIn('id', $ids);
                     if ($columns->contains('deleted_at')) {
                         $query->whereNull('deleted_at');

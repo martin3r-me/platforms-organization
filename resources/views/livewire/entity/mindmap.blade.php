@@ -16,10 +16,12 @@
         <div id="3d-graph" class="w-full h-full"></div>
 
         {{-- Sidebar --}}
-        <div id="sidebar" class="absolute top-3 left-3 z-20 w-72 bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-xl shadow-2xl text-xs overflow-hidden">
-            <div class="px-3 py-2 border-b border-gray-700/50 font-bold text-gray-300 text-sm flex items-center gap-2">
-                @svg('heroicon-o-funnel', 'w-4 h-4 text-gray-500') Layer
-            </div>
+        <div id="sidebar" class="absolute top-3 left-3 z-20 w-72 bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl shadow-2xl text-xs overflow-hidden">
+            <button type="button" data-collapse-target="filter-list" class="w-full px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">
+                @svg('heroicon-o-funnel', 'w-4 h-4 text-gray-500')
+                <span class="flex-1 text-left">Layer</span>
+                @svg('heroicon-s-chevron-up', 'w-3.5 h-3.5 text-gray-500 collapse-icon transition-transform')
+            </button>
             <div id="filter-list" class="p-2 space-y-0.5 max-h-[55vh] overflow-y-auto"></div>
         </div>
 
@@ -83,9 +85,13 @@
         </div>
 
         {{-- Legend --}}
-        <div class="absolute bottom-3 right-3 z-20 w-72 bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl p-2.5 text-xs">
-            <div class="text-gray-500 font-medium uppercase tracking-wider mb-1.5" style="font-size:9px">Legende</div>
-            <div class="space-y-1" id="legend"></div>
+        <div class="absolute bottom-3 right-3 z-20 w-72 bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl shadow-2xl text-xs overflow-hidden">
+            <button type="button" data-collapse-target="legend" class="w-full px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">
+                @svg('heroicon-o-swatch', 'w-4 h-4 text-gray-500')
+                <span class="flex-1 text-left">Legende</span>
+                @svg('heroicon-s-chevron-up', 'w-3.5 h-3.5 text-gray-500 collapse-icon transition-transform')
+            </button>
+            <div class="p-2 space-y-0.5 max-h-[55vh] overflow-y-auto" id="legend"></div>
         </div>
 
     </div>
@@ -559,11 +565,22 @@
             });
             items.forEach(function(item) {
                 var row = document.createElement('div');
-                row.className = 'flex items-center gap-2';
-                row.innerHTML = '<span class="w-2 h-2 rounded-full shrink-0" style="background:' + item.color + ';box-shadow:0 0 4px ' + item.color + '60"></span><span class="text-gray-400">' + item.label + '</span>';
+                row.className = 'flex items-center gap-2 px-2 py-1.5 rounded';
+                row.innerHTML = '<span class="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style="background:' + item.color + ';box-shadow:0 0 6px ' + item.color + '50"></span><span class="flex-1 text-gray-300">' + item.label + '</span>';
                 el.appendChild(row);
             });
         }
+
+        // ─── Collapse handling ───
+        document.querySelectorAll('[data-collapse-target]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var target = document.getElementById(btn.dataset.collapseTarget);
+                var icon = btn.querySelector('.collapse-icon');
+                if (!target) return;
+                var isHidden = target.classList.toggle('hidden');
+                if (icon) icon.style.transform = isHidden ? 'rotate(180deg)' : '';
+            });
+        });
 
         // ─── Zoom buttons ───
         document.getElementById('btn-zoom-in').addEventListener('click', function() {

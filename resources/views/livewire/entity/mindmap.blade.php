@@ -63,20 +63,32 @@
             </div>
 
             {{-- Timeline Slider --}}
-            <div id="timeline-slider" class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl w-[calc(2.25rem*3+2px)] px-2 py-2 text-xs">
-                @if(count($this->availableDates) > 0)
+            @php
+                $availableDates = $this->availableDates;
+                $snapshotCount = count($availableDates);
+                // slider positions: 0..N-1 = snapshots, N = Live
+                $sliderMax = $snapshotCount; // allows N+1 positions
+                $currentIdx = $snapshotCount; // default = Live
+                if ($snapshotDate) {
+                    foreach ($availableDates as $i => $s) {
+                        if ($s['key'] === $snapshotDate) { $currentIdx = $i; break; }
+                    }
+                }
+            @endphp
+            <div id="timeline-slider" wire:ignore class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl w-[calc(2.25rem*3+2px)] px-2 py-2 text-xs">
                 <div class="flex items-center justify-between mb-1.5">
                     <span class="text-gray-500 font-medium uppercase tracking-wider" style="font-size:9px">Timeline</span>
-                    <button id="btn-timeline-live" class="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider transition-colors {{ !$snapshotDate ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/5 text-gray-500 border border-gray-700/50 hover:text-gray-300' }}">
-                        Live
-                    </button>
+                    <span id="timeline-badge" class="px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider {{ !$snapshotDate ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-blue-500/20 text-blue-400 border border-blue-500/30' }}">
+                        {{ !$snapshotDate ? 'Live' : 'Snap' }}
+                    </span>
                 </div>
-                <input type="range" id="timeline-range" min="0" max="{{ max(count($this->availableDates) - 1, 0) }}" value="{{ $snapshotDate ? array_search($snapshotDate, $this->availableDates) : count($this->availableDates) - 1 }}" class="w-full h-1 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500 [&::-webkit-slider-thumb]:w-3 [&::-webkit-slider-thumb]:h-3 [&::-webkit-slider-thumb]:rounded-full [&::-webkit-slider-thumb]:bg-blue-500 [&::-webkit-slider-thumb]:appearance-none">
+                @if($snapshotCount > 0)
+                <input type="range" id="timeline-range" min="0" max="{{ $sliderMax }}" value="{{ $currentIdx }}" step="1" class="w-full h-2 bg-gray-700 rounded-lg appearance-none cursor-pointer accent-blue-500">
                 <div class="text-center mt-1">
-                    <span id="timeline-date" class="text-gray-300 font-medium tabular-nums" style="font-size:9px">{{ $snapshotDate ?? 'Live' }}</span>
+                    <span id="timeline-date" class="text-gray-300 font-medium tabular-nums" style="font-size:9px">{{ $snapshotDate ? (collect($availableDates)->firstWhere('key', $snapshotDate)['label'] ?? $snapshotDate) : 'Live' }}</span>
                 </div>
                 @else
-                <div class="flex items-center justify-center gap-1.5 text-gray-600">
+                <div class="flex items-center justify-center gap-1.5 text-gray-600 py-1">
                     @svg('heroicon-o-clock', 'w-3 h-3')
                     <span style="font-size:9px">Keine Snapshots</span>
                 </div>
@@ -745,7 +757,7 @@
         var timelineDates = JSON.parse(document.getElementById('timeline-dates').textContent || '[]');
         var timelineRange = document.getElementById('timeline-range');
         var timelineDate = document.getElementById('timeline-date');
-        var timelineLive = document.getElementById('btn-timeline-live');
+        var timelineBadge = document.getElementById('timeline-badge');
 
         function applyGraphUpdate(newData) {
             allNodes = newData.nodes;
@@ -778,36 +790,42 @@
             applyGraphUpdate(event.data);
         });
 
+        function updateTimelineBadge(isLive) {
+            if (!timelineBadge) return;
+            timelineBadge.textContent = isLive ? 'Live' : 'Snap';
+            timelineBadge.className = 'px-1.5 py-0.5 rounded text-[9px] font-semibold uppercase tracking-wider ' +
+                (isLive
+                    ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
+                    : 'bg-blue-500/20 text-blue-400 border border-blue-500/30');
+        }
+
+        function getLabelForIdx(idx) {
+            if (idx >= timelineDates.length) return 'Live';
+            var s = timelineDates[idx];
+            return (s && s.label) ? s.label : 'Live';
+        }
+
         if (timelineRange && timelineDates.length > 0) {
+            // Prevent 3d-force-graph from stealing pointer events during drag
+            ['pointerdown', 'mousedown', 'touchstart'].forEach(function(evt) {
+                timelineRange.addEventListener(evt, function(e) { e.stopPropagation(); }, { passive: true });
+            });
+
             timelineRange.addEventListener('input', function() {
                 var idx = parseInt(timelineRange.value);
-                var date = timelineDates[idx];
-                if (timelineDate) timelineDate.textContent = date || 'Live';
+                if (timelineDate) timelineDate.textContent = getLabelForIdx(idx);
+                updateTimelineBadge(idx >= timelineDates.length);
             });
 
             timelineRange.addEventListener('change', function() {
                 var idx = parseInt(timelineRange.value);
-                var date = timelineDates[idx];
-                if (date) {
-                    @this.set('snapshotDate', date);
-                    updateLiveButton(false, date);
+                if (idx >= timelineDates.length) {
+                    @this.set('snapshotDate', null);
+                } else {
+                    var s = timelineDates[idx];
+                    @this.set('snapshotDate', s.key);
                 }
             });
-
-            if (timelineLive) {
-                timelineLive.addEventListener('click', function() {
-                    @this.set('snapshotDate', null);
-                    updateLiveButton(true, 'Live');
-                });
-            }
-
-            function updateLiveButton(isLive, label) {
-                if (timelineLive) {
-                    timelineLive.className = 'shrink-0 px-2 py-1 rounded text-[10px] font-semibold uppercase tracking-wider transition-colors ' +
-                        (isLive ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30' : 'bg-white/5 text-gray-500 border border-gray-700/50 hover:text-gray-300');
-                }
-                if (timelineDate) timelineDate.textContent = label;
-            }
         }
     </script>
 </x-ui-page>

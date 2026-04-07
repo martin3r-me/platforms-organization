@@ -58,9 +58,18 @@ class Mindmap extends Component
     {
         return OrganizationTeamSnapshot::forTeam($this->entity->team_id)
             ->orderBy('snapshot_date')
-            ->pluck('snapshot_date')
-            ->map(fn($d) => $d->toDateString())
-            ->unique()
+            ->orderBy('snapshot_period')
+            ->get(['snapshot_date', 'snapshot_period'])
+            ->map(function ($s) {
+                $date = $s->snapshot_date->toDateString();
+                $period = $s->snapshot_period;
+                return [
+                    'key'    => $date . '_' . $period,
+                    'date'   => $date,
+                    'period' => $period,
+                    'label'  => $date . ' · ' . ($period === 'morning' ? 'AM' : 'PM'),
+                ];
+            })
             ->values()
             ->all();
     }
@@ -75,12 +84,21 @@ class Mindmap extends Component
         return $this->graphDataLive();
     }
 
-    protected function graphDataFromSnapshot(string $date): array
+    protected function graphDataFromSnapshot(string $key): array
     {
-        $snapshot = OrganizationTeamSnapshot::forTeam($this->entity->team_id)
-            ->where('snapshot_date', $date)
-            ->orderByDesc('snapshot_period')
-            ->first();
+        // key format: "YYYY-MM-DD_period"
+        [$date, $period] = array_pad(explode('_', $key, 2), 2, null);
+
+        $query = OrganizationTeamSnapshot::forTeam($this->entity->team_id)
+            ->where('snapshot_date', $date);
+
+        if ($period) {
+            $query->where('snapshot_period', $period);
+        } else {
+            $query->orderByDesc('snapshot_period');
+        }
+
+        $snapshot = $query->first();
 
         if (!$snapshot || !$snapshot->structure) {
             return ['nodes' => [], 'links' => [], 'categories' => [], 'entityGroups' => []];

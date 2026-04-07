@@ -196,17 +196,17 @@ class Mindmap extends Component
             ];
         }
 
-        // Entity links from snapshot (names already resolved)
+        // Entity links from snapshot (names already resolved) — normalize in case of mixed legacy data
         $linkedNodes = [];
-        $groupedLinks = $entityLinks->groupBy('linkable_type');
+        $groupedLinks = $entityLinks->groupBy(fn ($link) => $this->normalizeMorphType(is_array($link) ? ($link['linkable_type'] ?? '') : ($link->linkable_type ?? '')));
 
-        foreach ($groupedLinks as $morphType => $typeLinks) {
-            $typeColor = $this->colorFor('link:' . $morphType);
-            $typeName = $this->humanMorphType($morphType);
+        foreach ($groupedLinks as $morphAlias => $typeLinks) {
+            $typeColor = $this->colorFor('link:' . $morphAlias);
+            $typeName = $this->humanMorphType($morphAlias);
 
             foreach ($typeLinks as $link) {
                 $link = (object) $link;
-                $nodeId = $morphType . '-' . $link->linkable_id;
+                $nodeId = $morphAlias . '-' . $link->linkable_id;
 
                 if (!isset($linkedNodes[$nodeId])) {
                     $linkedNodes[$nodeId] = true;
@@ -216,7 +216,7 @@ class Mindmap extends Component
                         'color'    => $typeColor,
                         'val'      => 6,
                         'type'     => $typeName,
-                        'category' => $morphType,
+                        'category' => $morphAlias,
                     ];
                 }
 
@@ -370,14 +370,23 @@ class Mindmap extends Component
             ->get();
 
         $linkedNodes = [];
-        $grouped = $entityLinks->groupBy('linkable_type');
+        // Normalize linkable_type → group by canonical alias
+        $grouped = $entityLinks->groupBy(fn ($link) => $this->normalizeMorphType($link->linkable_type));
 
-        foreach ($grouped as $morphType => $typeLinks) {
+        foreach ($grouped as $morphAlias => $typeLinks) {
             $ids = $typeLinks->pluck('linkable_id')->unique()->values()->all();
-            $modelClass = Relation::getMorphedModel($morphType) ?? $morphType;
-            $labelMap = [];
 
-            if (class_exists($modelClass)) {
+            // Resolve class via alias first, then fall back to first raw type we see
+            $modelClass = $this->resolveMorphClass($morphAlias);
+            if (!$modelClass) {
+                foreach ($typeLinks as $l) {
+                    $modelClass = $this->resolveMorphClass($l->linkable_type);
+                    if ($modelClass) break;
+                }
+            }
+
+            $labelMap = [];
+            if ($modelClass) {
                 $table = (new $modelClass)->getTable();
                 $columns = collect(DB::getSchemaBuilder()->getColumnListing($table));
                 $nameCol = $columns->first(fn ($c) => in_array($c, ['name', 'title', 'subject', 'label']));
@@ -388,23 +397,22 @@ class Mindmap extends Component
                 if ($columns->contains('deleted_at')) {
                     $query->whereNull('deleted_at');
                 }
-                $rows = $query->select('id', $labelExpr)->get();
-                foreach ($rows as $row) {
+                foreach ($query->select('id', $labelExpr)->get() as $row) {
                     $labelMap[$row->id] = $row->label;
                 }
             }
 
-            // Farbe aus gemeinsamem Pool — keine Duplikate mit Entity-Gruppen
-            $typeColor = $this->colorFor('link:' . $morphType);
-            $typeName = $this->humanMorphType($morphType);
+            // Farbe + Name auf Basis des normalisierten Alias
+            $typeColor = $this->colorFor('link:' . $morphAlias);
+            $typeName = $this->humanMorphType($morphAlias);
 
             foreach ($typeLinks as $link) {
-                // Skip if row doesn't exist (deleted/missing)
-                if (class_exists($modelClass) && !isset($labelMap[$link->linkable_id])) {
+                // Skip if row doesn't exist (deleted/missing) when class is resolvable
+                if ($modelClass && !isset($labelMap[$link->linkable_id])) {
                     continue;
                 }
 
-                $nodeId = $morphType . '-' . $link->linkable_id;
+                $nodeId = $morphAlias . '-' . $link->linkable_id;
 
                 if (!isset($linkedNodes[$nodeId])) {
                     $linkedNodes[$nodeId] = true;
@@ -414,7 +422,7 @@ class Mindmap extends Component
                         'color'    => $typeColor,
                         'val'      => 6,
                         'type'     => $typeName,
-                        'category' => $morphType,
+                        'category' => $morphAlias,
                     ];
                 }
 
@@ -510,6 +518,46 @@ class Mindmap extends Component
             'helpdesk_ticket' => 'Ticket',
             default           => ucfirst(str_replace('_', ' ', $type)),
         };
+    }
+
+    /**
+     * Normalisiert einen linkable_type zu seinem kanonischen Morph-Alias.
+     * Behandelt: Alias, FQCN, und unbekannte Klassen (fallback: snake_case basename).
+     */
+    protected function normalizeMorphType(string $type): string
+    {
+        $morphMap = Relation::morphMap() ?: [];
+        // Already a registered alias
+        if (array_key_exists($type, $morphMap)) {
+            return $type;
+        }
+        // FQCN registered in morph map → return its alias
+        $reverse = array_flip($morphMap);
+        if (isset($reverse[$type])) {
+            return $reverse[$type];
+        }
+        // Unknown FQCN → try to derive alias from class basename
+        if (class_exists($type)) {
+            return \Illuminate\Support\Str::snake(class_basename($type));
+        }
+        return $type;
+    }
+
+    /**
+     * Resolves the actual model FQCN for a given linkable_type.
+     */
+    protected function resolveMorphClass(string $type): ?string
+    {
+        // Via Laravel's morphed model resolver (handles aliases)
+        $class = Relation::getMorphedModel($type);
+        if ($class && class_exists($class)) {
+            return $class;
+        }
+        // Direct FQCN
+        if (class_exists($type)) {
+            return $type;
+        }
+        return null;
     }
 
     public function render()

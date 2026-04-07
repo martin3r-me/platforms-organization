@@ -189,14 +189,30 @@ class SnapshotEntitiesCommand extends Command
             $teamLinks = $links->whereIn('entity_id', $entityIds);
             $entityLinksData = [];
 
-            $grouped = $teamLinks->groupBy('linkable_type');
-            foreach ($grouped as $morphType => $typeLinks) {
+            // Normalize linkable_type → group by canonical morph alias
+            $morphMap = Relation::morphMap() ?: [];
+            $grouped = $teamLinks->groupBy(function ($link) use ($morphMap, $reverseMorphMap) {
+                $type = $link->linkable_type;
+                if (array_key_exists($type, $morphMap)) return $type;
+                if (isset($reverseMorphMap[$type])) return $reverseMorphMap[$type];
+                if (class_exists($type)) return \Illuminate\Support\Str::snake(class_basename($type));
+                return $type;
+            });
+            foreach ($grouped as $morphAlias => $typeLinks) {
                 $ids = $typeLinks->pluck('linkable_id')->unique()->values()->all();
-                $morphAlias = $reverseMorphMap[$morphType] ?? $morphType;
-                $modelClass = Relation::getMorphedModel($morphAlias) ?? $morphType;
+                // Resolve model class: alias → FQCN, or use raw type if it is already a class
+                $modelClass = Relation::getMorphedModel($morphAlias);
+                if (!$modelClass || !class_exists($modelClass)) {
+                    foreach ($typeLinks as $l) {
+                        if (class_exists($l->linkable_type)) {
+                            $modelClass = $l->linkable_type;
+                            break;
+                        }
+                    }
+                }
                 $labelMap = [];
 
-                if (class_exists($modelClass)) {
+                if ($modelClass && class_exists($modelClass)) {
                     $table = (new $modelClass)->getTable();
                     $columns = collect(DB::getSchemaBuilder()->getColumnListing($table));
                     $nameCol = $columns->first(fn($c) => in_array($c, ['name', 'title', 'subject', 'label']));

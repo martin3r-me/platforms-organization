@@ -100,11 +100,11 @@
             </div>
         </div>
 
-        {{-- Legend --}}
+        {{-- Legend (link types) --}}
         <div class="absolute bottom-3 right-3 z-20 w-72 bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl shadow-2xl text-xs overflow-hidden">
             <button type="button" data-collapse-target="legend" class="w-full px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">
-                @svg('heroicon-o-swatch', 'w-4 h-4 text-gray-500')
-                <span class="flex-1 text-left">Legende</span>
+                @svg('heroicon-o-link', 'w-4 h-4 text-gray-500')
+                <span class="flex-1 text-left">Verbindungen</span>
                 @svg('heroicon-s-chevron-up', 'w-3.5 h-3.5 text-gray-500 collapse-icon transition-transform')
             </button>
             <div class="p-2 space-y-0.5 max-h-[55vh] overflow-y-auto" id="legend"></div>
@@ -624,38 +624,66 @@
             var el = document.getElementById('legend');
             el.innerHTML = '';
 
-            // Linked types (top group — matches sidebar categories)
-            var linkedKeys = Object.keys(categories).filter(function(k) { return k !== 'entity'; });
-            linkedKeys.forEach(function(key) {
-                var cat = categories[key];
-                var row = document.createElement('div');
-                row.className = 'flex items-center gap-2 px-2 py-1.5 rounded select-none';
-                row.innerHTML =
-                    '<span class="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style="background:' + cat.color + ';box-shadow:0 0 6px ' + cat.color + '50"></span>' +
-                    '<span class="flex-1 text-gray-300">' + cat.label + '</span>' +
-                    '<span class="text-gray-600 tabular-nums">' + cat.count + '</span>';
-                el.appendChild(row);
+            // Aggregate links by ltype, then by sub-key:
+            //   hierarchy   → single entry
+            //   relation    → per rel_label
+            //   entity_link → per category (= morph alias)
+            var groups = { hierarchy: {}, relation: {}, entity_link: {} };
+            allLinks.forEach(function(l) {
+                var ltype = l.ltype || 'entity_link';
+                if (!groups[ltype]) groups[ltype] = {};
+                var subKey, color;
+                if (ltype === 'hierarchy') {
+                    subKey = 'Hierarchie';
+                    color = l.color;
+                } else if (ltype === 'relation') {
+                    subKey = l.rel_label || 'Beziehung';
+                    color = l.color;
+                } else {
+                    var s = typeof l.source === 'object' ? l.source : null;
+                    var t = typeof l.target === 'object' ? l.target : null;
+                    var targetNode = t || allNodes.find(function(n) { return n.id === l.target; });
+                    var cat = targetNode && targetNode.category ? targetNode.category : 'link';
+                    subKey = (categories[cat] && categories[cat].label) || cat;
+                    color = l.color;
+                }
+                if (!groups[ltype][subKey]) groups[ltype][subKey] = { color: color, count: 0 };
+                groups[ltype][subKey].count++;
             });
 
-            // Entity groups (bottom group — matches sidebar subgroups)
-            if (Object.keys(entityGroups).length > 0) {
-                if (linkedKeys.length > 0) {
+            var sectionTitles = {
+                hierarchy: 'Hierarchie',
+                relation: 'Beziehungen',
+                entity_link: 'Verknüpfungen',
+            };
+            var first = true;
+            ['hierarchy', 'relation', 'entity_link'].forEach(function(ltype) {
+                var keys = Object.keys(groups[ltype] || {});
+                if (keys.length === 0) return;
+
+                if (!first) {
                     var sep = document.createElement('div');
                     sep.className = 'border-t border-gray-700/50 my-1';
                     el.appendChild(sep);
                 }
+                first = false;
 
-                Object.keys(entityGroups).forEach(function(key) {
-                    var g = entityGroups[key];
+                var header = document.createElement('div');
+                header.className = 'px-2 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-500';
+                header.textContent = sectionTitles[ltype];
+                el.appendChild(header);
+
+                keys.forEach(function(key) {
+                    var g = groups[ltype][key];
                     var row = document.createElement('div');
-                    row.className = 'flex items-center gap-2 px-2 py-1 rounded select-none ml-1';
+                    row.className = 'flex items-center gap-2 px-2 py-1 rounded select-none';
                     row.innerHTML =
-                        '<span class="w-2 h-2 rounded-full shrink-0" style="background:' + g.color + ';box-shadow:0 0 4px ' + g.color + '40"></span>' +
-                        '<span class="flex-1 text-gray-400">' + key + '</span>' +
+                        '<span class="inline-block shrink-0" style="width:18px;height:2px;background:' + g.color + ';box-shadow:0 0 4px ' + g.color + '60"></span>' +
+                        '<span class="flex-1 text-gray-300 truncate">' + key + '</span>' +
                         '<span class="text-gray-600 tabular-nums">' + g.count + '</span>';
                     el.appendChild(row);
                 });
-            }
+            });
         }
 
         // ─── Collapse handling ───

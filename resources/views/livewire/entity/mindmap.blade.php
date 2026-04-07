@@ -22,6 +22,10 @@
                 <span class="flex-1 text-left">Layer</span>
                 @svg('heroicon-s-chevron-up', 'w-3.5 h-3.5 text-gray-500 collapse-icon transition-transform')
             </button>
+            <div class="flex items-center gap-1 px-2 py-1.5 border-b border-gray-700/40 text-[10px] uppercase tracking-wider">
+                <button type="button" id="filter-select-all" class="px-2 py-0.5 rounded text-gray-400 hover:bg-white/5 hover:text-white transition-colors">Alle</button>
+                <button type="button" id="filter-select-none" class="px-2 py-0.5 rounded text-gray-400 hover:bg-white/5 hover:text-white transition-colors">Keine</button>
+            </div>
             <div id="filter-list" class="p-2 space-y-0.5 max-h-[55vh] overflow-y-auto"></div>
         </div>
 
@@ -187,6 +191,15 @@
                 cb.addEventListener('change', function() { groupFilters[cb.dataset.group] = cb.checked; graph.graphData(getFilteredData()); });
             });
         }
+
+        function setAllFilters(value) {
+            Object.keys(filters).forEach(function(k) { filters[k] = value; });
+            Object.keys(groupFilters).forEach(function(k) { groupFilters[k] = value; });
+            buildSidebar();
+            graph.graphData(getFilteredData());
+        }
+        document.getElementById('filter-select-all').addEventListener('click', function() { setAllFilters(true); });
+        document.getElementById('filter-select-none').addEventListener('click', function() { setAllFilters(false); });
 
         // ─── Label factory ───
         function makeLabel(text, fontSize, color) {

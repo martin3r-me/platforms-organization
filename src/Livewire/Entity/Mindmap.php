@@ -128,7 +128,7 @@ class Mindmap extends Component
 
         foreach ($entities as $e) {
             $e = (object) $e;
-            $groupName = $e->group_name ?? 'Sonstige';
+            $groupName = $e->type_name ?? $e->group_name ?? 'Sonstige';
             $isCenter = $e->id === $this->entity->id;
             $snap = $metricSnapshots[$e->id] ?? null;
             $metrics = $snap?->metrics ?? [];
@@ -287,7 +287,7 @@ class Mindmap extends Component
             ->keyBy('entity_id');
 
         foreach ($entities as $e) {
-            $groupName = $e->type?->group?->name ?? 'Sonstige';
+            $groupName = $e->type?->name ?? 'Sonstige';
             $isCenter = $e->id === $this->entity->id;
             $snap = $latestSnapshots[$e->id] ?? null;
             $metrics = $snap?->metrics ?? [];

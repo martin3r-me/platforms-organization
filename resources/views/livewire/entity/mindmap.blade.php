@@ -554,21 +554,40 @@
 
         function buildLegend() {
             var el = document.getElementById('legend');
-            var items = [];
-            // Entity groups
-            Object.keys(entityGroups).forEach(function(key) {
-                items.push({ label: key, color: entityGroups[key].color });
-            });
-            // Linked types
-            Object.keys(categories).forEach(function(key) {
-                if (key !== 'entity') items.push({ label: categories[key].label, color: categories[key].color });
-            });
-            items.forEach(function(item) {
+            el.innerHTML = '';
+
+            // Linked types (top group — matches sidebar categories)
+            var linkedKeys = Object.keys(categories).filter(function(k) { return k !== 'entity'; });
+            linkedKeys.forEach(function(key) {
+                var cat = categories[key];
                 var row = document.createElement('div');
-                row.className = 'flex items-center gap-2 px-2 py-1.5 rounded';
-                row.innerHTML = '<span class="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style="background:' + item.color + ';box-shadow:0 0 6px ' + item.color + '50"></span><span class="flex-1 text-gray-300">' + item.label + '</span>';
+                row.className = 'flex items-center gap-2 px-2 py-1.5 rounded select-none';
+                row.innerHTML =
+                    '<span class="w-2.5 h-2.5 rounded-full shrink-0 shadow-sm" style="background:' + cat.color + ';box-shadow:0 0 6px ' + cat.color + '50"></span>' +
+                    '<span class="flex-1 text-gray-300">' + cat.label + '</span>' +
+                    '<span class="text-gray-600 tabular-nums">' + cat.count + '</span>';
                 el.appendChild(row);
             });
+
+            // Entity groups (bottom group — matches sidebar subgroups)
+            if (Object.keys(entityGroups).length > 0) {
+                if (linkedKeys.length > 0) {
+                    var sep = document.createElement('div');
+                    sep.className = 'border-t border-gray-700/50 my-1';
+                    el.appendChild(sep);
+                }
+
+                Object.keys(entityGroups).forEach(function(key) {
+                    var g = entityGroups[key];
+                    var row = document.createElement('div');
+                    row.className = 'flex items-center gap-2 px-2 py-1 rounded select-none ml-1';
+                    row.innerHTML =
+                        '<span class="w-2 h-2 rounded-full shrink-0" style="background:' + g.color + ';box-shadow:0 0 4px ' + g.color + '40"></span>' +
+                        '<span class="flex-1 text-gray-400">' + key + '</span>' +
+                        '<span class="text-gray-600 tabular-nums">' + g.count + '</span>';
+                    el.appendChild(row);
+                });
+            }
         }
 
         // ─── Collapse handling ───

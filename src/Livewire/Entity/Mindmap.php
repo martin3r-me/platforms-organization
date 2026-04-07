@@ -512,21 +512,42 @@ class Mindmap extends Component
     protected function humanMorphType(string $type): string
     {
         return match ($type) {
+            'project'         => 'Projekt',
             'planner_project' => 'Projekt',
             'planner_task'    => 'Task',
+            'task'            => 'Task',
             'canvas'          => 'Canvas',
             'helpdesk_ticket' => 'Ticket',
+            'ticket'          => 'Ticket',
             default           => ucfirst(str_replace('_', ' ', $type)),
         };
     }
 
     /**
+     * Legacy-Aliase → kanonische Aliase
+     */
+    protected array $legacyAliasMap = [
+        'planner_project' => 'project',
+        'planner_task'    => 'task',
+    ];
+
+    /**
      * Normalisiert einen linkable_type zu seinem kanonischen Morph-Alias.
-     * Behandelt: Alias, FQCN, und unbekannte Klassen (fallback: snake_case basename).
+     * Behandelt: Alias, FQCN (mit/ohne leading backslash), legacy aliases,
+     * und unbekannte Klassen (fallback: snake_case basename).
      */
     protected function normalizeMorphType(string $type): string
     {
+        $type = ltrim($type, '\\');
+        if ($type === '') return $type;
+
+        // Legacy alias → canonical
+        if (isset($this->legacyAliasMap[$type])) {
+            return $this->legacyAliasMap[$type];
+        }
+
         $morphMap = Relation::morphMap() ?: [];
+
         // Already a registered alias
         if (array_key_exists($type, $morphMap)) {
             return $type;
@@ -538,7 +559,10 @@ class Mindmap extends Component
         }
         // Unknown FQCN → try to derive alias from class basename
         if (class_exists($type)) {
-            return \Illuminate\Support\Str::snake(class_basename($type));
+            $basename = class_basename($type);
+            $snake = \Illuminate\Support\Str::snake($basename);
+            // Also check legacy map for derived name
+            return $this->legacyAliasMap[$snake] ?? $snake;
         }
         return $type;
     }

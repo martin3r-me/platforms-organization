@@ -13,7 +13,7 @@
     </x-slot>
 
     <div class="relative w-full flex-1 min-h-0">
-        <div id="3d-graph" class="w-full h-full"></div>
+        <div wire:ignore id="3d-graph" class="w-full h-full"></div>
 
         {{-- Sidebar --}}
         <div id="sidebar" class="absolute top-3 left-3 z-20 w-72 bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl shadow-2xl text-xs overflow-hidden">

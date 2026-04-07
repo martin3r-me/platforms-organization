@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Platform\Organization\Console\Commands\GenerateReportsCommand;
+use Platform\Organization\Console\Commands\NormalizeEntityLinkTypesCommand;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
 use Platform\Organization\Console\Commands\SnapshotEntitiesCommand;
 use Platform\Core\PlatformCore;
@@ -25,6 +26,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 SeedOrganizationData::class,
                 GenerateReportsCommand::class,
                 SnapshotEntitiesCommand::class,
+                NormalizeEntityLinkTypesCommand::class,
             ]);
         }
 

@@ -180,6 +180,7 @@ class SnapshotEntitiesCommand extends Command
                     'from_entity_id' => $rel->from_entity_id,
                     'to_entity_id' => $rel->to_entity_id,
                     'relation_type_code' => $rel->relationType?->code,
+                    'relation_type_name' => $rel->relationType?->name,
                 ])
                 ->values()
                 ->all();

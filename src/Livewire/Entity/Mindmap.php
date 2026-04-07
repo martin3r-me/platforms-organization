@@ -167,12 +167,14 @@ class Mindmap extends Component
 
         foreach ($relationships as $rel) {
             $rel = (object) $rel;
+            $code = $rel->relation_type_code ?? '';
             $links[] = [
-                'source' => 'e' . $rel->from_entity_id,
-                'target' => 'e' . $rel->to_entity_id,
-                'color'  => $relationColors[$rel->relation_type_code ?? ''] ?? '#F59E0B',
-                'width'  => 2,
-                'ltype'  => 'relation',
+                'source'    => 'e' . $rel->from_entity_id,
+                'target'    => 'e' . $rel->to_entity_id,
+                'color'     => $relationColors[$code] ?? '#F59E0B',
+                'width'     => 2,
+                'ltype'     => 'relation',
+                'rel_label' => $rel->relation_type_name ?? $code,
             ];
         }
 
@@ -334,11 +336,12 @@ class Mindmap extends Component
         foreach ($relationships as $rel) {
             $code = $rel->relationType?->code ?? '';
             $links[] = [
-                'source' => 'e' . $rel->from_entity_id,
-                'target' => 'e' . $rel->to_entity_id,
-                'color'  => $relationColors[$code] ?? '#F59E0B',
-                'width'  => 2,
-                'ltype'  => 'relation',
+                'source'    => 'e' . $rel->from_entity_id,
+                'target'    => 'e' . $rel->to_entity_id,
+                'color'     => $relationColors[$code] ?? '#F59E0B',
+                'width'     => 2,
+                'ltype'     => 'relation',
+                'rel_label' => $rel->relationType?->name ?? $code,
             ];
         }
 

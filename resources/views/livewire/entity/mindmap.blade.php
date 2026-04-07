@@ -363,6 +363,27 @@
                 return 0.35;
             })
             .linkOpacity(0.4)
+            .linkLabel(function(l) {
+                if (l.ltype !== 'relation' || !l.rel_label) return '';
+                return '<div style="background:rgba(0,0,0,0.85);color:' + (l.color || '#fff') + ';padding:4px 8px;border-radius:6px;font-size:11px;font-weight:500">' + l.rel_label + '</div>';
+            })
+            .linkThreeObjectExtend(true)
+            .linkThreeObject(function(l) {
+                if (l.ltype !== 'relation' || !l.rel_label) return null;
+                var sprite = makeLabel(l.rel_label, 22, l.color || '#F59E0B');
+                sprite.name = 'rel_label';
+                sprite.visible = false;
+                return sprite;
+            })
+            .linkPositionUpdate(function(sprite, pos) {
+                if (!sprite || sprite.name !== 'rel_label') return false;
+                sprite.position.set(
+                    (pos.start.x + pos.end.x) / 2,
+                    (pos.start.y + pos.end.y) / 2,
+                    (pos.start.z + pos.end.z) / 2
+                );
+                return true;
+            })
             .linkDirectionalParticles(function(l) { return l.ltype === 'relation' ? 3 : 1; })
             .linkDirectionalParticleWidth(1.0)
             .linkDirectionalParticleSpeed(0.004)
@@ -545,6 +566,26 @@
                     sphere.material.opacity = op;
                     sphere.material.transparent = op < 1;
                 }
+            });
+
+            // Relation link labels LOD — show only when camera is close
+            currentData.links.forEach(function(link) {
+                if (link.ltype !== 'relation' || !link.__lineObj) return;
+                var sprite = link.__lineObj.__linkThreeObj || link.__curve;
+                // ForceGraph3D stores the extended three object on the link
+                var labelSprite = link.__threeObj;
+                if (!labelSprite || labelSprite.name !== 'rel_label') return;
+
+                var sx = (link.source && link.source.x) || 0;
+                var sy = (link.source && link.source.y) || 0;
+                var sz = (link.source && link.source.z) || 0;
+                var tx = (link.target && link.target.x) || 0;
+                var ty = (link.target && link.target.y) || 0;
+                var tz = (link.target && link.target.z) || 0;
+                var mx = (sx + tx) / 2, my = (sy + ty) / 2, mz = (sz + tz) / 2;
+                var ddx = cam.x - mx, ddy = cam.y - my, ddz = cam.z - mz;
+                var d = Math.sqrt(ddx * ddx + ddy * ddy + ddz * ddz);
+                labelSprite.visible = d < 180;
             });
         });
 

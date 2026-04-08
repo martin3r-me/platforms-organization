@@ -100,6 +100,16 @@
             </div>
         </div>
 
+        {{-- VSM Balance Panel (shown when VSM dimension is active) --}}
+        <div id="vsm-balance" class="absolute top-3 left-1/2 -translate-x-1/2 z-20 bg-gray-900/80 backdrop-blur-md border border-gray-700/50 rounded-xl shadow-2xl text-xs overflow-hidden hidden">
+            <div class="px-3 py-1.5 border-b border-gray-700/40 font-bold text-gray-300 text-[11px] uppercase tracking-wider flex items-center gap-2">
+                @svg('heroicon-o-squares-2x2', 'w-3.5 h-3.5 text-blue-400')
+                <span>VSM-Balance</span>
+                <span id="vsm-balance-diagnosis" class="ml-2 text-[9px] normal-case tracking-normal font-normal"></span>
+            </div>
+            <div id="vsm-balance-rows" class="p-1.5 flex items-stretch gap-1"></div>
+        </div>
+
         {{-- Legend (link types) --}}
         <div class="absolute bottom-3 right-3 z-20 w-72 bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl shadow-2xl text-xs overflow-hidden">
             <button type="button" data-collapse-target="legend" class="w-full px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">
@@ -592,31 +602,141 @@
             scene.add(dir);
         })();
 
-        // ─── VSM floor planes ───
+        // ─── VSM stats ───
+        function computeVsmStats() {
+            var stats = { S1: 0, S2: 0, S3: 0, S4: 0, S5: 0 };
+            allNodes.forEach(function(n) {
+                if (!n.vsm || !n.vsm.code) return;
+                if (stats[n.vsm.code] != null) stats[n.vsm.code]++;
+            });
+            return stats;
+        }
+
+        // ─── VSM floor planes (dynamic) ───
         var vsmLayersGroup = new THREE.Group();
         vsmLayersGroup.visible = false;
-        (function() {
+        graph.scene().add(vsmLayersGroup);
+
+        function rebuildVsmLayers() {
+            // Dispose old children
+            while (vsmLayersGroup.children.length > 0) {
+                var c = vsmLayersGroup.children[0];
+                vsmLayersGroup.remove(c);
+                if (c.geometry) c.geometry.dispose();
+                if (c.material && c.material.dispose) c.material.dispose();
+            }
+
+            var stats = computeVsmStats();
+            var counts = Object.values(stats);
+            var maxCount = Math.max.apply(null, counts.concat([1]));
             var size = 900;
             var codes = ['S1', 'S2', 'S3', 'S4', 'S5'];
+
             codes.forEach(function(code) {
                 var y = VSM_Y[code];
-                var grid = new THREE.GridHelper(size, 20, 0x60A5FA, 0x1e3a8a);
+                var count = stats[code];
+                var isEmpty = count === 0;
+                // Density: more entities → brighter grid
+                var density = maxCount > 0 ? (count / maxCount) : 0;
+                var baseOpacity = 0.10 + density * 0.25;
+                // Colors: empty → red warning, filled → blue
+                var majorColor = isEmpty ? 0xef4444 : 0x60A5FA;
+                var minorColor = isEmpty ? 0x7f1d1d : 0x1e3a8a;
+
+                var grid = new THREE.GridHelper(size, 20, majorColor, minorColor);
                 grid.position.y = y;
                 grid.material.transparent = true;
-                grid.material.opacity = 0.18;
+                grid.material.opacity = isEmpty ? 0.22 : baseOpacity;
                 grid.material.depthWrite = false;
                 vsmLayersGroup.add(grid);
 
-                // Code label at edge
-                var lbl = makeLabel(VSM_LABELS[code], 28, '#93C5FD');
-                lbl.position.set(-size / 2 - 30, y, 0);
+                // Left-edge label: "S3 · Control"
+                var labelColor = isEmpty ? '#fca5a5' : '#93C5FD';
+                var lbl = makeLabel(VSM_LABELS[code], 28, labelColor);
+                lbl.position.set(-size / 2 - 40, y, 0);
                 vsmLayersGroup.add(lbl);
+
+                // Right-edge label: count or "LEER" warning
+                var rightText = isEmpty ? '⚠ LEER' : (count + ' ' + (count === 1 ? 'Entity' : 'Entities'));
+                var rightColor = isEmpty ? '#f87171' : '#93C5FD';
+                var rightLbl = makeLabel(rightText, isEmpty ? 30 : 26, rightColor);
+                rightLbl.position.set(size / 2 + 40, y, 0);
+                vsmLayersGroup.add(rightLbl);
             });
-            graph.scene().add(vsmLayersGroup);
-        })();
+        }
+
+        function updateVsmBalancePanel() {
+            var panel = document.getElementById('vsm-balance');
+            var rows = document.getElementById('vsm-balance-rows');
+            var diag = document.getElementById('vsm-balance-diagnosis');
+            if (!panel || !rows) return;
+
+            var stats = computeVsmStats();
+            var codes = ['S1', 'S2', 'S3', 'S4', 'S5'];
+            var counts = codes.map(function(c) { return stats[c]; });
+            var max = Math.max.apply(null, counts.concat([1]));
+
+            rows.innerHTML = '';
+            codes.forEach(function(code) {
+                var count = stats[code];
+                var isEmpty = count === 0;
+                var pct = max > 0 ? Math.round((count / max) * 100) : 0;
+                var shortLabel = VSM_LABELS[code].split(' · ')[1] || code;
+
+                var cell = document.createElement('div');
+                cell.className = 'flex flex-col items-center gap-0.5 px-2 py-1 rounded ' + (isEmpty ? 'bg-red-500/15 border border-red-500/40' : 'bg-white/5');
+                cell.style.minWidth = '56px';
+                cell.innerHTML =
+                    '<div class="text-[9px] uppercase tracking-wider ' + (isEmpty ? 'text-red-300' : 'text-gray-500') + '">' + code + '</div>' +
+                    '<div class="text-base font-bold tabular-nums ' + (isEmpty ? 'text-red-400' : 'text-white') + '">' + count + '</div>' +
+                    '<div class="text-[8px] ' + (isEmpty ? 'text-red-400' : 'text-gray-500') + '">' + shortLabel + '</div>' +
+                    '<div class="w-full h-0.5 rounded ' + (isEmpty ? 'bg-red-500/30' : 'bg-blue-500/20') + ' mt-0.5 overflow-hidden">' +
+                        '<div class="h-full ' + (isEmpty ? 'bg-red-500' : 'bg-blue-400') + '" style="width:' + pct + '%"></div>' +
+                    '</div>';
+                rows.appendChild(cell);
+            });
+
+            // Diagnosis: S3/S4 balance + empty-level warning
+            var empty = codes.filter(function(c) { return stats[c] === 0; });
+            var s3 = stats.S3, s4 = stats.S4;
+            var diagText = '';
+            var diagClass = 'text-gray-500';
+            if (empty.length >= 3) {
+                diagText = '✗ ' + empty.length + ' leere Ebenen — fragil';
+                diagClass = 'text-red-400';
+            } else if (s3 > 0 && s4 === 0) {
+                diagText = '⚠ S3 ohne S4 — operativ, aber ohne Zukunftsradar';
+                diagClass = 'text-amber-400';
+            } else if (s4 > 0 && s3 === 0) {
+                diagText = '⚠ S4 ohne S3 — Vision ohne Steuerung';
+                diagClass = 'text-amber-400';
+            } else if (s3 > 0 && s4 > 0 && Math.abs(s3 - s4) <= 1) {
+                diagText = '✓ S3/S4 im Gleichgewicht';
+                diagClass = 'text-emerald-400';
+            } else if (empty.length > 0) {
+                diagText = '⚠ leere Ebenen: ' + empty.join(', ');
+                diagClass = 'text-amber-400';
+            } else {
+                diagText = '✓ alle Ebenen besetzt';
+                diagClass = 'text-emerald-400';
+            }
+            diag.textContent = diagText;
+            diag.className = 'ml-2 text-[9px] normal-case tracking-normal font-normal ' + diagClass;
+        }
+
+        function refreshVsmAll() {
+            rebuildVsmLayers();
+            updateVsmBalancePanel();
+        }
+
+        // Initial build
+        refreshVsmAll();
 
         function toggleVsmLayers(on) {
             vsmLayersGroup.visible = on;
+            var panel = document.getElementById('vsm-balance');
+            if (panel) panel.classList.toggle('hidden', !on);
+            if (on) refreshVsmAll();
             graph.d3ReheatSimulation();
         }
 
@@ -934,6 +1054,7 @@
             buildSidebar();
             document.getElementById('legend').innerHTML = '';
             buildLegend();
+            if (dimensions.vsm) refreshVsmAll();
         }
 
         Livewire.on('graph-data-updated', function(event) {

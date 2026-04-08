@@ -155,23 +155,58 @@
             S4: { hex: 0x8b5cf6, css: '#8b5cf6' }, // violet — intelligence
             S5: { hex: 0xec4899, css: '#ec4899' }, // pink — identity
         };
-        function vsmTargetY(node) {
-            if (!node.vsm || !node.vsm.code) return null;
-            return VSM_Y[node.vsm.code] != null ? VSM_Y[node.vsm.code] : null;
+        // VSM grid layout — hard-positioned per level
+        var VSM_GRID_SPACING = 95;
+
+        function hasVsm(n) {
+            return n && n.vsm && n.vsm.code && VSM_Y.hasOwnProperty(n.vsm.code);
         }
 
-        // Umwelt (environment) constants — spherical halo around the whole system
-        var UMWELT_RADIUS = 1200;
-        var UMWELT_PHI_MIN = 0.25 * Math.PI; // top of band (~45° from north pole)
-        var UMWELT_PHI_MAX = 0.75 * Math.PI; // bottom of band (~135° from north pole)
-        var umweltTargets = {}; // nodeId → {x, y, z}
-        var umweltSegments = []; // [{name, startAngle, endAngle, centerAngle, color, count}]
-
-        function isUmweltNode(n) {
+        function isUmweltEntity(n) {
             if (!n) return false;
             if ((n.category || 'entity') !== 'entity') return false;
-            if (n.val > 15) return false; // center = system-in-focus itself
-            return !n.vsm || !n.vsm.code;
+            if (n.val > 15) return false; // center = system itself
+            return !hasVsm(n);
+        }
+
+        function assignVsmGridPositions() {
+            var codes = ['S1', 'S2', 'S3', 'S4', 'S5'];
+            var byLevel = { S1: [], S2: [], S3: [], S4: [], S5: [] };
+            allNodes.forEach(function(n) {
+                if (hasVsm(n)) byLevel[n.vsm.code].push(n);
+            });
+            codes.forEach(function(code) {
+                var nodes = byLevel[code];
+                nodes.sort(function(a, b) {
+                    var ka = (a.type || '') + '|' + (a.name || '');
+                    var kb = (b.type || '') + '|' + (b.name || '');
+                    return ka.localeCompare(kb);
+                });
+                var N = nodes.length;
+                if (N === 0) return;
+                var cols = Math.max(1, Math.ceil(Math.sqrt(N * 1.6)));
+                var rows = Math.ceil(N / cols);
+                var gridW = (cols - 1) * VSM_GRID_SPACING;
+                var gridD = (rows - 1) * VSM_GRID_SPACING;
+                var y = VSM_Y[code];
+                nodes.forEach(function(n, idx) {
+                    var col = idx % cols;
+                    var row = Math.floor(idx / cols);
+                    n.fx = -gridW / 2 + col * VSM_GRID_SPACING;
+                    n.fy = y;
+                    n.fz = -gridD / 2 + row * VSM_GRID_SPACING;
+                });
+            });
+        }
+
+        function clearVsmGridPositions() {
+            allNodes.forEach(function(n) {
+                if (hasVsm(n)) {
+                    n.fx = null;
+                    n.fy = null;
+                    n.fz = null;
+                }
+            });
         }
 
         function getFilteredData() {
@@ -180,6 +215,8 @@
                 var cat = n.category || 'entity';
                 if (!filters[cat]) return false;
                 if (cat === 'entity' && n.group && !groupFilters[n.group]) return false;
+                // In VSM mode, hide Umwelt entities (they become fog)
+                if (dimensions.vsm && isUmweltEntity(n)) return false;
                 visibleIds.add(n.id);
                 return true;
             });
@@ -335,40 +372,14 @@
             return 60;
         });
 
-        // VSM Y-layer force — pulls entities hard toward their VSM system's Y plane
-        graph.d3Force('vsmLayer', function(alpha) {
-            if (!dimensions.vsm) return;
-            var s = alpha * 3.0;
-            allNodes.forEach(function(n) {
-                if (n.y == null) return;
-                var targetY = vsmTargetY(n);
-                if (targetY == null) return;
-                // Strong Y snap
-                n.vy += (targetY - n.y) * s;
-                // Dampen existing vy to prevent oscillation
-                n.vy *= 0.85;
-            });
-        });
-
-        // Umwelt force — pushes non-VSM entities onto a spherical halo around the system
-        graph.d3Force('umwelt', function(alpha) {
-            if (!dimensions.vsm) return;
-            var s = alpha * 2.8;
-            allNodes.forEach(function(n) {
-                var t = umweltTargets[n.id];
-                if (!t) return;
-                n.vx += (t.x - n.x) * s;
-                n.vy += (t.y - n.y) * s;
-                n.vz += (t.z - n.z) * s;
-            });
-        });
-
-        // Clustering force — respects VSM Y-lock when active
+        // Clustering force — groups non-fixed nodes by group/category
         graph.d3Force('cluster', function(alpha) {
             var centroids = {};
             var counts = {};
             allNodes.forEach(function(n) {
-                if (!n.x) return;
+                if (n.x == null) return;
+                // Fixed nodes (VSM grid) don't participate in clustering
+                if (n.fx != null) return;
                 var g = n.group || n.category || 'x';
                 if (!centroids[g]) { centroids[g] = { x: 0, y: 0, z: 0 }; counts[g] = 0; }
                 centroids[g].x += n.x; centroids[g].y += n.y; centroids[g].z += n.z;
@@ -377,19 +388,15 @@
             Object.keys(centroids).forEach(function(g) {
                 centroids[g].x /= counts[g]; centroids[g].y /= counts[g]; centroids[g].z /= counts[g];
             });
-            var vsmOn = dimensions.vsm;
             allNodes.forEach(function(n) {
-                if (!n.x) return;
-                // Skip Umwelt nodes when VSM on — Umwelt force owns their X/Z/Y
-                if (vsmOn && umweltTargets[n.id]) return;
+                if (n.x == null || n.fx != null) return;
                 var g = n.group || n.category || 'x';
                 var c = centroids[g];
                 if (!c) return;
                 var s = alpha * 0.25;
                 n.vx += (c.x - n.x) * s;
+                n.vy += (c.y - n.y) * s;
                 n.vz += (c.z - n.z) * s;
-                // Only affect Y when VSM not active (VSM force owns Y)
-                if (!vsmOn) n.vy += (c.y - n.y) * s;
             });
         });
 
@@ -415,14 +422,12 @@
                 node.__radius = radius;
 
                 // VSM membership detection
-                var hasVsm = node.vsm && node.vsm.code && VSM_COLORS[node.vsm.code];
-                var vsmCol = hasVsm ? VSM_COLORS[node.vsm.code] : null;
-                var isUmwelt = !hasVsm && !isCenter && !isLinked && !isSun;
+                var nodeHasVsm = node.vsm && node.vsm.code && VSM_COLORS[node.vsm.code];
+                var vsmCol = nodeHasVsm ? VSM_COLORS[node.vsm.code] : null;
 
-                // Core sphere — VSM entities get +40% emissive, Umwelt gets -50%
+                // Core sphere — VSM entities get +40% emissive boost
                 var emissiveIntensity = isCenter ? 0.4 : isSun ? 0.35 : Math.max(0.05, 0.2 - depth * 0.05);
-                if (hasVsm) emissiveIntensity *= 1.4;
-                else if (isUmwelt) emissiveIntensity *= 0.5;
+                if (nodeHasVsm) emissiveIntensity *= 1.4;
                 var sphere = new THREE.Mesh(
                     new THREE.SphereGeometry(radius, 24, 24),
                     new THREE.MeshPhongMaterial({
@@ -435,7 +440,7 @@
                 group.add(sphere);
 
                 // VSM pedestal ring — flat disc beneath sphere in VSM-level color
-                if (hasVsm) {
+                if (nodeHasVsm) {
                     var pedestal = new THREE.Mesh(
                         new THREE.RingGeometry(radius * 1.4, radius * 2.2, 32),
                         new THREE.MeshBasicMaterial({
@@ -772,171 +777,55 @@
             });
         }
 
-        // ─── Umwelt ring (environment halo) ───
-        var umweltGroup = new THREE.Group();
-        umweltGroup.visible = false;
-        graph.scene().add(umweltGroup);
+        // ─── Umwelt fog (ambient environment particles) ───
+        var umweltFogGroup = new THREE.Group();
+        umweltFogGroup.visible = false;
+        graph.scene().add(umweltFogGroup);
 
-        function computeUmweltLayout() {
-            var umweltNodes = allNodes.filter(isUmweltNode);
-            var bySeg = {};
-            umweltNodes.forEach(function(n) {
-                var seg = n.group || 'Sonstige';
-                if (!bySeg[seg]) bySeg[seg] = [];
-                bySeg[seg].push(n);
-            });
-            var segNames = Object.keys(bySeg).sort();
-            umweltSegments = [];
-            umweltTargets = {};
-            if (segNames.length === 0) return;
-
-            var fullCircle = Math.PI * 2;
-            var gap = 0.04;
-            var segArc = (fullCircle - gap * segNames.length) / segNames.length;
-            var R = UMWELT_RADIUS;
-            var phiRange = UMWELT_PHI_MAX - UMWELT_PHI_MIN;
-
-            segNames.forEach(function(i_seg, i) {
-                var startAngle = i * (segArc + gap);
-                var endAngle = startAngle + segArc;
-                var centerAngle = (startAngle + endAngle) / 2;
-                var color = (entityGroups[i_seg] && entityGroups[i_seg].color) || '#94a3b8';
-                var nodes = bySeg[i_seg];
-                var N = nodes.length;
-                umweltSegments.push({
-                    name: i_seg,
-                    startAngle: startAngle,
-                    endAngle: endAngle,
-                    centerAngle: centerAngle,
-                    color: color,
-                    count: N,
-                });
-                // Grid distribution within the wedge: cols along angle, rows along phi
-                var cols = Math.max(1, Math.round(Math.sqrt(N)));
-                var rows = Math.ceil(N / cols);
-                nodes.forEach(function(n, idx) {
-                    var row = Math.floor(idx / cols);
-                    var col = idx % cols;
-                    var thetaT = cols === 1 ? 0.5 : (col + 0.5) / cols;
-                    var phiT = rows === 1 ? 0.5 : (row + 0.5) / rows;
-                    var theta = startAngle + thetaT * segArc;
-                    var phi = UMWELT_PHI_MIN + phiT * phiRange;
-                    var sinPhi = Math.sin(phi);
-                    // Slight radius jitter for visual liveliness
-                    var rJit = R + ((idx % 3) - 1) * 25;
-                    umweltTargets[n.id] = {
-                        x: rJit * sinPhi * Math.cos(theta),
-                        y: rJit * Math.cos(phi),
-                        z: rJit * sinPhi * Math.sin(theta),
-                    };
-                });
-            });
-        }
-
-        function rebuildUmweltRing() {
-            // Dispose old
-            while (umweltGroup.children.length > 0) {
-                var c = umweltGroup.children[0];
-                umweltGroup.remove(c);
+        function rebuildUmweltFog() {
+            while (umweltFogGroup.children.length > 0) {
+                var c = umweltFogGroup.children[0];
+                umweltFogGroup.remove(c);
                 if (c.geometry) c.geometry.dispose();
                 if (c.material && c.material.dispose) c.material.dispose();
             }
-            if (umweltSegments.length === 0) return;
 
-            var R = UMWELT_RADIUS;
-            var steps = 192;
+            var umweltCount = allNodes.filter(isUmweltEntity).length;
+            if (umweltCount === 0) return;
 
-            // Helper: build a circle in the XZ plane at a given Y
-            function circleXZ(radiusAtY, y, steps) {
-                var pts = [];
-                for (var i = 0; i <= steps; i++) {
-                    var a = (i / steps) * Math.PI * 2;
-                    pts.push(new THREE.Vector3(Math.cos(a) * radiusAtY, y, Math.sin(a) * radiusAtY));
-                }
-                return pts;
+            // Particles scale with entity count — each entity ~12 particles
+            var particleCount = Math.max(240, umweltCount * 14);
+            var positions = new Float32Array(particleCount * 3);
+            var R_MIN = 1400, R_MAX = 1900;
+
+            for (var i = 0; i < particleCount; i++) {
+                var theta = Math.random() * Math.PI * 2;
+                // Uniform sphere via inverse-CDF on cos(phi)
+                var phi = Math.acos(2 * Math.random() - 1);
+                var r = R_MIN + Math.random() * (R_MAX - R_MIN);
+                var sinPhi = Math.sin(phi);
+                positions[i * 3]     = r * sinPhi * Math.cos(theta);
+                positions[i * 3 + 1] = r * Math.cos(phi);
+                positions[i * 3 + 2] = r * sinPhi * Math.sin(theta);
             }
 
-            // 1. Equator ring (y=0, radius R) — subtle dashed reference
-            var eqGeo = new THREE.BufferGeometry().setFromPoints(circleXZ(R, 0, steps));
-            var eqMat = new THREE.LineDashedMaterial({
-                color: 0x94a3b8,
-                dashSize: 20,
-                gapSize: 14,
+            var geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+            var mat = new THREE.PointsMaterial({
+                color: 0x64748b,
+                size: 5,
+                sizeAttenuation: true,
                 transparent: true,
-                opacity: 0.35,
+                opacity: 0.45,
+                depthWrite: false,
+                blending: THREE.AdditiveBlending,
             });
-            var eqLine = new THREE.Line(eqGeo, eqMat);
-            eqLine.computeLineDistances();
-            umweltGroup.add(eqLine);
+            umweltFogGroup.add(new THREE.Points(geo, mat));
 
-            // 2. Latitude bands — top and bottom edge of the Umwelt band
-            var topY = R * Math.cos(UMWELT_PHI_MIN);
-            var botY = R * Math.cos(UMWELT_PHI_MAX);
-            var topR = R * Math.sin(UMWELT_PHI_MIN);
-            var botR = R * Math.sin(UMWELT_PHI_MAX);
-            [
-                { y: topY, r: topR },
-                { y: botY, r: botR },
-            ].forEach(function(lat) {
-                var g = new THREE.BufferGeometry().setFromPoints(circleXZ(lat.r, lat.y, steps));
-                var m = new THREE.LineBasicMaterial({
-                    color: 0x475569,
-                    transparent: true,
-                    opacity: 0.18,
-                });
-                umweltGroup.add(new THREE.Line(g, m));
-            });
-
-            // 3. Meridian dividers + colored segment arcs + labels
-            var meridianSteps = 64;
-            umweltSegments.forEach(function(seg) {
-                var segColor = new THREE.Color(seg.color);
-
-                // 3a. Meridian line at segment start angle — arc from top to bottom on sphere
-                var meridianPoints = [];
-                for (var i = 0; i <= meridianSteps; i++) {
-                    var t = i / meridianSteps;
-                    var phi = UMWELT_PHI_MIN + t * (UMWELT_PHI_MAX - UMWELT_PHI_MIN);
-                    var sinPhi = Math.sin(phi);
-                    meridianPoints.push(new THREE.Vector3(
-                        R * sinPhi * Math.cos(seg.startAngle),
-                        R * Math.cos(phi),
-                        R * sinPhi * Math.sin(seg.startAngle)
-                    ));
-                }
-                var merGeo = new THREE.BufferGeometry().setFromPoints(meridianPoints);
-                var merMat = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.35 });
-                umweltGroup.add(new THREE.Line(merGeo, merMat));
-
-                // 3b. Colored arc along segment center latitude (equator of the wedge)
-                var arcSteps = 48;
-                var arcPoints = [];
-                for (var i = 0; i <= arcSteps; i++) {
-                    var t = i / arcSteps;
-                    var a = seg.startAngle + t * (seg.endAngle - seg.startAngle);
-                    arcPoints.push(new THREE.Vector3(Math.cos(a) * R, 0, Math.sin(a) * R));
-                }
-                var arcGeo = new THREE.BufferGeometry().setFromPoints(arcPoints);
-                var arcMat = new THREE.LineBasicMaterial({ color: segColor, transparent: true, opacity: 0.85 });
-                umweltGroup.add(new THREE.Line(arcGeo, arcMat));
-
-                // 3c. Segment label — at top of wedge, slightly outside sphere
-                var labelPhi = UMWELT_PHI_MIN + 0.15; // near top edge
-                var labelSinPhi = Math.sin(labelPhi);
-                var lblR = R + 60;
-                var lbl = makeLabel(seg.name + ' · ' + seg.count, 28, seg.color);
-                lbl.position.set(
-                    lblR * labelSinPhi * Math.cos(seg.centerAngle),
-                    lblR * Math.cos(labelPhi),
-                    lblR * labelSinPhi * Math.sin(seg.centerAngle)
-                );
-                umweltGroup.add(lbl);
-            });
-
-            // 4. Central UMWELT master label behind the sphere
-            var master = makeLabel('UMWELT', 48, '#94a3b8');
-            master.position.set(0, R * 0.9, 0);
-            umweltGroup.add(master);
+            // Ambient "UMWELT · N Entities" label floating above the stack
+            var lbl = makeLabel('UMWELT · ' + umweltCount + ' Entities', 26, '#94a3b8');
+            lbl.position.set(0, R_MAX * 0.55, -R_MAX * 0.7);
+            umweltFogGroup.add(lbl);
         }
 
         function updateVsmBalancePanel() {
@@ -1000,8 +889,7 @@
 
         function refreshVsmAll() {
             rebuildVsmLayers();
-            computeUmweltLayout();
-            rebuildUmweltRing();
+            rebuildUmweltFog();
             updateVsmBalancePanel();
         }
 
@@ -1010,37 +898,44 @@
 
         function toggleVsmLayers(on) {
             vsmLayersGroup.visible = on;
-            umweltGroup.visible = on;
+            umweltFogGroup.visible = on;
             var panel = document.getElementById('vsm-balance');
             if (panel) panel.classList.toggle('hidden', !on);
-            // Toggle per-node pedestals and halos
-            var data = graph.graphData();
-            data.nodes.forEach(function(n) {
-                if (!n.__threeObj) return;
-                var ped = n.__threeObj.getObjectByName('vsm_pedestal');
-                if (ped) ped.visible = on;
-                var halo = n.__threeObj.getObjectByName('vsm_halo');
-                if (halo) halo.visible = on;
-            });
+
             if (on) {
+                assignVsmGridPositions();
                 refreshVsmAll();
-                // Stronger repulsion for better X/Z spread within levels
-                graph.d3Force('charge').strength(-600);
-                // Auto-tilt camera to isometric view — wide enough to see sphere + stack
+                graph.graphData(getFilteredData()); // Umwelt entities drop out
+                // Softer repulsion — VSM nodes are fixed, others drift naturally
+                graph.d3Force('charge').strength(-200);
                 graph.cameraPosition(
-                    { x: 0, y: 700, z: 2000 },
+                    { x: 900, y: 600, z: 1400 },
                     { x: 0, y: 0, z: 0 },
                     1400
                 );
             } else {
+                clearVsmGridPositions();
+                graph.graphData(getFilteredData()); // Umwelt entities return
                 graph.d3Force('charge').strength(-300);
-                // Return to frontal view
                 graph.cameraPosition(
                     { x: 0, y: 0, z: 350 },
                     { x: 0, y: 0, z: 0 },
                     1200
                 );
             }
+
+            // Toggle per-node pedestals and halos (after graphData refresh — __threeObj rebuilt)
+            setTimeout(function() {
+                var data = graph.graphData();
+                data.nodes.forEach(function(n) {
+                    if (!n.__threeObj) return;
+                    var ped = n.__threeObj.getObjectByName('vsm_pedestal');
+                    if (ped) ped.visible = on;
+                    var halo = n.__threeObj.getObjectByName('vsm_halo');
+                    if (halo) halo.visible = on;
+                });
+            }, 50);
+
             graph.d3ReheatSimulation();
         }
 
@@ -1354,6 +1249,7 @@
             groupFilters = {};
             Object.keys(entityGroups).forEach(function(k) { groupFilters[k] = true; });
 
+            if (dimensions.vsm) assignVsmGridPositions();
             graph.graphData(getFilteredData());
             buildSidebar();
             document.getElementById('legend').innerHTML = '';

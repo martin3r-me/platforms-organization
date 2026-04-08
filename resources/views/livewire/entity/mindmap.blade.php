@@ -414,8 +414,15 @@
                 var radius = baseRadius + (m ? Math.min(m.items_total * 0.15, 2) : 0);
                 node.__radius = radius;
 
-                // Core sphere
+                // VSM membership detection
+                var hasVsm = node.vsm && node.vsm.code && VSM_COLORS[node.vsm.code];
+                var vsmCol = hasVsm ? VSM_COLORS[node.vsm.code] : null;
+                var isUmwelt = !hasVsm && !isCenter && !isLinked && !isSun;
+
+                // Core sphere — VSM entities get +40% emissive, Umwelt gets -50%
                 var emissiveIntensity = isCenter ? 0.4 : isSun ? 0.35 : Math.max(0.05, 0.2 - depth * 0.05);
+                if (hasVsm) emissiveIntensity *= 1.4;
+                else if (isUmwelt) emissiveIntensity *= 0.5;
                 var sphere = new THREE.Mesh(
                     new THREE.SphereGeometry(radius, 24, 24),
                     new THREE.MeshPhongMaterial({
@@ -426,6 +433,41 @@
                     })
                 );
                 group.add(sphere);
+
+                // VSM pedestal ring — flat disc beneath sphere in VSM-level color
+                if (hasVsm) {
+                    var pedestal = new THREE.Mesh(
+                        new THREE.RingGeometry(radius * 1.4, radius * 2.2, 32),
+                        new THREE.MeshBasicMaterial({
+                            color: vsmCol.hex,
+                            transparent: true,
+                            opacity: 0.55,
+                            side: THREE.DoubleSide,
+                            blending: THREE.AdditiveBlending,
+                            depthWrite: false,
+                        })
+                    );
+                    pedestal.rotation.x = -Math.PI / 2;
+                    pedestal.position.y = -radius * 0.15;
+                    pedestal.name = 'vsm_pedestal';
+                    pedestal.visible = dimensions.vsm;
+                    group.add(pedestal);
+
+                    // VSM-colored halo sphere
+                    var vsmHalo = new THREE.Mesh(
+                        new THREE.SphereGeometry(radius * 2.0, 16, 16),
+                        new THREE.MeshBasicMaterial({
+                            color: vsmCol.hex,
+                            transparent: true,
+                            opacity: 0.22,
+                            blending: THREE.AdditiveBlending,
+                            depthWrite: false,
+                        })
+                    );
+                    vsmHalo.name = 'vsm_halo';
+                    vsmHalo.visible = dimensions.vsm;
+                    group.add(vsmHalo);
+                }
 
                 // Sun corona - bright layered glow shells
                 if (isSun) {
@@ -683,12 +725,12 @@
                 var accentHex = isEmpty ? 0xef4444 : VSM_COLORS[code].hex;
                 var accentCss = isEmpty ? '#f87171' : VSM_COLORS[code].css;
 
-                // 1. Filled translucent plane sheet
+                // 1. Filled translucent plane sheet — very subtle so entities dominate
                 var planeGeo = new THREE.PlaneGeometry(size, size);
                 var planeMat = new THREE.MeshBasicMaterial({
                     color: accentHex,
                     transparent: true,
-                    opacity: isEmpty ? 0.09 : (0.05 + density * 0.09),
+                    opacity: isEmpty ? 0.05 : (0.025 + density * 0.05),
                     side: THREE.DoubleSide,
                     depthWrite: false,
                 });
@@ -697,11 +739,11 @@
                 plane.position.y = y;
                 vsmLayersGroup.add(plane);
 
-                // 2. Grid overlay — thicker, more divisions
+                // 2. Grid overlay — dimmer
                 var grid = new THREE.GridHelper(size, 24, accentHex, accentHex);
                 grid.position.y = y + 0.5;
                 grid.material.transparent = true;
-                grid.material.opacity = isEmpty ? 0.45 : (0.25 + density * 0.35);
+                grid.material.opacity = isEmpty ? 0.25 : (0.12 + density * 0.18);
                 grid.material.depthWrite = false;
                 vsmLayersGroup.add(grid);
 
@@ -971,6 +1013,15 @@
             umweltGroup.visible = on;
             var panel = document.getElementById('vsm-balance');
             if (panel) panel.classList.toggle('hidden', !on);
+            // Toggle per-node pedestals and halos
+            var data = graph.graphData();
+            data.nodes.forEach(function(n) {
+                if (!n.__threeObj) return;
+                var ped = n.__threeObj.getObjectByName('vsm_pedestal');
+                if (ped) ped.visible = on;
+                var halo = n.__threeObj.getObjectByName('vsm_halo');
+                if (halo) halo.visible = on;
+            });
             if (on) {
                 refreshVsmAll();
                 // Stronger repulsion for better X/Z spread within levels

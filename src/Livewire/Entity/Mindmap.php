@@ -145,6 +145,22 @@ class Mindmap extends Component
             $baseColor = $this->colorFor($groupName);
             $color = $this->lightenByDepth($baseColor, $depth);
 
+            $vsm = null;
+            if (!empty($e->vsm_code)) {
+                $vsm = [
+                    'code' => $e->vsm_code,
+                    'name' => $e->vsm_name ?? $e->vsm_code,
+                    'sort' => (int) ($e->vsm_sort ?? 0),
+                ];
+            }
+            $cc = null;
+            if (!empty($e->cost_center_name)) {
+                $cc = [
+                    'name'  => $e->cost_center_name,
+                    'color' => $this->colorFor('cc:' . $e->cost_center_name),
+                ];
+            }
+
             $nodes[] = [
                 'id'       => 'e' . $e->id,
                 'name'     => $e->name,
@@ -155,6 +171,8 @@ class Mindmap extends Component
                 'val'      => $baseVal,
                 'depth'    => $depth,
                 'isSun'    => $depth === 0 && $parentIds->has($e->id),
+                'vsm'         => $vsm,
+                'cost_center' => $cc,
                 'metrics'  => [
                     'items_total'   => $metrics['items_total'] ?? 0,
                     'items_done'    => $metrics['items_done'] ?? 0,
@@ -266,7 +284,11 @@ class Mindmap extends Component
     {
         $entities = OrganizationEntity::forTeam($this->entity->team_id)
             ->active()
-            ->with(['type.group'])
+            ->with([
+                'type.group',
+                'vsmSystem:id,code,name,sort_order',
+                'costCenter:id,code,name',
+            ])
             ->get();
 
         $nodes = [];
@@ -316,6 +338,15 @@ class Mindmap extends Component
                 'val'      => $baseVal,
                 'depth'    => $depth,
                 'isSun'    => $depth === 0 && $parentIds->has($e->id),
+                'vsm'      => $e->vsmSystem ? [
+                    'code' => $e->vsmSystem->code,
+                    'name' => $e->vsmSystem->name,
+                    'sort' => (int) $e->vsmSystem->sort_order,
+                ] : null,
+                'cost_center' => $e->costCenter ? [
+                    'name'  => $e->costCenter->name,
+                    'color' => $this->colorFor('cc:' . $e->costCenter->name),
+                ] : null,
                 'metrics'  => [
                     'items_total'   => $metrics['items_total'] ?? 0,
                     'items_done'    => $metrics['items_done'] ?? 0,

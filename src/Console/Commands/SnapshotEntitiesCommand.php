@@ -33,7 +33,13 @@ class SnapshotEntitiesCommand extends Command
         $this->info("Creating {$period} snapshots for {$today->toDateString()}...");
 
         // 1. Load all active entities (across all teams)
-        $entities = OrganizationEntity::active()->with(['type.group'])->get();
+        $entities = OrganizationEntity::active()
+            ->with([
+                'type.group',
+                'vsmSystem:id,code,name,sort_order',
+                'costCenter:id,code,name',
+            ])
+            ->get();
 
         if ($entities->isEmpty()) {
             $this->info('No active entities found.');
@@ -166,6 +172,11 @@ class SnapshotEntitiesCommand extends Command
                 'group_name' => $e->type?->group?->name,
                 'is_active' => $e->is_active,
                 'linked_user_id' => $e->linked_user_id,
+                'vsm_code' => $e->vsmSystem?->code,
+                'vsm_name' => $e->vsmSystem?->name,
+                'vsm_sort' => $e->vsmSystem?->sort_order,
+                'cost_center_id' => $e->cost_center_id,
+                'cost_center_name' => $e->costCenter?->name,
             ])->values()->all();
 
             // Relationships

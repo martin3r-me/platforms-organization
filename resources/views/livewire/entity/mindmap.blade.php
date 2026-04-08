@@ -132,6 +132,16 @@
         var groupFilters = {};
         Object.keys(entityGroups).forEach(function(k) { groupFilters[k] = true; });
 
+        // ─── Dimensions (VSM + Cost Centers) ───
+        var dimensions = { vsm: false, costCenter: false };
+        // VSM Y-layers — S1 (Operations) bottom, S5 (Policy) top
+        var VSM_Y = { S1: -260, S2: -130, S3: 0, S4: 130, S5: 260 };
+        var VSM_LABELS = { S1: 'S1 · Operations', S2: 'S2 · Coordination', S3: 'S3 · Control', S4: 'S4 · Intelligence', S5: 'S5 · Policy' };
+        function vsmTargetY(node) {
+            if (!node.vsm || !node.vsm.code) return null;
+            return VSM_Y[node.vsm.code] != null ? VSM_Y[node.vsm.code] : null;
+        }
+
         function getFilteredData() {
             var visibleIds = new Set();
             var nodes = allNodes.filter(function(n) {
@@ -184,11 +194,41 @@
                 });
             }
 
+            // Dimensions section
+            var dimSep = document.createElement('div');
+            dimSep.className = 'border-t border-gray-700/50 my-1';
+            el.appendChild(dimSep);
+
+            var dimHeader = document.createElement('div');
+            dimHeader.className = 'px-2 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-500';
+            dimHeader.textContent = 'Dimensionen';
+            el.appendChild(dimHeader);
+
+            [
+                { key: 'vsm', label: 'VSM-Ebenen', color: '#60A5FA' },
+                { key: 'costCenter', label: 'Kostenstellen', color: '#F59E0B' },
+            ].forEach(function(d) {
+                var row = document.createElement('label');
+                row.className = 'flex items-center gap-2 px-2 py-1 rounded hover:bg-white/5 cursor-pointer select-none';
+                row.innerHTML =
+                    '<input type="checkbox" ' + (dimensions[d.key] ? 'checked' : '') + ' class="rounded border-gray-600 bg-gray-800 text-blue-500 w-3.5 h-3.5" data-dim="' + d.key + '">' +
+                    '<span class="w-2.5 h-2.5 rounded-full shrink-0" style="background:' + d.color + ';box-shadow:0 0 6px ' + d.color + '50"></span>' +
+                    '<span class="flex-1 text-gray-300">' + d.label + '</span>';
+                el.appendChild(row);
+            });
+
             el.querySelectorAll('[data-cat]').forEach(function(cb) {
                 cb.addEventListener('change', function() { filters[cb.dataset.cat] = cb.checked; graph.graphData(getFilteredData()); });
             });
             el.querySelectorAll('[data-group]').forEach(function(cb) {
                 cb.addEventListener('change', function() { groupFilters[cb.dataset.group] = cb.checked; graph.graphData(getFilteredData()); });
+            });
+            el.querySelectorAll('[data-dim]').forEach(function(cb) {
+                cb.addEventListener('change', function() {
+                    dimensions[cb.dataset.dim] = cb.checked;
+                    if (cb.dataset.dim === 'vsm') toggleVsmLayers(cb.checked);
+                    if (cb.dataset.dim === 'costCenter') toggleCostCenterHalos(cb.checked);
+                });
             });
         }
 
@@ -261,6 +301,18 @@
             if (ltype === 'entity_link') return 20;
             if (ltype === 'hierarchy') return 45;
             return 60;
+        });
+
+        // VSM Y-layer force — pulls entities toward their VSM system's Y plane
+        graph.d3Force('vsmLayer', function(alpha) {
+            if (!dimensions.vsm) return;
+            var s = alpha * 1.2;
+            allNodes.forEach(function(n) {
+                if (n.y == null) return;
+                var targetY = vsmTargetY(n);
+                if (targetY == null) return;
+                n.vy += (targetY - n.y) * s;
+            });
         });
 
         // Clustering force
@@ -352,6 +404,24 @@
                         new THREE.SphereGeometry(glowSize * 0.85, 12, 12),
                         new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: glowIntensity })
                     ));
+                }
+
+                // Cost center halo — soft additive sphere tinted by CC color
+                if (node.cost_center && node.cost_center.color) {
+                    var ccColor = new THREE.Color(node.cost_center.color);
+                    var ccHalo = new THREE.Mesh(
+                        new THREE.SphereGeometry(radius * 2.2, 16, 16),
+                        new THREE.MeshBasicMaterial({
+                            color: ccColor,
+                            transparent: true,
+                            opacity: 0.18,
+                            blending: THREE.AdditiveBlending,
+                            depthWrite: false,
+                        })
+                    );
+                    ccHalo.name = 'cc_halo';
+                    ccHalo.visible = dimensions.costCenter;
+                    group.add(ccHalo);
                 }
 
                 // Label - bigger for root/depth1, smaller for deeper
@@ -521,6 +591,43 @@
             dir.position.set(100, 200, 150);
             scene.add(dir);
         })();
+
+        // ─── VSM floor planes ───
+        var vsmLayersGroup = new THREE.Group();
+        vsmLayersGroup.visible = false;
+        (function() {
+            var size = 900;
+            var codes = ['S1', 'S2', 'S3', 'S4', 'S5'];
+            codes.forEach(function(code) {
+                var y = VSM_Y[code];
+                var grid = new THREE.GridHelper(size, 20, 0x60A5FA, 0x1e3a8a);
+                grid.position.y = y;
+                grid.material.transparent = true;
+                grid.material.opacity = 0.18;
+                grid.material.depthWrite = false;
+                vsmLayersGroup.add(grid);
+
+                // Code label at edge
+                var lbl = makeLabel(VSM_LABELS[code], 28, '#93C5FD');
+                lbl.position.set(-size / 2 - 30, y, 0);
+                vsmLayersGroup.add(lbl);
+            });
+            graph.scene().add(vsmLayersGroup);
+        })();
+
+        function toggleVsmLayers(on) {
+            vsmLayersGroup.visible = on;
+            graph.d3ReheatSimulation();
+        }
+
+        function toggleCostCenterHalos(on) {
+            var data = graph.graphData();
+            data.nodes.forEach(function(n) {
+                if (!n.__threeObj) return;
+                var halo = n.__threeObj.getObjectByName('cc_halo');
+                if (halo) halo.visible = on;
+            });
+        }
 
         // ─── Info panel ───
         function showInfoPanel(node) {

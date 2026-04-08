@@ -160,6 +160,18 @@
             return VSM_Y[node.vsm.code] != null ? VSM_Y[node.vsm.code] : null;
         }
 
+        // Umwelt (environment) constants
+        var UMWELT_RADIUS = 780;
+        var umweltTargets = {}; // nodeId → {x, z, y}
+        var umweltSegments = []; // [{name, startAngle, endAngle, centerAngle, color, count}]
+
+        function isUmweltNode(n) {
+            if (!n) return false;
+            if ((n.category || 'entity') !== 'entity') return false;
+            if (n.val > 15) return false; // center = system-in-focus itself
+            return !n.vsm || !n.vsm.code;
+        }
+
         function getFilteredData() {
             var visibleIds = new Set();
             var nodes = allNodes.filter(function(n) {
@@ -336,6 +348,20 @@
             });
         });
 
+        // Umwelt force — pushes non-VSM entities onto the outer ring by segment
+        graph.d3Force('umwelt', function(alpha) {
+            if (!dimensions.vsm) return;
+            var s = alpha * 2.8;
+            allNodes.forEach(function(n) {
+                var t = umweltTargets[n.id];
+                if (!t) return;
+                n.vx += (t.x - n.x) * s;
+                n.vz += (t.z - n.z) * s;
+                // Soft pull toward mid-Y
+                n.vy += (t.y - n.y) * s * 0.35;
+            });
+        });
+
         // Clustering force — respects VSM Y-lock when active
         graph.d3Force('cluster', function(alpha) {
             var centroids = {};
@@ -353,6 +379,8 @@
             var vsmOn = dimensions.vsm;
             allNodes.forEach(function(n) {
                 if (!n.x) return;
+                // Skip Umwelt nodes when VSM on — Umwelt force owns their X/Z/Y
+                if (vsmOn && umweltTargets[n.id]) return;
                 var g = n.group || n.category || 'x';
                 var c = centroids[g];
                 if (!c) return;
@@ -701,6 +729,147 @@
             });
         }
 
+        // ─── Umwelt ring (environment halo) ───
+        var umweltGroup = new THREE.Group();
+        umweltGroup.visible = false;
+        graph.scene().add(umweltGroup);
+
+        function computeUmweltLayout() {
+            var umweltNodes = allNodes.filter(isUmweltNode);
+            var bySeg = {};
+            umweltNodes.forEach(function(n) {
+                var seg = n.group || 'Sonstige';
+                if (!bySeg[seg]) bySeg[seg] = [];
+                bySeg[seg].push(n);
+            });
+            var segNames = Object.keys(bySeg).sort();
+            umweltSegments = [];
+            umweltTargets = {};
+            if (segNames.length === 0) return;
+
+            var fullCircle = Math.PI * 2;
+            var gap = 0.05;
+            var segArc = (fullCircle - gap * segNames.length) / segNames.length;
+
+            segNames.forEach(function(seg, i) {
+                var startAngle = i * (segArc + gap);
+                var endAngle = startAngle + segArc;
+                var centerAngle = (startAngle + endAngle) / 2;
+                var color = (entityGroups[seg] && entityGroups[seg].color) || '#94a3b8';
+                var nodes = bySeg[seg];
+                umweltSegments.push({
+                    name: seg,
+                    startAngle: startAngle,
+                    endAngle: endAngle,
+                    centerAngle: centerAngle,
+                    color: color,
+                    count: nodes.length,
+                });
+                // Distribute nodes along arc within segment, two rings if many
+                nodes.forEach(function(n, idx) {
+                    var t = nodes.length === 1 ? 0.5 : (idx + 0.5) / nodes.length;
+                    var angle = startAngle + t * segArc;
+                    // Alternate slight inner/outer to avoid perfect line pile-up
+                    var rJitter = (idx % 2 === 0) ? 0 : 40;
+                    var radius = UMWELT_RADIUS + rJitter - 20;
+                    umweltTargets[n.id] = {
+                        x: Math.cos(angle) * radius,
+                        z: Math.sin(angle) * radius,
+                        y: 0,
+                    };
+                });
+            });
+        }
+
+        function rebuildUmweltRing() {
+            // Dispose old
+            while (umweltGroup.children.length > 0) {
+                var c = umweltGroup.children[0];
+                umweltGroup.remove(c);
+                if (c.geometry) c.geometry.dispose();
+                if (c.material && c.material.dispose) c.material.dispose();
+            }
+            if (umweltSegments.length === 0) return;
+
+            var R = UMWELT_RADIUS;
+            var steps = 256;
+
+            // 1. Outer dashed ring
+            var ringPoints = [];
+            for (var i = 0; i <= steps; i++) {
+                var a = (i / steps) * Math.PI * 2;
+                ringPoints.push(new THREE.Vector3(Math.cos(a) * R, 0, Math.sin(a) * R));
+            }
+            var ringGeo = new THREE.BufferGeometry().setFromPoints(ringPoints);
+            var ringMat = new THREE.LineDashedMaterial({
+                color: 0x94a3b8,
+                dashSize: 18,
+                gapSize: 14,
+                transparent: true,
+                opacity: 0.55,
+            });
+            var ring = new THREE.Line(ringGeo, ringMat);
+            ring.computeLineDistances();
+            umweltGroup.add(ring);
+
+            // 2. Inner boundary ring (system/environment border)
+            var innerR = R - 140;
+            var innerPoints = [];
+            for (var i = 0; i <= steps; i++) {
+                var a = (i / steps) * Math.PI * 2;
+                innerPoints.push(new THREE.Vector3(Math.cos(a) * innerR, 0, Math.sin(a) * innerR));
+            }
+            var innerGeo = new THREE.BufferGeometry().setFromPoints(innerPoints);
+            var innerMat = new THREE.LineBasicMaterial({
+                color: 0x475569,
+                transparent: true,
+                opacity: 0.25,
+            });
+            umweltGroup.add(new THREE.Line(innerGeo, innerMat));
+
+            // 3. Segment dividers + colored arcs + labels
+            umweltSegments.forEach(function(seg) {
+                var segColor = new THREE.Color(seg.color);
+
+                // 3a. Divider at start angle
+                var dx = Math.cos(seg.startAngle);
+                var dz = Math.sin(seg.startAngle);
+                var divPoints = [
+                    new THREE.Vector3(dx * innerR, 0, dz * innerR),
+                    new THREE.Vector3(dx * (R + 40), 0, dz * (R + 40)),
+                ];
+                var divGeo = new THREE.BufferGeometry().setFromPoints(divPoints);
+                var divMat = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.35 });
+                umweltGroup.add(new THREE.Line(divGeo, divMat));
+
+                // 3b. Colored arc outside the ring
+                var arcPoints = [];
+                var arcSteps = 40;
+                for (var i = 0; i <= arcSteps; i++) {
+                    var t = i / arcSteps;
+                    var a = seg.startAngle + t * (seg.endAngle - seg.startAngle);
+                    arcPoints.push(new THREE.Vector3(Math.cos(a) * (R + 25), 0, Math.sin(a) * (R + 25)));
+                }
+                var arcGeo = new THREE.BufferGeometry().setFromPoints(arcPoints);
+                var arcMat = new THREE.LineBasicMaterial({ color: segColor, transparent: true, opacity: 0.85 });
+                umweltGroup.add(new THREE.Line(arcGeo, arcMat));
+
+                // 3c. Segment label
+                var lblR = R + 100;
+                var lx = Math.cos(seg.centerAngle) * lblR;
+                var lz = Math.sin(seg.centerAngle) * lblR;
+                var labelText = seg.name + ' · ' + seg.count;
+                var lbl = makeLabel(labelText, 26, seg.color);
+                lbl.position.set(lx, 25, lz);
+                umweltGroup.add(lbl);
+            });
+
+            // 4. Central UMWELT master label
+            var master = makeLabel('UMWELT', 44, '#94a3b8');
+            master.position.set(0, -100, UMWELT_RADIUS + 140);
+            umweltGroup.add(master);
+        }
+
         function updateVsmBalancePanel() {
             var panel = document.getElementById('vsm-balance');
             var rows = document.getElementById('vsm-balance-rows');
@@ -762,6 +931,8 @@
 
         function refreshVsmAll() {
             rebuildVsmLayers();
+            computeUmweltLayout();
+            rebuildUmweltRing();
             updateVsmBalancePanel();
         }
 
@@ -770,17 +941,18 @@
 
         function toggleVsmLayers(on) {
             vsmLayersGroup.visible = on;
+            umweltGroup.visible = on;
             var panel = document.getElementById('vsm-balance');
             if (panel) panel.classList.toggle('hidden', !on);
             if (on) {
                 refreshVsmAll();
                 // Stronger repulsion for better X/Z spread within levels
                 graph.d3Force('charge').strength(-600);
-                // Auto-tilt camera to isometric view so stacked layers become visible
+                // Auto-tilt camera to isometric view — wide enough to see ring + stack
                 graph.cameraPosition(
-                    { x: 0, y: 280, z: 780 },
+                    { x: 0, y: 450, z: 1350 },
                     { x: 0, y: 0, z: 0 },
-                    1200
+                    1400
                 );
             } else {
                 graph.d3Force('charge').strength(-300);

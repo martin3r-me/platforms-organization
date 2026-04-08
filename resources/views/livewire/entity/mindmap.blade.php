@@ -160,9 +160,11 @@
             return VSM_Y[node.vsm.code] != null ? VSM_Y[node.vsm.code] : null;
         }
 
-        // Umwelt (environment) constants
-        var UMWELT_RADIUS = 780;
-        var umweltTargets = {}; // nodeId → {x, z, y}
+        // Umwelt (environment) constants — spherical halo around the whole system
+        var UMWELT_RADIUS = 1200;
+        var UMWELT_PHI_MIN = 0.25 * Math.PI; // top of band (~45° from north pole)
+        var UMWELT_PHI_MAX = 0.75 * Math.PI; // bottom of band (~135° from north pole)
+        var umweltTargets = {}; // nodeId → {x, y, z}
         var umweltSegments = []; // [{name, startAngle, endAngle, centerAngle, color, count}]
 
         function isUmweltNode(n) {
@@ -348,7 +350,7 @@
             });
         });
 
-        // Umwelt force — pushes non-VSM entities onto the outer ring by segment
+        // Umwelt force — pushes non-VSM entities onto a spherical halo around the system
         graph.d3Force('umwelt', function(alpha) {
             if (!dimensions.vsm) return;
             var s = alpha * 2.8;
@@ -356,9 +358,8 @@
                 var t = umweltTargets[n.id];
                 if (!t) return;
                 n.vx += (t.x - n.x) * s;
+                n.vy += (t.y - n.y) * s;
                 n.vz += (t.z - n.z) * s;
-                // Soft pull toward mid-Y
-                n.vy += (t.y - n.y) * s * 0.35;
             });
         });
 
@@ -748,34 +749,43 @@
             if (segNames.length === 0) return;
 
             var fullCircle = Math.PI * 2;
-            var gap = 0.05;
+            var gap = 0.04;
             var segArc = (fullCircle - gap * segNames.length) / segNames.length;
+            var R = UMWELT_RADIUS;
+            var phiRange = UMWELT_PHI_MAX - UMWELT_PHI_MIN;
 
-            segNames.forEach(function(seg, i) {
+            segNames.forEach(function(i_seg, i) {
                 var startAngle = i * (segArc + gap);
                 var endAngle = startAngle + segArc;
                 var centerAngle = (startAngle + endAngle) / 2;
-                var color = (entityGroups[seg] && entityGroups[seg].color) || '#94a3b8';
-                var nodes = bySeg[seg];
+                var color = (entityGroups[i_seg] && entityGroups[i_seg].color) || '#94a3b8';
+                var nodes = bySeg[i_seg];
+                var N = nodes.length;
                 umweltSegments.push({
-                    name: seg,
+                    name: i_seg,
                     startAngle: startAngle,
                     endAngle: endAngle,
                     centerAngle: centerAngle,
                     color: color,
-                    count: nodes.length,
+                    count: N,
                 });
-                // Distribute nodes along arc within segment, two rings if many
+                // Grid distribution within the wedge: cols along angle, rows along phi
+                var cols = Math.max(1, Math.round(Math.sqrt(N)));
+                var rows = Math.ceil(N / cols);
                 nodes.forEach(function(n, idx) {
-                    var t = nodes.length === 1 ? 0.5 : (idx + 0.5) / nodes.length;
-                    var angle = startAngle + t * segArc;
-                    // Alternate slight inner/outer to avoid perfect line pile-up
-                    var rJitter = (idx % 2 === 0) ? 0 : 40;
-                    var radius = UMWELT_RADIUS + rJitter - 20;
+                    var row = Math.floor(idx / cols);
+                    var col = idx % cols;
+                    var thetaT = cols === 1 ? 0.5 : (col + 0.5) / cols;
+                    var phiT = rows === 1 ? 0.5 : (row + 0.5) / rows;
+                    var theta = startAngle + thetaT * segArc;
+                    var phi = UMWELT_PHI_MIN + phiT * phiRange;
+                    var sinPhi = Math.sin(phi);
+                    // Slight radius jitter for visual liveliness
+                    var rJit = R + ((idx % 3) - 1) * 25;
                     umweltTargets[n.id] = {
-                        x: Math.cos(angle) * radius,
-                        z: Math.sin(angle) * radius,
-                        y: 0,
+                        x: rJit * sinPhi * Math.cos(theta),
+                        y: rJit * Math.cos(phi),
+                        z: rJit * sinPhi * Math.sin(theta),
                     };
                 });
             });
@@ -792,81 +802,98 @@
             if (umweltSegments.length === 0) return;
 
             var R = UMWELT_RADIUS;
-            var steps = 256;
+            var steps = 192;
 
-            // 1. Outer dashed ring
-            var ringPoints = [];
-            for (var i = 0; i <= steps; i++) {
-                var a = (i / steps) * Math.PI * 2;
-                ringPoints.push(new THREE.Vector3(Math.cos(a) * R, 0, Math.sin(a) * R));
+            // Helper: build a circle in the XZ plane at a given Y
+            function circleXZ(radiusAtY, y, steps) {
+                var pts = [];
+                for (var i = 0; i <= steps; i++) {
+                    var a = (i / steps) * Math.PI * 2;
+                    pts.push(new THREE.Vector3(Math.cos(a) * radiusAtY, y, Math.sin(a) * radiusAtY));
+                }
+                return pts;
             }
-            var ringGeo = new THREE.BufferGeometry().setFromPoints(ringPoints);
-            var ringMat = new THREE.LineDashedMaterial({
+
+            // 1. Equator ring (y=0, radius R) — subtle dashed reference
+            var eqGeo = new THREE.BufferGeometry().setFromPoints(circleXZ(R, 0, steps));
+            var eqMat = new THREE.LineDashedMaterial({
                 color: 0x94a3b8,
-                dashSize: 18,
+                dashSize: 20,
                 gapSize: 14,
                 transparent: true,
-                opacity: 0.55,
+                opacity: 0.35,
             });
-            var ring = new THREE.Line(ringGeo, ringMat);
-            ring.computeLineDistances();
-            umweltGroup.add(ring);
+            var eqLine = new THREE.Line(eqGeo, eqMat);
+            eqLine.computeLineDistances();
+            umweltGroup.add(eqLine);
 
-            // 2. Inner boundary ring (system/environment border)
-            var innerR = R - 140;
-            var innerPoints = [];
-            for (var i = 0; i <= steps; i++) {
-                var a = (i / steps) * Math.PI * 2;
-                innerPoints.push(new THREE.Vector3(Math.cos(a) * innerR, 0, Math.sin(a) * innerR));
-            }
-            var innerGeo = new THREE.BufferGeometry().setFromPoints(innerPoints);
-            var innerMat = new THREE.LineBasicMaterial({
-                color: 0x475569,
-                transparent: true,
-                opacity: 0.25,
+            // 2. Latitude bands — top and bottom edge of the Umwelt band
+            var topY = R * Math.cos(UMWELT_PHI_MIN);
+            var botY = R * Math.cos(UMWELT_PHI_MAX);
+            var topR = R * Math.sin(UMWELT_PHI_MIN);
+            var botR = R * Math.sin(UMWELT_PHI_MAX);
+            [
+                { y: topY, r: topR },
+                { y: botY, r: botR },
+            ].forEach(function(lat) {
+                var g = new THREE.BufferGeometry().setFromPoints(circleXZ(lat.r, lat.y, steps));
+                var m = new THREE.LineBasicMaterial({
+                    color: 0x475569,
+                    transparent: true,
+                    opacity: 0.18,
+                });
+                umweltGroup.add(new THREE.Line(g, m));
             });
-            umweltGroup.add(new THREE.Line(innerGeo, innerMat));
 
-            // 3. Segment dividers + colored arcs + labels
+            // 3. Meridian dividers + colored segment arcs + labels
+            var meridianSteps = 64;
             umweltSegments.forEach(function(seg) {
                 var segColor = new THREE.Color(seg.color);
 
-                // 3a. Divider at start angle
-                var dx = Math.cos(seg.startAngle);
-                var dz = Math.sin(seg.startAngle);
-                var divPoints = [
-                    new THREE.Vector3(dx * innerR, 0, dz * innerR),
-                    new THREE.Vector3(dx * (R + 40), 0, dz * (R + 40)),
-                ];
-                var divGeo = new THREE.BufferGeometry().setFromPoints(divPoints);
-                var divMat = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.35 });
-                umweltGroup.add(new THREE.Line(divGeo, divMat));
+                // 3a. Meridian line at segment start angle — arc from top to bottom on sphere
+                var meridianPoints = [];
+                for (var i = 0; i <= meridianSteps; i++) {
+                    var t = i / meridianSteps;
+                    var phi = UMWELT_PHI_MIN + t * (UMWELT_PHI_MAX - UMWELT_PHI_MIN);
+                    var sinPhi = Math.sin(phi);
+                    meridianPoints.push(new THREE.Vector3(
+                        R * sinPhi * Math.cos(seg.startAngle),
+                        R * Math.cos(phi),
+                        R * sinPhi * Math.sin(seg.startAngle)
+                    ));
+                }
+                var merGeo = new THREE.BufferGeometry().setFromPoints(meridianPoints);
+                var merMat = new THREE.LineBasicMaterial({ color: 0x64748b, transparent: true, opacity: 0.35 });
+                umweltGroup.add(new THREE.Line(merGeo, merMat));
 
-                // 3b. Colored arc outside the ring
+                // 3b. Colored arc along segment center latitude (equator of the wedge)
+                var arcSteps = 48;
                 var arcPoints = [];
-                var arcSteps = 40;
                 for (var i = 0; i <= arcSteps; i++) {
                     var t = i / arcSteps;
                     var a = seg.startAngle + t * (seg.endAngle - seg.startAngle);
-                    arcPoints.push(new THREE.Vector3(Math.cos(a) * (R + 25), 0, Math.sin(a) * (R + 25)));
+                    arcPoints.push(new THREE.Vector3(Math.cos(a) * R, 0, Math.sin(a) * R));
                 }
                 var arcGeo = new THREE.BufferGeometry().setFromPoints(arcPoints);
                 var arcMat = new THREE.LineBasicMaterial({ color: segColor, transparent: true, opacity: 0.85 });
                 umweltGroup.add(new THREE.Line(arcGeo, arcMat));
 
-                // 3c. Segment label
-                var lblR = R + 100;
-                var lx = Math.cos(seg.centerAngle) * lblR;
-                var lz = Math.sin(seg.centerAngle) * lblR;
-                var labelText = seg.name + ' · ' + seg.count;
-                var lbl = makeLabel(labelText, 26, seg.color);
-                lbl.position.set(lx, 25, lz);
+                // 3c. Segment label — at top of wedge, slightly outside sphere
+                var labelPhi = UMWELT_PHI_MIN + 0.15; // near top edge
+                var labelSinPhi = Math.sin(labelPhi);
+                var lblR = R + 60;
+                var lbl = makeLabel(seg.name + ' · ' + seg.count, 28, seg.color);
+                lbl.position.set(
+                    lblR * labelSinPhi * Math.cos(seg.centerAngle),
+                    lblR * Math.cos(labelPhi),
+                    lblR * labelSinPhi * Math.sin(seg.centerAngle)
+                );
                 umweltGroup.add(lbl);
             });
 
-            // 4. Central UMWELT master label
-            var master = makeLabel('UMWELT', 44, '#94a3b8');
-            master.position.set(0, -100, UMWELT_RADIUS + 140);
+            // 4. Central UMWELT master label behind the sphere
+            var master = makeLabel('UMWELT', 48, '#94a3b8');
+            master.position.set(0, R * 0.9, 0);
             umweltGroup.add(master);
         }
 
@@ -948,9 +975,9 @@
                 refreshVsmAll();
                 // Stronger repulsion for better X/Z spread within levels
                 graph.d3Force('charge').strength(-600);
-                // Auto-tilt camera to isometric view — wide enough to see ring + stack
+                // Auto-tilt camera to isometric view — wide enough to see sphere + stack
                 graph.cameraPosition(
-                    { x: 0, y: 450, z: 1350 },
+                    { x: 0, y: 700, z: 2000 },
                     { x: 0, y: 0, z: 0 },
                     1400
                 );

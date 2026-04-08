@@ -145,8 +145,16 @@
         // ─── Dimensions (VSM + Cost Centers) ───
         var dimensions = { vsm: false, costCenter: false };
         // VSM Y-layers — S1 (Operations) bottom, S5 (Policy) top
-        var VSM_Y = { S1: -260, S2: -130, S3: 0, S4: 130, S5: 260 };
+        var VSM_Y = { S1: -360, S2: -180, S3: 0, S4: 180, S5: 360 };
         var VSM_LABELS = { S1: 'S1 · Operations', S2: 'S2 · Coordination', S3: 'S3 · Control', S4: 'S4 · Intelligence', S5: 'S5 · Policy' };
+        // Per-level accent colors (HSV ramp warm→cool)
+        var VSM_COLORS = {
+            S1: { hex: 0x10b981, css: '#10b981' }, // emerald — operations
+            S2: { hex: 0x06b6d4, css: '#06b6d4' }, // cyan — coordination
+            S3: { hex: 0x3b82f6, css: '#3b82f6' }, // blue — control
+            S4: { hex: 0x8b5cf6, css: '#8b5cf6' }, // violet — intelligence
+            S5: { hex: 0xec4899, css: '#ec4899' }, // pink — identity
+        };
         function vsmTargetY(node) {
             if (!node.vsm || !node.vsm.code) return null;
             return VSM_Y[node.vsm.code] != null ? VSM_Y[node.vsm.code] : null;
@@ -313,19 +321,22 @@
             return 60;
         });
 
-        // VSM Y-layer force — pulls entities toward their VSM system's Y plane
+        // VSM Y-layer force — pulls entities hard toward their VSM system's Y plane
         graph.d3Force('vsmLayer', function(alpha) {
             if (!dimensions.vsm) return;
-            var s = alpha * 1.2;
+            var s = alpha * 3.0;
             allNodes.forEach(function(n) {
                 if (n.y == null) return;
                 var targetY = vsmTargetY(n);
                 if (targetY == null) return;
+                // Strong Y snap
                 n.vy += (targetY - n.y) * s;
+                // Dampen existing vy to prevent oscillation
+                n.vy *= 0.85;
             });
         });
 
-        // Clustering force
+        // Clustering force — respects VSM Y-lock when active
         graph.d3Force('cluster', function(alpha) {
             var centroids = {};
             var counts = {};
@@ -339,6 +350,7 @@
             Object.keys(centroids).forEach(function(g) {
                 centroids[g].x /= counts[g]; centroids[g].y /= counts[g]; centroids[g].z /= counts[g];
             });
+            var vsmOn = dimensions.vsm;
             allNodes.forEach(function(n) {
                 if (!n.x) return;
                 var g = n.group || n.category || 'x';
@@ -346,8 +358,9 @@
                 if (!c) return;
                 var s = alpha * 0.25;
                 n.vx += (c.x - n.x) * s;
-                n.vy += (c.y - n.y) * s;
                 n.vz += (c.z - n.z) * s;
+                // Only affect Y when VSM not active (VSM force owns Y)
+                if (!vsmOn) n.vy += (c.y - n.y) * s;
             });
         });
 
@@ -629,38 +642,61 @@
             var stats = computeVsmStats();
             var counts = Object.values(stats);
             var maxCount = Math.max.apply(null, counts.concat([1]));
-            var size = 900;
+            var size = 1100;
             var codes = ['S1', 'S2', 'S3', 'S4', 'S5'];
 
             codes.forEach(function(code) {
                 var y = VSM_Y[code];
                 var count = stats[code];
                 var isEmpty = count === 0;
-                // Density: more entities → brighter grid
                 var density = maxCount > 0 ? (count / maxCount) : 0;
-                var baseOpacity = 0.10 + density * 0.25;
-                // Colors: empty → red warning, filled → blue
-                var majorColor = isEmpty ? 0xef4444 : 0x60A5FA;
-                var minorColor = isEmpty ? 0x7f1d1d : 0x1e3a8a;
 
-                var grid = new THREE.GridHelper(size, 20, majorColor, minorColor);
-                grid.position.y = y;
+                var accentHex = isEmpty ? 0xef4444 : VSM_COLORS[code].hex;
+                var accentCss = isEmpty ? '#f87171' : VSM_COLORS[code].css;
+
+                // 1. Filled translucent plane sheet
+                var planeGeo = new THREE.PlaneGeometry(size, size);
+                var planeMat = new THREE.MeshBasicMaterial({
+                    color: accentHex,
+                    transparent: true,
+                    opacity: isEmpty ? 0.09 : (0.05 + density * 0.09),
+                    side: THREE.DoubleSide,
+                    depthWrite: false,
+                });
+                var plane = new THREE.Mesh(planeGeo, planeMat);
+                plane.rotation.x = -Math.PI / 2;
+                plane.position.y = y;
+                vsmLayersGroup.add(plane);
+
+                // 2. Grid overlay — thicker, more divisions
+                var grid = new THREE.GridHelper(size, 24, accentHex, accentHex);
+                grid.position.y = y + 0.5;
                 grid.material.transparent = true;
-                grid.material.opacity = isEmpty ? 0.22 : baseOpacity;
+                grid.material.opacity = isEmpty ? 0.45 : (0.25 + density * 0.35);
                 grid.material.depthWrite = false;
                 vsmLayersGroup.add(grid);
 
-                // Left-edge label: "S3 · Control"
-                var labelColor = isEmpty ? '#fca5a5' : '#93C5FD';
-                var lbl = makeLabel(VSM_LABELS[code], 28, labelColor);
-                lbl.position.set(-size / 2 - 40, y, 0);
+                // 3. Outer frame ring — highlights the level boundary
+                var frameGeo = new THREE.EdgesGeometry(planeGeo);
+                var frameMat = new THREE.LineBasicMaterial({
+                    color: accentHex,
+                    transparent: true,
+                    opacity: isEmpty ? 0.7 : 0.55,
+                });
+                var frame = new THREE.LineSegments(frameGeo, frameMat);
+                frame.rotation.x = -Math.PI / 2;
+                frame.position.y = y + 1;
+                vsmLayersGroup.add(frame);
+
+                // 4. Left-edge label
+                var lbl = makeLabel(VSM_LABELS[code], 34, accentCss);
+                lbl.position.set(-size / 2 - 60, y + 20, 0);
                 vsmLayersGroup.add(lbl);
 
-                // Right-edge label: count or "LEER" warning
+                // 5. Right-edge count label
                 var rightText = isEmpty ? '⚠ LEER' : (count + ' ' + (count === 1 ? 'Entity' : 'Entities'));
-                var rightColor = isEmpty ? '#f87171' : '#93C5FD';
-                var rightLbl = makeLabel(rightText, isEmpty ? 30 : 26, rightColor);
-                rightLbl.position.set(size / 2 + 40, y, 0);
+                var rightLbl = makeLabel(rightText, isEmpty ? 36 : 30, accentCss);
+                rightLbl.position.set(size / 2 + 60, y + 20, 0);
                 vsmLayersGroup.add(rightLbl);
             });
         }
@@ -736,7 +772,25 @@
             vsmLayersGroup.visible = on;
             var panel = document.getElementById('vsm-balance');
             if (panel) panel.classList.toggle('hidden', !on);
-            if (on) refreshVsmAll();
+            if (on) {
+                refreshVsmAll();
+                // Stronger repulsion for better X/Z spread within levels
+                graph.d3Force('charge').strength(-600);
+                // Auto-tilt camera to isometric view so stacked layers become visible
+                graph.cameraPosition(
+                    { x: 0, y: 280, z: 780 },
+                    { x: 0, y: 0, z: 0 },
+                    1200
+                );
+            } else {
+                graph.d3Force('charge').strength(-300);
+                // Return to frontal view
+                graph.cameraPosition(
+                    { x: 0, y: 0, z: 350 },
+                    { x: 0, y: 0, z: 0 },
+                    1200
+                );
+            }
             graph.d3ReheatSimulation();
         }
 

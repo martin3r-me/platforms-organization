@@ -523,6 +523,30 @@
                     group.add(ccHalo);
                 }
 
+                // OKR progress ring — visible when entity has OKR objectives
+                if (m && m.okr_obj_total > 0) {
+                    var okrPct = m.okr_obj_total > 0 ? m.okr_obj_done / m.okr_obj_total : 0;
+                    var okrArc = Math.max(0.05, okrPct) * Math.PI * 2;
+                    // Green (>=70%), amber (30-70%), red (<30%)
+                    var okrHex = m.okr_perf != null ? (m.okr_perf >= 70 ? 0x10b981 : m.okr_perf >= 30 ? 0xf59e0b : 0xef4444) : 0x6b7280;
+                    // Background track (full circle, dim)
+                    var trackGeo = new THREE.RingGeometry(radius * 1.25, radius * 1.45, 48);
+                    var track = new THREE.Mesh(trackGeo, new THREE.MeshBasicMaterial({
+                        color: okrHex, transparent: true, opacity: 0.12, side: THREE.DoubleSide, depthWrite: false,
+                    }));
+                    track.rotation.x = -Math.PI / 2;
+                    track.position.y = radius * 0.6;
+                    group.add(track);
+                    // Progress arc
+                    var arcGeo = new THREE.RingGeometry(radius * 1.25, radius * 1.45, 48, 1, 0, okrArc);
+                    var arc = new THREE.Mesh(arcGeo, new THREE.MeshBasicMaterial({
+                        color: okrHex, transparent: true, opacity: 0.7, side: THREE.DoubleSide, depthWrite: false,
+                    }));
+                    arc.rotation.x = -Math.PI / 2;
+                    arc.position.y = radius * 0.6;
+                    group.add(arc);
+                }
+
                 // Label - bigger for root/depth1, smaller for deeper
                 var labelText = node.type ? node.type + '  ' + node.name : node.name;
                 var fontSize;
@@ -546,6 +570,11 @@
                 if (m) {
                     if (m.items_total > 0) lines.push('Items: ' + m.items_done + '/' + m.items_total);
                     if (m.time_h > 0) lines.push('Zeit: ' + m.time_h + 'h');
+                    if (m.okr_obj_total > 0) {
+                        var okrLine = 'OKR: ' + m.okr_obj_done + '/' + m.okr_obj_total + ' Obj';
+                        if (m.okr_perf != null) okrLine += ' · ' + m.okr_perf + '%';
+                        lines.push(okrLine);
+                    }
                 }
                 return '<div style="background:rgba(0,0,0,0.85);color:#ccc;padding:6px 10px;border-radius:6px;font-size:11px;line-height:1.6;text-align:left">' + lines.join('<br/>') + '</div>';
             })
@@ -966,6 +995,16 @@
                 }
                 if (m.time_h > 0) meta += '<div>Zeit: <span class="text-white">' + m.time_h + 'h</span> <span class="text-gray-600">(abger. ' + m.time_billed_h + 'h)</span></div>';
                 if (m.links_count > 0) meta += '<div>Links: <span class="text-white">' + m.links_count + '</span></div>';
+                if (m.okr_obj_total > 0) {
+                    var okrPct = Math.round(m.okr_obj_done / m.okr_obj_total * 100);
+                    var okrColor = m.okr_perf != null ? (m.okr_perf >= 70 ? '#10b981' : m.okr_perf >= 30 ? '#f59e0b' : '#ef4444') : '#6b7280';
+                    meta += '<div class="mt-1.5 border-t border-gray-700/50 pt-1.5">';
+                    meta += '<div class="text-[9px] uppercase tracking-wider text-gray-500 mb-0.5">OKR</div>';
+                    meta += '<div>Objectives: <span class="text-white">' + m.okr_obj_done + '/' + m.okr_obj_total + '</span> <span class="text-gray-600">(' + okrPct + '%)</span></div>';
+                    if (m.okr_kr_total > 0) meta += '<div>Key Results: <span class="text-white">' + m.okr_kr_done + '/' + m.okr_kr_total + '</span></div>';
+                    if (m.okr_perf != null) meta += '<div>Performance: <span style="color:' + okrColor + '">' + m.okr_perf + '%</span></div>';
+                    meta += '</div>';
+                }
             }
             document.getElementById('info-meta').innerHTML = meta;
 

@@ -179,6 +179,13 @@ class Mindmap extends Component
                     'links_count'   => $metrics['links_count'] ?? 0,
                     'time_h'        => round(($metrics['time_total_minutes'] ?? 0) / 60, 1),
                     'time_billed_h' => round(($metrics['time_billed_minutes'] ?? 0) / 60, 1),
+                    'okr_obj_total' => $metrics['okr_objectives_total'] ?? 0,
+                    'okr_obj_done'  => $metrics['okr_objectives_done'] ?? 0,
+                    'okr_kr_total'  => $metrics['okr_key_results_total'] ?? 0,
+                    'okr_kr_done'   => $metrics['okr_key_results_done'] ?? 0,
+                    'okr_perf'      => ($metrics['okr_performance_count'] ?? 0) > 0
+                        ? round(($metrics['okr_performance_sum'] / $metrics['okr_performance_count']) * 100)
+                        : null,
                 ],
             ];
 
@@ -353,6 +360,13 @@ class Mindmap extends Component
                     'links_count'   => $metrics['links_count'] ?? 0,
                     'time_h'        => round(($metrics['time_total_minutes'] ?? 0) / 60, 1),
                     'time_billed_h' => round(($metrics['time_billed_minutes'] ?? 0) / 60, 1),
+                    'okr_obj_total' => $metrics['okr_objectives_total'] ?? 0,
+                    'okr_obj_done'  => $metrics['okr_objectives_done'] ?? 0,
+                    'okr_kr_total'  => $metrics['okr_key_results_total'] ?? 0,
+                    'okr_kr_done'   => $metrics['okr_key_results_done'] ?? 0,
+                    'okr_perf'      => ($metrics['okr_performance_count'] ?? 0) > 0
+                        ? round(($metrics['okr_performance_sum'] / $metrics['okr_performance_count']) * 100)
+                        : null,
                 ],
             ];
 

@@ -107,10 +107,22 @@ class SnapshotEntitiesCommand extends Command
                 'items_done' => $items['items_done'] ?? 0,
                 'time_total_minutes' => $time['total_minutes'],
                 'time_billed_minutes' => $time['billed_minutes'],
+                'okr_objectives_total' => $items['okr_objectives_total'] ?? 0,
+                'okr_objectives_done' => $items['okr_objectives_done'] ?? 0,
+                'okr_key_results_total' => $items['okr_key_results_total'] ?? 0,
+                'okr_key_results_done' => $items['okr_key_results_done'] ?? 0,
+                'okr_performance_sum' => $items['okr_performance_sum'] ?? 0,
+                'okr_performance_count' => $items['okr_performance_count'] ?? 0,
             ];
         }
 
-        $cascadeKeys = ['links_count', 'items_total', 'items_done', 'time_total_minutes', 'time_billed_minutes'];
+        $cascadeKeys = [
+            'links_count', 'items_total', 'items_done',
+            'time_total_minutes', 'time_billed_minutes',
+            'okr_objectives_total', 'okr_objectives_done',
+            'okr_key_results_total', 'okr_key_results_done',
+            'okr_performance_sum', 'okr_performance_count',
+        ];
         $cascadedMetrics = $hierarchyService->cascadeMetrics($ownMetricsMap, $childMap, $cascadeKeys);
 
         // 7. Upsert snapshots

@@ -28,6 +28,21 @@
                 @svg('heroicon-o-trash', 'w-4 h-4')
             </x-ui-confirm-button>
         </x-ui-page-actionbar>
+        @php
+            $tabItems = [
+                ['value' => 'details', 'label' => 'Details'],
+                ['value' => 'corefit', 'label' => 'COREFIT'],
+                ['value' => 'steps', 'label' => 'Steps', 'count' => $this->steps->count()],
+                ['value' => 'flows', 'label' => 'Flows', 'count' => $this->flows->count()],
+                ['value' => 'triggers', 'label' => 'Triggers', 'count' => $this->triggers->count()],
+                ['value' => 'outputs', 'label' => 'Outputs', 'count' => $this->outputs->count()],
+                ['value' => 'improvements', 'label' => 'Verbesserungen', 'count' => $this->processImprovements->count()],
+                ['value' => 'snapshots', 'label' => 'Snapshots', 'count' => $this->processSnapshots->count()],
+            ];
+        @endphp
+        <div class="px-4 py-2 bg-[var(--ui-surface)] border-b border-[var(--ui-border)]/40">
+            <x-ui-tab :tabs="$tabItems" model="activeTab" :showCounts="true" />
+        </div>
     </x-slot>
 
     <x-slot name="sidebar">
@@ -94,21 +109,6 @@
     </x-slot>
 
     <x-ui-page-container>
-        {{-- Tabs --}}
-        @php
-            $tabItems = [
-                ['value' => 'details', 'label' => 'Details'],
-                ['value' => 'corefit', 'label' => 'COREFIT'],
-                ['value' => 'steps', 'label' => 'Steps', 'count' => $this->steps->count()],
-                ['value' => 'flows', 'label' => 'Flows', 'count' => $this->flows->count()],
-                ['value' => 'triggers', 'label' => 'Triggers', 'count' => $this->triggers->count()],
-                ['value' => 'outputs', 'label' => 'Outputs', 'count' => $this->outputs->count()],
-                ['value' => 'improvements', 'label' => 'Verbesserungen', 'count' => $this->processImprovements->count()],
-                ['value' => 'snapshots', 'label' => 'Snapshots', 'count' => $this->processSnapshots->count()],
-            ];
-        @endphp
-        <x-ui-tab :tabs="$tabItems" model="activeTab" :showCounts="true" />
-
         {{-- ── Tab: Details ────────────────────────────────── --}}
         @if($activeTab === 'details')
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">

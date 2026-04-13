@@ -22,6 +22,8 @@ class OrganizationInterlink extends Model
         'user_id',
         'name',
         'description',
+        'url',
+        'reference',
         'category_id',
         'type_id',
         'is_bidirectional',

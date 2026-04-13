@@ -114,6 +114,8 @@ class ListInterlinksTool implements ToolContract, ToolMetadataContract
                     'uuid' => $interlink->uuid,
                     'name' => $interlink->name,
                     'description' => $interlink->description,
+                    'url' => $interlink->url,
+                    'reference' => $interlink->reference,
                     'category_id' => $interlink->category_id,
                     'type_id' => $interlink->type_id,
                     'is_bidirectional' => (bool) $interlink->is_bidirectional,

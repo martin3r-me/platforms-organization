@@ -47,6 +47,14 @@ class UpdateInterlinkTool implements ToolContract, ToolMetadataContract
                     'type' => 'string',
                     'description' => 'Optional: Beschreibung ("" zum Leeren).',
                 ],
+                'url' => [
+                    'type' => 'string',
+                    'description' => 'Optional: URL/Link ("" zum Leeren).',
+                ],
+                'reference' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Kennung/Referenz ("" zum Leeren).',
+                ],
                 'category_id' => [
                     'type' => 'integer',
                     'description' => 'Optional: Neue Kategorie-ID. Nutze organization.interlink_categories.GET.',
@@ -123,6 +131,16 @@ class UpdateInterlinkTool implements ToolContract, ToolMetadataContract
                 $update['description'] = $d === '' ? null : $d;
             }
 
+            if (array_key_exists('url', $arguments)) {
+                $v = (string)($arguments['url'] ?? '');
+                $update['url'] = $v === '' ? null : $v;
+            }
+
+            if (array_key_exists('reference', $arguments)) {
+                $v = (string)($arguments['reference'] ?? '');
+                $update['reference'] = $v === '' ? null : $v;
+            }
+
             if (array_key_exists('category_id', $arguments) && $arguments['category_id'] !== null) {
                 $catId = (int) $arguments['category_id'];
                 $category = OrganizationInterlinkCategory::find($catId);
@@ -185,6 +203,8 @@ class UpdateInterlinkTool implements ToolContract, ToolMetadataContract
                 'uuid' => $interlink->uuid,
                 'name' => $interlink->name,
                 'description' => $interlink->description,
+                'url' => $interlink->url,
+                'reference' => $interlink->reference,
                 'category_id' => $interlink->category_id,
                 'category_name' => $interlink->category?->name,
                 'type_id' => $interlink->type_id,

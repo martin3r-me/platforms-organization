@@ -42,6 +42,14 @@ class CreateInterlinkTool implements ToolContract, ToolMetadataContract
                     'type' => 'string',
                     'description' => 'Optional: Beschreibung.',
                 ],
+                'url' => [
+                    'type' => 'string',
+                    'description' => 'Optional: URL/Link zum konkreten System, Dokument oder Tool (z.B. Jira-Board, SharePoint-Ordner, Teams-Kanal).',
+                ],
+                'reference' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Kennung/Referenz (z.B. Vertragsnummer, Queue-Name, Kanal-ID).',
+                ],
                 'category_id' => [
                     'type' => 'integer',
                     'description' => 'ERFORDERLICH: ID der Interlink-Kategorie. Nutze organization.interlink_categories.GET.',
@@ -130,6 +138,8 @@ class CreateInterlinkTool implements ToolContract, ToolMetadataContract
             $interlink = OrganizationInterlink::create([
                 'name' => $name,
                 'description' => (array_key_exists('description', $arguments) && $arguments['description'] !== '') ? (string)$arguments['description'] : null,
+                'url' => (array_key_exists('url', $arguments) && $arguments['url'] !== '') ? (string)$arguments['url'] : null,
+                'reference' => (array_key_exists('reference', $arguments) && $arguments['reference'] !== '') ? (string)$arguments['reference'] : null,
                 'category_id' => $categoryId,
                 'type_id' => $typeId,
                 'is_bidirectional' => (bool)($arguments['is_bidirectional'] ?? false),
@@ -148,6 +158,8 @@ class CreateInterlinkTool implements ToolContract, ToolMetadataContract
                 'uuid' => $interlink->uuid,
                 'name' => $interlink->name,
                 'description' => $interlink->description,
+                'url' => $interlink->url,
+                'reference' => $interlink->reference,
                 'category_id' => $interlink->category_id,
                 'category_name' => $interlink->category?->name,
                 'type_id' => $interlink->type_id,

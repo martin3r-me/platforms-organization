@@ -47,13 +47,24 @@
             @if($hasInterlinks)
                 <div class="flex flex-wrap gap-1.5 mt-2 ml-10">
                     @foreach($linkedInterlinks as $ri)
-                        <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[var(--ui-primary-5)] text-[var(--ui-primary)] border border-[var(--ui-primary)]/20">
-                            @svg('heroicon-o-puzzle-piece', 'w-3 h-3')
-                            {{ $ri->interlink->name ?? '–' }}
-                            @if($ri->interlink?->category)
-                                <span class="text-[var(--ui-muted)]">({{ $ri->interlink->category->name }})</span>
-                            @endif
-                        </span>
+                        @if($ri->interlink?->url)
+                            <a href="{{ $ri->interlink->url }}" target="_blank" class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[var(--ui-primary-5)] text-[var(--ui-primary)] border border-[var(--ui-primary)]/20 hover:bg-[var(--ui-primary-10)] transition-colors">
+                                @svg('heroicon-o-puzzle-piece', 'w-3 h-3')
+                                {{ $ri->interlink->name ?? '–' }}
+                                @if($ri->interlink?->reference)
+                                    <span class="text-[var(--ui-muted)]">{{ $ri->interlink->reference }}</span>
+                                @endif
+                                @svg('heroicon-o-arrow-top-right-on-square', 'w-2.5 h-2.5 text-[var(--ui-muted)]')
+                            </a>
+                        @else
+                            <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs bg-[var(--ui-primary-5)] text-[var(--ui-primary)] border border-[var(--ui-primary)]/20">
+                                @svg('heroicon-o-puzzle-piece', 'w-3 h-3')
+                                {{ $ri->interlink->name ?? '–' }}
+                                @if($ri->interlink?->reference)
+                                    <span class="text-[var(--ui-muted)]">{{ $ri->interlink->reference }}</span>
+                                @endif
+                            </span>
+                        @endif
                     @endforeach
                 </div>
             @endif
@@ -98,13 +109,22 @@
                                 <div class="flex items-center gap-2">
                                     @svg('heroicon-o-puzzle-piece', 'w-4 h-4 text-[var(--ui-primary)] flex-shrink-0')
                                     <div>
-                                        <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $ri->interlink->name ?? '–' }}</div>
+                                        <div class="text-sm font-medium text-[var(--ui-secondary)]">
+                                            @if($ri->interlink?->url)
+                                                <a href="{{ $ri->interlink->url }}" target="_blank" class="hover:text-[var(--ui-primary)] hover:underline">{{ $ri->interlink->name ?? '–' }}</a>
+                                            @else
+                                                {{ $ri->interlink->name ?? '–' }}
+                                            @endif
+                                        </div>
                                         <div class="text-xs text-[var(--ui-muted)]">
                                             @if($ri->interlink?->category)
                                                 <span>{{ $ri->interlink->category->name }}</span>
                                             @endif
                                             @if($ri->interlink?->type)
                                                 <span>&middot; {{ $ri->interlink->type->name }}</span>
+                                            @endif
+                                            @if($ri->interlink?->reference)
+                                                <span>&middot; {{ $ri->interlink->reference }}</span>
                                             @endif
                                             @if($ri->note)
                                                 <span>&middot; <em>{{ $ri->note }}</em></span>

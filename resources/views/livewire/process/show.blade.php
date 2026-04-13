@@ -164,68 +164,47 @@
             @php $metrics = $this->corefitMetrics; @endphp
 
             {{-- Metriken-Kacheln --}}
-            <x-ui-stats-grid :cols="4" :gap="4">
-                <x-ui-dashboard-tile
-                    title="Core-Steps"
-                    :count="$metrics['core']['count']"
-                    :description="$metrics['core']['percent'] . '%'"
-                    icon="check-badge"
-                    variant="success"
-                    size="sm"
-                />
-                <x-ui-dashboard-tile
-                    title="Context-Steps"
-                    :count="$metrics['context']['count']"
-                    :description="$metrics['context']['percent'] . '%'"
-                    icon="puzzle-piece"
-                    variant="warning"
-                    size="sm"
-                />
-                <x-ui-dashboard-tile
-                    title="No-Fit-Steps"
-                    :count="$metrics['no_fit']['count']"
-                    :description="$metrics['no_fit']['percent'] . '%'"
-                    icon="x-circle"
-                    variant="danger"
-                    size="sm"
-                />
-                <x-ui-dashboard-tile
-                    title="Gesamtkosten"
-                    :count="$metrics['total_cost']"
-                    description="EUR"
-                    icon="currency-euro"
-                    variant="info"
-                    size="sm"
-                />
-            </x-ui-stats-grid>
+            <div class="grid grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
+                    <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Core-Steps</h3>
+                    <p class="text-2xl font-bold text-[var(--ui-success)]">{{ $metrics['core']['count'] }}</p>
+                    <p class="text-xs text-[var(--ui-muted)]">{{ $metrics['core']['percent'] }}%</p>
+                </div>
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
+                    <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Context-Steps</h3>
+                    <p class="text-2xl font-bold text-[var(--ui-warning)]">{{ $metrics['context']['count'] }}</p>
+                    <p class="text-xs text-[var(--ui-muted)]">{{ $metrics['context']['percent'] }}%</p>
+                </div>
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
+                    <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">No-Fit-Steps</h3>
+                    <p class="text-2xl font-bold text-[var(--ui-danger)]">{{ $metrics['no_fit']['count'] }}</p>
+                    <p class="text-xs text-[var(--ui-muted)]">{{ $metrics['no_fit']['percent'] }}%</p>
+                </div>
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
+                    <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Gesamtkosten</h3>
+                    <p class="text-2xl font-bold text-[var(--ui-info)]">{{ number_format($metrics['total_cost'], 2, ',', '.') }}</p>
+                    <p class="text-xs text-[var(--ui-muted)]">EUR</p>
+                </div>
+            </div>
 
             {{-- Zeitanalyse --}}
-            <x-ui-stats-grid :cols="3" :gap="4">
-                <x-ui-dashboard-tile
-                    title="Core-Zeit"
-                    :count="$metrics['core']['minutes']"
-                    :description="'Min. / ' . number_format($metrics['core']['cost'], 2, ',', '.') . ' EUR'"
-                    icon="clock"
-                    variant="success"
-                    size="sm"
-                />
-                <x-ui-dashboard-tile
-                    title="Context-Zeit"
-                    :count="$metrics['context']['minutes']"
-                    :description="'Min. / ' . number_format($metrics['context']['cost'], 2, ',', '.') . ' EUR'"
-                    icon="clock"
-                    variant="warning"
-                    size="sm"
-                />
-                <x-ui-dashboard-tile
-                    title="Wartezeit"
-                    :count="$metrics['total_wait']"
-                    description="Min."
-                    icon="pause-circle"
-                    variant="neutral"
-                    size="sm"
-                />
-            </x-ui-stats-grid>
+            <div class="grid grid-cols-3 gap-4 mb-6">
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
+                    <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Core-Zeit</h3>
+                    <p class="text-2xl font-bold text-[var(--ui-success)]">{{ $metrics['core']['minutes'] }}</p>
+                    <p class="text-xs text-[var(--ui-muted)]">Min. / {{ number_format($metrics['core']['cost'], 2, ',', '.') }} EUR</p>
+                </div>
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
+                    <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Context-Zeit</h3>
+                    <p class="text-2xl font-bold text-[var(--ui-warning)]">{{ $metrics['context']['minutes'] }}</p>
+                    <p class="text-xs text-[var(--ui-muted)]">Min. / {{ number_format($metrics['context']['cost'], 2, ',', '.') }} EUR</p>
+                </div>
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
+                    <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Wartezeit</h3>
+                    <p class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $metrics['total_wait'] }}</p>
+                    <p class="text-xs text-[var(--ui-muted)]">Min.</p>
+                </div>
+            </div>
 
             {{-- Progress Bars --}}
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mb-6">
@@ -236,21 +215,27 @@
                             <span class="text-[var(--ui-secondary)]">Core</span>
                             <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['core']['percent'] }}%</span>
                         </div>
-                        <x-ui-progress-bar :value="$metrics['core']['percent']" variant="success" height="sm" />
+                        <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2">
+                            <div class="bg-[var(--ui-success)] h-2 rounded-full" style="width: {{ min(100, $metrics['core']['percent']) }}%"></div>
+                        </div>
                     </div>
                     <div>
                         <div class="flex justify-between text-sm mb-1">
                             <span class="text-[var(--ui-secondary)]">Context</span>
                             <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['context']['percent'] }}%</span>
                         </div>
-                        <x-ui-progress-bar :value="$metrics['context']['percent']" variant="warning" height="sm" />
+                        <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2">
+                            <div class="bg-[var(--ui-warning)] h-2 rounded-full" style="width: {{ min(100, $metrics['context']['percent']) }}%"></div>
+                        </div>
                     </div>
                     <div>
                         <div class="flex justify-between text-sm mb-1">
                             <span class="text-[var(--ui-secondary)]">No Fit</span>
                             <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['no_fit']['percent'] }}%</span>
                         </div>
-                        <x-ui-progress-bar :value="$metrics['no_fit']['percent']" variant="danger" height="sm" />
+                        <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2">
+                            <div class="bg-[var(--ui-danger)] h-2 rounded-full" style="width: {{ min(100, $metrics['no_fit']['percent']) }}%"></div>
+                        </div>
                     </div>
                 </div>
             </div>

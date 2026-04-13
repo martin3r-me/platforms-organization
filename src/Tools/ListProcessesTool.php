@@ -28,15 +28,14 @@ class ListProcessesTool implements ToolContract, ToolMetadataContract
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['team_id', 'status', 'is_active', 'owner_entity_id', 'vsm_system_id', 'process_group_id']),
+            $this->getStandardGetSchema(['team_id', 'status', 'is_active', 'owner_entity_id', 'vsm_system_id']),
             [
                 'properties' => [
-                    'team_id'          => ['type' => 'integer'],
-                    'status'           => ['type' => 'string', 'description' => 'Optional: draft | active | deprecated.'],
-                    'is_active'        => ['type' => 'boolean', 'description' => 'Optional: Default true.'],
-                    'owner_entity_id'  => ['type' => 'integer', 'description' => 'Optional: Filter nach Owner-Entity.'],
-                    'vsm_system_id'    => ['type' => 'integer', 'description' => 'Optional: Filter nach VSM-System.'],
-                    'process_group_id' => ['type' => 'integer', 'description' => 'Optional: Filter nach Prozess-Gruppe.'],
+                    'team_id'         => ['type' => 'integer'],
+                    'status'          => ['type' => 'string', 'description' => 'Optional: draft | active | deprecated.'],
+                    'is_active'       => ['type' => 'boolean', 'description' => 'Optional: Default true.'],
+                    'owner_entity_id' => ['type' => 'integer', 'description' => 'Optional: Filter nach Owner-Entity.'],
+                    'vsm_system_id'   => ['type' => 'integer', 'description' => 'Optional: Filter nach VSM-System.'],
                 ],
             ]
         );
@@ -65,16 +64,7 @@ class ListProcessesTool implements ToolContract, ToolMetadataContract
             if (! empty($arguments['vsm_system_id'])) {
                 $q->where('vsm_system_id', (int) $arguments['vsm_system_id']);
             }
-            if (array_key_exists('process_group_id', $arguments)) {
-                $val = $arguments['process_group_id'];
-                if ($val === null || $val === 0) {
-                    $q->whereNull('process_group_id');
-                } else {
-                    $q->where('process_group_id', (int) $val);
-                }
-            }
-
-            $this->applyStandardFilters($q, $arguments, ['team_id', 'status', 'is_active', 'owner_entity_id', 'vsm_system_id', 'process_group_id', 'created_at']);
+            $this->applyStandardFilters($q, $arguments, ['team_id', 'status', 'is_active', 'owner_entity_id', 'vsm_system_id', 'created_at']);
             $this->applyStandardSearch($q, $arguments, ['name', 'code', 'description']);
             $this->applyStandardSort($q, $arguments, ['name', 'code', 'status', 'version', 'id', 'created_at'], 'name', 'asc');
 
@@ -87,7 +77,6 @@ class ListProcessesTool implements ToolContract, ToolMetadataContract
                 'description'     => $p->description,
                 'owner_entity_id' => $p->owner_entity_id,
                 'vsm_system_id'   => $p->vsm_system_id,
-                'process_group_id' => $p->process_group_id,
                 'status'          => $p->status,
                 'version'         => $p->version,
                 'is_active'       => $p->is_active,

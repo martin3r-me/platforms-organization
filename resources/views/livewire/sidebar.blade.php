@@ -89,6 +89,39 @@
         </a>
     </div>
 
+    {{-- Abschnitt: Personen --}}
+    <div>
+        <h4 x-show="!collapsed" class="px-4 py-3 text-xs tracking-wide font-semibold text-[color:var(--ui-muted)] uppercase">Personen</h4>
+
+        {{-- Jobprofile --}}
+        <a href="{{ route('organization.job-profiles.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/job-profiles')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-identification class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Jobprofile</span>
+        </a>
+
+        {{-- Rollen --}}
+        <a href="{{ route('organization.roles.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/roles')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-user-group class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Rollen</span>
+        </a>
+    </div>
+
     {{-- Abschnitt: Dimensionen --}}
     <div>
         <h4 x-show="!collapsed" class="px-4 py-3 text-xs tracking-wide font-semibold text-[color:var(--ui-muted)] uppercase">Dimensionen</h4>

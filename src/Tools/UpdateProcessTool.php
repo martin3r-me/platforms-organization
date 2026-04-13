@@ -39,7 +39,14 @@ class UpdateProcessTool implements ToolContract, ToolMetadataContract
                 'status'          => ['type' => 'string', 'description' => 'draft | active | deprecated.'],
                 'version'         => ['type' => 'integer'],
                 'is_active'       => ['type' => 'boolean'],
-                'metadata'        => ['type' => 'object'],
+                'metadata'              => ['type' => 'object'],
+                'target_description'    => ['type' => 'string', 'description' => 'Zielbild. "" zum Leeren.'],
+                'value_proposition'     => ['type' => 'string', 'description' => 'Kundennutzen & Wertbeitrag. "" zum Leeren.'],
+                'cost_analysis'         => ['type' => 'string', 'description' => 'Kosten & Break-Even. "" zum Leeren.'],
+                'risk_assessment'       => ['type' => 'string', 'description' => 'Risiko & Resilienz. "" zum Leeren.'],
+                'improvement_levers'    => ['type' => 'string', 'description' => 'Hebel & Lösungsdesign. "" zum Leeren.'],
+                'action_plan'           => ['type' => 'string', 'description' => 'Maßnahmenplan. "" zum Leeren.'],
+                'standardization_notes' => ['type' => 'string', 'description' => 'Standardisierung & Kontrolle. "" zum Leeren.'],
             ],
             'required' => ['process_id'],
         ]);
@@ -103,6 +110,12 @@ class UpdateProcessTool implements ToolContract, ToolMetadataContract
             }
             if (array_key_exists('metadata', $arguments)) {
                 $update['metadata'] = $arguments['metadata'];
+            }
+            foreach (['target_description', 'value_proposition', 'cost_analysis', 'risk_assessment', 'improvement_levers', 'action_plan', 'standardization_notes'] as $field) {
+                if (array_key_exists($field, $arguments)) {
+                    $val = (string) ($arguments[$field] ?? '');
+                    $update[$field] = $val === '' ? null : $val;
+                }
             }
 
             if (! empty($update)) {

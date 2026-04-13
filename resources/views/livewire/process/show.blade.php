@@ -96,7 +96,7 @@
     <x-ui-page-container>
         <!-- Tabs -->
         <div class="flex items-center gap-1 mb-6 border-b border-[var(--ui-border)]/60">
-            @foreach(['details' => 'Details', 'steps' => 'Steps', 'flows' => 'Flows', 'triggers' => 'Triggers', 'outputs' => 'Outputs'] as $tab => $label)
+            @foreach(['details' => 'Details', 'steps' => 'Steps', 'flows' => 'Flows', 'triggers' => 'Triggers', 'outputs' => 'Outputs', 'improvements' => 'Verbesserungen', 'snapshots' => 'Snapshots'] as $tab => $label)
                 <button
                     wire:click="$set('activeTab', '{{ $tab }}')"
                     class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors {{ $activeTab === $tab ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}"
@@ -110,6 +110,10 @@
                         <span class="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $this->triggers->count() }}</span>
                     @elseif($tab === 'outputs')
                         <span class="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $this->outputs->count() }}</span>
+                    @elseif($tab === 'improvements')
+                        <span class="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $this->processImprovements->count() }}</span>
+                    @elseif($tab === 'snapshots')
+                        <span class="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $this->processSnapshots->count() }}</span>
                     @endif
                 </button>
             @endforeach
@@ -164,6 +168,19 @@
                         <input type="checkbox" wire:model.live="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
                         <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv geschaltet</label>
                     </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mt-6">
+                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">COREFIT-Analyse</h2>
+                <div class="space-y-4">
+                    <x-ui-input-textarea name="target_description" label="Zielbild" wire:model.live="form.target_description" rows="3" placeholder="Wie soll der Prozess idealerweise aussehen?" />
+                    <x-ui-input-textarea name="value_proposition" label="Kundennutzen & Wertbeitrag" wire:model.live="form.value_proposition" rows="3" placeholder="Welchen Wert liefert der Prozess?" />
+                    <x-ui-input-textarea name="cost_analysis" label="Kosten & Break-Even" wire:model.live="form.cost_analysis" rows="3" placeholder="Kosten, Aufwand, Break-Even-Analyse" />
+                    <x-ui-input-textarea name="risk_assessment" label="Risiko & Resilienz" wire:model.live="form.risk_assessment" rows="3" placeholder="Risiken, Single Points of Failure, Resilienz" />
+                    <x-ui-input-textarea name="improvement_levers" label="Hebel & Lösungsdesign" wire:model.live="form.improvement_levers" rows="3" placeholder="Wo liegen die größten Verbesserungshebel?" />
+                    <x-ui-input-textarea name="action_plan" label="Maßnahmenplan" wire:model.live="form.action_plan" rows="3" placeholder="Konkrete nächste Schritte" />
+                    <x-ui-input-textarea name="standardization_notes" label="Standardisierung & Kontrolle" wire:model.live="form.standardization_notes" rows="3" placeholder="Standards, KPIs, Kontrollmechanismen" />
                 </div>
             </div>
         @endif
@@ -418,6 +435,135 @@
                 </x-ui-table-body>
             </x-ui-table>
         @endif
+        {{-- ── Tab: Verbesserungen ──────────────────────────── --}}
+        @if($activeTab === 'improvements')
+            <div class="flex justify-end mb-4">
+                <x-ui-button variant="primary" size="sm" wire:click="createImprovement">
+                    @svg('heroicon-o-plus', 'w-4 h-4')
+                    <span>Neue Verbesserung</span>
+                </x-ui-button>
+            </div>
+
+            <x-ui-table compact="true">
+                <x-ui-table-header>
+                    <x-ui-table-header-cell compact="true">Titel</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Kategorie</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Priorität</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true"></x-ui-table-header-cell>
+                </x-ui-table-header>
+                <x-ui-table-body>
+                    @forelse($this->processImprovements as $imp)
+                        <x-ui-table-row compact="true">
+                            <x-ui-table-cell compact="true">
+                                <div class="font-medium">{{ $imp->title }}</div>
+                                @if($imp->description)
+                                    <div class="text-xs text-[var(--ui-muted)]">{{ \Illuminate\Support\Str::limit($imp->description, 60) }}</div>
+                                @endif
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                <x-ui-badge variant="info" size="sm">{{ ucfirst($imp->category) }}</x-ui-badge>
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                @if($imp->priority === 'critical')
+                                    <x-ui-badge variant="danger" size="sm">Kritisch</x-ui-badge>
+                                @elseif($imp->priority === 'high')
+                                    <x-ui-badge variant="warning" size="sm">Hoch</x-ui-badge>
+                                @elseif($imp->priority === 'medium')
+                                    <x-ui-badge variant="info" size="sm">Mittel</x-ui-badge>
+                                @else
+                                    <x-ui-badge variant="muted" size="sm">Niedrig</x-ui-badge>
+                                @endif
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                @if($imp->status === 'completed')
+                                    <x-ui-badge variant="success" size="sm">Abgeschlossen</x-ui-badge>
+                                @elseif($imp->status === 'in_progress')
+                                    <x-ui-badge variant="warning" size="sm">In Arbeit</x-ui-badge>
+                                @elseif($imp->status === 'planned')
+                                    <x-ui-badge variant="info" size="sm">Geplant</x-ui-badge>
+                                @elseif($imp->status === 'rejected')
+                                    <x-ui-badge variant="danger" size="sm">Abgelehnt</x-ui-badge>
+                                @else
+                                    <x-ui-badge variant="muted" size="sm">Identifiziert</x-ui-badge>
+                                @endif
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                <div class="flex gap-1 justify-end">
+                                    <x-ui-button size="xs" variant="secondary-outline" wire:click="editImprovement({{ $imp->id }})">
+                                        @svg('heroicon-o-pencil-square', 'w-4 h-4')
+                                    </x-ui-button>
+                                    <x-ui-confirm-button size="xs" variant="danger-outline" wire:click="deleteImprovement({{ $imp->id }})" confirm-text="Verbesserung wirklich löschen?">
+                                        @svg('heroicon-o-trash', 'w-4 h-4')
+                                    </x-ui-confirm-button>
+                                </div>
+                            </x-ui-table-cell>
+                        </x-ui-table-row>
+                    @empty
+                        <x-ui-table-row compact="true">
+                            <x-ui-table-cell compact="true" colspan="5">
+                                <div class="text-center text-[var(--ui-muted)] py-6">Keine Verbesserungen vorhanden.</div>
+                            </x-ui-table-cell>
+                        </x-ui-table-row>
+                    @endforelse
+                </x-ui-table-body>
+            </x-ui-table>
+        @endif
+
+        {{-- ── Tab: Snapshots ────────────────────────────────── --}}
+        @if($activeTab === 'snapshots')
+            <div class="flex justify-end mb-4">
+                <x-ui-button variant="primary" size="sm" wire:click="createSnapshot">
+                    @svg('heroicon-o-camera', 'w-4 h-4')
+                    <span>Snapshot erstellen</span>
+                </x-ui-button>
+            </div>
+
+            <x-ui-table compact="true">
+                <x-ui-table-header>
+                    <x-ui-table-header-cell compact="true">Version</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Label</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Steps</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Dauer</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Erstellt</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true"></x-ui-table-header-cell>
+                </x-ui-table-header>
+                <x-ui-table-body>
+                    @forelse($this->processSnapshots as $snap)
+                        <x-ui-table-row compact="true">
+                            <x-ui-table-cell compact="true">
+                                <span class="text-sm font-mono font-bold">v{{ $snap->version }}</span>
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                <span class="text-sm">{{ $snap->label ?? '–' }}</span>
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                <span class="text-sm">{{ $snap->metrics['total_steps'] ?? 0 }}</span>
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                <span class="text-sm">{{ $snap->metrics['total_duration'] ?? 0 }} min</span>
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                <span class="text-sm">{{ $snap->created_at?->format('d.m.Y H:i') }}</span>
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                <div class="flex gap-1 justify-end">
+                                    <x-ui-confirm-button size="xs" variant="danger-outline" wire:click="deleteSnapshot({{ $snap->id }})" confirm-text="Snapshot wirklich löschen?">
+                                        @svg('heroicon-o-trash', 'w-4 h-4')
+                                    </x-ui-confirm-button>
+                                </div>
+                            </x-ui-table-cell>
+                        </x-ui-table-row>
+                    @empty
+                        <x-ui-table-row compact="true">
+                            <x-ui-table-cell compact="true" colspan="6">
+                                <div class="text-center text-[var(--ui-muted)] py-6">Keine Snapshots vorhanden.</div>
+                            </x-ui-table-cell>
+                        </x-ui-table-row>
+                    @endforelse
+                </x-ui-table-body>
+            </x-ui-table>
+        @endif
     </x-ui-page-container>
 
     {{-- ── Step Modal ──────────────────────────────────────── --}}
@@ -640,6 +786,87 @@
                 <x-ui-button type="button" variant="primary" wire:click="storeOutput">
                     @svg('heroicon-o-check', 'w-4 h-4 mr-2')
                     {{ $editingOutputId ? 'Speichern' : 'Erstellen' }}
+                </x-ui-button>
+            </div>
+        </x-slot>
+    </x-ui-modal>
+
+    {{-- ── Snapshot Modal ──────────────────────────────────── --}}
+    <x-ui-modal wire:model="snapshotModalShow" size="md">
+        <x-slot name="header">
+            Snapshot erstellen
+        </x-slot>
+
+        <form wire:submit.prevent="storeSnapshot" class="space-y-4">
+            <x-ui-input-text name="snapshot_label" label="Label (optional)" wire:model.live="snapshotLabel" placeholder="z.B. Baseline, Nach Optimierung" />
+            <p class="text-sm text-[var(--ui-muted)]">
+                Ein Snapshot friert den aktuellen Zustand des Prozesses ein (inkl. Steps, Flows, Triggers, Outputs und strategische Felder).
+            </p>
+        </form>
+
+        <x-slot name="footer">
+            <div class="d-flex justify-end gap-2">
+                <x-ui-button type="button" variant="secondary-outline" wire:click="$set('snapshotModalShow', false)">Abbrechen</x-ui-button>
+                <x-ui-button type="button" variant="primary" wire:click="storeSnapshot">
+                    @svg('heroicon-o-camera', 'w-4 h-4 mr-2')
+                    Snapshot erstellen
+                </x-ui-button>
+            </div>
+        </x-slot>
+    </x-ui-modal>
+
+    {{-- ── Improvement Modal ───────────────────────────────── --}}
+    <x-ui-modal wire:model="improvementModalShow" size="lg">
+        <x-slot name="header">
+            {{ $editingImprovementId ? 'Verbesserung bearbeiten' : 'Neue Verbesserung' }}
+        </x-slot>
+
+        <form wire:submit.prevent="storeImprovement" class="space-y-4">
+            <x-ui-input-text name="imp_title" label="Titel" wire:model.live="improvementForm.title" required />
+            <x-ui-input-textarea name="imp_description" label="Beschreibung" wire:model.live="improvementForm.description" rows="2" />
+
+            <div class="grid grid-cols-3 gap-4">
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Kategorie</label>
+                    <select wire:model.live="improvementForm.category" class="w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="cost">Kosten</option>
+                        <option value="quality">Qualität</option>
+                        <option value="speed">Geschwindigkeit</option>
+                        <option value="risk">Risiko</option>
+                        <option value="standardization">Standardisierung</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Priorität</label>
+                    <select wire:model.live="improvementForm.priority" class="w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="low">Niedrig</option>
+                        <option value="medium">Mittel</option>
+                        <option value="high">Hoch</option>
+                        <option value="critical">Kritisch</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
+                    <select wire:model.live="improvementForm.status" class="w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="identified">Identifiziert</option>
+                        <option value="planned">Geplant</option>
+                        <option value="in_progress">In Arbeit</option>
+                        <option value="completed">Abgeschlossen</option>
+                        <option value="rejected">Abgelehnt</option>
+                    </select>
+                </div>
+            </div>
+
+            <x-ui-input-textarea name="expected_outcome" label="Erwartetes Ergebnis" wire:model.live="improvementForm.expected_outcome" rows="2" />
+            <x-ui-input-textarea name="actual_outcome" label="Tatsächliches Ergebnis" wire:model.live="improvementForm.actual_outcome" rows="2" />
+        </form>
+
+        <x-slot name="footer">
+            <div class="d-flex justify-end gap-2">
+                <x-ui-button type="button" variant="secondary-outline" wire:click="$set('improvementModalShow', false)">Abbrechen</x-ui-button>
+                <x-ui-button type="button" variant="primary" wire:click="storeImprovement">
+                    @svg('heroicon-o-check', 'w-4 h-4 mr-2')
+                    {{ $editingImprovementId ? 'Speichern' : 'Erstellen' }}
                 </x-ui-button>
             </div>
         </x-slot>

@@ -30,6 +30,13 @@ class OrganizationProcess extends Model
         'version',
         'is_active',
         'metadata',
+        'target_description',
+        'value_proposition',
+        'cost_analysis',
+        'risk_assessment',
+        'improvement_levers',
+        'action_plan',
+        'standardization_notes',
     ];
 
     protected $casts = [
@@ -96,6 +103,16 @@ class OrganizationProcess extends Model
     public function outputs(): HasMany
     {
         return $this->hasMany(OrganizationProcessOutput::class, 'process_id');
+    }
+
+    public function snapshots(): HasMany
+    {
+        return $this->hasMany(OrganizationProcessSnapshot::class, 'process_id');
+    }
+
+    public function improvements(): HasMany
+    {
+        return $this->hasMany(OrganizationProcessImprovement::class, 'process_id');
     }
 
     public function scopeActive($query)

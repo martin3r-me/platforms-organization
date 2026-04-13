@@ -323,6 +323,18 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\CreateProcessStepInterlinkTool());
             $registry->register(new \Platform\Organization\Tools\UpdateProcessStepInterlinkTool());
             $registry->register(new \Platform\Organization\Tools\DeleteProcessStepInterlinkTool());
+
+            // Process Snapshot Tools
+            $registry->register(new \Platform\Organization\Tools\CreateProcessSnapshotTool());
+            $registry->register(new \Platform\Organization\Tools\ListProcessSnapshotsTool());
+            $registry->register(new \Platform\Organization\Tools\GetProcessSnapshotTool());
+            $registry->register(new \Platform\Organization\Tools\CompareProcessSnapshotsTool());
+
+            // Process Improvement Tools
+            $registry->register(new \Platform\Organization\Tools\CreateProcessImprovementTool());
+            $registry->register(new \Platform\Organization\Tools\ListProcessImprovementsTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateProcessImprovementTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteProcessImprovementTool());
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

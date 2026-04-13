@@ -10,6 +10,8 @@ use Platform\Organization\Models\OrganizationProcessStep;
 use Platform\Organization\Models\OrganizationProcessFlow;
 use Platform\Organization\Models\OrganizationProcessTrigger;
 use Platform\Organization\Models\OrganizationProcessOutput;
+use Platform\Organization\Models\OrganizationProcessSnapshot;
+use Platform\Organization\Models\OrganizationProcessImprovement;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationVsmSystem;
 
@@ -68,6 +70,23 @@ class Show extends Component
         'interlink_id' => '',
     ];
 
+    // Snapshot
+    public bool $snapshotModalShow = false;
+    public string $snapshotLabel = '';
+
+    // Improvement CRUD
+    public bool $improvementModalShow = false;
+    public ?int $editingImprovementId = null;
+    public array $improvementForm = [
+        'title' => '',
+        'description' => '',
+        'category' => 'speed',
+        'priority' => 'medium',
+        'status' => 'identified',
+        'expected_outcome' => '',
+        'actual_outcome' => '',
+    ];
+
     public function mount(OrganizationProcess $process)
     {
         $this->process = $process->load(['ownerEntity', 'vsmSystem', 'user']);
@@ -77,14 +96,21 @@ class Show extends Component
     public function loadForm()
     {
         $this->form = [
-            'name'            => $this->process->name,
-            'code'            => $this->process->code ?? '',
-            'description'     => $this->process->description ?? '',
-            'status'          => $this->process->status ?? 'draft',
-            'owner_entity_id' => (string) ($this->process->owner_entity_id ?? ''),
-            'vsm_system_id'   => (string) ($this->process->vsm_system_id ?? ''),
-            'version'         => (string) ($this->process->version ?? '1'),
-            'is_active'       => $this->process->is_active,
+            'name'                  => $this->process->name,
+            'code'                  => $this->process->code ?? '',
+            'description'           => $this->process->description ?? '',
+            'status'                => $this->process->status ?? 'draft',
+            'owner_entity_id'       => (string) ($this->process->owner_entity_id ?? ''),
+            'vsm_system_id'         => (string) ($this->process->vsm_system_id ?? ''),
+            'version'               => (string) ($this->process->version ?? '1'),
+            'is_active'             => $this->process->is_active,
+            'target_description'    => $this->process->target_description ?? '',
+            'value_proposition'     => $this->process->value_proposition ?? '',
+            'cost_analysis'         => $this->process->cost_analysis ?? '',
+            'risk_assessment'       => $this->process->risk_assessment ?? '',
+            'improvement_levers'    => $this->process->improvement_levers ?? '',
+            'action_plan'           => $this->process->action_plan ?? '',
+            'standardization_notes' => $this->process->standardization_notes ?? '',
         ];
     }
 
@@ -98,7 +124,14 @@ class Show extends Component
                $this->form['owner_entity_id'] != ($this->process->owner_entity_id ?? '') ||
                $this->form['vsm_system_id'] != ($this->process->vsm_system_id ?? '') ||
                (int) $this->form['version'] !== ($this->process->version ?? 1) ||
-               $this->form['is_active'] !== $this->process->is_active;
+               $this->form['is_active'] !== $this->process->is_active ||
+               $this->form['target_description'] !== ($this->process->target_description ?? '') ||
+               $this->form['value_proposition'] !== ($this->process->value_proposition ?? '') ||
+               $this->form['cost_analysis'] !== ($this->process->cost_analysis ?? '') ||
+               $this->form['risk_assessment'] !== ($this->process->risk_assessment ?? '') ||
+               $this->form['improvement_levers'] !== ($this->process->improvement_levers ?? '') ||
+               $this->form['action_plan'] !== ($this->process->action_plan ?? '') ||
+               $this->form['standardization_notes'] !== ($this->process->standardization_notes ?? '');
     }
 
     #[Computed]
@@ -148,30 +181,56 @@ class Show extends Component
             ->get();
     }
 
+    #[Computed]
+    public function processSnapshots()
+    {
+        return $this->process->snapshots()->orderByDesc('version')->get();
+    }
+
+    #[Computed]
+    public function processImprovements()
+    {
+        return $this->process->improvements()->orderByDesc('created_at')->get();
+    }
+
     // ── Process save/delete ─────────────────────────────────────
 
     public function save()
     {
         $this->validate([
-            'form.name'            => 'required|string|max:255',
-            'form.code'            => 'nullable|string|max:100',
-            'form.description'     => 'nullable|string',
-            'form.status'          => 'required|in:draft,active,deprecated',
-            'form.owner_entity_id' => 'nullable|integer|exists:organization_entities,id',
-            'form.vsm_system_id'   => 'nullable|integer|exists:organization_vsm_systems,id',
-            'form.version'         => 'required|integer|min:1',
-            'form.is_active'       => 'boolean',
+            'form.name'                  => 'required|string|max:255',
+            'form.code'                  => 'nullable|string|max:100',
+            'form.description'           => 'nullable|string',
+            'form.status'                => 'required|in:draft,active,deprecated',
+            'form.owner_entity_id'       => 'nullable|integer|exists:organization_entities,id',
+            'form.vsm_system_id'         => 'nullable|integer|exists:organization_vsm_systems,id',
+            'form.version'               => 'required|integer|min:1',
+            'form.is_active'             => 'boolean',
+            'form.target_description'    => 'nullable|string',
+            'form.value_proposition'     => 'nullable|string',
+            'form.cost_analysis'         => 'nullable|string',
+            'form.risk_assessment'       => 'nullable|string',
+            'form.improvement_levers'    => 'nullable|string',
+            'form.action_plan'           => 'nullable|string',
+            'form.standardization_notes' => 'nullable|string',
         ]);
 
         $this->process->update([
-            'name'            => $this->form['name'],
-            'code'            => $this->form['code'] !== '' ? $this->form['code'] : null,
-            'description'     => $this->form['description'] !== '' ? $this->form['description'] : null,
-            'status'          => $this->form['status'],
-            'owner_entity_id' => $this->form['owner_entity_id'] !== '' ? (int) $this->form['owner_entity_id'] : null,
-            'vsm_system_id'   => $this->form['vsm_system_id'] !== '' ? (int) $this->form['vsm_system_id'] : null,
-            'version'         => (int) $this->form['version'],
-            'is_active'       => $this->form['is_active'],
+            'name'                  => $this->form['name'],
+            'code'                  => $this->form['code'] !== '' ? $this->form['code'] : null,
+            'description'           => $this->form['description'] !== '' ? $this->form['description'] : null,
+            'status'                => $this->form['status'],
+            'owner_entity_id'       => $this->form['owner_entity_id'] !== '' ? (int) $this->form['owner_entity_id'] : null,
+            'vsm_system_id'         => $this->form['vsm_system_id'] !== '' ? (int) $this->form['vsm_system_id'] : null,
+            'version'               => (int) $this->form['version'],
+            'is_active'             => $this->form['is_active'],
+            'target_description'    => $this->form['target_description'] !== '' ? $this->form['target_description'] : null,
+            'value_proposition'     => $this->form['value_proposition'] !== '' ? $this->form['value_proposition'] : null,
+            'cost_analysis'         => $this->form['cost_analysis'] !== '' ? $this->form['cost_analysis'] : null,
+            'risk_assessment'       => $this->form['risk_assessment'] !== '' ? $this->form['risk_assessment'] : null,
+            'improvement_levers'    => $this->form['improvement_levers'] !== '' ? $this->form['improvement_levers'] : null,
+            'action_plan'           => $this->form['action_plan'] !== '' ? $this->form['action_plan'] : null,
+            'standardization_notes' => $this->form['standardization_notes'] !== '' ? $this->form['standardization_notes'] : null,
         ]);
 
         $this->process->refresh();
@@ -487,6 +546,170 @@ class Show extends Component
         $this->process->outputs()->where('id', $id)->delete();
         $this->dispatch('toast', message: 'Output gelöscht');
         unset($this->outputs);
+    }
+
+    // ── Snapshot CRUD ───────────────────────────────────────────
+
+    public function createSnapshot(): void
+    {
+        $this->resetValidation();
+        $this->snapshotLabel = '';
+        $this->snapshotModalShow = true;
+    }
+
+    public function storeSnapshot(): void
+    {
+        $process = $this->process->load(['steps', 'flows', 'triggers', 'outputs']);
+        $maxVersion = $process->snapshots()->max('version') ?? 0;
+        $nextVersion = $maxVersion + 1;
+
+        $snapshotData = [
+            'process' => $process->only([
+                'name', 'code', 'description', 'status', 'version', 'is_active',
+                'owner_entity_id', 'vsm_system_id', 'metadata',
+                'target_description', 'value_proposition', 'cost_analysis',
+                'risk_assessment', 'improvement_levers', 'action_plan', 'standardization_notes',
+            ]),
+            'steps'    => $process->steps->map(fn ($s) => $s->only([
+                'id', 'name', 'description', 'position', 'step_type',
+                'duration_target_minutes', 'wait_target_minutes',
+                'corefit_classification', 'is_active',
+            ]))->values()->toArray(),
+            'flows'    => $process->flows->map(fn ($f) => $f->only([
+                'id', 'from_step_id', 'to_step_id', 'condition_label', 'is_default',
+            ]))->values()->toArray(),
+            'triggers' => $process->triggers->map(fn ($t) => $t->only([
+                'id', 'label', 'description', 'trigger_type',
+                'entity_id', 'source_process_id', 'interlink_id', 'schedule_expression',
+            ]))->values()->toArray(),
+            'outputs'  => $process->outputs->map(fn ($o) => $o->only([
+                'id', 'label', 'description', 'output_type',
+                'entity_id', 'target_process_id', 'interlink_id',
+            ]))->values()->toArray(),
+        ];
+
+        $steps = $process->steps;
+        $corefitCounts = $steps->groupBy('corefit_classification')->map->count();
+        $metrics = [
+            'total_steps'    => $steps->count(),
+            'total_flows'    => $process->flows->count(),
+            'total_triggers' => $process->triggers->count(),
+            'total_outputs'  => $process->outputs->count(),
+            'total_duration' => $steps->sum('duration_target_minutes') ?? 0,
+            'total_wait'     => $steps->sum('wait_target_minutes') ?? 0,
+            'corefit' => [
+                'core'    => $corefitCounts->get('core', 0),
+                'context' => $corefitCounts->get('context', 0),
+                'no_fit'  => $corefitCounts->get('no_fit', 0),
+            ],
+        ];
+
+        OrganizationProcessSnapshot::create([
+            'process_id'         => $process->id,
+            'version'            => $nextVersion,
+            'label'              => $this->snapshotLabel !== '' ? $this->snapshotLabel : null,
+            'snapshot_data'      => $snapshotData,
+            'metrics'            => $metrics,
+            'created_by_user_id' => Auth::id(),
+        ]);
+
+        $this->snapshotModalShow = false;
+        unset($this->processSnapshots);
+        $this->dispatch('toast', message: "Snapshot v{$nextVersion} erstellt");
+    }
+
+    public function deleteSnapshot(int $id): void
+    {
+        OrganizationProcessSnapshot::where('id', $id)->where('process_id', $this->process->id)->delete();
+        unset($this->processSnapshots);
+        $this->dispatch('toast', message: 'Snapshot gelöscht');
+    }
+
+    // ── Improvement CRUD ────────────────────────────────────────
+
+    public function createImprovement(): void
+    {
+        $this->resetValidation();
+        $this->editingImprovementId = null;
+        $this->improvementForm = [
+            'title' => '', 'description' => '', 'category' => 'speed',
+            'priority' => 'medium', 'status' => 'identified',
+            'expected_outcome' => '', 'actual_outcome' => '',
+        ];
+        $this->improvementModalShow = true;
+    }
+
+    public function editImprovement(int $id): void
+    {
+        $imp = $this->process->improvements()->find($id);
+        if (! $imp) return;
+
+        $this->resetValidation();
+        $this->editingImprovementId = $imp->id;
+        $this->improvementForm = [
+            'title'            => $imp->title,
+            'description'      => $imp->description ?? '',
+            'category'         => $imp->category,
+            'priority'         => $imp->priority,
+            'status'           => $imp->status,
+            'expected_outcome' => $imp->expected_outcome ?? '',
+            'actual_outcome'   => $imp->actual_outcome ?? '',
+        ];
+        $this->improvementModalShow = true;
+    }
+
+    public function storeImprovement(): void
+    {
+        $this->validate([
+            'improvementForm.title'            => 'required|string|max:255',
+            'improvementForm.description'      => 'nullable|string',
+            'improvementForm.category'         => 'required|in:cost,quality,speed,risk,standardization',
+            'improvementForm.priority'         => 'required|in:low,medium,high,critical',
+            'improvementForm.status'           => 'required|in:identified,planned,in_progress,completed,rejected',
+            'improvementForm.expected_outcome' => 'nullable|string',
+            'improvementForm.actual_outcome'   => 'nullable|string',
+        ]);
+
+        $payload = [
+            'title'            => $this->improvementForm['title'],
+            'description'      => $this->improvementForm['description'] !== '' ? $this->improvementForm['description'] : null,
+            'category'         => $this->improvementForm['category'],
+            'priority'         => $this->improvementForm['priority'],
+            'status'           => $this->improvementForm['status'],
+            'expected_outcome' => $this->improvementForm['expected_outcome'] !== '' ? $this->improvementForm['expected_outcome'] : null,
+            'actual_outcome'   => $this->improvementForm['actual_outcome'] !== '' ? $this->improvementForm['actual_outcome'] : null,
+        ];
+
+        if ($this->improvementForm['status'] === 'completed') {
+            $payload['completed_at'] = now();
+        }
+
+        if ($this->editingImprovementId) {
+            $imp = $this->process->improvements()->find($this->editingImprovementId);
+            if ($imp) {
+                if ($this->improvementForm['status'] !== 'completed') {
+                    $payload['completed_at'] = null;
+                }
+                $imp->update($payload);
+            }
+            $this->dispatch('toast', message: 'Verbesserung aktualisiert');
+        } else {
+            $this->process->improvements()->create(array_merge($payload, [
+                'team_id' => Auth::user()->currentTeam->id,
+                'user_id' => Auth::id(),
+            ]));
+            $this->dispatch('toast', message: 'Verbesserung erstellt');
+        }
+
+        $this->improvementModalShow = false;
+        unset($this->processImprovements);
+    }
+
+    public function deleteImprovement(int $id): void
+    {
+        $this->process->improvements()->where('id', $id)->delete();
+        unset($this->processImprovements);
+        $this->dispatch('toast', message: 'Verbesserung gelöscht');
     }
 
     public function render()

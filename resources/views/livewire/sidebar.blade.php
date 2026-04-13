@@ -56,6 +56,22 @@
             <span x-show="!collapsed" class="truncate">Interlinks</span>
         </a>
 
+        {{-- Prozesse --}}
+        <a href="{{ route('organization.processes.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/processes') ||
+               window.location.pathname.endsWith('/processes') ||
+               window.location.pathname.endsWith('/processes/')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-arrow-path class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Prozesse</span>
+        </a>
+
         {{-- SLA-Verträge --}}
         <a href="{{ route('organization.sla-contracts.index') }}"
            class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"

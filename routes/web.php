@@ -26,6 +26,8 @@ use Platform\Organization\Livewire\TimeEntries\Index as TimeEntriesIndex;
 use Platform\Organization\Livewire\PlannedTimes\Index as PlannedTimesIndex;
 use Platform\Organization\Livewire\JobProfile\Index as JobProfileIndex;
 use Platform\Organization\Livewire\Role\Index as RoleIndex;
+use Platform\Organization\Livewire\Process\Index as ProcessIndex;
+use Platform\Organization\Livewire\Process\Show as ProcessShow;
 
 Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organization.dashboard');
 
@@ -76,3 +78,7 @@ Route::get('/planned-times', PlannedTimesIndex::class)->name('organization.plann
 // Personen-Katalog: JobProfiles und Rollen
 Route::get('/job-profiles', JobProfileIndex::class)->name('organization.job-profiles.index');
 Route::get('/roles', RoleIndex::class)->name('organization.roles.index');
+
+// Prozesse
+Route::get('/processes', ProcessIndex::class)->name('organization.processes.index');
+Route::get('/processes/{process}', ProcessShow::class)->name('organization.processes.show');

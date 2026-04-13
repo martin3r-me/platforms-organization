@@ -46,6 +46,11 @@ return [
                         ],
                     ],
                 ],
+                'processes' => [
+                    'title' => 'Prozesse',
+                    'route' => 'organization.processes.index',
+                    'icon' => 'heroicon-o-arrow-path',
+                ],
                 'people' => [
                     'title' => 'Personen',
                     'icon' => 'heroicon-o-user-group',

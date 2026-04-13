@@ -37,6 +37,7 @@ class CreateProcessStepTool implements ToolContract, ToolMetadataContract
                 'duration_target_minutes' => ['type' => 'integer', 'description' => 'Optional: Soll-Dauer in Minuten.'],
                 'wait_target_minutes'     => ['type' => 'integer', 'description' => 'Optional: Soll-Wartezeit in Minuten.'],
                 'corefit_classification'  => ['type' => 'string', 'description' => 'Optional: green | yellow | red.'],
+                'sub_process_id'          => ['type' => 'integer', 'description' => 'Optional: Verknüpfter Sub-Prozess (bei step_type=subprocess).'],
                 'is_active'               => ['type' => 'boolean', 'description' => 'Optional: Default true.'],
                 'metadata'                => ['type' => 'object'],
             ],
@@ -78,6 +79,7 @@ class CreateProcessStepTool implements ToolContract, ToolMetadataContract
                 'duration_target_minutes' => isset($arguments['duration_target_minutes']) ? (int) $arguments['duration_target_minutes'] : null,
                 'wait_target_minutes'     => isset($arguments['wait_target_minutes']) ? (int) $arguments['wait_target_minutes'] : null,
                 'corefit_classification'  => ($arguments['corefit_classification'] ?? null) ?: null,
+                'sub_process_id'          => ! empty($arguments['sub_process_id']) ? (int) $arguments['sub_process_id'] : null,
                 'is_active'               => $arguments['is_active'] ?? true,
                 'metadata'                => $arguments['metadata'] ?? null,
             ]);
@@ -88,8 +90,9 @@ class CreateProcessStepTool implements ToolContract, ToolMetadataContract
                 'process_id' => $step->process_id,
                 'name'       => $step->name,
                 'position'   => $step->position,
-                'step_type'  => $step->step_type,
-                'team_id'    => $step->team_id,
+                'step_type'        => $step->step_type,
+                'sub_process_id'   => $step->sub_process_id,
+                'team_id'          => $step->team_id,
                 'message'    => 'Prozess-Schritt erfolgreich erstellt.',
             ]);
         } catch (\Throwable $e) {

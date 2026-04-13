@@ -38,6 +38,7 @@ class UpdateProcessStepTool implements ToolContract, ToolMetadataContract
                 'duration_target_minutes' => ['type' => 'integer', 'description' => '0 oder null zum Leeren.'],
                 'wait_target_minutes'     => ['type' => 'integer', 'description' => '0 oder null zum Leeren.'],
                 'corefit_classification'  => ['type' => 'string', 'description' => '"" zum Leeren.'],
+                'sub_process_id'          => ['type' => 'integer', 'description' => 'Verknüpfter Sub-Prozess. 0 oder null zum Leeren.'],
                 'is_active'               => ['type' => 'boolean'],
                 'metadata'                => ['type' => 'object'],
             ],
@@ -100,6 +101,10 @@ class UpdateProcessStepTool implements ToolContract, ToolMetadataContract
                 $val = (string) ($arguments['corefit_classification'] ?? '');
                 $update['corefit_classification'] = $val === '' ? null : $val;
             }
+            if (array_key_exists('sub_process_id', $arguments)) {
+                $val = $arguments['sub_process_id'];
+                $update['sub_process_id'] = (! empty($val) && (int) $val > 0) ? (int) $val : null;
+            }
             if (array_key_exists('is_active', $arguments)) {
                 $update['is_active'] = (bool) $arguments['is_active'];
             }
@@ -118,8 +123,9 @@ class UpdateProcessStepTool implements ToolContract, ToolMetadataContract
                 'process_id' => $step->process_id,
                 'name'       => $step->name,
                 'position'   => $step->position,
-                'step_type'  => $step->step_type,
-                'team_id'    => $step->team_id,
+                'step_type'        => $step->step_type,
+                'sub_process_id'   => $step->sub_process_id,
+                'team_id'          => $step->team_id,
                 'message'    => 'Prozess-Schritt erfolgreich aktualisiert.',
             ]);
         } catch (\Throwable $e) {

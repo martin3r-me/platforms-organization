@@ -335,6 +335,12 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\ListProcessImprovementsTool());
             $registry->register(new \Platform\Organization\Tools\UpdateProcessImprovementTool());
             $registry->register(new \Platform\Organization\Tools\DeleteProcessImprovementTool());
+
+            // Process Group Tools (thematisches Clustering von Prozessen)
+            $registry->register(new \Platform\Organization\Tools\ListProcessGroupsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateProcessGroupTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateProcessGroupTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteProcessGroupTool());
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

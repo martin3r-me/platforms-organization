@@ -81,6 +81,7 @@ class ListProcessStepsTool implements ToolContract, ToolMetadataContract
                 'duration_target_minutes' => $s->duration_target_minutes,
                 'wait_target_minutes'     => $s->wait_target_minutes,
                 'corefit_classification'  => $s->corefit_classification,
+                'sub_process_id'          => $s->sub_process_id,
                 'is_active'               => $s->is_active,
                 'team_id'                 => $s->team_id,
             ])->values()->toArray();

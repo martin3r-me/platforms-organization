@@ -11,35 +11,29 @@ use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
 use Symfony\Component\Uid\UuidV7;
 
-class OrganizationProcessStep extends Model
+class OrganizationProcessGroup extends Model
 {
     use SoftDeletes;
 
-    protected $table = 'organization_process_steps';
+    protected $table = 'organization_process_groups';
 
     protected $fillable = [
         'uuid',
         'team_id',
         'user_id',
-        'process_id',
         'name',
+        'code',
         'description',
-        'position',
-        'step_type',
-        'duration_target_minutes',
-        'wait_target_minutes',
-        'corefit_classification',
-        'sub_process_id',
+        'icon',
+        'sort_order',
         'is_active',
         'metadata',
     ];
 
     protected $casts = [
-        'position'                => 'integer',
-        'duration_target_minutes' => 'integer',
-        'wait_target_minutes'     => 'integer',
-        'is_active'               => 'boolean',
-        'metadata'                => 'array',
+        'sort_order' => 'integer',
+        'is_active' => 'boolean',
+        'metadata' => 'array',
     ];
 
     protected static function booted(): void
@@ -51,25 +45,13 @@ class OrganizationProcessStep extends Model
                 } while (self::where('uuid', $uuid)->exists());
                 $model->uuid = $uuid;
             }
-
             if (! $model->user_id) {
                 $model->user_id = Auth::id();
             }
-
             if (! $model->team_id) {
                 $model->team_id = Auth::user()?->currentTeamRelation?->id;
             }
         });
-    }
-
-    public function process(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationProcess::class, 'process_id');
-    }
-
-    public function subProcess(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationProcess::class, 'sub_process_id');
     }
 
     public function team(): BelongsTo
@@ -82,24 +64,9 @@ class OrganizationProcessStep extends Model
         return $this->belongsTo(User::class);
     }
 
-    public function outgoingFlows(): HasMany
+    public function processes(): HasMany
     {
-        return $this->hasMany(OrganizationProcessFlow::class, 'from_step_id');
-    }
-
-    public function incomingFlows(): HasMany
-    {
-        return $this->hasMany(OrganizationProcessFlow::class, 'to_step_id');
-    }
-
-    public function stepEntities(): HasMany
-    {
-        return $this->hasMany(OrganizationProcessStepEntity::class, 'process_step_id');
-    }
-
-    public function stepInterlinks(): HasMany
-    {
-        return $this->hasMany(OrganizationProcessStepInterlink::class, 'process_step_id');
+        return $this->hasMany(OrganizationProcess::class, 'process_group_id');
     }
 
     public function scopeActive($query)
@@ -110,5 +77,10 @@ class OrganizationProcessStep extends Model
     public function scopeForTeam($query, int $teamId)
     {
         return $query->where('team_id', $teamId);
+    }
+
+    public function scopeOrdered($query)
+    {
+        return $query->orderBy('sort_order')->orderBy('name');
     }
 }

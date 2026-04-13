@@ -63,6 +63,43 @@
                         @endif
                     </div>
                 </div>
+                @php
+                    $sidebarSteps = $this->steps;
+                    $sidebarTotal = $sidebarSteps->count();
+                    $sidebarLlm = $sidebarSteps->whereIn('automation_level', ['llm_assisted', 'llm_autonomous', 'hybrid'])->count();
+                    $sidebarLlmQuote = $sidebarTotal > 0 ? round(($sidebarLlm / $sidebarTotal) * 100) : 0;
+                @endphp
+                @if($sidebarTotal > 0)
+                    <div>
+                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">LLM-Quote</h3>
+                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-[var(--ui-muted)]">{{ $sidebarLlm }} von {{ $sidebarTotal }} Steps</span>
+                                <span class="text-lg font-bold {{ $sidebarLlmQuote >= 70 ? 'text-[var(--ui-success)]' : ($sidebarLlmQuote >= 30 ? 'text-[var(--ui-info)]' : 'text-[var(--ui-secondary)]') }}">{{ $sidebarLlmQuote }}%</span>
+                            </div>
+                            <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2">
+                                <div class="h-2 rounded-full {{ $sidebarLlmQuote >= 70 ? 'bg-[var(--ui-success)]' : ($sidebarLlmQuote >= 30 ? 'bg-[var(--ui-info)]' : 'bg-[var(--ui-muted)]') }}" style="width: {{ $sidebarLlmQuote }}%"></div>
+                            </div>
+                            @php
+                                $autoBreakdown = $this->automationMetrics;
+                            @endphp
+                            <div class="mt-2 flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[var(--ui-muted)]">
+                                @if($autoBreakdown['llm_autonomous']['count'] > 0)
+                                    <span><span class="inline-block w-1.5 h-1.5 rounded-full bg-[var(--ui-success)] mr-0.5"></span>{{ $autoBreakdown['llm_autonomous']['count'] }} autonom</span>
+                                @endif
+                                @if($autoBreakdown['llm_assisted']['count'] > 0)
+                                    <span><span class="inline-block w-1.5 h-1.5 rounded-full bg-[var(--ui-info)] mr-0.5"></span>{{ $autoBreakdown['llm_assisted']['count'] }} assisted</span>
+                                @endif
+                                @if($autoBreakdown['hybrid']['count'] > 0)
+                                    <span><span class="inline-block w-1.5 h-1.5 rounded-full bg-[var(--ui-warning)] mr-0.5"></span>{{ $autoBreakdown['hybrid']['count'] }} hybrid</span>
+                                @endif
+                                @if($autoBreakdown['human']['count'] > 0)
+                                    <span><span class="inline-block w-1.5 h-1.5 rounded-full bg-[var(--ui-muted)] mr-0.5"></span>{{ $autoBreakdown['human']['count'] }} human</span>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Details</h3>
                     <div class="space-y-3">

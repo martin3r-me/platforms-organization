@@ -63,7 +63,7 @@ class Index extends Component
             $q->where('status', $this->statusFilter);
         }
 
-        return $q->with(['ownerEntity', 'vsmSystem'])->orderBy('name')->get();
+        return $q->with(['ownerEntity', 'vsmSystem', 'steps:id,process_id,automation_level'])->orderBy('name')->get();
     }
 
     #[Computed]

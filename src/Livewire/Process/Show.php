@@ -175,22 +175,66 @@ class Show extends Component
     public function groupedEntityOptions(): array
     {
         $entities = OrganizationEntity::where('team_id', Auth::user()->currentTeam->id)
-            ->with(['type.group'])
+            ->with(['type.group', 'parent'])
             ->where('is_active', true)
-            ->get();
+            ->get()
+            ->keyBy('id');
 
-        return $entities
-            ->sortBy([
-                fn ($a, $b) => ($a->type?->group?->sort_order ?? 999) <=> ($b->type?->group?->sort_order ?? 999),
+        // Build tree: root entities first (no parent), then children indented
+        $result = [];
+        $byType = $entities->groupBy(fn ($e) => $e->type?->group?->sort_order ?? 999);
+
+        // Sort by group sort_order
+        $sorted = $byType->sortKeys();
+
+        foreach ($sorted as $entities_in_group) {
+            // Sort by type sort_order, then by name
+            $typed = $entities_in_group->sortBy([
                 fn ($a, $b) => ($a->type?->sort_order ?? 999) <=> ($b->type?->sort_order ?? 999),
                 fn ($a, $b) => $a->name <=> $b->name,
-            ])
-            ->map(fn ($e) => [
-                'value' => (string) $e->id,
-                'label' => ($e->type?->name ? $e->type->name . ' / ' : '') . $e->name,
-            ])
-            ->values()
-            ->toArray();
+            ]);
+
+            // Separate roots and children
+            $roots = $typed->whereNull('parent_entity_id');
+            $childrenByParent = $typed->whereNotNull('parent_entity_id')->groupBy('parent_entity_id');
+
+            foreach ($roots as $root) {
+                $typeName = $root->type?->name ?? '';
+                $result[] = [
+                    'value' => (string) $root->id,
+                    'label' => ($typeName ? $typeName . ' / ' : '') . $root->name,
+                ];
+                $this->addChildOptions($result, $root->id, $entities, 1);
+            }
+        }
+
+        // Also add orphan children whose parent is in a different type group
+        $usedIds = collect($result)->pluck('value')->toArray();
+        foreach ($entities as $e) {
+            if (! in_array((string) $e->id, $usedIds, true)) {
+                $typeName = $e->type?->name ?? '';
+                $result[] = [
+                    'value' => (string) $e->id,
+                    'label' => ($typeName ? $typeName . ' / ' : '') . $e->name,
+                ];
+            }
+        }
+
+        return $result;
+    }
+
+    private function addChildOptions(array &$result, int $parentId, $entities, int $depth): void
+    {
+        $indent = str_repeat('  ', $depth);
+        $children = $entities->where('parent_entity_id', $parentId)->sortBy('name');
+
+        foreach ($children as $child) {
+            $result[] = [
+                'value' => (string) $child->id,
+                'label' => $indent . '└ ' . $child->name,
+            ];
+            $this->addChildOptions($result, $child->id, $entities, $depth + 1);
+        }
     }
 
     #[Computed]

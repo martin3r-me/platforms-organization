@@ -137,7 +137,7 @@
                         <x-ui-input-select
                             name="owner_entity_id"
                             label="Owner (Entity)"
-                            :options="$this->availableEntities->map(fn($e) => ['value' => (string) $e->id, 'label' => $e->name])->toArray()"
+                            :options="$this->groupedEntityOptions"
                             nullable
                             nullLabel="– Kein Owner –"
                             wire:model.live="form.owner_entity_id"
@@ -955,7 +955,7 @@
                     <x-ui-input-select
                         name="trigger_entity_id"
                         label="Quell-Entity"
-                        :options="$this->availableEntities->map(fn($e) => ['value' => (string) $e->id, 'label' => $e->name])->toArray()"
+                        :options="$this->groupedEntityOptions"
                         nullable
                         nullLabel="– Auswählen –"
                         wire:model.live="triggerForm.entity_id"
@@ -1025,7 +1025,7 @@
                 <x-ui-input-select
                     name="output_entity_id"
                     label="Ziel-Entity (optional)"
-                    :options="$this->availableEntities->map(fn($e) => ['value' => (string) $e->id, 'label' => $e->name])->toArray()"
+                    :options="$this->groupedEntityOptions"
                     nullable
                     nullLabel="– Auswählen –"
                     wire:model.live="outputForm.entity_id"

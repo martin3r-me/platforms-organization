@@ -172,6 +172,28 @@ class Show extends Component
     }
 
     #[Computed]
+    public function groupedEntityOptions(): array
+    {
+        $entities = OrganizationEntity::where('team_id', Auth::user()->currentTeam->id)
+            ->with(['type.group'])
+            ->where('is_active', true)
+            ->get();
+
+        return $entities
+            ->sortBy([
+                fn ($a, $b) => ($a->type?->group?->sort_order ?? 999) <=> ($b->type?->group?->sort_order ?? 999),
+                fn ($a, $b) => ($a->type?->sort_order ?? 999) <=> ($b->type?->sort_order ?? 999),
+                fn ($a, $b) => $a->name <=> $b->name,
+            ])
+            ->map(fn ($e) => [
+                'value' => (string) $e->id,
+                'label' => ($e->type?->name ? $e->type->name . ' / ' : '') . $e->name,
+            ])
+            ->values()
+            ->toArray();
+    }
+
+    #[Computed]
     public function availableEntityTypes()
     {
         return OrganizationEntityType::active()->ordered()->get();

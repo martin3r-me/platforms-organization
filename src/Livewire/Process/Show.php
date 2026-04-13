@@ -136,9 +136,7 @@ class Show extends Component
     #[Computed]
     public function availableVsmSystems()
     {
-        return OrganizationVsmSystem::where('team_id', Auth::user()->currentTeam->id)
-            ->orderBy('name')
-            ->get();
+        return OrganizationVsmSystem::orderBy('name')->get();
     }
 
     #[Computed]

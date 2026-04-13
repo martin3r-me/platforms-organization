@@ -33,6 +33,7 @@ class Show extends Component
         'duration_target_minutes' => '',
         'wait_target_minutes' => '',
         'corefit_classification' => 'core',
+        'automation_level' => 'human',
         'is_active' => true,
     ];
 
@@ -333,6 +334,41 @@ class Show extends Component
     }
 
     #[Computed]
+    public function automationMetrics(): array
+    {
+        $steps = $this->steps;
+        $totalSteps = $steps->count();
+
+        $empty = ['count' => 0, 'percent' => 0, 'minutes' => 0];
+        if ($totalSteps === 0) {
+            return [
+                'human' => $empty,
+                'llm_assisted' => $empty,
+                'llm_autonomous' => $empty,
+                'hybrid' => $empty,
+            ];
+        }
+
+        $grouped = $steps->groupBy('automation_level');
+        $result = [];
+
+        foreach (['human', 'llm_assisted', 'llm_autonomous', 'hybrid'] as $level) {
+            $group = $grouped->get($level, collect());
+            $count = $group->count();
+            $minutes = $group->sum('duration_target_minutes') ?? 0;
+            $percent = $totalSteps > 0 ? round(($count / $totalSteps) * 100, 1) : 0;
+
+            $result[$level] = [
+                'count' => $count,
+                'percent' => $percent,
+                'minutes' => $minutes,
+            ];
+        }
+
+        return $result;
+    }
+
+    #[Computed]
     public function improvementsByCategory(): array
     {
         $improvements = $this->processImprovements;
@@ -420,6 +456,7 @@ class Show extends Component
             'duration_target_minutes' => '',
             'wait_target_minutes' => '',
             'corefit_classification' => 'core',
+            'automation_level' => 'human',
             'is_active' => true,
         ];
         $this->stepModalShow = true;
@@ -440,6 +477,7 @@ class Show extends Component
             'duration_target_minutes' => (string) ($step->duration_target_minutes ?? ''),
             'wait_target_minutes'     => (string) ($step->wait_target_minutes ?? ''),
             'corefit_classification'  => $step->corefit_classification ?? 'core',
+            'automation_level'        => $step->automation_level ?? 'human',
             'is_active'               => $step->is_active,
         ];
         $this->stepModalShow = true;
@@ -455,6 +493,7 @@ class Show extends Component
             'stepForm.duration_target_minutes' => 'nullable|integer|min:0',
             'stepForm.wait_target_minutes'     => 'nullable|integer|min:0',
             'stepForm.corefit_classification'  => 'required|in:core,context,no_fit',
+            'stepForm.automation_level'        => 'required|in:human,llm_assisted,llm_autonomous,hybrid',
             'stepForm.is_active'               => 'boolean',
         ]);
 
@@ -466,6 +505,7 @@ class Show extends Component
             'duration_target_minutes' => $this->stepForm['duration_target_minutes'] !== '' ? (int) $this->stepForm['duration_target_minutes'] : null,
             'wait_target_minutes'     => $this->stepForm['wait_target_minutes'] !== '' ? (int) $this->stepForm['wait_target_minutes'] : null,
             'corefit_classification'  => $this->stepForm['corefit_classification'],
+            'automation_level'        => $this->stepForm['automation_level'],
             'is_active'               => $this->stepForm['is_active'],
         ];
 
@@ -482,14 +522,14 @@ class Show extends Component
         }
 
         $this->stepModalShow = false;
-        unset($this->steps, $this->corefitMetrics);
+        unset($this->steps, $this->corefitMetrics, $this->automationMetrics);
     }
 
     public function deleteStep(int $id): void
     {
         $this->process->steps()->where('id', $id)->delete();
         $this->dispatch('toast', message: 'Schritt gelöscht');
-        unset($this->steps, $this->corefitMetrics);
+        unset($this->steps, $this->corefitMetrics, $this->automationMetrics);
     }
 
     // ── Flow CRUD ───────────────────────────────────────────────
@@ -764,7 +804,7 @@ class Show extends Component
             'steps'    => $process->steps->map(fn ($s) => $s->only([
                 'id', 'name', 'description', 'position', 'step_type',
                 'duration_target_minutes', 'wait_target_minutes',
-                'corefit_classification', 'is_active',
+                'corefit_classification', 'automation_level', 'is_active',
             ]))->values()->toArray(),
             'flows'    => $process->flows->map(fn ($f) => $f->only([
                 'id', 'from_step_id', 'to_step_id', 'condition_label', 'is_default',
@@ -781,6 +821,7 @@ class Show extends Component
 
         $steps = $process->steps;
         $corefitCounts = $steps->groupBy('corefit_classification')->map->count();
+        $automationCounts = $steps->groupBy('automation_level')->map->count();
         $metrics = [
             'total_steps'    => $steps->count(),
             'total_flows'    => $process->flows->count(),
@@ -792,6 +833,12 @@ class Show extends Component
                 'core'    => $corefitCounts->get('core', 0),
                 'context' => $corefitCounts->get('context', 0),
                 'no_fit'  => $corefitCounts->get('no_fit', 0),
+            ],
+            'automation' => [
+                'human'          => $automationCounts->get('human', 0),
+                'llm_assisted'   => $automationCounts->get('llm_assisted', 0),
+                'llm_autonomous' => $automationCounts->get('llm_autonomous', 0),
+                'hybrid'         => $automationCounts->get('hybrid', 0),
             ],
         ];
 

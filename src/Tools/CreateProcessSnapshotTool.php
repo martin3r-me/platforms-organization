@@ -69,7 +69,7 @@ class CreateProcessSnapshotTool implements ToolContract, ToolMetadataContract
                 'steps'    => $process->steps->map(fn ($s) => $s->only([
                     'id', 'name', 'description', 'position', 'step_type',
                     'duration_target_minutes', 'wait_target_minutes',
-                    'corefit_classification', 'is_active',
+                    'corefit_classification', 'automation_level', 'is_active',
                 ]))->values()->toArray(),
                 'flows'    => $process->flows->map(fn ($f) => $f->only([
                     'id', 'from_step_id', 'to_step_id', 'condition_label', 'is_default',
@@ -89,6 +89,7 @@ class CreateProcessSnapshotTool implements ToolContract, ToolMetadataContract
             $totalDuration = $steps->sum('duration_target_minutes') ?? 0;
             $totalWait = $steps->sum('wait_target_minutes') ?? 0;
             $corefitCounts = $steps->groupBy('corefit_classification')->map->count();
+            $automationCounts = $steps->groupBy('automation_level')->map->count();
 
             $metrics = [
                 'total_steps'      => $steps->count(),
@@ -101,6 +102,12 @@ class CreateProcessSnapshotTool implements ToolContract, ToolMetadataContract
                     'core'    => $corefitCounts->get('core', 0),
                     'context' => $corefitCounts->get('context', 0),
                     'no_fit'  => $corefitCounts->get('no_fit', 0),
+                ],
+                'automation' => [
+                    'human'          => $automationCounts->get('human', 0),
+                    'llm_assisted'   => $automationCounts->get('llm_assisted', 0),
+                    'llm_autonomous' => $automationCounts->get('llm_autonomous', 0),
+                    'hybrid'         => $automationCounts->get('hybrid', 0),
                 ],
             ];
 

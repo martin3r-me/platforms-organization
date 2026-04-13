@@ -29,6 +29,7 @@ class OrganizationProcessStep extends Model
         'duration_target_minutes',
         'wait_target_minutes',
         'corefit_classification',
+        'automation_level',
         'sub_process_id',
         'is_active',
         'metadata',

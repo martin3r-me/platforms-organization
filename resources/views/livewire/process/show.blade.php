@@ -328,6 +328,88 @@
                 </div>
             </div>
 
+            {{-- Automation-Metriken --}}
+            @php $autoMetrics = $this->automationMetrics; @endphp
+
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mb-6">
+                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1">Automatisierungsgrad</h3>
+                <p class="text-xs text-[var(--ui-muted)] mb-4">Verteilung der Prozessschritte nach Automatisierungsgrad. Ziel: manuellen Anteil reduzieren, LLM-Anteil steigern.</p>
+
+                <div class="grid grid-cols-4 gap-4 mb-4">
+                    <div class="border border-[var(--ui-border)]/40 rounded-lg p-4">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="inline-block w-2 h-2 rounded-full bg-[var(--ui-muted)]"></span>
+                            <h4 class="text-sm font-medium text-[var(--ui-secondary)]">Human</h4>
+                        </div>
+                        <p class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $autoMetrics['human']['count'] }}</p>
+                        <p class="text-xs text-[var(--ui-muted)]">{{ $autoMetrics['human']['percent'] }}% &middot; {{ $autoMetrics['human']['minutes'] }} Min.</p>
+                    </div>
+                    <div class="border border-[var(--ui-border)]/40 rounded-lg p-4">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="inline-block w-2 h-2 rounded-full bg-[var(--ui-info)]"></span>
+                            <h4 class="text-sm font-medium text-[var(--ui-secondary)]">LLM-Assisted</h4>
+                        </div>
+                        <p class="text-2xl font-bold text-[var(--ui-info)]">{{ $autoMetrics['llm_assisted']['count'] }}</p>
+                        <p class="text-xs text-[var(--ui-muted)]">{{ $autoMetrics['llm_assisted']['percent'] }}% &middot; {{ $autoMetrics['llm_assisted']['minutes'] }} Min.</p>
+                    </div>
+                    <div class="border border-[var(--ui-border)]/40 rounded-lg p-4">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="inline-block w-2 h-2 rounded-full bg-[var(--ui-success)]"></span>
+                            <h4 class="text-sm font-medium text-[var(--ui-secondary)]">LLM-Autonomous</h4>
+                        </div>
+                        <p class="text-2xl font-bold text-[var(--ui-success)]">{{ $autoMetrics['llm_autonomous']['count'] }}</p>
+                        <p class="text-xs text-[var(--ui-muted)]">{{ $autoMetrics['llm_autonomous']['percent'] }}% &middot; {{ $autoMetrics['llm_autonomous']['minutes'] }} Min.</p>
+                    </div>
+                    <div class="border border-[var(--ui-border)]/40 rounded-lg p-4">
+                        <div class="flex items-center gap-2 mb-1">
+                            <span class="inline-block w-2 h-2 rounded-full bg-[var(--ui-warning)]"></span>
+                            <h4 class="text-sm font-medium text-[var(--ui-secondary)]">Hybrid</h4>
+                        </div>
+                        <p class="text-2xl font-bold text-[var(--ui-warning)]">{{ $autoMetrics['hybrid']['count'] }}</p>
+                        <p class="text-xs text-[var(--ui-muted)]">{{ $autoMetrics['hybrid']['percent'] }}% &middot; {{ $autoMetrics['hybrid']['minutes'] }} Min.</p>
+                    </div>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-[var(--ui-secondary)]">Human</span>
+                            <span class="font-medium text-[var(--ui-secondary)]">{{ $autoMetrics['human']['percent'] }}%</span>
+                        </div>
+                        <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2">
+                            <div class="bg-[var(--ui-muted)] h-2 rounded-full" style="width: {{ min(100, $autoMetrics['human']['percent']) }}%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-[var(--ui-secondary)]">LLM-Assisted</span>
+                            <span class="font-medium text-[var(--ui-secondary)]">{{ $autoMetrics['llm_assisted']['percent'] }}%</span>
+                        </div>
+                        <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2">
+                            <div class="bg-[var(--ui-info)] h-2 rounded-full" style="width: {{ min(100, $autoMetrics['llm_assisted']['percent']) }}%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-[var(--ui-secondary)]">LLM-Autonomous</span>
+                            <span class="font-medium text-[var(--ui-secondary)]">{{ $autoMetrics['llm_autonomous']['percent'] }}%</span>
+                        </div>
+                        <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2">
+                            <div class="bg-[var(--ui-success)] h-2 rounded-full" style="width: {{ min(100, $autoMetrics['llm_autonomous']['percent']) }}%"></div>
+                        </div>
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-[var(--ui-secondary)]">Hybrid</span>
+                            <span class="font-medium text-[var(--ui-secondary)]">{{ $autoMetrics['hybrid']['percent'] }}%</span>
+                        </div>
+                        <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2">
+                            <div class="bg-[var(--ui-warning)] h-2 rounded-full" style="width: {{ min(100, $autoMetrics['hybrid']['percent']) }}%"></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
             {{-- Stundensatz --}}
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mb-6">
                 <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1">Kostenbasis</h3>
@@ -411,6 +493,7 @@
                     <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
                     <x-ui-table-header-cell compact="true">Dauer</x-ui-table-header-cell>
                     <x-ui-table-header-cell compact="true">CoreFit</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Automation</x-ui-table-header-cell>
                     <x-ui-table-header-cell compact="true"></x-ui-table-header-cell>
                 </x-ui-table-header>
                 <x-ui-table-body>
@@ -445,6 +528,17 @@
                                 @endif
                             </x-ui-table-cell>
                             <x-ui-table-cell compact="true">
+                                @if($step->automation_level === 'llm_autonomous')
+                                    <x-ui-badge variant="success" size="sm">LLM-Autonomous</x-ui-badge>
+                                @elseif($step->automation_level === 'llm_assisted')
+                                    <x-ui-badge variant="info" size="sm">LLM-Assisted</x-ui-badge>
+                                @elseif($step->automation_level === 'hybrid')
+                                    <x-ui-badge variant="warning" size="sm">Hybrid</x-ui-badge>
+                                @else
+                                    <x-ui-badge variant="muted" size="sm">Human</x-ui-badge>
+                                @endif
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
                                 <div class="flex gap-1 justify-end">
                                     <x-ui-button size="xs" variant="secondary-outline" wire:click="editStep({{ $step->id }})">
                                         @svg('heroicon-o-pencil-square', 'w-4 h-4')
@@ -457,7 +551,7 @@
                         </x-ui-table-row>
                     @empty
                         <x-ui-table-row compact="true">
-                            <x-ui-table-cell compact="true" colspan="6">
+                            <x-ui-table-cell compact="true" colspan="7">
                                 <div class="text-center text-[var(--ui-muted)] py-6">Keine Schritte vorhanden.</div>
                             </x-ui-table-cell>
                         </x-ui-table-row>
@@ -828,6 +922,21 @@
                     />
                     <p class="text-xs text-[var(--ui-muted)] mt-1">Core = Wertschöpfend, Context = Notwendig aber nicht wertschöpfend, No Fit = Eliminieren</p>
                 </div>
+            </div>
+
+            <div>
+                <x-ui-input-select
+                    name="automation_level"
+                    label="Automatisierungsgrad"
+                    :options="[
+                        ['value' => 'human', 'label' => 'Human'],
+                        ['value' => 'llm_assisted', 'label' => 'LLM-Assisted'],
+                        ['value' => 'llm_autonomous', 'label' => 'LLM-Autonomous'],
+                        ['value' => 'hybrid', 'label' => 'Hybrid'],
+                    ]"
+                    wire:model.live="stepForm.automation_level"
+                />
+                <p class="text-xs text-[var(--ui-muted)] mt-1">Human = Mensch, LLM-Assisted = KI-unterstützt, LLM-Autonomous = KI-autonom, Hybrid = Mensch + KI gemeinsam</p>
             </div>
 
             <div class="grid grid-cols-2 gap-4">

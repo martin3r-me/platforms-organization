@@ -369,6 +369,35 @@ class Show extends Component
     }
 
     #[Computed]
+    public function efficiencyMatrix(): array
+    {
+        $steps = $this->steps;
+        $hourlyRate = (float) ($this->form['hourly_rate'] ?? 0);
+        $minuteRate = $hourlyRate > 0 ? $hourlyRate / 60 : 0;
+
+        $matrix = [];
+        foreach (['core', 'context', 'no_fit'] as $corefit) {
+            foreach (['human', 'llm_assisted', 'llm_autonomous', 'hybrid'] as $auto) {
+                $group = $steps->filter(fn($s) =>
+                    ($s->corefit_classification ?? 'core') === $corefit &&
+                    ($s->automation_level ?? 'human') === $auto
+                );
+                $count = $group->count();
+                $minutes = $group->sum('duration_target_minutes') ?? 0;
+                $cost = round($minutes * $minuteRate, 2);
+
+                $matrix[$corefit][$auto] = [
+                    'count' => $count,
+                    'minutes' => $minutes,
+                    'cost' => $cost,
+                ];
+            }
+        }
+
+        return $matrix;
+    }
+
+    #[Computed]
     public function improvementsByCategory(): array
     {
         $improvements = $this->processImprovements;
@@ -522,14 +551,14 @@ class Show extends Component
         }
 
         $this->stepModalShow = false;
-        unset($this->steps, $this->corefitMetrics, $this->automationMetrics);
+        unset($this->steps, $this->corefitMetrics, $this->automationMetrics, $this->efficiencyMatrix);
     }
 
     public function deleteStep(int $id): void
     {
         $this->process->steps()->where('id', $id)->delete();
         $this->dispatch('toast', message: 'Schritt gelöscht');
-        unset($this->steps, $this->corefitMetrics, $this->automationMetrics);
+        unset($this->steps, $this->corefitMetrics, $this->automationMetrics, $this->efficiencyMatrix);
     }
 
     // ── Flow CRUD ───────────────────────────────────────────────

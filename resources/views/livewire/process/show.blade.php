@@ -447,6 +447,148 @@
                 </div>
             </div>
 
+            {{-- Effizienz-Matrix --}}
+            @php
+                $matrix = $this->efficiencyMatrix;
+                $autoLabels = [
+                    'human' => 'Human',
+                    'llm_assisted' => 'LLM-Assisted',
+                    'llm_autonomous' => 'LLM-Autonomous',
+                    'hybrid' => 'Hybrid',
+                ];
+                $corefitLabels = [
+                    'core' => 'Core',
+                    'context' => 'Context',
+                    'no_fit' => 'No Fit',
+                ];
+                // Recommendation map: corefit => automation => [label, color-class]
+                $recommendations = [
+                    'core' => [
+                        'human' => ['Investieren', 'bg-blue-50 border-blue-200'],
+                        'llm_assisted' => ['Gut', 'bg-green-50 border-green-200'],
+                        'llm_autonomous' => ['Optimal', 'bg-green-100 border-green-300'],
+                        'hybrid' => ['Gut', 'bg-green-50 border-green-200'],
+                    ],
+                    'context' => [
+                        'human' => ['Automatisieren', 'bg-orange-50 border-orange-200'],
+                        'llm_assisted' => ['Akzeptabel', 'bg-yellow-50 border-yellow-200'],
+                        'llm_autonomous' => ['Akzeptabel', 'bg-yellow-50 border-yellow-200'],
+                        'hybrid' => ['Akzeptabel', 'bg-yellow-50 border-yellow-200'],
+                    ],
+                    'no_fit' => [
+                        'human' => ['Eliminieren', 'bg-red-100 border-red-300'],
+                        'llm_assisted' => ['Eliminieren', 'bg-red-50 border-red-200'],
+                        'llm_autonomous' => ['Eliminieren', 'bg-red-50 border-red-200'],
+                        'hybrid' => ['Eliminieren', 'bg-red-50 border-red-200'],
+                    ],
+                ];
+                // Summary counts
+                $summaryEliminate = 0;
+                $summaryAutomate = 0;
+                $summaryInvest = 0;
+                $summaryOptimal = 0;
+                $summaryAcceptable = 0;
+                foreach ($matrix as $cf => $autos) {
+                    foreach ($autos as $al => $cell) {
+                        if ($cell['count'] === 0) continue;
+                        $rec = $recommendations[$cf][$al][0] ?? '';
+                        if ($rec === 'Eliminieren') $summaryEliminate += $cell['count'];
+                        elseif ($rec === 'Automatisieren') $summaryAutomate += $cell['count'];
+                        elseif ($rec === 'Investieren') $summaryInvest += $cell['count'];
+                        elseif ($rec === 'Optimal') $summaryOptimal += $cell['count'];
+                        elseif (in_array($rec, ['Gut', 'Akzeptabel'])) $summaryAcceptable += $cell['count'];
+                    }
+                }
+            @endphp
+
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mb-6">
+                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1">Effizienz-Matrix</h3>
+                <p class="text-xs text-[var(--ui-muted)] mb-4">Kreuzt COREFIT-Klassifikation mit Automatisierungsgrad. Leitprinzip: <strong>Eliminieren schlägt Automatisieren</strong> — selbst automatisierte Steps sollten weg, wenn sie keinen Wert liefern.</p>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr>
+                                <th class="text-left py-2 px-3 text-xs font-semibold text-[var(--ui-muted)] uppercase tracking-wider"></th>
+                                @foreach($autoLabels as $autoKey => $autoLabel)
+                                    <th class="text-center py-2 px-3 text-xs font-semibold text-[var(--ui-muted)] uppercase tracking-wider">{{ $autoLabel }}</th>
+                                @endforeach
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach($corefitLabels as $cfKey => $cfLabel)
+                                <tr>
+                                    <td class="py-2 px-3 font-semibold text-[var(--ui-secondary)] whitespace-nowrap">
+                                        <div class="flex items-center gap-2">
+                                            <span class="inline-block w-2 h-2 rounded-full {{ $cfKey === 'core' ? 'bg-[var(--ui-success)]' : ($cfKey === 'context' ? 'bg-[var(--ui-warning)]' : 'bg-[var(--ui-danger)]') }}"></span>
+                                            {{ $cfLabel }}
+                                        </div>
+                                    </td>
+                                    @foreach($autoLabels as $autoKey => $autoLabel)
+                                        @php
+                                            $cell = $matrix[$cfKey][$autoKey] ?? ['count' => 0, 'minutes' => 0, 'cost' => 0];
+                                            $rec = $recommendations[$cfKey][$autoKey] ?? ['–', 'bg-gray-50 border-gray-200'];
+                                        @endphp
+                                        <td class="py-2 px-3">
+                                            <div class="rounded-lg border p-3 {{ $cell['count'] > 0 ? $rec[1] : 'bg-[var(--ui-muted-5)] border-[var(--ui-border)]/40' }}">
+                                                @if($cell['count'] > 0)
+                                                    <div class="text-center">
+                                                        <div class="text-lg font-bold text-[var(--ui-secondary)]">{{ $cell['count'] }}</div>
+                                                        <div class="text-xs text-[var(--ui-muted)]">{{ $cell['minutes'] }} Min. &middot; {{ number_format($cell['cost'], 2, ',', '.') }} EUR</div>
+                                                        <div class="mt-1 text-xs font-semibold {{ str_contains($rec[1], 'red') ? 'text-red-700' : (str_contains($rec[1], 'orange') ? 'text-orange-700' : (str_contains($rec[1], 'blue') ? 'text-blue-700' : (str_contains($rec[1], 'green') ? 'text-green-700' : 'text-yellow-700'))) }}">{{ $rec[0] }}</div>
+                                                    </div>
+                                                @else
+                                                    <div class="text-center text-xs text-[var(--ui-muted)]">—</div>
+                                                @endif
+                                            </div>
+                                        </td>
+                                    @endforeach
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </div>
+
+                {{-- Handlungsbedarf-Zusammenfassung --}}
+                @if($metrics['total_steps'] > 0)
+                    <div class="mt-4 pt-4 border-t border-[var(--ui-border)]/40">
+                        <h4 class="text-xs font-semibold text-[var(--ui-secondary)] uppercase tracking-wider mb-2">Handlungsbedarf</h4>
+                        <div class="flex flex-wrap gap-3">
+                            @if($summaryEliminate > 0)
+                                <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-red-50 border border-red-200">
+                                    <span class="inline-block w-2 h-2 rounded-full bg-red-500"></span>
+                                    <span class="text-sm font-medium text-red-700">{{ $summaryEliminate }} Steps eliminieren</span>
+                                </div>
+                            @endif
+                            @if($summaryAutomate > 0)
+                                <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-orange-50 border border-orange-200">
+                                    <span class="inline-block w-2 h-2 rounded-full bg-orange-500"></span>
+                                    <span class="text-sm font-medium text-orange-700">{{ $summaryAutomate }} Steps automatisieren</span>
+                                </div>
+                            @endif
+                            @if($summaryInvest > 0)
+                                <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-blue-50 border border-blue-200">
+                                    <span class="inline-block w-2 h-2 rounded-full bg-blue-500"></span>
+                                    <span class="text-sm font-medium text-blue-700">{{ $summaryInvest }} Steps investieren</span>
+                                </div>
+                            @endif
+                            @if($summaryOptimal > 0)
+                                <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-green-100 border border-green-300">
+                                    <span class="inline-block w-2 h-2 rounded-full bg-green-600"></span>
+                                    <span class="text-sm font-medium text-green-700">{{ $summaryOptimal }} Steps optimal</span>
+                                </div>
+                            @endif
+                            @if($summaryAcceptable > 0)
+                                <div class="flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-yellow-50 border border-yellow-200">
+                                    <span class="inline-block w-2 h-2 rounded-full bg-yellow-500"></span>
+                                    <span class="text-sm font-medium text-yellow-700">{{ $summaryAcceptable }} Steps gut/akzeptabel</span>
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                @endif
+            </div>
+
             {{-- Stundensatz --}}
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mb-6">
                 <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1">Kostenbasis</h3>

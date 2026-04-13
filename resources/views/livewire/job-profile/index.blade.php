@@ -85,7 +85,14 @@
                             </x-ui-badge>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
-                            <span class="text-sm">{{ $jp->assignments_count }} Person(en)</span>
+                            <button type="button" wire:click="toggleAssignments({{ $jp->id }})" class="text-sm text-[var(--ui-primary)] hover:underline cursor-pointer">
+                                {{ $jp->assignments_count }} Person(en)
+                                @if($expandedProfileId === $jp->id)
+                                    @svg('heroicon-o-chevron-up', 'w-3 h-3 inline')
+                                @else
+                                    @svg('heroicon-o-chevron-down', 'w-3 h-3 inline')
+                                @endif
+                            </button>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
                             <div class="text-xs text-[var(--ui-muted)]">
@@ -115,6 +122,82 @@
                             </div>
                         </x-ui-table-cell>
                     </x-ui-table-row>
+
+                    @if($expandedProfileId === $jp->id)
+                        <tr>
+                            <td colspan="6" class="px-4 py-3 bg-[var(--ui-bg-secondary)]">
+                                {{-- Existing assignments --}}
+                                @if($jp->assignments->isNotEmpty())
+                                    <table class="w-full text-sm mb-3">
+                                        <thead>
+                                            <tr class="text-xs text-[var(--ui-muted)] uppercase">
+                                                <th class="text-left py-1 px-2">Person</th>
+                                                <th class="text-left py-1 px-2">%</th>
+                                                <th class="text-left py-1 px-2">Primär</th>
+                                                <th class="text-left py-1 px-2">Gültig ab</th>
+                                                <th class="text-left py-1 px-2">Gültig bis</th>
+                                                <th class="text-left py-1 px-2">Notiz</th>
+                                                <th class="py-1 px-2"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($jp->assignments as $a)
+                                                <tr class="border-t border-[var(--ui-border)]">
+                                                    <td class="py-1.5 px-2">{{ $a->person?->name ?? '—' }}</td>
+                                                    <td class="py-1.5 px-2">{{ $a->percentage ?? '—' }}%</td>
+                                                    <td class="py-1.5 px-2">
+                                                        @if($a->is_primary)
+                                                            @svg('heroicon-o-check', 'w-4 h-4 text-green-500')
+                                                        @else
+                                                            <span class="text-[var(--ui-muted)]">—</span>
+                                                        @endif
+                                                    </td>
+                                                    <td class="py-1.5 px-2">{{ $a->valid_from?->format('d.m.Y') ?? '—' }}</td>
+                                                    <td class="py-1.5 px-2">{{ $a->valid_to?->format('d.m.Y') ?? '—' }}</td>
+                                                    <td class="py-1.5 px-2 text-xs text-[var(--ui-muted)]">{{ $a->note ?? '' }}</td>
+                                                    <td class="py-1.5 px-2 text-right">
+                                                        <button type="button" wire:click="deleteAssignment({{ $a->id }})" wire:confirm="Zuweisung wirklich entfernen?" class="text-red-500 hover:text-red-700">
+                                                            @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                @else
+                                    <p class="text-sm text-[var(--ui-muted)] mb-3">Keine Zuweisungen vorhanden.</p>
+                                @endif
+
+                                {{-- Add new assignment form --}}
+                                <div class="flex items-end gap-2 flex-wrap border-t border-[var(--ui-border)] pt-3">
+                                    <div class="w-48">
+                                        <x-ui-input-select name="assignForm.person_entity_id" label="Person" :options="$this->groupedPersonOptions" wire:model="assignForm.person_entity_id" nullable nullLabel="— Person wählen —" size="sm" />
+                                    </div>
+                                    <div class="w-20">
+                                        <x-ui-input-text name="assignForm.percentage" label="%" wire:model="assignForm.percentage" size="sm" type="number" />
+                                    </div>
+                                    <div class="flex items-center gap-1 pb-1">
+                                        <input type="checkbox" wire:model="assignForm.is_primary" id="assign_primary_{{ $jp->id }}" class="rounded border-gray-300">
+                                        <label for="assign_primary_{{ $jp->id }}" class="text-xs">Primär</label>
+                                    </div>
+                                    <div class="w-32">
+                                        <x-ui-input-text name="assignForm.valid_from" label="Von" wire:model="assignForm.valid_from" size="sm" type="date" />
+                                    </div>
+                                    <div class="w-32">
+                                        <x-ui-input-text name="assignForm.valid_to" label="Bis" wire:model="assignForm.valid_to" size="sm" type="date" />
+                                    </div>
+                                    <div class="flex-1 min-w-[120px]">
+                                        <x-ui-input-text name="assignForm.note" label="Notiz" wire:model="assignForm.note" size="sm" />
+                                    </div>
+                                    <div class="pb-0.5">
+                                        <x-ui-button size="sm" variant="primary" wire:click="storeAssignment">
+                                            @svg('heroicon-o-plus', 'w-4 h-4')
+                                        </x-ui-button>
+                                    </div>
+                                </div>
+                            </td>
+                        </tr>
+                    @endif
                 @empty
                     <x-ui-table-row compact="true">
                         <x-ui-table-cell compact="true" colspan="6">

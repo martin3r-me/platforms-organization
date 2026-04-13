@@ -5,13 +5,25 @@ namespace Platform\Organization\Livewire\JobProfile;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationJobProfile;
+use Platform\Organization\Models\OrganizationPersonJobProfile;
 
 class Index extends Component
 {
     public string $search = '';
     public string $statusFilter = 'active';
     public ?string $levelFilter = null;
+
+    public ?int $expandedProfileId = null;
+    public array $assignForm = [
+        'person_entity_id' => '',
+        'percentage' => '100',
+        'is_primary' => false,
+        'valid_from' => '',
+        'valid_to' => '',
+        'note' => '',
+    ];
 
     public bool $modalShow = false;
     public ?int $editingId = null;
@@ -54,6 +66,7 @@ class Index extends Component
     {
         $q = OrganizationJobProfile::query()
             ->withCount('assignments')
+            ->with('assignments.person')
             ->where('team_id', Auth::user()->currentTeam->id);
 
         if ($this->search !== '') {
@@ -178,6 +191,80 @@ class Index extends Component
 
         $jp->delete();
         $this->dispatch('toast', message: 'JobProfile gelöscht');
+    }
+
+    #[Computed]
+    public function groupedPersonOptions(): array
+    {
+        $entities = OrganizationEntity::where('team_id', Auth::user()->currentTeam->id)
+            ->with(['type'])
+            ->where('is_active', true)
+            ->whereHas('type', fn ($q) => $q->where('code', 'person'))
+            ->orderBy('name')
+            ->get();
+
+        $result = [];
+        $byType = $entities->groupBy(fn ($e) => $e->type?->name ?? 'Sonstige');
+
+        foreach ($byType as $typeName => $group) {
+            foreach ($group as $entity) {
+                $result[] = [
+                    'value' => (string) $entity->id,
+                    'label' => $entity->name,
+                ];
+            }
+        }
+
+        return $result;
+    }
+
+    public function toggleAssignments(int $id): void
+    {
+        $this->expandedProfileId = $this->expandedProfileId === $id ? null : $id;
+        $this->reset('assignForm');
+        $this->assignForm['percentage'] = '100';
+    }
+
+    public function storeAssignment(): void
+    {
+        if (! $this->expandedProfileId || empty($this->assignForm['person_entity_id'])) {
+            return;
+        }
+
+        $teamId = Auth::user()->currentTeam->id;
+
+        $jp = OrganizationJobProfile::where('team_id', $teamId)->find($this->expandedProfileId);
+        if (! $jp) {
+            return;
+        }
+
+        OrganizationPersonJobProfile::create([
+            'team_id' => $teamId,
+            'job_profile_id' => $jp->id,
+            'person_entity_id' => (int) $this->assignForm['person_entity_id'],
+            'percentage' => $this->assignForm['percentage'] !== '' ? (int) $this->assignForm['percentage'] : null,
+            'is_primary' => (bool) $this->assignForm['is_primary'],
+            'valid_from' => $this->assignForm['valid_from'] ?: null,
+            'valid_to' => $this->assignForm['valid_to'] ?: null,
+            'note' => $this->assignForm['note'] !== '' ? $this->assignForm['note'] : null,
+        ]);
+
+        $this->reset('assignForm');
+        $this->assignForm['percentage'] = '100';
+        unset($this->jobProfiles);
+        $this->dispatch('toast', message: 'Zuweisung erstellt');
+    }
+
+    public function deleteAssignment(int $id): void
+    {
+        $teamId = Auth::user()->currentTeam->id;
+
+        $assignment = OrganizationPersonJobProfile::where('team_id', $teamId)->find($id);
+        if ($assignment) {
+            $assignment->delete();
+            unset($this->jobProfiles);
+            $this->dispatch('toast', message: 'Zuweisung entfernt');
+        }
     }
 
     protected function csvToArray(string $value): ?array

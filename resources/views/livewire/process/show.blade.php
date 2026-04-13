@@ -201,22 +201,95 @@
                 </div>
             </div>
 
-            {{-- Zeitanalyse --}}
-            <div class="grid grid-cols-3 gap-4 mb-6">
+            {{-- Durchlaufzeit & Effizienz --}}
+            <div class="grid grid-cols-4 gap-4 mb-6">
                 <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
-                    <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Core-Zeit</h3>
-                    <p class="text-2xl font-bold text-[var(--ui-success)]">{{ $metrics['core']['minutes'] }}</p>
-                    <p class="text-xs text-[var(--ui-muted)]">Min. / {{ number_format($metrics['core']['cost'], 2, ',', '.') }} EUR</p>
+                    <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Bearbeitungszeit</h3>
+                    <p class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $metrics['total_duration'] }}</p>
+                    <p class="text-xs text-[var(--ui-muted)]">Min. aktive Arbeit</p>
                 </div>
                 <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
-                    <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Context-Zeit</h3>
-                    <p class="text-2xl font-bold text-[var(--ui-warning)]">{{ $metrics['context']['minutes'] }}</p>
-                    <p class="text-xs text-[var(--ui-muted)]">Min. / {{ number_format($metrics['context']['cost'], 2, ',', '.') }} EUR</p>
-                </div>
-                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
-                    <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Wartezeit</h3>
+                    <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Wartezeit gesamt</h3>
                     <p class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $metrics['total_wait'] }}</p>
-                    <p class="text-xs text-[var(--ui-muted)]">Min. Liegezeit zwischen Schritten</p>
+                    <p class="text-xs text-[var(--ui-muted)]">Min. Liegezeit</p>
+                </div>
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
+                    <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Durchlaufzeit</h3>
+                    <p class="text-2xl font-bold text-[var(--ui-info)]">{{ $metrics['lead_time'] }}</p>
+                    <p class="text-xs text-[var(--ui-muted)]">Min. (Bearbeitung + Wartezeit)</p>
+                </div>
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
+                    <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Prozesseffizienz</h3>
+                    <p class="text-2xl font-bold {{ $metrics['efficiency'] >= 70 ? 'text-[var(--ui-success)]' : ($metrics['efficiency'] >= 40 ? 'text-[var(--ui-warning)]' : 'text-[var(--ui-danger)]') }}">{{ $metrics['efficiency'] }}%</p>
+                    <p class="text-xs text-[var(--ui-muted)]">Anteil aktiver Arbeit an Durchlaufzeit</p>
+                </div>
+            </div>
+
+            {{-- Zeitanalyse pro Klassifikation --}}
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mb-6">
+                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1">Zeitanalyse pro Klassifikation</h3>
+                <p class="text-xs text-[var(--ui-muted)] mb-4">Bearbeitungszeit und Wartezeit aufgeschlüsselt nach Core, Context und No Fit.</p>
+                <div class="grid grid-cols-3 gap-4">
+                    <div class="border border-[var(--ui-border)]/40 rounded-lg p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="inline-block w-2 h-2 rounded-full bg-[var(--ui-success)]"></span>
+                            <h4 class="text-sm font-medium text-[var(--ui-secondary)]">Core</h4>
+                        </div>
+                        <div class="space-y-1 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-[var(--ui-muted)]">Bearbeitung</span>
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['core']['minutes'] }} Min.</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-[var(--ui-muted)]">Wartezeit</span>
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['core']['wait'] }} Min.</span>
+                            </div>
+                            <div class="flex justify-between border-t border-[var(--ui-border)]/40 pt-1">
+                                <span class="text-[var(--ui-muted)]">Kosten</span>
+                                <span class="font-medium text-[var(--ui-success)]">{{ number_format($metrics['core']['cost'], 2, ',', '.') }} EUR</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="border border-[var(--ui-border)]/40 rounded-lg p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="inline-block w-2 h-2 rounded-full bg-[var(--ui-warning)]"></span>
+                            <h4 class="text-sm font-medium text-[var(--ui-secondary)]">Context</h4>
+                        </div>
+                        <div class="space-y-1 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-[var(--ui-muted)]">Bearbeitung</span>
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['context']['minutes'] }} Min.</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-[var(--ui-muted)]">Wartezeit</span>
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['context']['wait'] }} Min.</span>
+                            </div>
+                            <div class="flex justify-between border-t border-[var(--ui-border)]/40 pt-1">
+                                <span class="text-[var(--ui-muted)]">Kosten</span>
+                                <span class="font-medium text-[var(--ui-warning)]">{{ number_format($metrics['context']['cost'], 2, ',', '.') }} EUR</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="border border-[var(--ui-border)]/40 rounded-lg p-4">
+                        <div class="flex items-center gap-2 mb-2">
+                            <span class="inline-block w-2 h-2 rounded-full bg-[var(--ui-danger)]"></span>
+                            <h4 class="text-sm font-medium text-[var(--ui-secondary)]">No Fit</h4>
+                        </div>
+                        <div class="space-y-1 text-sm">
+                            <div class="flex justify-between">
+                                <span class="text-[var(--ui-muted)]">Bearbeitung</span>
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['no_fit']['minutes'] }} Min.</span>
+                            </div>
+                            <div class="flex justify-between">
+                                <span class="text-[var(--ui-muted)]">Wartezeit</span>
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['no_fit']['wait'] }} Min.</span>
+                            </div>
+                            <div class="flex justify-between border-t border-[var(--ui-border)]/40 pt-1">
+                                <span class="text-[var(--ui-muted)]">Kosten</span>
+                                <span class="font-medium text-[var(--ui-danger)]">{{ number_format($metrics['no_fit']['cost'], 2, ',', '.') }} EUR</span>
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
 

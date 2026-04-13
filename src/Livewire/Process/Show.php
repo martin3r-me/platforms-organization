@@ -201,14 +201,17 @@ class Show extends Component
         $steps = $this->steps;
         $totalSteps = $steps->count();
 
+        $empty = ['count' => 0, 'minutes' => 0, 'wait' => 0, 'percent' => 0, 'cost' => 0];
         if ($totalSteps === 0) {
             return [
                 'total_steps' => 0,
                 'total_duration' => 0,
                 'total_wait' => 0,
-                'core' => ['count' => 0, 'minutes' => 0, 'percent' => 0, 'cost' => 0],
-                'context' => ['count' => 0, 'minutes' => 0, 'percent' => 0, 'cost' => 0],
-                'no_fit' => ['count' => 0, 'minutes' => 0, 'percent' => 0, 'cost' => 0],
+                'lead_time' => 0,
+                'efficiency' => 0,
+                'core' => $empty,
+                'context' => $empty,
+                'no_fit' => $empty,
                 'total_cost' => 0,
             ];
         }
@@ -219,11 +222,15 @@ class Show extends Component
         $grouped = $steps->groupBy('corefit_classification');
         $totalDuration = $steps->sum('duration_target_minutes') ?? 0;
         $totalWait = $steps->sum('wait_target_minutes') ?? 0;
+        $leadTime = $totalDuration + $totalWait;
+        $efficiency = $leadTime > 0 ? round(($totalDuration / $leadTime) * 100, 1) : 0;
 
         $result = [
             'total_steps' => $totalSteps,
             'total_duration' => $totalDuration,
             'total_wait' => $totalWait,
+            'lead_time' => $leadTime,
+            'efficiency' => $efficiency,
         ];
 
         $totalCost = 0;
@@ -231,6 +238,7 @@ class Show extends Component
             $group = $grouped->get($classification, collect());
             $count = $group->count();
             $minutes = $group->sum('duration_target_minutes') ?? 0;
+            $wait = $group->sum('wait_target_minutes') ?? 0;
             $percent = $totalSteps > 0 ? round(($count / $totalSteps) * 100, 1) : 0;
             $cost = round($minutes * $minuteRate, 2);
             $totalCost += $cost;
@@ -238,6 +246,7 @@ class Show extends Component
             $result[$classification] = [
                 'count' => $count,
                 'minutes' => $minutes,
+                'wait' => $wait,
                 'percent' => $percent,
                 'cost' => $cost,
             ];

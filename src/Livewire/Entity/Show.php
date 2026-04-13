@@ -12,6 +12,10 @@ use Platform\Organization\Models\OrganizationVsmSystem;
 use Platform\Organization\Models\OrganizationCostCenter;
 use Platform\Organization\Models\OrganizationVsmFunction;
 use Platform\Organization\Models\OrganizationContext;
+use Platform\Organization\Models\OrganizationEntityRelationship;
+use Platform\Organization\Models\OrganizationEntityRelationType;
+use Platform\Organization\Models\OrganizationEntityRelationshipInterlink;
+use Platform\Organization\Models\OrganizationInterlink;
 use Platform\Core\Models\Team;
 use Platform\Core\Enums\TeamRole;
 use Platform\Organization\Services\EntityTimeResolver;
@@ -30,6 +34,22 @@ class Show extends Component
     public array $newTeam = [
         'name' => '',
         'parent_team_id' => null,
+    ];
+
+    // Relation CRUD
+    public bool $relationFormShow = false;
+    public array $relationForm = [
+        'to_entity_id' => '',
+        'relation_type_id' => '',
+        'valid_from' => '',
+        'valid_to' => '',
+    ];
+
+    // Interlink management
+    public ?int $expandedRelationId = null;
+    public array $interlinkForm = [
+        'interlink_id' => '',
+        'note' => '',
     ];
 
     #[Computed]
@@ -168,6 +188,151 @@ class Show extends Component
         }
 
         return $team->users()->orderBy('name')->get(['users.id', 'users.name', 'users.email']);
+    }
+
+    // ── Relation & Interlink Management ─────────────────────────
+
+    #[Computed]
+    public function relationsFrom()
+    {
+        return $this->entity->relationsFrom()
+            ->with(['toEntity.type', 'relationType', 'interlinks.interlink.category', 'interlinks.interlink.type'])
+            ->orderByDesc('created_at')
+            ->get();
+    }
+
+    #[Computed]
+    public function relationsTo()
+    {
+        return $this->entity->relationsTo()
+            ->with(['fromEntity.type', 'relationType', 'interlinks.interlink.category', 'interlinks.interlink.type'])
+            ->orderByDesc('created_at')
+            ->get();
+    }
+
+    #[Computed]
+    public function availableRelationTypes()
+    {
+        return OrganizationEntityRelationType::where('is_active', true)
+            ->orderBy('sort_order')->orderBy('name')
+            ->get();
+    }
+
+    #[Computed]
+    public function availableRelationEntities()
+    {
+        return OrganizationEntity::where('team_id', auth()->user()->currentTeam->id)
+            ->where('id', '!=', $this->entity->id)
+            ->where('is_active', true)
+            ->with('type')
+            ->orderBy('name')
+            ->get();
+    }
+
+    #[Computed]
+    public function availableInterlinks()
+    {
+        return OrganizationInterlink::where('team_id', auth()->user()->currentTeam->id)
+            ->active()
+            ->with(['category', 'type'])
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function createRelation(): void
+    {
+        $this->validate([
+            'relationForm.to_entity_id' => 'required|integer|exists:organization_entities,id',
+            'relationForm.relation_type_id' => 'required|integer|exists:organization_entity_relation_types,id',
+            'relationForm.valid_from' => 'nullable|date',
+            'relationForm.valid_to' => 'nullable|date|after_or_equal:relationForm.valid_from',
+        ]);
+
+        $exists = OrganizationEntityRelationship::where('from_entity_id', $this->entity->id)
+            ->where('to_entity_id', (int) $this->relationForm['to_entity_id'])
+            ->where('relation_type_id', (int) $this->relationForm['relation_type_id'])
+            ->exists();
+
+        if ($exists) {
+            $this->addError('relationForm.to_entity_id', 'Diese Beziehung existiert bereits.');
+            return;
+        }
+
+        OrganizationEntityRelationship::create([
+            'from_entity_id' => $this->entity->id,
+            'to_entity_id' => (int) $this->relationForm['to_entity_id'],
+            'relation_type_id' => (int) $this->relationForm['relation_type_id'],
+            'valid_from' => $this->relationForm['valid_from'] !== '' ? $this->relationForm['valid_from'] : null,
+            'valid_to' => $this->relationForm['valid_to'] !== '' ? $this->relationForm['valid_to'] : null,
+        ]);
+
+        $this->relationForm = ['to_entity_id' => '', 'relation_type_id' => '', 'valid_from' => '', 'valid_to' => ''];
+        $this->relationFormShow = false;
+        unset($this->relationsFrom, $this->relationsTo);
+        $this->dispatch('toast', message: 'Beziehung erstellt');
+    }
+
+    public function deleteRelation(int $id): void
+    {
+        $relation = OrganizationEntityRelationship::find($id);
+        if (! $relation) return;
+
+        if ((int) $relation->team_id !== (int) auth()->user()->currentTeam->id) {
+            $this->dispatch('toast', message: 'Keine Berechtigung', variant: 'danger');
+            return;
+        }
+
+        $relation->delete();
+        unset($this->relationsFrom, $this->relationsTo);
+        $this->dispatch('toast', message: 'Beziehung gelöscht');
+    }
+
+    public function toggleRelationInterlinks(int $relationId): void
+    {
+        if ($this->expandedRelationId === $relationId) {
+            $this->expandedRelationId = null;
+        } else {
+            $this->expandedRelationId = $relationId;
+        }
+        $this->interlinkForm = ['interlink_id' => '', 'note' => ''];
+    }
+
+    public function linkInterlink(int $relationId): void
+    {
+        $this->validate([
+            'interlinkForm.interlink_id' => 'required|integer|exists:organization_interlinks,id',
+            'interlinkForm.note' => 'nullable|string|max:500',
+        ]);
+
+        $exists = OrganizationEntityRelationshipInterlink::where('entity_relationship_id', $relationId)
+            ->where('interlink_id', (int) $this->interlinkForm['interlink_id'])
+            ->exists();
+
+        if ($exists) {
+            $this->addError('interlinkForm.interlink_id', 'Diese Schnittstelle ist bereits verknüpft.');
+            return;
+        }
+
+        OrganizationEntityRelationshipInterlink::create([
+            'entity_relationship_id' => $relationId,
+            'interlink_id' => (int) $this->interlinkForm['interlink_id'],
+            'note' => $this->interlinkForm['note'] !== '' ? $this->interlinkForm['note'] : null,
+            'is_active' => true,
+        ]);
+
+        $this->interlinkForm = ['interlink_id' => '', 'note' => ''];
+        unset($this->relationsFrom, $this->relationsTo);
+        $this->dispatch('toast', message: 'Schnittstelle verknüpft');
+    }
+
+    public function unlinkInterlink(int $pivotId): void
+    {
+        $pivot = OrganizationEntityRelationshipInterlink::find($pivotId);
+        if (! $pivot) return;
+
+        $pivot->delete();
+        unset($this->relationsFrom, $this->relationsTo);
+        $this->dispatch('toast', message: 'Schnittstelle entfernt');
     }
 
     public function openCreateTeamModal()

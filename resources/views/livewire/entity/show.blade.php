@@ -721,75 +721,122 @@
 
                 {{-- Tab: Relations --}}
                 <div x-show="tab === 'relations'" x-cloak>
-                    <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                        <div class="flex items-center justify-between mb-4">
-                            <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Relations</h2>
-                            <x-ui-button
-                                variant="primary-outline"
-                                size="sm"
-                                wire:click="$dispatch('open-relations-modal', { entityId: {{ $entity->id }} })"
-                            >
-                                @svg('heroicon-o-plus', 'w-4 h-4 mr-2')
-                                Relation hinzufügen
-                            </x-ui-button>
+                    <div class="space-y-6">
+                        {{-- Intro --}}
+                        <div class="bg-[var(--ui-info-5)] border border-[var(--ui-info-20)] rounded-lg p-4">
+                            <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1">Beziehungen & Schnittstellen</h4>
+                            <p class="text-sm text-[var(--ui-muted)]">
+                                <strong>Beziehungen</strong> beschreiben, wie Organisationseinheiten zusammenhängen (z.B. "liefert an", "beauftragt").
+                                An jede Beziehung können <strong>Schnittstellen</strong> gehängt werden — die konkreten Berührungspunkte: Verträge, Ticketsysteme, Datenflüsse, APIs.
+                                Pro Beziehung sind <strong>mehrere Schnittstellen</strong> möglich.
+                            </p>
                         </div>
-                        <div class="space-y-4">
-                            @php
-                                $relationsFrom = $entity->relationsFrom->whereNull('deleted_at');
-                                $relationsTo = $entity->relationsTo->whereNull('deleted_at');
-                            @endphp
 
-                            @if($relationsFrom->count() > 0 || $relationsTo->count() > 0)
-                                @if($relationsFrom->count() > 0)
-                                    <div>
-                                        <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
-                                            @svg('heroicon-o-arrow-right', 'w-4 h-4')
-                                            Von dieser Entity ({{ $relationsFrom->count() }})
-                                        </h3>
-                                        <div class="space-y-2">
-                                            @foreach($relationsFrom as $relation)
-                                                <div class="flex items-center justify-between p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                                                    <div class="flex items-center gap-2">
-                                                        <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity->name }}</span>
-                                                        <span class="text-sm text-[var(--ui-muted)]">{{ $relation->relationType->name }}</span>
-                                                        <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $relation->toEntity->name }}</span>
-                                                        <x-ui-badge variant="secondary" size="xs">{{ $relation->toEntity->type->name }}</x-ui-badge>
-                                                    </div>
-                                                </div>
-                                            @endforeach
+                        {{-- Ausgehende Beziehungen --}}
+                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                            <div class="flex items-center justify-between mb-1">
+                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] flex items-center gap-2">
+                                    @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-primary)]')
+                                    Ausgehende Beziehungen
+                                    <span class="text-xs font-normal text-[var(--ui-muted)]">({{ $this->relationsFrom->count() }})</span>
+                                </h3>
+                                <x-ui-button variant="primary" size="sm" wire:click="$toggle('relationFormShow')">
+                                    @svg('heroicon-o-plus', 'w-4 h-4')
+                                    <span>Neue Beziehung</span>
+                                </x-ui-button>
+                            </div>
+                            <p class="text-xs text-[var(--ui-muted)] mb-4">Von <strong>{{ $entity->name }}</strong> ausgehende Beziehungen zu anderen Einheiten.</p>
+
+                            {{-- Neue Beziehung erstellen (inline) --}}
+                            @if($relationFormShow)
+                                <div class="border border-[var(--ui-border)]/60 rounded-lg p-4 mb-4 bg-[var(--ui-muted-5)]">
+                                    <h4 class="text-xs font-semibold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Neue Beziehung</h4>
+                                    <div class="grid grid-cols-2 gap-3 mb-3">
+                                        <div>
+                                            <x-ui-input-select
+                                                name="relation_to_entity_id"
+                                                label="Ziel-Einheit"
+                                                :options="$this->availableRelationEntities->map(fn($e) => ['value' => (string) $e->id, 'label' => $e->name . ' (' . ($e->type->name ?? '') . ')'])->toArray()"
+                                                nullable
+                                                nullLabel="– Einheit auswählen –"
+                                                wire:model.live="relationForm.to_entity_id"
+                                            />
+                                            <p class="text-xs text-[var(--ui-muted)] mt-1">Mit welcher Einheit besteht die Beziehung?</p>
+                                            @error('relationForm.to_entity_id') <p class="text-xs text-[var(--ui-danger)] mt-1">{{ $message }}</p> @enderror
+                                        </div>
+                                        <div>
+                                            <x-ui-input-select
+                                                name="relation_type_id"
+                                                label="Art der Beziehung"
+                                                :options="$this->availableRelationTypes->map(fn($t) => ['value' => (string) $t->id, 'label' => $t->name])->toArray()"
+                                                nullable
+                                                nullLabel="– Beziehungstyp auswählen –"
+                                                wire:model.live="relationForm.relation_type_id"
+                                            />
+                                            <p class="text-xs text-[var(--ui-muted)] mt-1">z.B. "liefert an", "beauftragt", "ist Dienstleister für"</p>
+                                            @error('relationForm.relation_type_id') <p class="text-xs text-[var(--ui-danger)] mt-1">{{ $message }}</p> @enderror
                                         </div>
                                     </div>
-                                @endif
-
-                                @if($relationsTo->count() > 0)
-                                    <div>
-                                        <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-2 flex items-center gap-2">
-                                            @svg('heroicon-o-arrow-left', 'w-4 h-4')
-                                            Zu dieser Entity ({{ $relationsTo->count() }})
-                                        </h3>
-                                        <div class="space-y-2">
-                                            @foreach($relationsTo as $relation)
-                                                <div class="flex items-center justify-between p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                                                    <div class="flex items-center gap-2">
-                                                        <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $relation->fromEntity->name }}</span>
-                                                        <span class="text-sm text-[var(--ui-muted)]">{{ $relation->relationType->name }}</span>
-                                                        <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity->name }}</span>
-                                                        <x-ui-badge variant="secondary" size="xs">{{ $relation->fromEntity->type->name }}</x-ui-badge>
-                                                    </div>
-                                                </div>
-                                            @endforeach
-                                        </div>
+                                    <div class="grid grid-cols-2 gap-3 mb-3">
+                                        <x-ui-input-text name="relation_valid_from" label="Gültig von (optional)" type="date" wire:model.live="relationForm.valid_from" />
+                                        <x-ui-input-text name="relation_valid_to" label="Gültig bis (optional)" type="date" wire:model.live="relationForm.valid_to" />
                                     </div>
-                                @endif
-                            @else
-                                <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                                    <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
-                                        @svg('heroicon-o-link', 'w-8 h-8 text-[var(--ui-muted)]')
+                                    <div class="flex gap-2">
+                                        <x-ui-button variant="primary" size="sm" wire:click="createRelation">
+                                            @svg('heroicon-o-check', 'w-4 h-4')
+                                            <span>Erstellen</span>
+                                        </x-ui-button>
+                                        <x-ui-button variant="secondary-ghost" size="sm" wire:click="$set('relationFormShow', false)">
+                                            Abbrechen
+                                        </x-ui-button>
                                     </div>
-                                    <p class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Keine Relations vorhanden</p>
-                                    <p class="text-xs text-[var(--ui-muted)]">Erstellen Sie eine Relation zu einer anderen Entity</p>
                                 </div>
                             @endif
+
+                            {{-- Liste --}}
+                            <div class="space-y-2">
+                                @forelse($this->relationsFrom as $relation)
+                                    @include('organization::livewire.entity.partials.relation-card-inline', [
+                                        'relation' => $relation,
+                                        'direction' => 'from',
+                                        'thisEntity' => $entity,
+                                        'otherEntity' => $relation->toEntity,
+                                    ])
+                                @empty
+                                    <div class="p-6 text-center rounded-lg border border-dashed border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                        @svg('heroicon-o-arrow-right', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
+                                        <p class="text-sm font-medium text-[var(--ui-secondary)] mb-0.5">Keine ausgehenden Beziehungen</p>
+                                        <p class="text-xs text-[var(--ui-muted)]">Klicke "Neue Beziehung" um eine Beziehung zu einer anderen Einheit zu erstellen.</p>
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+
+                        {{-- Eingehende Beziehungen --}}
+                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                            <h3 class="text-sm font-semibold text-[var(--ui-secondary)] flex items-center gap-2 mb-1">
+                                @svg('heroicon-o-arrow-left', 'w-4 h-4 text-[var(--ui-info)]')
+                                Eingehende Beziehungen
+                                <span class="text-xs font-normal text-[var(--ui-muted)]">({{ $this->relationsTo->count() }})</span>
+                            </h3>
+                            <p class="text-xs text-[var(--ui-muted)] mb-4">Beziehungen, die von anderen Einheiten auf <strong>{{ $entity->name }}</strong> zeigen.</p>
+
+                            <div class="space-y-2">
+                                @forelse($this->relationsTo as $relation)
+                                    @include('organization::livewire.entity.partials.relation-card-inline', [
+                                        'relation' => $relation,
+                                        'direction' => 'to',
+                                        'thisEntity' => $entity,
+                                        'otherEntity' => $relation->fromEntity,
+                                    ])
+                                @empty
+                                    <div class="p-6 text-center rounded-lg border border-dashed border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                        @svg('heroicon-o-arrow-left', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
+                                        <p class="text-sm font-medium text-[var(--ui-secondary)] mb-0.5">Keine eingehenden Beziehungen</p>
+                                        <p class="text-xs text-[var(--ui-muted)]">Andere Einheiten können Beziehungen zu dieser Entity anlegen.</p>
+                                    </div>
+                                @endforelse
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -1138,9 +1185,6 @@
         }));
     });
     </script>
-
-    <!-- Relations Modal -->
-    <livewire:organization.entity.modal-relations/>
 
     <!-- Create Team Modal -->
     <x-ui-modal

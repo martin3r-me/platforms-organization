@@ -47,6 +47,7 @@ class UpdateProcessTool implements ToolContract, ToolMetadataContract
                 'improvement_levers'    => ['type' => 'string', 'description' => 'Hebel & Lösungsdesign. "" zum Leeren.'],
                 'action_plan'           => ['type' => 'string', 'description' => 'Maßnahmenplan. "" zum Leeren.'],
                 'standardization_notes' => ['type' => 'string', 'description' => 'Standardisierung & Kontrolle. "" zum Leeren.'],
+                'hourly_rate'           => ['type' => 'number', 'description' => 'Stundensatz in EUR. 0 oder null zum Leeren.'],
             ],
             'required' => ['process_id'],
         ]);
@@ -116,6 +117,10 @@ class UpdateProcessTool implements ToolContract, ToolMetadataContract
                     $val = (string) ($arguments[$field] ?? '');
                     $update[$field] = $val === '' ? null : $val;
                 }
+            }
+            if (array_key_exists('hourly_rate', $arguments)) {
+                $val = $arguments['hourly_rate'];
+                $update['hourly_rate'] = (! empty($val) && (float) $val > 0) ? round((float) $val, 2) : null;
             }
 
             if (! empty($update)) {

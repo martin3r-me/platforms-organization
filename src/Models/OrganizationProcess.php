@@ -37,12 +37,14 @@ class OrganizationProcess extends Model
         'improvement_levers',
         'action_plan',
         'standardization_notes',
+        'hourly_rate',
     ];
 
     protected $casts = [
-        'is_active' => 'boolean',
-        'version'   => 'integer',
-        'metadata'  => 'array',
+        'is_active'   => 'boolean',
+        'version'     => 'integer',
+        'metadata'    => 'array',
+        'hourly_rate' => 'decimal:2',
     ];
 
     protected static function booted(): void

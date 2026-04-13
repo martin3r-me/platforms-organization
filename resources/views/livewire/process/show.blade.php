@@ -94,30 +94,20 @@
     </x-slot>
 
     <x-ui-page-container>
-        <!-- Tabs -->
-        <div class="flex items-center gap-1 mb-6 border-b border-[var(--ui-border)]/60">
-            @foreach(['details' => 'Details', 'steps' => 'Steps', 'flows' => 'Flows', 'triggers' => 'Triggers', 'outputs' => 'Outputs', 'improvements' => 'Verbesserungen', 'snapshots' => 'Snapshots'] as $tab => $label)
-                <button
-                    wire:click="$set('activeTab', '{{ $tab }}')"
-                    class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors {{ $activeTab === $tab ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}"
-                >
-                    {{ $label }}
-                    @if($tab === 'steps')
-                        <span class="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $this->steps->count() }}</span>
-                    @elseif($tab === 'flows')
-                        <span class="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $this->flows->count() }}</span>
-                    @elseif($tab === 'triggers')
-                        <span class="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $this->triggers->count() }}</span>
-                    @elseif($tab === 'outputs')
-                        <span class="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $this->outputs->count() }}</span>
-                    @elseif($tab === 'improvements')
-                        <span class="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $this->processImprovements->count() }}</span>
-                    @elseif($tab === 'snapshots')
-                        <span class="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $this->processSnapshots->count() }}</span>
-                    @endif
-                </button>
-            @endforeach
-        </div>
+        {{-- Tabs --}}
+        @php
+            $tabItems = [
+                ['value' => 'details', 'label' => 'Details'],
+                ['value' => 'corefit', 'label' => 'COREFIT'],
+                ['value' => 'steps', 'label' => 'Steps', 'count' => $this->steps->count()],
+                ['value' => 'flows', 'label' => 'Flows', 'count' => $this->flows->count()],
+                ['value' => 'triggers', 'label' => 'Triggers', 'count' => $this->triggers->count()],
+                ['value' => 'outputs', 'label' => 'Outputs', 'count' => $this->outputs->count()],
+                ['value' => 'improvements', 'label' => 'Verbesserungen', 'count' => $this->processImprovements->count()],
+                ['value' => 'snapshots', 'label' => 'Snapshots', 'count' => $this->processSnapshots->count()],
+            ];
+        @endphp
+        <x-ui-tab :tabs="$tabItems" model="activeTab" :showCounts="true" />
 
         {{-- ── Tab: Details ────────────────────────────────── --}}
         @if($activeTab === 'details')
@@ -129,39 +119,36 @@
                     <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" />
 
                     <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">Status</label>
-                            <select wire:model.live="form.status" class="w-full rounded-md border-gray-300 shadow-sm">
-                                <option value="draft">Entwurf</option>
-                                <option value="active">Aktiv</option>
-                                <option value="deprecated">Veraltet</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">Version</label>
-                            <x-ui-input-text name="version" type="number" wire:model.live="form.version" min="1" />
-                        </div>
+                        <x-ui-input-select
+                            name="status"
+                            label="Status"
+                            :options="[
+                                ['value' => 'draft', 'label' => 'Entwurf'],
+                                ['value' => 'active', 'label' => 'Aktiv'],
+                                ['value' => 'deprecated', 'label' => 'Veraltet'],
+                            ]"
+                            wire:model.live="form.status"
+                        />
+                        <x-ui-input-text name="version" label="Version" type="number" wire:model.live="form.version" min="1" />
                     </div>
 
                     <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">Owner (Entity)</label>
-                            <select wire:model.live="form.owner_entity_id" class="w-full rounded-md border-gray-300 shadow-sm">
-                                <option value="">– Kein Owner –</option>
-                                @foreach($this->availableEntities as $entity)
-                                    <option value="{{ $entity->id }}">{{ $entity->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">VSM System</label>
-                            <select wire:model.live="form.vsm_system_id" class="w-full rounded-md border-gray-300 shadow-sm">
-                                <option value="">– Kein VSM System –</option>
-                                @foreach($this->availableVsmSystems as $vsm)
-                                    <option value="{{ $vsm->id }}">{{ $vsm->name }}</option>
-                                @endforeach
-                            </select>
-                        </div>
+                        <x-ui-input-select
+                            name="owner_entity_id"
+                            label="Owner (Entity)"
+                            :options="$this->availableEntities->map(fn($e) => ['value' => (string) $e->id, 'label' => $e->name])->toArray()"
+                            nullable
+                            nullLabel="– Kein Owner –"
+                            wire:model.live="form.owner_entity_id"
+                        />
+                        <x-ui-input-select
+                            name="vsm_system_id"
+                            label="VSM System"
+                            :options="$this->availableVsmSystems->map(fn($v) => ['value' => (string) $v->id, 'label' => $v->name])->toArray()"
+                            nullable
+                            nullLabel="– Kein VSM System –"
+                            wire:model.live="form.vsm_system_id"
+                        />
                     </div>
 
                     <div class="flex items-center">
@@ -170,18 +157,166 @@
                     </div>
                 </div>
             </div>
+        @endif
 
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mt-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">COREFIT-Analyse</h2>
-                <div class="space-y-4">
-                    <x-ui-input-textarea name="target_description" label="Zielbild" wire:model.live="form.target_description" rows="3" placeholder="Wie soll der Prozess idealerweise aussehen?" />
-                    <x-ui-input-textarea name="value_proposition" label="Kundennutzen & Wertbeitrag" wire:model.live="form.value_proposition" rows="3" placeholder="Welchen Wert liefert der Prozess?" />
-                    <x-ui-input-textarea name="cost_analysis" label="Kosten & Break-Even" wire:model.live="form.cost_analysis" rows="3" placeholder="Kosten, Aufwand, Break-Even-Analyse" />
-                    <x-ui-input-textarea name="risk_assessment" label="Risiko & Resilienz" wire:model.live="form.risk_assessment" rows="3" placeholder="Risiken, Single Points of Failure, Resilienz" />
-                    <x-ui-input-textarea name="improvement_levers" label="Hebel & Lösungsdesign" wire:model.live="form.improvement_levers" rows="3" placeholder="Wo liegen die größten Verbesserungshebel?" />
-                    <x-ui-input-textarea name="action_plan" label="Maßnahmenplan" wire:model.live="form.action_plan" rows="3" placeholder="Konkrete nächste Schritte" />
-                    <x-ui-input-textarea name="standardization_notes" label="Standardisierung & Kontrolle" wire:model.live="form.standardization_notes" rows="3" placeholder="Standards, KPIs, Kontrollmechanismen" />
+        {{-- ── Tab: COREFIT ────────────────────────────────── --}}
+        @if($activeTab === 'corefit')
+            @php $metrics = $this->corefitMetrics; @endphp
+
+            {{-- Metriken-Kacheln --}}
+            <x-ui-stats-grid :cols="4" :gap="4">
+                <x-ui-dashboard-tile
+                    title="Core-Steps"
+                    :count="$metrics['core']['count']"
+                    :description="$metrics['core']['percent'] . '%'"
+                    icon="check-badge"
+                    variant="success"
+                    size="sm"
+                />
+                <x-ui-dashboard-tile
+                    title="Context-Steps"
+                    :count="$metrics['context']['count']"
+                    :description="$metrics['context']['percent'] . '%'"
+                    icon="puzzle-piece"
+                    variant="warning"
+                    size="sm"
+                />
+                <x-ui-dashboard-tile
+                    title="No-Fit-Steps"
+                    :count="$metrics['no_fit']['count']"
+                    :description="$metrics['no_fit']['percent'] . '%'"
+                    icon="x-circle"
+                    variant="danger"
+                    size="sm"
+                />
+                <x-ui-dashboard-tile
+                    title="Gesamtkosten"
+                    :count="$metrics['total_cost']"
+                    description="EUR"
+                    icon="currency-euro"
+                    variant="info"
+                    size="sm"
+                />
+            </x-ui-stats-grid>
+
+            {{-- Zeitanalyse --}}
+            <x-ui-stats-grid :cols="3" :gap="4">
+                <x-ui-dashboard-tile
+                    title="Core-Zeit"
+                    :count="$metrics['core']['minutes']"
+                    :description="'Min. / ' . number_format($metrics['core']['cost'], 2, ',', '.') . ' EUR'"
+                    icon="clock"
+                    variant="success"
+                    size="sm"
+                />
+                <x-ui-dashboard-tile
+                    title="Context-Zeit"
+                    :count="$metrics['context']['minutes']"
+                    :description="'Min. / ' . number_format($metrics['context']['cost'], 2, ',', '.') . ' EUR'"
+                    icon="clock"
+                    variant="warning"
+                    size="sm"
+                />
+                <x-ui-dashboard-tile
+                    title="Wartezeit"
+                    :count="$metrics['total_wait']"
+                    description="Min."
+                    icon="pause-circle"
+                    variant="neutral"
+                    size="sm"
+                />
+            </x-ui-stats-grid>
+
+            {{-- Progress Bars --}}
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mb-6">
+                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">COREFIT-Verteilung</h3>
+                <div class="space-y-3">
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-[var(--ui-secondary)]">Core</span>
+                            <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['core']['percent'] }}%</span>
+                        </div>
+                        <x-ui-progress-bar :value="$metrics['core']['percent']" variant="success" height="sm" />
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-[var(--ui-secondary)]">Context</span>
+                            <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['context']['percent'] }}%</span>
+                        </div>
+                        <x-ui-progress-bar :value="$metrics['context']['percent']" variant="warning" height="sm" />
+                    </div>
+                    <div>
+                        <div class="flex justify-between text-sm mb-1">
+                            <span class="text-[var(--ui-secondary)]">No Fit</span>
+                            <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['no_fit']['percent'] }}%</span>
+                        </div>
+                        <x-ui-progress-bar :value="$metrics['no_fit']['percent']" variant="danger" height="sm" />
+                    </div>
                 </div>
+            </div>
+
+            {{-- Stundensatz --}}
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mb-6">
+                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">Stundensatz</h3>
+                <div class="max-w-xs">
+                    <x-ui-input-text name="hourly_rate" label="Stundensatz (EUR/h)" type="number" wire:model.live="form.hourly_rate" min="0" step="0.01" placeholder="z.B. 85.00" />
+                </div>
+            </div>
+
+            {{-- Canvas Cards --}}
+            @php
+                $impByCategory = $this->improvementsByCategory;
+                $canvasCards = [
+                    ['field' => 'target_description', 'label' => 'Zielbild', 'placeholder' => 'Wie soll der Prozess idealerweise aussehen?', 'category' => null],
+                    ['field' => 'value_proposition', 'label' => 'Kundennutzen & Wertbeitrag', 'placeholder' => 'Welchen Wert liefert der Prozess?', 'category' => 'quality'],
+                    ['field' => 'cost_analysis', 'label' => 'Kosten & Break-Even', 'placeholder' => 'Kosten, Aufwand, Break-Even-Analyse', 'category' => 'cost'],
+                    ['field' => 'risk_assessment', 'label' => 'Risiko & Resilienz', 'placeholder' => 'Risiken, Single Points of Failure, Resilienz', 'category' => 'risk'],
+                    ['field' => 'improvement_levers', 'label' => 'Hebel & Lösungsdesign', 'placeholder' => 'Wo liegen die größten Verbesserungshebel?', 'category' => 'speed'],
+                    ['field' => 'action_plan', 'label' => 'Maßnahmenplan', 'placeholder' => 'Konkrete nächste Schritte', 'category' => null],
+                    ['field' => 'standardization_notes', 'label' => 'Standardisierung & Kontrolle', 'placeholder' => 'Standards, KPIs, Kontrollmechanismen', 'category' => 'standardization'],
+                ];
+            @endphp
+
+            <div class="space-y-4">
+                @foreach($canvasCards as $card)
+                    <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                        <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">{{ $card['label'] }}</h3>
+                        <x-ui-input-textarea
+                            name="{{ $card['field'] }}"
+                            wire:model.live="form.{{ $card['field'] }}"
+                            rows="3"
+                            placeholder="{{ $card['placeholder'] }}"
+                        />
+                        @if($card['category'] && isset($impByCategory[$card['category']]))
+                            @php $catData = $impByCategory[$card['category']]; @endphp
+                            @if($catData['total'] > 0)
+                                <div class="mt-3 flex flex-wrap gap-2">
+                                    @foreach($catData['statuses'] as $status => $count)
+                                        @php
+                                            $statusLabels = [
+                                                'identified' => 'identifiziert',
+                                                'planned' => 'geplant',
+                                                'in_progress' => 'in Arbeit',
+                                                'completed' => 'abgeschlossen',
+                                                'rejected' => 'abgelehnt',
+                                            ];
+                                            $statusVariants = [
+                                                'identified' => 'muted',
+                                                'planned' => 'info',
+                                                'in_progress' => 'warning',
+                                                'completed' => 'success',
+                                                'rejected' => 'danger',
+                                            ];
+                                        @endphp
+                                        <x-ui-badge variant="{{ $statusVariants[$status] ?? 'muted' }}" size="sm">
+                                            {{ $count }} {{ $statusLabels[$status] ?? $status }}
+                                        </x-ui-badge>
+                                    @endforeach
+                                </div>
+                            @endif
+                        @endif
+                    </div>
+                @endforeach
             </div>
         @endif
 
@@ -435,6 +570,7 @@
                 </x-ui-table-body>
             </x-ui-table>
         @endif
+
         {{-- ── Tab: Verbesserungen ──────────────────────────── --}}
         @if($activeTab === 'improvements')
             <div class="flex justify-end mb-4">
@@ -585,23 +721,27 @@
             <x-ui-input-textarea name="step_description" label="Beschreibung" wire:model.live="stepForm.description" rows="2" />
 
             <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Schritttyp</label>
-                    <select wire:model.live="stepForm.step_type" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="task">Task</option>
-                        <option value="decision">Decision</option>
-                        <option value="event">Event</option>
-                        <option value="subprocess">Subprocess</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">CoreFit Klassifikation</label>
-                    <select wire:model.live="stepForm.corefit_classification" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="core">Core</option>
-                        <option value="context">Context</option>
-                        <option value="no_fit">No Fit</option>
-                    </select>
-                </div>
+                <x-ui-input-select
+                    name="step_type"
+                    label="Schritttyp"
+                    :options="[
+                        ['value' => 'task', 'label' => 'Task'],
+                        ['value' => 'decision', 'label' => 'Decision'],
+                        ['value' => 'event', 'label' => 'Event'],
+                        ['value' => 'subprocess', 'label' => 'Subprocess'],
+                    ]"
+                    wire:model.live="stepForm.step_type"
+                />
+                <x-ui-input-select
+                    name="corefit_classification"
+                    label="CoreFit Klassifikation"
+                    :options="[
+                        ['value' => 'core', 'label' => 'Core'],
+                        ['value' => 'context', 'label' => 'Context'],
+                        ['value' => 'no_fit', 'label' => 'No Fit'],
+                    ]"
+                    wire:model.live="stepForm.corefit_classification"
+                />
             </div>
 
             <div class="grid grid-cols-2 gap-4">
@@ -634,24 +774,24 @@
 
         <form wire:submit.prevent="storeFlow" class="space-y-4">
             <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Von Schritt</label>
-                    <select wire:model.live="flowForm.from_step_id" class="w-full rounded-md border-gray-300 shadow-sm" required>
-                        <option value="">– Auswählen –</option>
-                        @foreach($this->steps as $step)
-                            <option value="{{ $step->id }}">{{ $step->position }}. {{ $step->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Nach Schritt</label>
-                    <select wire:model.live="flowForm.to_step_id" class="w-full rounded-md border-gray-300 shadow-sm" required>
-                        <option value="">– Auswählen –</option>
-                        @foreach($this->steps as $step)
-                            <option value="{{ $step->id }}">{{ $step->position }}. {{ $step->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                <x-ui-input-select
+                    name="from_step_id"
+                    label="Von Schritt"
+                    :options="$this->steps->map(fn($s) => ['value' => (string) $s->id, 'label' => $s->position . '. ' . $s->name])->toArray()"
+                    nullable
+                    nullLabel="– Auswählen –"
+                    wire:model.live="flowForm.from_step_id"
+                    required
+                />
+                <x-ui-input-select
+                    name="to_step_id"
+                    label="Nach Schritt"
+                    :options="$this->steps->map(fn($s) => ['value' => (string) $s->id, 'label' => $s->position . '. ' . $s->name])->toArray()"
+                    nullable
+                    nullLabel="– Auswählen –"
+                    wire:model.live="flowForm.to_step_id"
+                    required
+                />
             </div>
 
             <x-ui-input-text name="condition_label" label="Bedingung (optional)" wire:model.live="flowForm.condition_label" placeholder="z.B. Ja / Nein" />
@@ -683,43 +823,43 @@
             <x-ui-input-text name="trigger_label" label="Label" wire:model.live="triggerForm.label" required />
             <x-ui-input-textarea name="trigger_description" label="Beschreibung" wire:model.live="triggerForm.description" rows="2" />
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Trigger-Typ</label>
-                <select wire:model.live="triggerForm.trigger_type" class="w-full rounded-md border-gray-300 shadow-sm">
-                    <option value="manual">Manuell</option>
-                    <option value="scheduled">Geplant</option>
-                    <option value="event">Event</option>
-                    <option value="process_output">Prozess-Output</option>
-                    <option value="interlink">Interlink</option>
-                </select>
-            </div>
+            <x-ui-input-select
+                name="trigger_type"
+                label="Trigger-Typ"
+                :options="[
+                    ['value' => 'manual', 'label' => 'Manuell'],
+                    ['value' => 'scheduled', 'label' => 'Geplant'],
+                    ['value' => 'event', 'label' => 'Event'],
+                    ['value' => 'process_output', 'label' => 'Prozess-Output'],
+                    ['value' => 'interlink', 'label' => 'Interlink'],
+                ]"
+                wire:model.live="triggerForm.trigger_type"
+            />
 
             @if($triggerForm['trigger_type'] === 'scheduled')
                 <x-ui-input-text name="schedule_expression" label="Schedule-Ausdruck (Cron)" wire:model.live="triggerForm.schedule_expression" placeholder="z.B. 0 8 * * MON" />
             @endif
 
             @if($triggerForm['trigger_type'] === 'event')
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Quell-Entity</label>
-                    <select wire:model.live="triggerForm.entity_id" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">– Auswählen –</option>
-                        @foreach($this->availableEntities as $entity)
-                            <option value="{{ $entity->id }}">{{ $entity->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                <x-ui-input-select
+                    name="trigger_entity_id"
+                    label="Quell-Entity"
+                    :options="$this->availableEntities->map(fn($e) => ['value' => (string) $e->id, 'label' => $e->name])->toArray()"
+                    nullable
+                    nullLabel="– Auswählen –"
+                    wire:model.live="triggerForm.entity_id"
+                />
             @endif
 
             @if($triggerForm['trigger_type'] === 'process_output')
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Quell-Prozess</label>
-                    <select wire:model.live="triggerForm.source_process_id" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">– Auswählen –</option>
-                        @foreach($this->availableProcesses as $proc)
-                            <option value="{{ $proc->id }}">{{ $proc->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                <x-ui-input-select
+                    name="source_process_id"
+                    label="Quell-Prozess"
+                    :options="$this->availableProcesses->map(fn($p) => ['value' => (string) $p->id, 'label' => $p->name])->toArray()"
+                    nullable
+                    nullLabel="– Auswählen –"
+                    wire:model.live="triggerForm.source_process_id"
+                />
             @endif
         </form>
 
@@ -744,39 +884,39 @@
             <x-ui-input-text name="output_label" label="Label" wire:model.live="outputForm.label" required />
             <x-ui-input-textarea name="output_description" label="Beschreibung" wire:model.live="outputForm.description" rows="2" />
 
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">Output-Typ</label>
-                <select wire:model.live="outputForm.output_type" class="w-full rounded-md border-gray-300 shadow-sm">
-                    <option value="document">Dokument</option>
-                    <option value="data">Daten</option>
-                    <option value="notification">Benachrichtigung</option>
-                    <option value="process_trigger">Prozess-Trigger</option>
-                    <option value="interlink">Interlink</option>
-                </select>
-            </div>
+            <x-ui-input-select
+                name="output_type"
+                label="Output-Typ"
+                :options="[
+                    ['value' => 'document', 'label' => 'Dokument'],
+                    ['value' => 'data', 'label' => 'Daten'],
+                    ['value' => 'notification', 'label' => 'Benachrichtigung'],
+                    ['value' => 'process_trigger', 'label' => 'Prozess-Trigger'],
+                    ['value' => 'interlink', 'label' => 'Interlink'],
+                ]"
+                wire:model.live="outputForm.output_type"
+            />
 
             @if($outputForm['output_type'] === 'process_trigger')
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Ziel-Prozess</label>
-                    <select wire:model.live="outputForm.target_process_id" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">– Auswählen –</option>
-                        @foreach($this->availableProcesses as $proc)
-                            <option value="{{ $proc->id }}">{{ $proc->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                <x-ui-input-select
+                    name="target_process_id"
+                    label="Ziel-Prozess"
+                    :options="$this->availableProcesses->map(fn($p) => ['value' => (string) $p->id, 'label' => $p->name])->toArray()"
+                    nullable
+                    nullLabel="– Auswählen –"
+                    wire:model.live="outputForm.target_process_id"
+                />
             @endif
 
             @if(in_array($outputForm['output_type'], ['document', 'data', 'notification']))
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Ziel-Entity (optional)</label>
-                    <select wire:model.live="outputForm.entity_id" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">– Auswählen –</option>
-                        @foreach($this->availableEntities as $entity)
-                            <option value="{{ $entity->id }}">{{ $entity->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                <x-ui-input-select
+                    name="output_entity_id"
+                    label="Ziel-Entity (optional)"
+                    :options="$this->availableEntities->map(fn($e) => ['value' => (string) $e->id, 'label' => $e->name])->toArray()"
+                    nullable
+                    nullLabel="– Auswählen –"
+                    wire:model.live="outputForm.entity_id"
+                />
             @endif
         </form>
 
@@ -826,35 +966,41 @@
             <x-ui-input-textarea name="imp_description" label="Beschreibung" wire:model.live="improvementForm.description" rows="2" />
 
             <div class="grid grid-cols-3 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Kategorie</label>
-                    <select wire:model.live="improvementForm.category" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="cost">Kosten</option>
-                        <option value="quality">Qualität</option>
-                        <option value="speed">Geschwindigkeit</option>
-                        <option value="risk">Risiko</option>
-                        <option value="standardization">Standardisierung</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Priorität</label>
-                    <select wire:model.live="improvementForm.priority" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="low">Niedrig</option>
-                        <option value="medium">Mittel</option>
-                        <option value="high">Hoch</option>
-                        <option value="critical">Kritisch</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                    <select wire:model.live="improvementForm.status" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="identified">Identifiziert</option>
-                        <option value="planned">Geplant</option>
-                        <option value="in_progress">In Arbeit</option>
-                        <option value="completed">Abgeschlossen</option>
-                        <option value="rejected">Abgelehnt</option>
-                    </select>
-                </div>
+                <x-ui-input-select
+                    name="imp_category"
+                    label="Kategorie"
+                    :options="[
+                        ['value' => 'cost', 'label' => 'Kosten'],
+                        ['value' => 'quality', 'label' => 'Qualität'],
+                        ['value' => 'speed', 'label' => 'Geschwindigkeit'],
+                        ['value' => 'risk', 'label' => 'Risiko'],
+                        ['value' => 'standardization', 'label' => 'Standardisierung'],
+                    ]"
+                    wire:model.live="improvementForm.category"
+                />
+                <x-ui-input-select
+                    name="imp_priority"
+                    label="Priorität"
+                    :options="[
+                        ['value' => 'low', 'label' => 'Niedrig'],
+                        ['value' => 'medium', 'label' => 'Mittel'],
+                        ['value' => 'high', 'label' => 'Hoch'],
+                        ['value' => 'critical', 'label' => 'Kritisch'],
+                    ]"
+                    wire:model.live="improvementForm.priority"
+                />
+                <x-ui-input-select
+                    name="imp_status"
+                    label="Status"
+                    :options="[
+                        ['value' => 'identified', 'label' => 'Identifiziert'],
+                        ['value' => 'planned', 'label' => 'Geplant'],
+                        ['value' => 'in_progress', 'label' => 'In Arbeit'],
+                        ['value' => 'completed', 'label' => 'Abgeschlossen'],
+                        ['value' => 'rejected', 'label' => 'Abgelehnt'],
+                    ]"
+                    wire:model.live="improvementForm.status"
+                />
             </div>
 
             <x-ui-input-textarea name="expected_outcome" label="Erwartetes Ergebnis" wire:model.live="improvementForm.expected_outcome" rows="2" />

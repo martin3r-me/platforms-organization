@@ -104,6 +104,7 @@ class Show extends Component
             'vsm_system_id'         => (string) ($this->process->vsm_system_id ?? ''),
             'version'               => (string) ($this->process->version ?? '1'),
             'is_active'             => $this->process->is_active,
+            'hourly_rate'           => (string) ($this->process->hourly_rate ?? ''),
             'target_description'    => $this->process->target_description ?? '',
             'value_proposition'     => $this->process->value_proposition ?? '',
             'cost_analysis'         => $this->process->cost_analysis ?? '',
@@ -125,6 +126,7 @@ class Show extends Component
                $this->form['vsm_system_id'] != ($this->process->vsm_system_id ?? '') ||
                (int) $this->form['version'] !== ($this->process->version ?? 1) ||
                $this->form['is_active'] !== $this->process->is_active ||
+               $this->form['hourly_rate'] !== (string) ($this->process->hourly_rate ?? '') ||
                $this->form['target_description'] !== ($this->process->target_description ?? '') ||
                $this->form['value_proposition'] !== ($this->process->value_proposition ?? '') ||
                $this->form['cost_analysis'] !== ($this->process->cost_analysis ?? '') ||
@@ -193,6 +195,77 @@ class Show extends Component
         return $this->process->improvements()->orderByDesc('created_at')->get();
     }
 
+    #[Computed]
+    public function corefitMetrics(): array
+    {
+        $steps = $this->steps;
+        $totalSteps = $steps->count();
+
+        if ($totalSteps === 0) {
+            return [
+                'total_steps' => 0,
+                'total_duration' => 0,
+                'total_wait' => 0,
+                'core' => ['count' => 0, 'minutes' => 0, 'percent' => 0, 'cost' => 0],
+                'context' => ['count' => 0, 'minutes' => 0, 'percent' => 0, 'cost' => 0],
+                'no_fit' => ['count' => 0, 'minutes' => 0, 'percent' => 0, 'cost' => 0],
+                'total_cost' => 0,
+            ];
+        }
+
+        $hourlyRate = (float) ($this->form['hourly_rate'] ?? 0);
+        $minuteRate = $hourlyRate > 0 ? $hourlyRate / 60 : 0;
+
+        $grouped = $steps->groupBy('corefit_classification');
+        $totalDuration = $steps->sum('duration_target_minutes') ?? 0;
+        $totalWait = $steps->sum('wait_target_minutes') ?? 0;
+
+        $result = [
+            'total_steps' => $totalSteps,
+            'total_duration' => $totalDuration,
+            'total_wait' => $totalWait,
+        ];
+
+        $totalCost = 0;
+        foreach (['core', 'context', 'no_fit'] as $classification) {
+            $group = $grouped->get($classification, collect());
+            $count = $group->count();
+            $minutes = $group->sum('duration_target_minutes') ?? 0;
+            $percent = $totalSteps > 0 ? round(($count / $totalSteps) * 100, 1) : 0;
+            $cost = round($minutes * $minuteRate, 2);
+            $totalCost += $cost;
+
+            $result[$classification] = [
+                'count' => $count,
+                'minutes' => $minutes,
+                'percent' => $percent,
+                'cost' => $cost,
+            ];
+        }
+
+        $result['total_cost'] = round($totalCost, 2);
+
+        return $result;
+    }
+
+    #[Computed]
+    public function improvementsByCategory(): array
+    {
+        $improvements = $this->processImprovements;
+        $grouped = [];
+
+        foreach (['cost', 'quality', 'speed', 'risk', 'standardization'] as $category) {
+            $catImprovements = $improvements->where('category', $category);
+            $statusCounts = $catImprovements->groupBy('status')->map->count();
+            $grouped[$category] = [
+                'total' => $catImprovements->count(),
+                'statuses' => $statusCounts->toArray(),
+            ];
+        }
+
+        return $grouped;
+    }
+
     // ── Process save/delete ─────────────────────────────────────
 
     public function save()
@@ -206,6 +279,7 @@ class Show extends Component
             'form.vsm_system_id'         => 'nullable|integer|exists:organization_vsm_systems,id',
             'form.version'               => 'required|integer|min:1',
             'form.is_active'             => 'boolean',
+            'form.hourly_rate'           => 'nullable|numeric|min:0',
             'form.target_description'    => 'nullable|string',
             'form.value_proposition'     => 'nullable|string',
             'form.cost_analysis'         => 'nullable|string',
@@ -224,6 +298,7 @@ class Show extends Component
             'vsm_system_id'         => $this->form['vsm_system_id'] !== '' ? (int) $this->form['vsm_system_id'] : null,
             'version'               => (int) $this->form['version'],
             'is_active'             => $this->form['is_active'],
+            'hourly_rate'           => $this->form['hourly_rate'] !== '' ? (float) $this->form['hourly_rate'] : null,
             'target_description'    => $this->form['target_description'] !== '' ? $this->form['target_description'] : null,
             'value_proposition'     => $this->form['value_proposition'] !== '' ? $this->form['value_proposition'] : null,
             'cost_analysis'         => $this->form['cost_analysis'] !== '' ? $this->form['cost_analysis'] : null,
@@ -235,6 +310,7 @@ class Show extends Component
 
         $this->process->refresh();
         $this->loadForm();
+        unset($this->corefitMetrics);
         $this->dispatch('toast', message: 'Prozess gespeichert');
     }
 
@@ -322,14 +398,14 @@ class Show extends Component
         }
 
         $this->stepModalShow = false;
-        unset($this->steps);
+        unset($this->steps, $this->corefitMetrics);
     }
 
     public function deleteStep(int $id): void
     {
         $this->process->steps()->where('id', $id)->delete();
         $this->dispatch('toast', message: 'Schritt gelöscht');
-        unset($this->steps);
+        unset($this->steps, $this->corefitMetrics);
     }
 
     // ── Flow CRUD ───────────────────────────────────────────────
@@ -569,6 +645,7 @@ class Show extends Component
                 'owner_entity_id', 'vsm_system_id', 'metadata',
                 'target_description', 'value_proposition', 'cost_analysis',
                 'risk_assessment', 'improvement_levers', 'action_plan', 'standardization_notes',
+                'hourly_rate',
             ]),
             'steps'    => $process->steps->map(fn ($s) => $s->only([
                 'id', 'name', 'description', 'position', 'step_type',
@@ -702,13 +779,13 @@ class Show extends Component
         }
 
         $this->improvementModalShow = false;
-        unset($this->processImprovements);
+        unset($this->processImprovements, $this->improvementsByCategory);
     }
 
     public function deleteImprovement(int $id): void
     {
         $this->process->improvements()->where('id', $id)->delete();
-        unset($this->processImprovements);
+        unset($this->processImprovements, $this->improvementsByCategory);
         $this->dispatch('toast', message: 'Verbesserung gelöscht');
     }
 

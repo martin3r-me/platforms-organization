@@ -8,11 +8,13 @@ return new class extends Migration
 {
     public function up(): void
     {
-        // Remove process_group_id FK from processes
-        Schema::table('organization_processes', function (Blueprint $table) {
-            $table->dropForeign(['process_group_id']);
-            $table->dropColumn('process_group_id');
-        });
+        // Remove process_group_id FK + column from processes (if they exist)
+        if (Schema::hasColumn('organization_processes', 'process_group_id')) {
+            Schema::table('organization_processes', function (Blueprint $table) {
+                $table->dropForeign(['process_group_id']);
+                $table->dropColumn('process_group_id');
+            });
+        }
 
         // Drop the process groups table entirely
         Schema::dropIfExists('organization_process_groups');

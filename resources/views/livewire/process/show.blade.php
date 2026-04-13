@@ -112,11 +112,12 @@
         {{-- ── Tab: Details ────────────────────────────────── --}}
         @if($activeTab === 'details')
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Grunddaten</h2>
+                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-1">Grunddaten</h2>
+                <p class="text-xs text-[var(--ui-muted)] mb-4">Allgemeine Informationen zum Prozess. Name und Status sind Pflichtfelder.</p>
                 <div class="space-y-4">
-                    <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required />
-                    <x-ui-input-text name="code" label="Code" wire:model.live="form.code" />
-                    <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" />
+                    <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required placeholder="Aussagekräftiger Prozessname" />
+                    <x-ui-input-text name="code" label="Code" wire:model.live="form.code" placeholder="Optionales Kürzel, z.B. PRO-001" />
+                    <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" placeholder="Kurze Zusammenfassung: Was macht dieser Prozess und warum existiert er?" />
 
                     <div class="grid grid-cols-2 gap-4">
                         <x-ui-input-select
@@ -163,27 +164,40 @@
         @if($activeTab === 'corefit')
             @php $metrics = $this->corefitMetrics; @endphp
 
+            {{-- Einführung --}}
+            <div class="bg-[var(--ui-info-5)] border border-[var(--ui-info-20)] rounded-lg p-4 mb-6">
+                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1">Was ist COREFIT?</h3>
+                <p class="text-sm text-[var(--ui-muted)]">
+                    COREFIT klassifiziert jeden Prozessschritt nach seinem Wertbeitrag. Ziel: Core maximieren, Context reduzieren, No Fit eliminieren.
+                </p>
+                <div class="mt-2 flex flex-wrap gap-4 text-xs text-[var(--ui-muted)]">
+                    <span><span class="inline-block w-2 h-2 rounded-full bg-[var(--ui-success)] mr-1"></span><strong>Core</strong> — Direkte Wertschöpfung für den Kunden</span>
+                    <span><span class="inline-block w-2 h-2 rounded-full bg-[var(--ui-warning)] mr-1"></span><strong>Context</strong> — Notwendig, aber kein direkter Kundenwert (Admin, Compliance)</span>
+                    <span><span class="inline-block w-2 h-2 rounded-full bg-[var(--ui-danger)] mr-1"></span><strong>No Fit</strong> — Kein Wertbeitrag, sollte eliminiert werden</span>
+                </div>
+            </div>
+
             {{-- Metriken-Kacheln --}}
             <div class="grid grid-cols-4 gap-4 mb-6">
                 <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
                     <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Core-Steps</h3>
                     <p class="text-2xl font-bold text-[var(--ui-success)]">{{ $metrics['core']['count'] }}</p>
-                    <p class="text-xs text-[var(--ui-muted)]">{{ $metrics['core']['percent'] }}%</p>
+                    <p class="text-xs text-[var(--ui-muted)]">{{ $metrics['core']['percent'] }}% aller Schritte</p>
                 </div>
                 <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
                     <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Context-Steps</h3>
                     <p class="text-2xl font-bold text-[var(--ui-warning)]">{{ $metrics['context']['count'] }}</p>
-                    <p class="text-xs text-[var(--ui-muted)]">{{ $metrics['context']['percent'] }}%</p>
+                    <p class="text-xs text-[var(--ui-muted)]">{{ $metrics['context']['percent'] }}% aller Schritte</p>
                 </div>
                 <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
                     <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">No-Fit-Steps</h3>
                     <p class="text-2xl font-bold text-[var(--ui-danger)]">{{ $metrics['no_fit']['count'] }}</p>
-                    <p class="text-xs text-[var(--ui-muted)]">{{ $metrics['no_fit']['percent'] }}%</p>
+                    <p class="text-xs text-[var(--ui-muted)]">{{ $metrics['no_fit']['percent'] }}% aller Schritte</p>
                 </div>
                 <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
                     <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Gesamtkosten</h3>
                     <p class="text-2xl font-bold text-[var(--ui-info)]">{{ number_format($metrics['total_cost'], 2, ',', '.') }}</p>
-                    <p class="text-xs text-[var(--ui-muted)]">EUR</p>
+                    <p class="text-xs text-[var(--ui-muted)]">EUR (basierend auf Stundensatz)</p>
                 </div>
             </div>
 
@@ -202,13 +216,14 @@
                 <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
                     <h3 class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Wartezeit</h3>
                     <p class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $metrics['total_wait'] }}</p>
-                    <p class="text-xs text-[var(--ui-muted)]">Min.</p>
+                    <p class="text-xs text-[var(--ui-muted)]">Min. Liegezeit zwischen Schritten</p>
                 </div>
             </div>
 
             {{-- Progress Bars --}}
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mb-6">
-                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">COREFIT-Verteilung</h3>
+                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1">COREFIT-Verteilung</h3>
+                <p class="text-xs text-[var(--ui-muted)] mb-4">Anteil der Schritte je Klassifikation. Idealerweise: Core hoch, Context niedrig, No Fit bei 0%.</p>
                 <div class="space-y-3">
                     <div>
                         <div class="flex justify-between text-sm mb-1">
@@ -242,7 +257,8 @@
 
             {{-- Stundensatz --}}
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mb-6">
-                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">Stundensatz</h3>
+                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1">Kostenbasis</h3>
+                <p class="text-xs text-[var(--ui-muted)] mb-4">Der Stundensatz wird mit der Dauer jedes Schritts multipliziert, um die Prozesskosten pro Klassifikation zu berechnen.</p>
                 <div class="max-w-xs">
                     <x-ui-input-text name="hourly_rate" label="Stundensatz (EUR/h)" type="number" wire:model.live="form.hourly_rate" min="0" step="0.01" placeholder="z.B. 85.00" />
                 </div>
@@ -252,20 +268,21 @@
             @php
                 $impByCategory = $this->improvementsByCategory;
                 $canvasCards = [
-                    ['field' => 'target_description', 'label' => 'Zielbild', 'placeholder' => 'Wie soll der Prozess idealerweise aussehen?', 'category' => null],
-                    ['field' => 'value_proposition', 'label' => 'Kundennutzen & Wertbeitrag', 'placeholder' => 'Welchen Wert liefert der Prozess?', 'category' => 'quality'],
-                    ['field' => 'cost_analysis', 'label' => 'Kosten & Break-Even', 'placeholder' => 'Kosten, Aufwand, Break-Even-Analyse', 'category' => 'cost'],
-                    ['field' => 'risk_assessment', 'label' => 'Risiko & Resilienz', 'placeholder' => 'Risiken, Single Points of Failure, Resilienz', 'category' => 'risk'],
-                    ['field' => 'improvement_levers', 'label' => 'Hebel & Lösungsdesign', 'placeholder' => 'Wo liegen die größten Verbesserungshebel?', 'category' => 'speed'],
-                    ['field' => 'action_plan', 'label' => 'Maßnahmenplan', 'placeholder' => 'Konkrete nächste Schritte', 'category' => null],
-                    ['field' => 'standardization_notes', 'label' => 'Standardisierung & Kontrolle', 'placeholder' => 'Standards, KPIs, Kontrollmechanismen', 'category' => 'standardization'],
+                    ['field' => 'target_description', 'label' => 'Zielbild', 'description' => 'Beschreibung des optimalen Soll-Zustands dieses Prozesses.', 'placeholder' => 'Wie soll der Prozess idealerweise aussehen?', 'category' => null],
+                    ['field' => 'value_proposition', 'label' => 'Kundennutzen & Wertbeitrag', 'description' => 'Welchen konkreten Mehrwert liefert dieser Prozess an interne/externe Kunden?', 'placeholder' => 'Welchen Wert liefert der Prozess?', 'category' => 'quality'],
+                    ['field' => 'cost_analysis', 'label' => 'Kosten & Break-Even', 'description' => 'Analyse der laufenden Kosten, Investitionen und ab wann sich Verbesserungen rechnen.', 'placeholder' => 'Kosten, Aufwand, Break-Even-Analyse', 'category' => 'cost'],
+                    ['field' => 'risk_assessment', 'label' => 'Risiko & Resilienz', 'description' => 'Wo liegen Ausfallrisiken, Single Points of Failure und Schwachstellen?', 'placeholder' => 'Risiken, Single Points of Failure, Resilienz', 'category' => 'risk'],
+                    ['field' => 'improvement_levers', 'label' => 'Hebel & Lösungsdesign', 'description' => 'Die wirksamsten Stellschrauben zur Verbesserung von Durchlaufzeit und Effizienz.', 'placeholder' => 'Wo liegen die größten Verbesserungshebel?', 'category' => 'speed'],
+                    ['field' => 'action_plan', 'label' => 'Maßnahmenplan', 'description' => 'Konkrete nächste Schritte mit Verantwortlichkeiten und Zeitrahmen.', 'placeholder' => 'Konkrete nächste Schritte', 'category' => null],
+                    ['field' => 'standardization_notes', 'label' => 'Standardisierung & Kontrolle', 'description' => 'Definierte Standards, KPIs und Kontrollmechanismen zur nachhaltigen Absicherung.', 'placeholder' => 'Standards, KPIs, Kontrollmechanismen', 'category' => 'standardization'],
                 ];
             @endphp
 
             <div class="space-y-4">
                 @foreach($canvasCards as $card)
                     <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                        <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">{{ $card['label'] }}</h3>
+                        <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1">{{ $card['label'] }}</h3>
+                        <p class="text-xs text-[var(--ui-muted)] mb-3">{{ $card['description'] }}</p>
                         <x-ui-input-textarea
                             name="{{ $card['field'] }}"
                             wire:model.live="form.{{ $card['field'] }}"
@@ -696,42 +713,48 @@
         <form wire:submit.prevent="storeStep" class="space-y-4">
             <div class="grid grid-cols-4 gap-4">
                 <div class="col-span-1">
-                    <x-ui-input-text name="position" label="Position" type="number" wire:model.live="stepForm.position" required min="1" />
+                    <x-ui-input-text name="position" label="Position" type="number" wire:model.live="stepForm.position" required min="1" placeholder="#" />
                 </div>
                 <div class="col-span-3">
-                    <x-ui-input-text name="step_name" label="Name" wire:model.live="stepForm.name" required />
+                    <x-ui-input-text name="step_name" label="Name" wire:model.live="stepForm.name" required placeholder="Was passiert in diesem Schritt?" />
                 </div>
             </div>
 
-            <x-ui-input-textarea name="step_description" label="Beschreibung" wire:model.live="stepForm.description" rows="2" />
+            <x-ui-input-textarea name="step_description" label="Beschreibung" wire:model.live="stepForm.description" rows="2" placeholder="Detailbeschreibung: Wer macht was, mit welchem Ergebnis?" />
 
             <div class="grid grid-cols-2 gap-4">
-                <x-ui-input-select
-                    name="step_type"
-                    label="Schritttyp"
-                    :options="[
-                        ['value' => 'task', 'label' => 'Task'],
-                        ['value' => 'decision', 'label' => 'Decision'],
-                        ['value' => 'event', 'label' => 'Event'],
-                        ['value' => 'subprocess', 'label' => 'Subprocess'],
-                    ]"
-                    wire:model.live="stepForm.step_type"
-                />
-                <x-ui-input-select
-                    name="corefit_classification"
-                    label="CoreFit Klassifikation"
-                    :options="[
-                        ['value' => 'core', 'label' => 'Core'],
-                        ['value' => 'context', 'label' => 'Context'],
-                        ['value' => 'no_fit', 'label' => 'No Fit'],
-                    ]"
-                    wire:model.live="stepForm.corefit_classification"
-                />
+                <div>
+                    <x-ui-input-select
+                        name="step_type"
+                        label="Schritttyp"
+                        :options="[
+                            ['value' => 'task', 'label' => 'Task'],
+                            ['value' => 'decision', 'label' => 'Decision'],
+                            ['value' => 'event', 'label' => 'Event'],
+                            ['value' => 'subprocess', 'label' => 'Subprocess'],
+                        ]"
+                        wire:model.live="stepForm.step_type"
+                    />
+                    <p class="text-xs text-[var(--ui-muted)] mt-1">Task = Arbeitsschritt, Decision = Entscheidung, Event = Ereignis, Subprocess = eingebetteter Teilprozess</p>
+                </div>
+                <div>
+                    <x-ui-input-select
+                        name="corefit_classification"
+                        label="COREFIT Klassifikation"
+                        :options="[
+                            ['value' => 'core', 'label' => 'Core'],
+                            ['value' => 'context', 'label' => 'Context'],
+                            ['value' => 'no_fit', 'label' => 'No Fit'],
+                        ]"
+                        wire:model.live="stepForm.corefit_classification"
+                    />
+                    <p class="text-xs text-[var(--ui-muted)] mt-1">Core = Wertschöpfend, Context = Notwendig aber nicht wertschöpfend, No Fit = Eliminieren</p>
+                </div>
             </div>
 
             <div class="grid grid-cols-2 gap-4">
-                <x-ui-input-text name="duration_target_minutes" label="Dauer (Min.)" type="number" wire:model.live="stepForm.duration_target_minutes" min="0" />
-                <x-ui-input-text name="wait_target_minutes" label="Wartezeit (Min.)" type="number" wire:model.live="stepForm.wait_target_minutes" min="0" />
+                <x-ui-input-text name="duration_target_minutes" label="Dauer (Min.)" type="number" wire:model.live="stepForm.duration_target_minutes" min="0" placeholder="Aktive Bearbeitungszeit" />
+                <x-ui-input-text name="wait_target_minutes" label="Wartezeit (Min.)" type="number" wire:model.live="stepForm.wait_target_minutes" min="0" placeholder="Liegezeit bis zum nächsten Schritt" />
             </div>
 
             <div class="flex items-center">
@@ -947,49 +970,58 @@
         </x-slot>
 
         <form wire:submit.prevent="storeImprovement" class="space-y-4">
-            <x-ui-input-text name="imp_title" label="Titel" wire:model.live="improvementForm.title" required />
-            <x-ui-input-textarea name="imp_description" label="Beschreibung" wire:model.live="improvementForm.description" rows="2" />
+            <x-ui-input-text name="imp_title" label="Titel" wire:model.live="improvementForm.title" required placeholder="Kurzer, aussagekräftiger Titel der Verbesserung" />
+            <x-ui-input-textarea name="imp_description" label="Beschreibung" wire:model.live="improvementForm.description" rows="2" placeholder="Was genau soll verbessert werden und warum?" />
 
             <div class="grid grid-cols-3 gap-4">
-                <x-ui-input-select
-                    name="imp_category"
-                    label="Kategorie"
-                    :options="[
-                        ['value' => 'cost', 'label' => 'Kosten'],
-                        ['value' => 'quality', 'label' => 'Qualität'],
-                        ['value' => 'speed', 'label' => 'Geschwindigkeit'],
-                        ['value' => 'risk', 'label' => 'Risiko'],
-                        ['value' => 'standardization', 'label' => 'Standardisierung'],
-                    ]"
-                    wire:model.live="improvementForm.category"
-                />
-                <x-ui-input-select
-                    name="imp_priority"
-                    label="Priorität"
-                    :options="[
-                        ['value' => 'low', 'label' => 'Niedrig'],
-                        ['value' => 'medium', 'label' => 'Mittel'],
-                        ['value' => 'high', 'label' => 'Hoch'],
-                        ['value' => 'critical', 'label' => 'Kritisch'],
-                    ]"
-                    wire:model.live="improvementForm.priority"
-                />
-                <x-ui-input-select
-                    name="imp_status"
-                    label="Status"
-                    :options="[
-                        ['value' => 'identified', 'label' => 'Identifiziert'],
-                        ['value' => 'planned', 'label' => 'Geplant'],
-                        ['value' => 'in_progress', 'label' => 'In Arbeit'],
-                        ['value' => 'completed', 'label' => 'Abgeschlossen'],
-                        ['value' => 'rejected', 'label' => 'Abgelehnt'],
-                    ]"
-                    wire:model.live="improvementForm.status"
-                />
+                <div>
+                    <x-ui-input-select
+                        name="imp_category"
+                        label="Kategorie"
+                        :options="[
+                            ['value' => 'cost', 'label' => 'Kosten'],
+                            ['value' => 'quality', 'label' => 'Qualität'],
+                            ['value' => 'speed', 'label' => 'Geschwindigkeit'],
+                            ['value' => 'risk', 'label' => 'Risiko'],
+                            ['value' => 'standardization', 'label' => 'Standardisierung'],
+                        ]"
+                        wire:model.live="improvementForm.category"
+                    />
+                    <p class="text-xs text-[var(--ui-muted)] mt-1">In welchem Bereich wirkt die Verbesserung?</p>
+                </div>
+                <div>
+                    <x-ui-input-select
+                        name="imp_priority"
+                        label="Priorität"
+                        :options="[
+                            ['value' => 'low', 'label' => 'Niedrig'],
+                            ['value' => 'medium', 'label' => 'Mittel'],
+                            ['value' => 'high', 'label' => 'Hoch'],
+                            ['value' => 'critical', 'label' => 'Kritisch'],
+                        ]"
+                        wire:model.live="improvementForm.priority"
+                    />
+                    <p class="text-xs text-[var(--ui-muted)] mt-1">Wie dringend ist die Umsetzung?</p>
+                </div>
+                <div>
+                    <x-ui-input-select
+                        name="imp_status"
+                        label="Status"
+                        :options="[
+                            ['value' => 'identified', 'label' => 'Identifiziert'],
+                            ['value' => 'planned', 'label' => 'Geplant'],
+                            ['value' => 'in_progress', 'label' => 'In Arbeit'],
+                            ['value' => 'completed', 'label' => 'Abgeschlossen'],
+                            ['value' => 'rejected', 'label' => 'Abgelehnt'],
+                        ]"
+                        wire:model.live="improvementForm.status"
+                    />
+                    <p class="text-xs text-[var(--ui-muted)] mt-1">Aktueller Stand der Umsetzung</p>
+                </div>
             </div>
 
-            <x-ui-input-textarea name="expected_outcome" label="Erwartetes Ergebnis" wire:model.live="improvementForm.expected_outcome" rows="2" />
-            <x-ui-input-textarea name="actual_outcome" label="Tatsächliches Ergebnis" wire:model.live="improvementForm.actual_outcome" rows="2" />
+            <x-ui-input-textarea name="expected_outcome" label="Erwartetes Ergebnis" wire:model.live="improvementForm.expected_outcome" rows="2" placeholder="Welche messbare Verbesserung wird erwartet?" />
+            <x-ui-input-textarea name="actual_outcome" label="Tatsächliches Ergebnis" wire:model.live="improvementForm.actual_outcome" rows="2" placeholder="Was wurde tatsächlich erreicht? (nach Abschluss ausfüllen)" />
         </form>
 
         <x-slot name="footer">

@@ -551,7 +551,12 @@
                                 <x-ui-badge variant="info" size="sm">{{ ucfirst(str_replace('_', ' ', $trigger->trigger_type)) }}</x-ui-badge>
                             </x-ui-table-cell>
                             <x-ui-table-cell compact="true">
-                                @if($trigger->entity)
+                                @if($trigger->entityType)
+                                    <span class="text-sm">
+                                        <x-ui-badge variant="muted" size="sm">Typ</x-ui-badge>
+                                        {{ $trigger->entityType->name }}
+                                    </span>
+                                @elseif($trigger->entity)
                                     <span class="text-sm">{{ $trigger->entity->name }}</span>
                                 @elseif($trigger->sourceProcess)
                                     <span class="text-sm">{{ $trigger->sourceProcess->name }}</span>
@@ -923,13 +928,40 @@
 
             @if($triggerForm['trigger_type'] === 'event')
                 <x-ui-input-select
-                    name="trigger_entity_id"
-                    label="Quell-Entity"
-                    :options="$this->availableEntities->map(fn($e) => ['value' => (string) $e->id, 'label' => $e->name])->toArray()"
-                    nullable
-                    nullLabel="– Auswählen –"
-                    wire:model.live="triggerForm.entity_id"
+                    name="entity_scope"
+                    label="Quell-Zuordnung"
+                    :options="[
+                        ['value' => 'none', 'label' => 'Keine'],
+                        ['value' => 'entity_type', 'label' => 'Entity-Typ (generisch)'],
+                        ['value' => 'entity', 'label' => 'Konkrete Entity'],
+                    ]"
+                    wire:model.live="triggerForm.entity_scope"
                 />
+                <p class="text-xs text-[var(--ui-muted)] -mt-2">Entity-Typ = alle Entitäten dieses Typs lösen den Trigger aus. Konkrete Entity = nur eine bestimmte Entität.</p>
+
+                @if($triggerForm['entity_scope'] === 'entity_type')
+                    <x-ui-input-select
+                        name="trigger_entity_type_id"
+                        label="Entity-Typ"
+                        :options="$this->availableEntityTypes->map(fn($t) => ['value' => (string) $t->id, 'label' => $t->name])->toArray()"
+                        nullable
+                        nullLabel="– Auswählen –"
+                        wire:model.live="triggerForm.entity_type_id"
+                        required
+                    />
+                @endif
+
+                @if($triggerForm['entity_scope'] === 'entity')
+                    <x-ui-input-select
+                        name="trigger_entity_id"
+                        label="Quell-Entity"
+                        :options="$this->availableEntities->map(fn($e) => ['value' => (string) $e->id, 'label' => $e->name])->toArray()"
+                        nullable
+                        nullLabel="– Auswählen –"
+                        wire:model.live="triggerForm.entity_id"
+                        required
+                    />
+                @endif
             @endif
 
             @if($triggerForm['trigger_type'] === 'process_output')

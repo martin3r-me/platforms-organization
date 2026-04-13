@@ -13,6 +13,7 @@ use Platform\Organization\Models\OrganizationProcessOutput;
 use Platform\Organization\Models\OrganizationProcessSnapshot;
 use Platform\Organization\Models\OrganizationProcessImprovement;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationVsmSystem;
 
 class Show extends Component
@@ -52,6 +53,8 @@ class Show extends Component
         'label' => '',
         'description' => '',
         'trigger_type' => 'manual',
+        'entity_scope' => 'none',
+        'entity_type_id' => '',
         'entity_id' => '',
         'source_process_id' => '',
         'interlink_id' => '',
@@ -151,7 +154,7 @@ class Show extends Component
     #[Computed]
     public function triggers()
     {
-        return $this->process->triggers()->with(['entity', 'sourceProcess', 'interlink'])->get();
+        return $this->process->triggers()->with(['entityType', 'entity', 'sourceProcess', 'interlink'])->get();
     }
 
     #[Computed]
@@ -166,6 +169,12 @@ class Show extends Component
         return OrganizationEntity::where('team_id', Auth::user()->currentTeam->id)
             ->orderBy('name')
             ->get();
+    }
+
+    #[Computed]
+    public function availableEntityTypes()
+    {
+        return OrganizationEntityType::active()->ordered()->get();
     }
 
     #[Computed]
@@ -490,7 +499,8 @@ class Show extends Component
         $this->editingTriggerId = null;
         $this->triggerForm = [
             'label' => '', 'description' => '', 'trigger_type' => 'manual',
-            'entity_id' => '', 'source_process_id' => '', 'interlink_id' => '', 'schedule_expression' => '',
+            'entity_scope' => 'none', 'entity_type_id' => '', 'entity_id' => '',
+            'source_process_id' => '', 'interlink_id' => '', 'schedule_expression' => '',
         ];
         $this->triggerModalShow = true;
     }
@@ -502,10 +512,20 @@ class Show extends Component
 
         $this->resetValidation();
         $this->editingTriggerId = $trigger->id;
+
+        $entityScope = 'none';
+        if ($trigger->entity_type_id) {
+            $entityScope = 'entity_type';
+        } elseif ($trigger->entity_id) {
+            $entityScope = 'entity';
+        }
+
         $this->triggerForm = [
             'label'               => $trigger->label,
             'description'         => $trigger->description ?? '',
             'trigger_type'        => $trigger->trigger_type ?? 'manual',
+            'entity_scope'        => $entityScope,
+            'entity_type_id'      => (string) ($trigger->entity_type_id ?? ''),
             'entity_id'           => (string) ($trigger->entity_id ?? ''),
             'source_process_id'   => (string) ($trigger->source_process_id ?? ''),
             'interlink_id'        => (string) ($trigger->interlink_id ?? ''),
@@ -516,25 +536,44 @@ class Show extends Component
 
     public function storeTrigger(): void
     {
-        $this->validate([
+        $rules = [
             'triggerForm.label'               => 'required|string|max:255',
             'triggerForm.description'          => 'nullable|string',
             'triggerForm.trigger_type'         => 'required|in:manual,scheduled,event,process_output,interlink',
-            'triggerForm.entity_id'            => 'nullable|integer|exists:organization_entities,id',
             'triggerForm.source_process_id'    => 'nullable|integer|exists:organization_processes,id',
             'triggerForm.interlink_id'         => 'nullable|integer|exists:organization_interlinks,id',
             'triggerForm.schedule_expression'  => 'nullable|string|max:255',
-        ]);
+        ];
+
+        $entityScope = $this->triggerForm['entity_scope'] ?? 'none';
+        if ($entityScope === 'entity_type') {
+            $rules['triggerForm.entity_type_id'] = 'required|integer|exists:organization_entity_types,id';
+        } elseif ($entityScope === 'entity') {
+            $rules['triggerForm.entity_id'] = 'required|integer|exists:organization_entities,id';
+        }
+
+        $this->validate($rules);
 
         $payload = [
             'label'               => $this->triggerForm['label'],
             'description'         => $this->triggerForm['description'] !== '' ? $this->triggerForm['description'] : null,
             'trigger_type'        => $this->triggerForm['trigger_type'],
-            'entity_id'           => $this->triggerForm['entity_id'] !== '' ? (int) $this->triggerForm['entity_id'] : null,
             'source_process_id'   => $this->triggerForm['source_process_id'] !== '' ? (int) $this->triggerForm['source_process_id'] : null,
             'interlink_id'        => $this->triggerForm['interlink_id'] !== '' ? (int) $this->triggerForm['interlink_id'] : null,
             'schedule_expression' => $this->triggerForm['schedule_expression'] !== '' ? $this->triggerForm['schedule_expression'] : null,
         ];
+
+        // Either-or: entity_type_id OR entity_id, never both
+        if ($entityScope === 'entity_type') {
+            $payload['entity_type_id'] = (int) $this->triggerForm['entity_type_id'];
+            $payload['entity_id'] = null;
+        } elseif ($entityScope === 'entity') {
+            $payload['entity_id'] = (int) $this->triggerForm['entity_id'];
+            $payload['entity_type_id'] = null;
+        } else {
+            $payload['entity_type_id'] = null;
+            $payload['entity_id'] = null;
+        }
 
         if ($this->editingTriggerId) {
             $trigger = $this->process->triggers()->find($this->editingTriggerId);
@@ -666,7 +705,7 @@ class Show extends Component
             ]))->values()->toArray(),
             'triggers' => $process->triggers->map(fn ($t) => $t->only([
                 'id', 'label', 'description', 'trigger_type',
-                'entity_id', 'source_process_id', 'interlink_id', 'schedule_expression',
+                'entity_type_id', 'entity_id', 'source_process_id', 'interlink_id', 'schedule_expression',
             ]))->values()->toArray(),
             'outputs'  => $process->outputs->map(fn ($o) => $o->only([
                 'id', 'label', 'description', 'output_type',

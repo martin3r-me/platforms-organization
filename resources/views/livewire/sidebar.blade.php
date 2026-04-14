@@ -28,7 +28,7 @@
         <a href="{{ route('organization.entities.index') }}"
            class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
            :class="[
-               window.location.pathname.includes('/entities') || 
+               window.location.pathname.includes('/entities') ||
                window.location.pathname.endsWith('/entities') ||
                window.location.pathname.endsWith('/entities/')
                    ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
@@ -38,22 +38,6 @@
            wire:navigate>
             <x-heroicon-o-building-office class="w-6 h-6 flex-shrink-0"/>
             <span x-show="!collapsed" class="truncate">Organisationseinheiten</span>
-        </a>
-
-        {{-- Interlinks --}}
-        <a href="{{ route('organization.interlinks.index') }}"
-           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
-           :class="[
-               window.location.pathname.includes('/interlinks') ||
-               window.location.pathname.endsWith('/interlinks') ||
-               window.location.pathname.endsWith('/interlinks/')
-                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
-                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
-               collapsed ? 'justify-center' : 'gap-3'
-           ]"
-           wire:navigate>
-            <x-heroicon-o-puzzle-piece class="w-6 h-6 flex-shrink-0"/>
-            <span x-show="!collapsed" class="truncate">Interlinks</span>
         </a>
 
         {{-- Prozesse --}}
@@ -70,6 +54,27 @@
            wire:navigate>
             <x-heroicon-o-arrow-path class="w-6 h-6 flex-shrink-0"/>
             <span x-show="!collapsed" class="truncate">Prozesse</span>
+        </a>
+    </div>
+
+    {{-- Abschnitt: Verbindungen --}}
+    <div>
+        <h4 x-show="!collapsed" class="px-4 py-3 text-xs tracking-wide font-semibold text-[color:var(--ui-muted)] uppercase">Verbindungen</h4>
+
+        {{-- Interlinks --}}
+        <a href="{{ route('organization.interlinks.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/interlinks') ||
+               window.location.pathname.endsWith('/interlinks') ||
+               window.location.pathname.endsWith('/interlinks/')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-arrows-right-left class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Interlinks</span>
         </a>
 
         {{-- SLA-Verträge --}}

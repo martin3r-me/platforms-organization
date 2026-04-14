@@ -1272,39 +1272,34 @@
             @php $certData = $this->certificateData; @endphp
 
             {{-- Actions --}}
-            <div class="flex items-center gap-3 mb-6">
+            <div class="flex items-center gap-2 mb-6">
                 <a href="{{ route('organization.processes.certificate-pdf', $process) }}"
-                   class="inline-flex items-center gap-2 px-4 py-2 bg-[var(--ui-primary)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+                   class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ui-primary)] text-white rounded-md text-sm font-medium hover:opacity-90 transition-opacity">
                     @svg('heroicon-o-arrow-down-tray', 'w-4 h-4')
-                    PDF herunterladen
+                    <span>PDF</span>
                 </a>
 
                 @if($process->public_token && $process->public_token_expires_at?->isFuture())
-                    <div class="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg text-sm">
-                        @svg('heroicon-o-link', 'w-4 h-4 text-green-600')
-                        <span class="text-green-700 font-medium">Link aktiv</span>
-                        <span class="text-green-600 text-xs">bis {{ $process->public_token_expires_at->format('d.m.Y') }}</span>
-                    </div>
                     <button
                         onclick="navigator.clipboard.writeText('{{ route('organization.certificate.public', $process->public_token) }}'); $wire.dispatch('toast', {message: 'Link kopiert!'})"
-                        class="inline-flex items-center gap-1.5 px-3 py-2 border border-[var(--ui-border)] rounded-lg text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)] transition-colors"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-green-300 bg-green-50 rounded-md text-sm text-green-700 hover:bg-green-100 transition-colors"
                     >
-                        @svg('heroicon-o-clipboard-document', 'w-4 h-4')
-                        Kopieren
+                        @svg('heroicon-o-clipboard-document', 'w-3.5 h-3.5')
+                        <span>Link kopieren</span>
                     </button>
+                    <span class="text-xs text-[var(--ui-muted)]">bis {{ $process->public_token_expires_at->format('d.m.Y') }}</span>
                     <x-ui-confirm-button
                         variant="danger-outline"
-                        size="sm"
+                        size="xs"
                         wire:click="revokePublicLink"
                         confirm-text="Link wirklich widerrufen?"
                     >
-                        @svg('heroicon-o-x-mark', 'w-4 h-4')
-                        <span>Widerrufen</span>
+                        @svg('heroicon-o-x-mark', 'w-3.5 h-3.5')
                     </x-ui-confirm-button>
                 @else
                     <x-ui-button variant="secondary-outline" size="sm" wire:click="generatePublicLink">
                         @svg('heroicon-o-link', 'w-4 h-4')
-                        <span>Öffentlichen Link erstellen</span>
+                        <span>Link erstellen</span>
                     </x-ui-button>
                 @endif
             </div>

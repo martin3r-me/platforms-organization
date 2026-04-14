@@ -1456,6 +1456,35 @@
                     @endif
                 </div>
 
+                {{-- COREFIT Analysis Texts --}}
+                @php
+                    $analysisBlocks = [
+                        ['key' => 'target_description',    'label' => 'Zielbeschreibung'],
+                        ['key' => 'value_proposition',     'label' => 'Wertbeitrag'],
+                        ['key' => 'cost_analysis',         'label' => 'Kostenanalyse'],
+                        ['key' => 'risk_assessment',       'label' => 'Risikobewertung'],
+                        ['key' => 'improvement_levers',    'label' => 'Verbesserungshebel'],
+                        ['key' => 'action_plan',           'label' => 'Maßnahmenplan'],
+                        ['key' => 'standardization_notes', 'label' => 'Standardisierung'],
+                    ];
+                    $hasAnyText = collect($analysisBlocks)->contains(fn ($b) => !empty($certData['process'][$b['key']]));
+                @endphp
+                @if($hasAnyText)
+                    <div class="mb-5">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-gray-800 mb-3 pb-1 border-b border-gray-200">Analyse & Bewertung</h3>
+                        <div class="space-y-3">
+                            @foreach($analysisBlocks as $block)
+                                @if(!empty($certData['process'][$block['key']]))
+                                    <div>
+                                        <div class="text-[10px] font-bold text-gray-700 mb-0.5">{{ $block['label'] }}</div>
+                                        <div class="text-[10px] text-gray-500 leading-relaxed pl-1">{{ \Illuminate\Support\Str::limit($certData['process'][$block['key']], 600) }}</div>
+                                    </div>
+                                @endif
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+
                 {{-- Steps List --}}
                 @if(count($certData['steps_list']) > 0)
                     <div class="mb-5">

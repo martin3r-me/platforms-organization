@@ -239,6 +239,40 @@
         @endif
     </div>
 
+    {{-- COREFIT Analysis Texts --}}
+    @php
+        $analysisBlocks = [
+            ['key' => 'target_description',    'label' => 'Zielbeschreibung',        'icon' => 'Ziel'],
+            ['key' => 'value_proposition',     'label' => 'Wertbeitrag',             'icon' => 'Wert'],
+            ['key' => 'cost_analysis',         'label' => 'Kostenanalyse',           'icon' => 'Kosten'],
+            ['key' => 'risk_assessment',       'label' => 'Risikobewertung',         'icon' => 'Risiko'],
+            ['key' => 'improvement_levers',    'label' => 'Verbesserungshebel',      'icon' => 'Hebel'],
+            ['key' => 'action_plan',           'label' => 'Maßnahmenplan',           'icon' => 'Plan'],
+            ['key' => 'standardization_notes', 'label' => 'Standardisierung',        'icon' => 'Std.'],
+        ];
+        $hasAnyText = collect($analysisBlocks)->contains(fn ($b) => !empty($data['process'][$b['key']]));
+    @endphp
+    @if($hasAnyText)
+        <div style="page-break-before: always; padding-top: 36px;">
+            <div class="page2-header">
+                <div class="page2-title">Analyse & Bewertung</div>
+                <div class="page2-sub">{{ $data['process']['name'] }} &middot; COREFIT-Analyse</div>
+            </div>
+
+            @foreach($analysisBlocks as $block)
+                @if(!empty($data['process'][$block['key']]))
+                    <div style="margin-bottom: 14px;">
+                        <div style="font-size: 10px; font-weight: bold; color: #1e293b; margin-bottom: 4px; padding-bottom: 3px; border-bottom: 1px solid #f1f5f9;">
+                            <span style="display: inline-block; padding: 1px 5px; background: #f1f5f9; border-radius: 2px; font-size: 8px; color: #64748b; margin-right: 6px;">{{ $block['icon'] }}</span>
+                            {{ $block['label'] }}
+                        </div>
+                        <div style="font-size: 10px; color: #475569; line-height: 1.5; padding-left: 4px;">{{ \Illuminate\Support\Str::limit($data['process'][$block['key']], 600) }}</div>
+                    </div>
+                @endif
+            @endforeach
+        </div>
+    @endif
+
     {{-- Steps List --}}
     @if(count($data['steps_list']) > 0)
         <div style="page-break-before: always; padding-top: 36px; margin-bottom: 24px;">

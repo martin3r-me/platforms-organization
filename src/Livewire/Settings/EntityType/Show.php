@@ -6,6 +6,7 @@ use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Schema;
+use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntityTypeGroup;
 use Platform\Organization\Models\OrganizationEntityTypeModelMapping;
@@ -84,7 +85,21 @@ class Show extends Component
 
     public function delete()
     {
+        // Block if active entities still use this type
+        $hasActiveEntities = OrganizationEntity::query()
+            ->where('entity_type_id', $this->entityType->id)
+            ->exists();
+        if ($hasActiveEntities) {
+            $this->dispatch('toast', message: 'Entity Type wird noch von aktiven Entities verwendet und kann nicht gelöscht werden.', variant: 'danger');
+            return;
+        }
+
         try {
+            // Force-delete soft-deleted entities to clear the DB constraint
+            OrganizationEntity::onlyTrashed()
+                ->where('entity_type_id', $this->entityType->id)
+                ->forceDelete();
+
             $this->entityType->delete();
             $this->dispatch('toast', message: 'Entity Type gelöscht');
             return redirect()->route('organization.settings.entity-types.index');

@@ -64,13 +64,18 @@ class DeleteEntityTypeTool implements ToolContract, ToolMetadataContract
             /** @var OrganizationEntityType $et */
             $et = $found['model'];
 
-            // Safety: don't delete if entity type is still used by entities
-            $hasEntities = OrganizationEntity::query()
+            // Safety: don't delete if entity type is still used by active entities
+            $hasActiveEntities = OrganizationEntity::query()
                 ->where('entity_type_id', $et->id)
                 ->exists();
-            if ($hasEntities) {
-                return ToolResult::error('VALIDATION_ERROR', 'Entity Type wird noch von Entities verwendet und kann nicht gelöscht werden. Setze stattdessen is_active=false.');
+            if ($hasActiveEntities) {
+                return ToolResult::error('VALIDATION_ERROR', 'Entity Type wird noch von aktiven Entities verwendet und kann nicht gelöscht werden. Setze stattdessen is_active=false.');
             }
+
+            // Force-delete soft-deleted entities to clear the DB constraint
+            OrganizationEntity::onlyTrashed()
+                ->where('entity_type_id', $et->id)
+                ->forceDelete();
 
             $et->delete();
 

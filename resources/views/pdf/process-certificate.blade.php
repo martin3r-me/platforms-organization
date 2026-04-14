@@ -54,18 +54,23 @@
         /* Action items */
         .action-badge { display: inline-block; padding: 4px 10px; border-radius: 10px; font-size: 10px; font-weight: bold; margin-right: 6px; margin-bottom: 6px; }
 
+        /* Page 2 header */
+        .page2-header { border-bottom: 2px solid #1e293b; padding-bottom: 10px; margin-bottom: 20px; }
+        .page2-title { font-size: 14px; font-weight: bold; color: #1e293b; text-transform: uppercase; letter-spacing: 1px; }
+        .page2-sub { font-size: 10px; color: #94a3b8; margin-top: 2px; }
+
         /* Steps table */
-        .steps-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-        .steps-table th { font-size: 7px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: bold; text-align: left; padding: 3px 4px; border-bottom: 1px solid #e2e8f0; }
-        .steps-table td { font-size: 8px; color: #475569; padding: 2px 4px; border-bottom: 1px solid #f1f5f9; }
-        .steps-table .pos { font-family: monospace; color: #94a3b8; width: 20px; text-align: right; }
-        .steps-table .name { color: #1e293b; }
-        .badge-sm { display: inline-block; padding: 1px 4px; border-radius: 2px; font-size: 7px; font-weight: bold; }
+        .steps-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+        .steps-table th { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: bold; text-align: left; padding: 6px 6px; border-bottom: 2px solid #e2e8f0; }
+        .steps-table td { font-size: 10px; color: #475569; padding: 5px 6px; border-bottom: 1px solid #f1f5f9; }
+        .steps-table .pos { font-family: monospace; color: #94a3b8; width: 24px; text-align: right; }
+        .steps-table .name { color: #1e293b; font-weight: 500; }
+        .badge-sm { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 8px; font-weight: bold; }
 
         /* Improvements table */
-        .imp-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
-        .imp-table th { font-size: 7px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: bold; text-align: left; padding: 3px 4px; border-bottom: 1px solid #e2e8f0; }
-        .imp-table td { font-size: 8px; color: #475569; padding: 2px 4px; border-bottom: 1px solid #f1f5f9; }
+        .imp-table { width: 100%; border-collapse: collapse; margin-bottom: 24px; }
+        .imp-table th { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: bold; text-align: left; padding: 6px 6px; border-bottom: 2px solid #e2e8f0; }
+        .imp-table td { font-size: 10px; color: #475569; padding: 5px 6px; border-bottom: 1px solid #f1f5f9; }
 
         /* Footer */
         .footer { border-top: 2px solid #1e293b; padding-top: 10px; margin-top: 28px; font-size: 9px; color: #94a3b8; }
@@ -229,16 +234,22 @@
 
     {{-- Steps List --}}
     @if(count($data['steps_list']) > 0)
-        <div style="margin-bottom: 16px; page-break-before: always;">
-            <div class="section-title">Prozessschritte ({{ count($data['steps_list']) }})</div>
+        <div style="page-break-before: always; padding-top: 36px; margin-bottom: 24px;">
+            {{-- Page 2 Header --}}
+            <div class="page2-header">
+                <div class="page2-title">Prozessschritte</div>
+                <div class="page2-sub">{{ $data['process']['name'] }} &middot; {{ count($data['steps_list']) }} Schritte &middot; {{ $data['kpis']['lead_time'] }} Min. Durchlaufzeit</div>
+            </div>
+
             <table class="steps-table">
                 <thead>
                     <tr>
-                        <th style="width: 20px;">#</th>
+                        <th style="width: 24px;">#</th>
                         <th>Schritt</th>
-                        <th style="width: 50px;">COREFIT</th>
-                        <th style="width: 65px;">Automation</th>
-                        <th style="width: 40px; text-align: right;">Min.</th>
+                        <th style="width: 55px;">COREFIT</th>
+                        <th style="width: 75px;">Automation</th>
+                        <th style="width: 45px; text-align: right;">Dauer</th>
+                        <th style="width: 45px; text-align: right;">Warten</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -249,7 +260,7 @@
                     @foreach($data['steps_list'] as $step)
                         <tr>
                             <td class="pos">{{ $step['position'] }}</td>
-                            <td class="name">{{ \Illuminate\Support\Str::limit($step['name'], 50) }}</td>
+                            <td class="name">{{ \Illuminate\Support\Str::limit($step['name'], 60) }}</td>
                             <td>
                                 @php $cb = $cfBadge[$step['corefit']] ?? $cfBadge['core']; @endphp
                                 <span class="badge-sm" style="background: {{ $cb['bg'] }}; color: {{ $cb['color'] }};">{{ $cb['label'] }}</span>
@@ -259,6 +270,7 @@
                                 <span class="badge-sm" style="background: {{ $ab['bg'] }}; color: {{ $ab['color'] }};">{{ $ab['label'] }}</span>
                             </td>
                             <td style="text-align: right;">{{ $step['duration'] ?? '–' }}</td>
+                            <td style="text-align: right; color: #94a3b8;">{{ $step['wait'] ?? '–' }}</td>
                         </tr>
                     @endforeach
                 </tbody>
@@ -268,15 +280,15 @@
 
     {{-- Improvements --}}
     @if(count($data['improvements_list']) > 0)
-        <div style="margin-bottom: 16px;">
+        <div style="margin-bottom: 24px; margin-top: 12px;">
             <div class="section-title">Verbesserungen ({{ count($data['improvements_list']) }})</div>
             <table class="imp-table">
                 <thead>
                     <tr>
                         <th>Titel</th>
-                        <th style="width: 60px;">Kategorie</th>
-                        <th style="width: 45px;">Priorität</th>
-                        <th style="width: 55px;">Status</th>
+                        <th style="width: 70px;">Kategorie</th>
+                        <th style="width: 55px;">Priorität</th>
+                        <th style="width: 65px;">Status</th>
                     </tr>
                 </thead>
                 <tbody>
@@ -287,14 +299,14 @@
                     @endphp
                     @foreach($data['improvements_list'] as $imp)
                         <tr>
-                            <td style="color: #1e293b;">{{ \Illuminate\Support\Str::limit($imp['title'], 55) }}</td>
+                            <td style="color: #1e293b; font-weight: 500;">{{ \Illuminate\Support\Str::limit($imp['title'], 65) }}</td>
                             <td>{{ $catLabels[$imp['category']] ?? $imp['category'] }}</td>
                             <td>
                                 @php $pc = $prioColors[$imp['priority']] ?? $prioColors['medium']; @endphp
                                 <span class="badge-sm" style="background: {{ $pc['bg'] }}; color: {{ $pc['color'] }};">{{ ucfirst($imp['priority']) }}</span>
                             </td>
                             <td>
-                                <span style="font-size: 7px;">{{ $statusLabels[$imp['status']] ?? $imp['status'] }}</span>
+                                <span style="font-size: 9px;">{{ $statusLabels[$imp['status']] ?? $imp['status'] }}</span>
                             </td>
                         </tr>
                     @endforeach

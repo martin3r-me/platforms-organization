@@ -5,54 +5,54 @@
     <title>Prozessausweis – {{ $data['process']['name'] }}</title>
     <style>
         * { margin: 0; padding: 0; box-sizing: border-box; }
-        body { font-family: 'DejaVu Sans', sans-serif; font-size: 10px; color: #1e293b; background: #fff; }
-        .page { padding: 28px 32px; }
+        body { font-family: 'DejaVu Sans', sans-serif; font-size: 11px; color: #1e293b; background: #fff; }
+        .page { padding: 36px 40px; }
 
         /* Header */
-        .header { border-bottom: 3px solid #1e293b; padding-bottom: 12px; margin-bottom: 16px; }
-        .header-title { font-size: 22px; font-weight: bold; letter-spacing: 3px; color: #1e293b; text-transform: uppercase; }
-        .header-sub { font-size: 13px; color: #475569; margin-top: 4px; }
-        .header-code { font-size: 10px; color: #94a3b8; font-family: monospace; }
+        .header { border-bottom: 3px solid #1e293b; padding-bottom: 16px; margin-bottom: 24px; }
+        .header-title { font-size: 26px; font-weight: bold; letter-spacing: 4px; color: #1e293b; text-transform: uppercase; }
+        .header-sub { font-size: 15px; color: #475569; margin-top: 6px; }
+        .header-code { font-size: 11px; color: #94a3b8; font-family: monospace; margin-top: 2px; }
 
         /* Meta row */
-        .meta-row { display: table; width: 100%; margin-bottom: 16px; }
-        .meta-cell { display: table-cell; width: 25%; padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; }
-        .meta-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: bold; }
-        .meta-value { font-size: 10px; font-weight: bold; color: #1e293b; margin-top: 2px; }
+        .meta-row { display: table; width: 100%; margin-bottom: 24px; }
+        .meta-cell { display: table-cell; width: 25%; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; }
+        .meta-label { font-size: 9px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: bold; }
+        .meta-value { font-size: 12px; font-weight: bold; color: #1e293b; margin-top: 3px; }
 
         /* Efficiency scale */
-        .efficiency-section { margin-bottom: 16px; }
-        .efficiency-title { font-size: 11px; font-weight: bold; color: #1e293b; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .efficiency-section { margin-bottom: 24px; }
+        .efficiency-title { font-size: 12px; font-weight: bold; color: #1e293b; margin-bottom: 10px; text-transform: uppercase; letter-spacing: 0.5px; }
         .scale-table { width: 100%; border-collapse: collapse; }
-        .scale-table td { padding: 0; height: 28px; text-align: center; font-size: 11px; font-weight: bold; color: #fff; }
+        .scale-table td { padding: 0; height: 36px; text-align: center; font-size: 13px; font-weight: bold; color: #fff; }
         .scale-arrow { width: 100%; height: 20px; position: relative; margin-top: 2px; }
-        .efficiency-result { margin-top: 8px; padding: 8px 12px; border-radius: 4px; display: inline-block; }
-        .efficiency-result-class { font-size: 28px; font-weight: bold; }
-        .efficiency-result-label { font-size: 10px; margin-left: 8px; }
-        .efficiency-result-percent { font-size: 12px; color: #64748b; margin-left: 12px; }
+        .efficiency-result { margin-top: 12px; padding: 10px 16px; border-radius: 4px; display: inline-block; }
+        .efficiency-result-class { font-size: 36px; font-weight: bold; }
+        .efficiency-result-label { font-size: 12px; margin-left: 10px; }
+        .efficiency-result-percent { font-size: 14px; color: #64748b; margin-left: 14px; }
 
         /* KPI grid */
-        .kpi-grid { display: table; width: 100%; margin-bottom: 16px; }
-        .kpi-cell { display: table-cell; width: 25%; padding: 8px; text-align: center; border: 1px solid #e2e8f0; background: #fff; }
-        .kpi-value { font-size: 20px; font-weight: bold; color: #1e293b; }
-        .kpi-label { font-size: 8px; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; }
-        .kpi-detail { font-size: 8px; color: #64748b; margin-top: 2px; }
+        .kpi-grid { display: table; width: 100%; margin-bottom: 24px; }
+        .kpi-cell { display: table-cell; width: 25%; padding: 12px; text-align: center; border: 1px solid #e2e8f0; background: #fff; }
+        .kpi-value { font-size: 26px; font-weight: bold; color: #1e293b; }
+        .kpi-label { font-size: 9px; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; }
+        .kpi-detail { font-size: 9px; color: #64748b; margin-top: 3px; }
 
         /* Bars */
-        .section-title { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
-        .bar-row { margin-bottom: 6px; }
-        .bar-label { font-size: 9px; color: #475569; margin-bottom: 2px; }
-        .bar-track { width: 100%; height: 14px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
-        .bar-fill { height: 14px; border-radius: 3px; min-width: 2px; }
-        .bar-info { font-size: 8px; color: #64748b; margin-top: 1px; }
+        .section-title { font-size: 12px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; margin-bottom: 10px; border-bottom: 1px solid #e2e8f0; padding-bottom: 5px; }
+        .bar-row { margin-bottom: 10px; }
+        .bar-label { font-size: 10px; color: #475569; margin-bottom: 3px; }
+        .bar-track { width: 100%; height: 18px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+        .bar-fill { height: 18px; border-radius: 3px; min-width: 2px; }
+        .bar-info { font-size: 9px; color: #64748b; margin-top: 2px; }
 
         /* Two columns */
-        .two-col { display: table; width: 100%; margin-bottom: 16px; }
-        .col-left { display: table-cell; width: 48%; vertical-align: top; padding-right: 12px; }
-        .col-right { display: table-cell; width: 48%; vertical-align: top; padding-left: 12px; }
+        .two-col { display: table; width: 100%; margin-bottom: 24px; }
+        .col-left { display: table-cell; width: 48%; vertical-align: top; padding-right: 16px; }
+        .col-right { display: table-cell; width: 48%; vertical-align: top; padding-left: 16px; }
 
         /* Action items */
-        .action-badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 9px; font-weight: bold; margin-right: 4px; margin-bottom: 4px; }
+        .action-badge { display: inline-block; padding: 4px 10px; border-radius: 10px; font-size: 10px; font-weight: bold; margin-right: 6px; margin-bottom: 6px; }
 
         /* Steps table */
         .steps-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
@@ -68,11 +68,11 @@
         .imp-table td { font-size: 8px; color: #475569; padding: 2px 4px; border-bottom: 1px solid #f1f5f9; }
 
         /* Footer */
-        .footer { border-top: 2px solid #1e293b; padding-top: 8px; margin-top: 16px; font-size: 8px; color: #94a3b8; }
+        .footer { border-top: 2px solid #1e293b; padding-top: 10px; margin-top: 28px; font-size: 9px; color: #94a3b8; }
         .footer-row { display: table; width: 100%; }
         .footer-left { display: table-cell; width: 50%; }
         .footer-right { display: table-cell; width: 50%; text-align: right; }
-        .checksum { font-family: monospace; font-size: 7px; color: #cbd5e1; word-break: break-all; }
+        .checksum { font-family: monospace; font-size: 8px; color: #cbd5e1; word-break: break-all; }
     </style>
 </head>
 <body>
@@ -129,7 +129,7 @@
         <table class="scale-table">
             <tr>
                 @foreach($scaleClasses as $sc)
-                    <td style="background: {{ $sc['color'] }}; width: {{ $sc['width'] }};{{ $sc['class'] === $currentClass ? ' border: 3px solid #1e293b; font-size: 14px;' : '' }}">
+                    <td style="background: {{ $sc['color'] }}; width: {{ $sc['width'] }};{{ $sc['class'] === $currentClass ? ' border: 3px solid #1e293b; font-size: 16px;' : '' }}">
                         {{ $sc['class'] }}
                     </td>
                 @endforeach
@@ -204,7 +204,7 @@
     </div>
 
     {{-- Handlungsbedarf --}}
-    <div style="margin-bottom: 16px;">
+    <div style="margin-bottom: 24px;">
         <div class="section-title">Handlungsbedarf</div>
         @if($data['kpis']['total_steps'] > 0)
             @if($data['action_items']['eliminate'] > 0)
@@ -305,9 +305,9 @@
 
     {{-- Description --}}
     @if($data['process']['description'])
-        <div style="margin-bottom: 16px;">
+        <div style="margin-bottom: 24px;">
             <div class="section-title">Beschreibung</div>
-            <div style="font-size: 9px; color: #475569; line-height: 1.4;">{{ \Illuminate\Support\Str::limit($data['process']['description'], 500) }}</div>
+            <div style="font-size: 10px; color: #475569; line-height: 1.5;">{{ \Illuminate\Support\Str::limit($data['process']['description'], 500) }}</div>
         </div>
     @endif
 

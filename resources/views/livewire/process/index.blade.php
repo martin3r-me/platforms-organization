@@ -42,82 +42,15 @@
     </x-slot>
 
     <x-ui-page-container>
-        <x-ui-table compact="true">
-            <x-ui-table-header>
-                <x-ui-table-header-cell compact="true">Name / Code</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Owner</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Steps</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">LLM-Quote</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true"></x-ui-table-header-cell>
-            </x-ui-table-header>
+        @php $tree = $this->processTree; @endphp
 
-            <x-ui-table-body>
-                @forelse($this->processes as $process)
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true">
-                            <a href="{{ route('organization.processes.show', $process) }}" class="font-semibold text-[var(--ui-primary)] hover:underline" wire:navigate>
-                                {{ $process->name }}
-                            </a>
-                            @if($process->code)
-                                <code class="ml-2 text-xs text-[var(--ui-muted)]">{{ $process->code }}</code>
-                            @endif
-                            @if($process->description)
-                                <div class="text-xs text-[var(--ui-muted)]">{{ \Illuminate\Support\Str::limit($process->description, 80) }}</div>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($process->status === 'active')
-                                <x-ui-badge variant="success">Aktiv</x-ui-badge>
-                            @elseif($process->status === 'draft')
-                                <x-ui-badge variant="muted">Entwurf</x-ui-badge>
-                            @else
-                                <x-ui-badge variant="danger">Veraltet</x-ui-badge>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <span class="text-sm">{{ $process->ownerEntity?->name ?? '–' }}</span>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <span class="text-sm">{{ $process->steps_count }}</span>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @php
-                                $totalSteps = $process->steps->count();
-                                $llmSteps = $process->steps->whereIn('automation_level', ['llm_assisted', 'llm_autonomous', 'hybrid'])->count();
-                                $llmQuote = $totalSteps > 0 ? round(($llmSteps / $totalSteps) * 100) : 0;
-                            @endphp
-                            @if($totalSteps > 0)
-                                <div class="flex items-center gap-2">
-                                    <div class="w-16 bg-[var(--ui-muted-20)] rounded-full h-1.5">
-                                        <div class="h-1.5 rounded-full {{ $llmQuote >= 70 ? 'bg-[var(--ui-success)]' : ($llmQuote >= 30 ? 'bg-[var(--ui-info)]' : 'bg-[var(--ui-muted)]') }}" style="width: {{ $llmQuote }}%"></div>
-                                    </div>
-                                    <span class="text-xs font-medium text-[var(--ui-secondary)]">{{ $llmQuote }}%</span>
-                                </div>
-                            @else
-                                <span class="text-xs text-[var(--ui-muted)]">–</span>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <div class="flex gap-1 justify-end">
-                                <x-ui-button size="xs" variant="secondary-outline" wire:click="edit({{ $process->id }})">
-                                    @svg('heroicon-o-pencil-square', 'w-4 h-4')
-                                </x-ui-button>
-                                <x-ui-confirm-button size="xs" variant="danger-outline" wire:click="delete({{ $process->id }})" confirm-text="Prozess wirklich löschen?">
-                                    @svg('heroicon-o-trash', 'w-4 h-4')
-                                </x-ui-confirm-button>
-                            </div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @empty
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="6">
-                            <div class="text-center text-[var(--ui-muted)] py-6">Keine Prozesse gefunden.</div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @endforelse
-            </x-ui-table-body>
-        </x-ui-table>
+        @if(count($tree) === 0 && $this->processes->isEmpty())
+            <div class="text-center text-[var(--ui-muted)] py-12">Keine Prozesse gefunden.</div>
+        @else
+            <div class="space-y-1">
+                @each('organization::livewire.process.partials.tree-node', $tree, 'node')
+            </div>
+        @endif
     </x-ui-page-container>
 
     <!-- Create/Edit Modal -->

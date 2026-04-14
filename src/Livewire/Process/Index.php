@@ -7,6 +7,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Platform\Organization\Models\OrganizationProcess;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationVsmSystem;
 
 class Index extends Component
@@ -64,6 +65,97 @@ class Index extends Component
         }
 
         return $q->with(['ownerEntity', 'vsmSystem', 'steps:id,process_id,automation_level'])->orderBy('name')->get();
+    }
+
+    #[Computed]
+    public function processTree(): array
+    {
+        $processes = $this->processes;
+        $teamId = Auth::user()->currentTeam->id;
+
+        // Load all entities with type for the team (keyed by id)
+        $entities = OrganizationEntity::where('team_id', $teamId)
+            ->with('type')
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('id');
+
+        // Group processes by owner_entity_id
+        $byOwner = $processes->groupBy('owner_entity_id');
+
+        // Build tree: find root entities (no parent) that have processes (directly or via children)
+        $tree = [];
+
+        // Collect all entity IDs that own processes
+        $ownerIds = $byOwner->keys()->filter()->toArray();
+
+        // For each owner, walk up to find the root ancestor
+        $entityAncestorCache = [];
+        $relevantEntityIds = collect();
+
+        foreach ($ownerIds as $ownerId) {
+            $current = $entities->get($ownerId);
+            if (!$current) continue;
+
+            // Collect this entity and all its ancestors
+            $chain = [];
+            $visited = [];
+            while ($current && !in_array($current->id, $visited)) {
+                $visited[] = $current->id;
+                $chain[] = $current->id;
+                $relevantEntityIds->push($current->id);
+                $current = $current->parent_entity_id ? $entities->get($current->parent_entity_id) : null;
+            }
+            $entityAncestorCache[$ownerId] = $chain;
+        }
+
+        $relevantEntityIds = $relevantEntityIds->unique();
+
+        // Build nested tree recursively
+        $tree = $this->buildEntityNode(null, $entities, $byOwner, $relevantEntityIds, 0);
+
+        // Add "Ohne Owner" group
+        $unowned = $byOwner->get('', collect())->merge($byOwner->get(null, collect()));
+        if ($unowned->isNotEmpty()) {
+            $tree[] = [
+                'type' => 'group',
+                'label' => 'Ohne Owner',
+                'entity' => null,
+                'entity_type' => null,
+                'depth' => 0,
+                'processes' => $unowned->values()->all(),
+                'children' => [],
+            ];
+        }
+
+        return $tree;
+    }
+
+    private function buildEntityNode(?int $parentId, $entities, $byOwner, $relevantEntityIds, int $depth): array
+    {
+        $nodes = [];
+
+        // Get children of this parent that are relevant
+        $children = $entities->filter(function ($e) use ($parentId, $relevantEntityIds) {
+            return $e->parent_entity_id == $parentId && $relevantEntityIds->contains($e->id);
+        })->sortBy(fn ($e) => ($e->type?->sort_order ?? 999) . '_' . $e->name);
+
+        foreach ($children as $entity) {
+            $directProcesses = $byOwner->get($entity->id, collect());
+            $childNodes = $this->buildEntityNode($entity->id, $entities, $byOwner, $relevantEntityIds, $depth + 1);
+
+            $nodes[] = [
+                'type' => 'entity',
+                'label' => $entity->name,
+                'entity' => $entity,
+                'entity_type' => $entity->type?->name,
+                'depth' => $depth,
+                'processes' => $directProcesses->values()->all(),
+                'children' => $childNodes,
+            ];
+        }
+
+        return $nodes;
     }
 
     #[Computed]

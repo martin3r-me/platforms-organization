@@ -8,7 +8,7 @@ class ProcessCertificateService
 {
     public static function compute(OrganizationProcess $process): array
     {
-        $process->loadMissing(['ownerEntity', 'vsmSystem', 'steps', 'team']);
+        $process->loadMissing(['ownerEntity', 'vsmSystem', 'steps', 'improvements', 'team']);
 
         $steps = $process->steps->sortBy('position');
         $totalSteps = $steps->count();
@@ -119,6 +119,22 @@ class ProcessCertificateService
             'corefit' => $corefit,
             'automation' => $automation,
             'action_items' => $actionItems,
+            'steps_list' => $steps->map(fn ($s) => [
+                'position' => $s->position,
+                'name' => $s->name,
+                'corefit' => $s->corefit_classification ?? 'core',
+                'automation' => $s->automation_level ?? 'human',
+                'duration' => $s->duration_target_minutes,
+                'wait' => $s->wait_target_minutes,
+            ])->values()->toArray(),
+            'improvements_list' => $process->improvements
+                ->sortByDesc('created_at')
+                ->map(fn ($i) => [
+                    'title' => $i->title,
+                    'category' => $i->category,
+                    'priority' => $i->priority,
+                    'status' => $i->status,
+                ])->values()->toArray(),
             'meta' => [
                 'generated_at' => $now->toIso8601String(),
                 'generated_at_formatted' => $now->format('d.m.Y H:i'),

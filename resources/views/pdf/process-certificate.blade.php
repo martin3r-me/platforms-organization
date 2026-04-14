@@ -54,6 +54,19 @@
         /* Action items */
         .action-badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 9px; font-weight: bold; margin-right: 4px; margin-bottom: 4px; }
 
+        /* Steps table */
+        .steps-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        .steps-table th { font-size: 7px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: bold; text-align: left; padding: 3px 4px; border-bottom: 1px solid #e2e8f0; }
+        .steps-table td { font-size: 8px; color: #475569; padding: 2px 4px; border-bottom: 1px solid #f1f5f9; }
+        .steps-table .pos { font-family: monospace; color: #94a3b8; width: 20px; text-align: right; }
+        .steps-table .name { color: #1e293b; }
+        .badge-sm { display: inline-block; padding: 1px 4px; border-radius: 2px; font-size: 7px; font-weight: bold; }
+
+        /* Improvements table */
+        .imp-table { width: 100%; border-collapse: collapse; margin-bottom: 16px; }
+        .imp-table th { font-size: 7px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: bold; text-align: left; padding: 3px 4px; border-bottom: 1px solid #e2e8f0; }
+        .imp-table td { font-size: 8px; color: #475569; padding: 2px 4px; border-bottom: 1px solid #f1f5f9; }
+
         /* Footer */
         .footer { border-top: 2px solid #1e293b; padding-top: 8px; margin-top: 16px; font-size: 8px; color: #94a3b8; }
         .footer-row { display: table; width: 100%; }
@@ -213,6 +226,82 @@
             <span style="font-size: 9px; color: #94a3b8;">Keine Prozessschritte vorhanden</span>
         @endif
     </div>
+
+    {{-- Steps List --}}
+    @if(count($data['steps_list']) > 0)
+        <div style="margin-bottom: 16px;">
+            <div class="section-title">Prozessschritte ({{ count($data['steps_list']) }})</div>
+            <table class="steps-table">
+                <thead>
+                    <tr>
+                        <th style="width: 20px;">#</th>
+                        <th>Schritt</th>
+                        <th style="width: 50px;">COREFIT</th>
+                        <th style="width: 65px;">Automation</th>
+                        <th style="width: 40px; text-align: right;">Min.</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @php
+                        $cfBadge = ['core' => ['bg' => '#dcfce7', 'color' => '#15803d', 'label' => 'Core'], 'context' => ['bg' => '#fef9c3', 'color' => '#a16207', 'label' => 'Ctx'], 'no_fit' => ['bg' => '#fef2f2', 'color' => '#b91c1c', 'label' => 'NF']];
+                        $alBadge = ['human' => ['bg' => '#f1f5f9', 'color' => '#64748b', 'label' => 'Human'], 'llm_assisted' => ['bg' => '#dbeafe', 'color' => '#1d4ed8', 'label' => 'Assisted'], 'llm_autonomous' => ['bg' => '#dcfce7', 'color' => '#15803d', 'label' => 'Autonom'], 'hybrid' => ['bg' => '#fef9c3', 'color' => '#a16207', 'label' => 'Hybrid']];
+                    @endphp
+                    @foreach($data['steps_list'] as $step)
+                        <tr>
+                            <td class="pos">{{ $step['position'] }}</td>
+                            <td class="name">{{ \Illuminate\Support\Str::limit($step['name'], 50) }}</td>
+                            <td>
+                                @php $cb = $cfBadge[$step['corefit']] ?? $cfBadge['core']; @endphp
+                                <span class="badge-sm" style="background: {{ $cb['bg'] }}; color: {{ $cb['color'] }};">{{ $cb['label'] }}</span>
+                            </td>
+                            <td>
+                                @php $ab = $alBadge[$step['automation']] ?? $alBadge['human']; @endphp
+                                <span class="badge-sm" style="background: {{ $ab['bg'] }}; color: {{ $ab['color'] }};">{{ $ab['label'] }}</span>
+                            </td>
+                            <td style="text-align: right;">{{ $step['duration'] ?? '–' }}</td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
+
+    {{-- Improvements --}}
+    @if(count($data['improvements_list']) > 0)
+        <div style="margin-bottom: 16px;">
+            <div class="section-title">Verbesserungen ({{ count($data['improvements_list']) }})</div>
+            <table class="imp-table">
+                <thead>
+                    <tr>
+                        <th>Titel</th>
+                        <th style="width: 60px;">Kategorie</th>
+                        <th style="width: 45px;">Priorität</th>
+                        <th style="width: 55px;">Status</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    @php
+                        $catLabels = ['cost' => 'Kosten', 'quality' => 'Qualität', 'speed' => 'Speed', 'risk' => 'Risiko', 'standardization' => 'Standard'];
+                        $prioColors = ['critical' => ['bg' => '#fef2f2', 'color' => '#b91c1c'], 'high' => ['bg' => '#fff7ed', 'color' => '#c2410c'], 'medium' => ['bg' => '#fef9c3', 'color' => '#a16207'], 'low' => ['bg' => '#f1f5f9', 'color' => '#64748b']];
+                        $statusLabels = ['identified' => 'Erkannt', 'planned' => 'Geplant', 'in_progress' => 'In Arbeit', 'completed' => 'Erledigt', 'rejected' => 'Abgelehnt'];
+                    @endphp
+                    @foreach($data['improvements_list'] as $imp)
+                        <tr>
+                            <td style="color: #1e293b;">{{ \Illuminate\Support\Str::limit($imp['title'], 55) }}</td>
+                            <td>{{ $catLabels[$imp['category']] ?? $imp['category'] }}</td>
+                            <td>
+                                @php $pc = $prioColors[$imp['priority']] ?? $prioColors['medium']; @endphp
+                                <span class="badge-sm" style="background: {{ $pc['bg'] }}; color: {{ $pc['color'] }};">{{ ucfirst($imp['priority']) }}</span>
+                            </td>
+                            <td>
+                                <span style="font-size: 7px;">{{ $statusLabels[$imp['status']] ?? $imp['status'] }}</span>
+                            </td>
+                        </tr>
+                    @endforeach
+                </tbody>
+            </table>
+        </div>
+    @endif
 
     {{-- Description --}}
     @if($data['process']['description'])

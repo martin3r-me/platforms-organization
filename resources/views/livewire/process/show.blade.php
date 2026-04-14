@@ -1456,6 +1456,94 @@
                     @endif
                 </div>
 
+                {{-- Steps List --}}
+                @if(count($certData['steps_list']) > 0)
+                    <div class="mb-5">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-gray-800 mb-2 pb-1 border-b border-gray-200">Prozessschritte ({{ count($certData['steps_list']) }})</h3>
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="border-b border-gray-200">
+                                    <th class="text-[9px] uppercase tracking-wider text-gray-400 font-bold py-1 px-1 w-6">#</th>
+                                    <th class="text-[9px] uppercase tracking-wider text-gray-400 font-bold py-1 px-1">Schritt</th>
+                                    <th class="text-[9px] uppercase tracking-wider text-gray-400 font-bold py-1 px-1 w-14">COREFIT</th>
+                                    <th class="text-[9px] uppercase tracking-wider text-gray-400 font-bold py-1 px-1 w-20">Automation</th>
+                                    <th class="text-[9px] uppercase tracking-wider text-gray-400 font-bold py-1 px-1 w-10 text-right">Min.</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($certData['steps_list'] as $step)
+                                    <tr class="border-b border-gray-50">
+                                        <td class="text-[10px] text-gray-400 font-mono py-0.5 px-1 text-right">{{ $step['position'] }}</td>
+                                        <td class="text-[10px] text-gray-800 py-0.5 px-1">{{ \Illuminate\Support\Str::limit($step['name'], 50) }}</td>
+                                        <td class="py-0.5 px-1">
+                                            @if($step['corefit'] === 'core')
+                                                <span class="inline-block px-1 py-px rounded text-[8px] font-bold bg-green-50 text-green-700">Core</span>
+                                            @elseif($step['corefit'] === 'context')
+                                                <span class="inline-block px-1 py-px rounded text-[8px] font-bold bg-yellow-50 text-yellow-700">Ctx</span>
+                                            @else
+                                                <span class="inline-block px-1 py-px rounded text-[8px] font-bold bg-red-50 text-red-700">NF</span>
+                                            @endif
+                                        </td>
+                                        <td class="py-0.5 px-1">
+                                            @if($step['automation'] === 'llm_autonomous')
+                                                <span class="inline-block px-1 py-px rounded text-[8px] font-bold bg-green-50 text-green-700">Autonom</span>
+                                            @elseif($step['automation'] === 'llm_assisted')
+                                                <span class="inline-block px-1 py-px rounded text-[8px] font-bold bg-blue-50 text-blue-700">Assisted</span>
+                                            @elseif($step['automation'] === 'hybrid')
+                                                <span class="inline-block px-1 py-px rounded text-[8px] font-bold bg-yellow-50 text-yellow-700">Hybrid</span>
+                                            @else
+                                                <span class="inline-block px-1 py-px rounded text-[8px] font-bold bg-gray-50 text-gray-500">Human</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-[10px] text-gray-500 py-0.5 px-1 text-right">{{ $step['duration'] ?? '–' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
+                {{-- Improvements --}}
+                @if(count($certData['improvements_list']) > 0)
+                    <div class="mb-5">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-gray-800 mb-2 pb-1 border-b border-gray-200">Verbesserungen ({{ count($certData['improvements_list']) }})</h3>
+                        @php
+                            $catLabels = ['cost' => 'Kosten', 'quality' => 'Qualität', 'speed' => 'Speed', 'risk' => 'Risiko', 'standardization' => 'Standard'];
+                            $statusLabels = ['identified' => 'Erkannt', 'planned' => 'Geplant', 'in_progress' => 'In Arbeit', 'completed' => 'Erledigt', 'rejected' => 'Abgelehnt'];
+                        @endphp
+                        <table class="w-full text-left">
+                            <thead>
+                                <tr class="border-b border-gray-200">
+                                    <th class="text-[9px] uppercase tracking-wider text-gray-400 font-bold py-1 px-1">Titel</th>
+                                    <th class="text-[9px] uppercase tracking-wider text-gray-400 font-bold py-1 px-1 w-16">Kategorie</th>
+                                    <th class="text-[9px] uppercase tracking-wider text-gray-400 font-bold py-1 px-1 w-14">Priorität</th>
+                                    <th class="text-[9px] uppercase tracking-wider text-gray-400 font-bold py-1 px-1 w-16">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach($certData['improvements_list'] as $imp)
+                                    <tr class="border-b border-gray-50">
+                                        <td class="text-[10px] text-gray-800 py-0.5 px-1">{{ \Illuminate\Support\Str::limit($imp['title'], 55) }}</td>
+                                        <td class="text-[10px] text-gray-500 py-0.5 px-1">{{ $catLabels[$imp['category']] ?? $imp['category'] }}</td>
+                                        <td class="py-0.5 px-1">
+                                            @if($imp['priority'] === 'critical')
+                                                <span class="inline-block px-1 py-px rounded text-[8px] font-bold bg-red-50 text-red-700">Critical</span>
+                                            @elseif($imp['priority'] === 'high')
+                                                <span class="inline-block px-1 py-px rounded text-[8px] font-bold bg-orange-50 text-orange-700">High</span>
+                                            @elseif($imp['priority'] === 'medium')
+                                                <span class="inline-block px-1 py-px rounded text-[8px] font-bold bg-yellow-50 text-yellow-700">Medium</span>
+                                            @else
+                                                <span class="inline-block px-1 py-px rounded text-[8px] font-bold bg-gray-50 text-gray-500">Low</span>
+                                            @endif
+                                        </td>
+                                        <td class="text-[9px] text-gray-500 py-0.5 px-1">{{ $statusLabels[$imp['status']] ?? $imp['status'] }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                @endif
+
                 {{-- Footer --}}
                 <div class="border-t-2 border-gray-800 pt-2 flex justify-between text-[10px] text-gray-400">
                     <span>Erstellt am {{ $certData['meta']['generated_at_formatted'] }}</span>

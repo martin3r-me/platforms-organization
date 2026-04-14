@@ -27,6 +27,7 @@ class OrganizationSlaContract extends Model
         'resolution_time_hours',
         'error_tolerance_percent',
         'is_active',
+        'owner_entity_id',
     ];
 
     protected $casts = [
@@ -55,6 +56,11 @@ class OrganizationSlaContract extends Model
                 $sla->team_id = Auth::user()?->currentTeamRelation?->id;
             }
         });
+    }
+
+    public function ownerEntity(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationEntity::class, 'owner_entity_id');
     }
 
     public function team(): BelongsTo

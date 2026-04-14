@@ -67,6 +67,22 @@ return [
                         ],
                     ],
                 ],
+                'connections' => [
+                    'title' => 'Verbindungen',
+                    'icon' => 'heroicon-o-link',
+                    'items' => [
+                        'interlinks' => [
+                            'title' => 'Interlinks',
+                            'route' => 'organization.interlinks.index',
+                            'icon' => 'heroicon-o-arrows-right-left',
+                        ],
+                        'sla-contracts' => [
+                            'title' => 'SLA-Verträge',
+                            'route' => 'organization.sla-contracts.index',
+                            'icon' => 'heroicon-o-shield-check',
+                        ],
+                    ],
+                ],
                 'dashboard' => [
                     'title' => 'Dashboard',
                     'route' => 'organization.dashboard',

@@ -77,104 +77,17 @@
             </div>
         @endif
 
-        <x-ui-table compact="true">
-            <x-ui-table-header>
-                <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Kategorie</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Bidirektional</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Gültigkeit</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Aktionen</x-ui-table-header-cell>
-            </x-ui-table-header>
+        @php $tree = $this->itemTree; @endphp
 
-            <x-ui-table-body>
-                @forelse($this->interlinks as $interlink)
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true">
-                            <a href="{{ route('organization.interlinks.show', $interlink) }}" class="font-semibold text-[var(--ui-primary)] hover:underline">
-                                {{ $interlink->name }}
-                            </a>
-                            @if($interlink->description)
-                                <div class="text-xs text-[var(--ui-muted)] truncate max-w-xs">{{ $interlink->description }}</div>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($interlink->category)
-                                <x-ui-badge variant="secondary" size="sm">{{ $interlink->category->name }}</x-ui-badge>
-                            @else
-                                <span class="text-xs text-[var(--ui-muted)]">–</span>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($interlink->type)
-                                <x-ui-badge variant="secondary" size="sm">{{ $interlink->type->name }}</x-ui-badge>
-                            @else
-                                <span class="text-xs text-[var(--ui-muted)]">–</span>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($interlink->is_bidirectional)
-                                @svg('heroicon-o-arrows-right-left', 'w-4 h-4 text-[var(--ui-primary)]')
-                            @else
-                                @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-muted)]')
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <div class="text-xs text-[var(--ui-muted)]">
-                                @if($interlink->valid_from || $interlink->valid_to)
-                                    @if($interlink->valid_from)
-                                        {{ $interlink->valid_from->format('d.m.Y') }}
-                                    @else
-                                        –
-                                    @endif
-                                    →
-                                    @if($interlink->valid_to)
-                                        {{ $interlink->valid_to->format('d.m.Y') }}
-                                    @else
-                                        –
-                                    @endif
-                                @else
-                                    Unbegrenzt
-                                @endif
-                            </div>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($interlink->is_active)
-                                <x-ui-badge variant="success" size="sm">Aktiv</x-ui-badge>
-                            @else
-                                <x-ui-badge variant="danger" size="sm">Inaktiv</x-ui-badge>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <div class="flex items-center gap-1">
-                                <a href="{{ route('organization.interlinks.show', $interlink) }}">
-                                    <x-ui-button variant="secondary-ghost" size="sm">
-                                        @svg('heroicon-o-pencil', 'w-4 h-4')
-                                    </x-ui-button>
-                                </a>
-                                <x-ui-confirm-button
-                                    variant="danger-ghost"
-                                    size="sm"
-                                    wire:click="deleteInterlink({{ $interlink->id }})"
-                                    confirm-text="Interlink wirklich löschen?"
-                                >
-                                    @svg('heroicon-o-trash', 'w-4 h-4')
-                                </x-ui-confirm-button>
-                            </div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @empty
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="7">
-                            <div class="py-8 text-center text-sm text-[var(--ui-muted)]">
-                                Keine Interlinks gefunden.
-                            </div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @endforelse
-            </x-ui-table-body>
-        </x-ui-table>
+        @if(count($tree) === 0 && $this->interlinks->isEmpty())
+            <div class="text-center text-[var(--ui-muted)] py-12">Keine Interlinks gefunden.</div>
+        @else
+            <div class="space-y-1">
+                @foreach($tree as $node)
+                    @include('organization::livewire.partials.entity-tree-node', ['node' => $node, 'itemPartial' => 'organization::livewire.interlink.partials.tree-item'])
+                @endforeach
+            </div>
+        @endif
     </x-ui-page-container>
 
     <!-- Create Interlink Modal -->
@@ -225,6 +138,16 @@
                         wire:model.live="newInterlink.type_id"
                         required
                     />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">Owner (Entity)</label>
+                    <select wire:model.live="newInterlink.owner_entity_id" class="w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="">– Kein Owner –</option>
+                        @foreach($this->availableEntities as $entity)
+                            <option value="{{ $entity->id }}">{{ $entity->name }}</option>
+                        @endforeach
+                    </select>
                 </div>
 
                 <div class="grid grid-cols-2 gap-4">

@@ -32,6 +32,7 @@ class Index extends Component
         'slug' => '',
         'description' => '',
         'status' => 'active',
+        'owner_entity_id' => '',
     ];
 
     protected $queryString = [
@@ -45,7 +46,8 @@ class Index extends Component
             'form.name'        => ['required', 'string', 'max:255'],
             'form.slug'        => ['nullable', 'string', 'max:255'],
             'form.description' => ['nullable', 'string'],
-            'form.status'      => ['required', 'in:active,archived'],
+            'form.status'          => ['required', 'in:active,archived'],
+            'form.owner_entity_id' => ['nullable', 'integer', 'exists:organization_entities,id'],
         ];
     }
 
@@ -54,7 +56,7 @@ class Index extends Component
     {
         $q = OrganizationRole::query()
             ->withCount('assignments')
-            ->with('assignments.person', 'assignments.context')
+            ->with('ownerEntity', 'assignments.person', 'assignments.context')
             ->where('team_id', Auth::user()->currentTeam->id);
 
         if ($this->search !== '') {
@@ -71,6 +73,89 @@ class Index extends Component
         }
 
         return $q->orderBy('name')->get();
+    }
+
+    #[Computed]
+    public function itemTree(): array
+    {
+        $items = $this->roles;
+        $teamId = Auth::user()->currentTeam->id;
+
+        $entities = OrganizationEntity::where('team_id', $teamId)
+            ->with('type')
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('id');
+
+        $byOwner = $items->groupBy('owner_entity_id');
+
+        $ownerIds = $byOwner->keys()->filter()->toArray();
+        $relevantEntityIds = collect();
+
+        foreach ($ownerIds as $ownerId) {
+            $current = $entities->get($ownerId);
+            if (!$current) continue;
+
+            $visited = [];
+            while ($current && !in_array($current->id, $visited)) {
+                $visited[] = $current->id;
+                $relevantEntityIds->push($current->id);
+                $current = $current->parent_entity_id ? $entities->get($current->parent_entity_id) : null;
+            }
+        }
+
+        $relevantEntityIds = $relevantEntityIds->unique();
+
+        $tree = $this->buildEntityNode(null, $entities, $byOwner, $relevantEntityIds, 0);
+
+        $unowned = $byOwner->get('', collect())->merge($byOwner->get(null, collect()));
+        if ($unowned->isNotEmpty()) {
+            $tree[] = [
+                'type' => 'group',
+                'label' => 'Ohne Owner',
+                'entity' => null,
+                'entity_type' => null,
+                'depth' => 0,
+                'items' => $unowned->values()->all(),
+                'children' => [],
+            ];
+        }
+
+        return $tree;
+    }
+
+    private function buildEntityNode(?int $parentId, $entities, $byOwner, $relevantEntityIds, int $depth): array
+    {
+        $nodes = [];
+
+        $children = $entities->filter(function ($e) use ($parentId, $relevantEntityIds) {
+            return $e->parent_entity_id == $parentId && $relevantEntityIds->contains($e->id);
+        })->sortBy(fn ($e) => ($e->type?->sort_order ?? 999) . '_' . $e->name);
+
+        foreach ($children as $entity) {
+            $directItems = $byOwner->get($entity->id, collect());
+            $childNodes = $this->buildEntityNode($entity->id, $entities, $byOwner, $relevantEntityIds, $depth + 1);
+
+            $nodes[] = [
+                'type' => 'entity',
+                'label' => $entity->name,
+                'entity' => $entity,
+                'entity_type' => $entity->type?->name,
+                'depth' => $depth,
+                'items' => $directItems->values()->all(),
+                'children' => $childNodes,
+            ];
+        }
+
+        return $nodes;
+    }
+
+    #[Computed]
+    public function availableEntities()
+    {
+        return OrganizationEntity::where('team_id', Auth::user()->currentTeam->id)
+            ->orderBy('name')
+            ->get();
     }
 
     public function create(): void
@@ -92,10 +177,11 @@ class Index extends Component
         $this->resetValidation();
         $this->editingId = $role->id;
         $this->form = [
-            'name'        => (string) $role->name,
-            'slug'        => (string) ($role->slug ?? ''),
-            'description' => (string) ($role->description ?? ''),
-            'status'      => (string) ($role->status ?? 'active'),
+            'name'            => (string) $role->name,
+            'slug'            => (string) ($role->slug ?? ''),
+            'description'     => (string) ($role->description ?? ''),
+            'status'          => (string) ($role->status ?? 'active'),
+            'owner_entity_id' => (string) ($role->owner_entity_id ?? ''),
         ];
         $this->modalShow = true;
     }
@@ -105,10 +191,11 @@ class Index extends Component
         $data = $this->validate()['form'];
 
         $payload = [
-            'name'        => trim($data['name']),
-            'slug'        => $data['slug'] !== '' ? $data['slug'] : null,
-            'description' => $data['description'] !== '' ? $data['description'] : null,
-            'status'      => $data['status'],
+            'name'            => trim($data['name']),
+            'slug'            => $data['slug'] !== '' ? $data['slug'] : null,
+            'description'     => $data['description'] !== '' ? $data['description'] : null,
+            'status'          => $data['status'],
+            'owner_entity_id' => $data['owner_entity_id'] !== '' ? (int) $data['owner_entity_id'] : null,
         ];
 
         if ($this->editingId) {

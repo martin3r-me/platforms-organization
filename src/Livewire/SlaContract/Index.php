@@ -2,8 +2,10 @@
 
 namespace Platform\Organization\Livewire\SlaContract;
 
+use Illuminate\Support\Facades\Auth;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
+use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationSlaContract;
 
 class Index extends Component
@@ -18,6 +20,7 @@ class Index extends Component
         'resolution_time_hours' => null,
         'error_tolerance_percent' => null,
         'is_active' => true,
+        'owner_entity_id' => '',
     ];
 
     protected $queryString = [
@@ -34,7 +37,7 @@ class Index extends Component
     public function slaContracts()
     {
         $query = OrganizationSlaContract::query()
-            ->with(['user'])
+            ->with(['user', 'ownerEntity'])
             ->where('team_id', auth()->user()->currentTeam->id);
 
         if ($this->search) {
@@ -63,6 +66,89 @@ class Index extends Component
         ];
     }
 
+    #[Computed]
+    public function itemTree(): array
+    {
+        $items = $this->slaContracts;
+        $teamId = Auth::user()->currentTeam->id;
+
+        $entities = OrganizationEntity::where('team_id', $teamId)
+            ->with('type')
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('id');
+
+        $byOwner = $items->groupBy('owner_entity_id');
+
+        $ownerIds = $byOwner->keys()->filter()->toArray();
+        $relevantEntityIds = collect();
+
+        foreach ($ownerIds as $ownerId) {
+            $current = $entities->get($ownerId);
+            if (!$current) continue;
+
+            $visited = [];
+            while ($current && !in_array($current->id, $visited)) {
+                $visited[] = $current->id;
+                $relevantEntityIds->push($current->id);
+                $current = $current->parent_entity_id ? $entities->get($current->parent_entity_id) : null;
+            }
+        }
+
+        $relevantEntityIds = $relevantEntityIds->unique();
+
+        $tree = $this->buildEntityNode(null, $entities, $byOwner, $relevantEntityIds, 0);
+
+        $unowned = $byOwner->get('', collect())->merge($byOwner->get(null, collect()));
+        if ($unowned->isNotEmpty()) {
+            $tree[] = [
+                'type' => 'group',
+                'label' => 'Ohne Owner',
+                'entity' => null,
+                'entity_type' => null,
+                'depth' => 0,
+                'items' => $unowned->values()->all(),
+                'children' => [],
+            ];
+        }
+
+        return $tree;
+    }
+
+    private function buildEntityNode(?int $parentId, $entities, $byOwner, $relevantEntityIds, int $depth): array
+    {
+        $nodes = [];
+
+        $children = $entities->filter(function ($e) use ($parentId, $relevantEntityIds) {
+            return $e->parent_entity_id == $parentId && $relevantEntityIds->contains($e->id);
+        })->sortBy(fn ($e) => ($e->type?->sort_order ?? 999) . '_' . $e->name);
+
+        foreach ($children as $entity) {
+            $directItems = $byOwner->get($entity->id, collect());
+            $childNodes = $this->buildEntityNode($entity->id, $entities, $byOwner, $relevantEntityIds, $depth + 1);
+
+            $nodes[] = [
+                'type' => 'entity',
+                'label' => $entity->name,
+                'entity' => $entity,
+                'entity_type' => $entity->type?->name,
+                'depth' => $depth,
+                'items' => $directItems->values()->all(),
+                'children' => $childNodes,
+            ];
+        }
+
+        return $nodes;
+    }
+
+    #[Computed]
+    public function availableEntities()
+    {
+        return OrganizationEntity::where('team_id', Auth::user()->currentTeam->id)
+            ->orderBy('name')
+            ->get();
+    }
+
     public function openCreateModal()
     {
         $this->modalShow = true;
@@ -83,6 +169,7 @@ class Index extends Component
             'newSlaContract.resolution_time_hours' => 'nullable|integer|min:1',
             'newSlaContract.error_tolerance_percent' => 'nullable|integer|min:0|max:100',
             'newSlaContract.is_active' => 'boolean',
+            'newSlaContract.owner_entity_id' => 'nullable|integer|exists:organization_entities,id',
         ]);
 
         OrganizationSlaContract::create([
@@ -92,6 +179,7 @@ class Index extends Component
             'resolution_time_hours' => $this->newSlaContract['resolution_time_hours'] ?: null,
             'error_tolerance_percent' => $this->newSlaContract['error_tolerance_percent'],
             'is_active' => $this->newSlaContract['is_active'],
+            'owner_entity_id' => $this->newSlaContract['owner_entity_id'] !== '' ? (int) $this->newSlaContract['owner_entity_id'] : null,
             'team_id' => auth()->user()->currentTeam->id,
             'user_id' => auth()->id(),
         ]);

@@ -71,84 +71,17 @@
             </div>
         @endif
 
-        <x-ui-table compact="true">
-            <x-ui-table-header>
-                <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Reaktionszeit</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Lösungszeit</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Fehlertoleranz</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Aktionen</x-ui-table-header-cell>
-            </x-ui-table-header>
+        @php $tree = $this->itemTree; @endphp
 
-            <x-ui-table-body>
-                @forelse($this->slaContracts as $slaContract)
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true">
-                            <a href="{{ route('organization.sla-contracts.show', $slaContract) }}" class="font-semibold text-[var(--ui-primary)] hover:underline">
-                                {{ $slaContract->name }}
-                            </a>
-                            @if($slaContract->description)
-                                <div class="text-xs text-[var(--ui-muted)] truncate max-w-xs">{{ $slaContract->description }}</div>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($slaContract->response_time_hours)
-                                <span class="text-sm text-[var(--ui-secondary)]">{{ $slaContract->response_time_hours }} h</span>
-                            @else
-                                <span class="text-xs text-[var(--ui-muted)]">–</span>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($slaContract->resolution_time_hours)
-                                <span class="text-sm text-[var(--ui-secondary)]">{{ $slaContract->resolution_time_hours }} h</span>
-                            @else
-                                <span class="text-xs text-[var(--ui-muted)]">–</span>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($slaContract->error_tolerance_percent !== null)
-                                <span class="text-sm text-[var(--ui-secondary)]">{{ $slaContract->error_tolerance_percent }}%</span>
-                            @else
-                                <span class="text-xs text-[var(--ui-muted)]">–</span>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($slaContract->is_active)
-                                <x-ui-badge variant="success" size="sm">Aktiv</x-ui-badge>
-                            @else
-                                <x-ui-badge variant="danger" size="sm">Inaktiv</x-ui-badge>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <div class="flex items-center gap-1">
-                                <a href="{{ route('organization.sla-contracts.show', $slaContract) }}">
-                                    <x-ui-button variant="secondary-ghost" size="sm">
-                                        @svg('heroicon-o-pencil', 'w-4 h-4')
-                                    </x-ui-button>
-                                </a>
-                                <x-ui-confirm-button
-                                    variant="danger-ghost"
-                                    size="sm"
-                                    wire:click="deleteSlaContract({{ $slaContract->id }})"
-                                    confirm-text="SLA-Vertrag wirklich löschen?"
-                                >
-                                    @svg('heroicon-o-trash', 'w-4 h-4')
-                                </x-ui-confirm-button>
-                            </div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @empty
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="6">
-                            <div class="py-8 text-center text-sm text-[var(--ui-muted)]">
-                                Keine SLA-Verträge gefunden.
-                            </div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @endforelse
-            </x-ui-table-body>
-        </x-ui-table>
+        @if(count($tree) === 0 && $this->slaContracts->isEmpty())
+            <div class="text-center text-[var(--ui-muted)] py-12">Keine SLA-Verträge gefunden.</div>
+        @else
+            <div class="space-y-1">
+                @foreach($tree as $node)
+                    @include('organization::livewire.partials.entity-tree-node', ['node' => $node, 'itemPartial' => 'organization::livewire.sla-contract.partials.tree-item'])
+                @endforeach
+            </div>
+        @endif
     </x-ui-page-container>
 
     <!-- Create SLA Contract Modal -->
@@ -203,6 +136,16 @@
                         min="0"
                         max="100"
                     />
+                </div>
+
+                <div>
+                    <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">Owner (Entity)</label>
+                    <select wire:model.live="newSlaContract.owner_entity_id" class="w-full rounded-md border-gray-300 shadow-sm">
+                        <option value="">– Kein Owner –</option>
+                        @foreach($this->availableEntities as $entity)
+                            <option value="{{ $entity->id }}">{{ $entity->name }}</option>
+                        @endforeach
+                    </select>
                 </div>
 
                 <div class="flex items-center">

@@ -31,6 +31,7 @@ class OrganizationJobProfile extends Model
         'skills',
         'responsibilities',
         'status',
+        'owner_entity_id',
         'effective_from',
         'effective_to',
     ];
@@ -62,6 +63,11 @@ class OrganizationJobProfile extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(\Platform\Core\Models\User::class);
+    }
+
+    public function ownerEntity(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationEntity::class, 'owner_entity_id');
     }
 
     /**

@@ -36,6 +36,7 @@ class Index extends Component
         'skills' => '',           // komma-getrennt im UI
         'responsibilities' => '', // komma-getrennt im UI
         'status' => 'active',
+        'owner_entity_id' => '',
         'effective_from' => null,
         'effective_to' => null,
     ];
@@ -56,6 +57,7 @@ class Index extends Component
             'form.skills'           => ['nullable', 'string'],
             'form.responsibilities' => ['nullable', 'string'],
             'form.status'           => ['required', 'in:active,archived,draft'],
+            'form.owner_entity_id'  => ['nullable', 'integer', 'exists:organization_entities,id'],
             'form.effective_from'   => ['nullable', 'date'],
             'form.effective_to'     => ['nullable', 'date'],
         ];
@@ -66,7 +68,7 @@ class Index extends Component
     {
         $q = OrganizationJobProfile::query()
             ->withCount('assignments')
-            ->with('assignments.person')
+            ->with('ownerEntity', 'assignments.person')
             ->where('team_id', Auth::user()->currentTeam->id);
 
         if ($this->search !== '') {
@@ -87,6 +89,89 @@ class Index extends Component
         }
 
         return $q->orderBy('name')->get();
+    }
+
+    #[Computed]
+    public function itemTree(): array
+    {
+        $items = $this->jobProfiles;
+        $teamId = Auth::user()->currentTeam->id;
+
+        $entities = OrganizationEntity::where('team_id', $teamId)
+            ->with('type')
+            ->where('is_active', true)
+            ->get()
+            ->keyBy('id');
+
+        $byOwner = $items->groupBy('owner_entity_id');
+
+        $ownerIds = $byOwner->keys()->filter()->toArray();
+        $relevantEntityIds = collect();
+
+        foreach ($ownerIds as $ownerId) {
+            $current = $entities->get($ownerId);
+            if (!$current) continue;
+
+            $visited = [];
+            while ($current && !in_array($current->id, $visited)) {
+                $visited[] = $current->id;
+                $relevantEntityIds->push($current->id);
+                $current = $current->parent_entity_id ? $entities->get($current->parent_entity_id) : null;
+            }
+        }
+
+        $relevantEntityIds = $relevantEntityIds->unique();
+
+        $tree = $this->buildEntityNode(null, $entities, $byOwner, $relevantEntityIds, 0);
+
+        $unowned = $byOwner->get('', collect())->merge($byOwner->get(null, collect()));
+        if ($unowned->isNotEmpty()) {
+            $tree[] = [
+                'type' => 'group',
+                'label' => 'Ohne Owner',
+                'entity' => null,
+                'entity_type' => null,
+                'depth' => 0,
+                'items' => $unowned->values()->all(),
+                'children' => [],
+            ];
+        }
+
+        return $tree;
+    }
+
+    private function buildEntityNode(?int $parentId, $entities, $byOwner, $relevantEntityIds, int $depth): array
+    {
+        $nodes = [];
+
+        $children = $entities->filter(function ($e) use ($parentId, $relevantEntityIds) {
+            return $e->parent_entity_id == $parentId && $relevantEntityIds->contains($e->id);
+        })->sortBy(fn ($e) => ($e->type?->sort_order ?? 999) . '_' . $e->name);
+
+        foreach ($children as $entity) {
+            $directItems = $byOwner->get($entity->id, collect());
+            $childNodes = $this->buildEntityNode($entity->id, $entities, $byOwner, $relevantEntityIds, $depth + 1);
+
+            $nodes[] = [
+                'type' => 'entity',
+                'label' => $entity->name,
+                'entity' => $entity,
+                'entity_type' => $entity->type?->name,
+                'depth' => $depth,
+                'items' => $directItems->values()->all(),
+                'children' => $childNodes,
+            ];
+        }
+
+        return $nodes;
+    }
+
+    #[Computed]
+    public function availableEntities()
+    {
+        return OrganizationEntity::where('team_id', Auth::user()->currentTeam->id)
+            ->orderBy('name')
+            ->get();
     }
 
     public function create(): void
@@ -115,6 +200,7 @@ class Index extends Component
             'skills'           => implode(', ', is_array($jp->skills) ? $jp->skills : []),
             'responsibilities' => implode(', ', is_array($jp->responsibilities) ? $jp->responsibilities : []),
             'status'           => (string) ($jp->status ?? 'active'),
+            'owner_entity_id'  => (string) ($jp->owner_entity_id ?? ''),
             'effective_from'   => $jp->effective_from?->toDateString(),
             'effective_to'     => $jp->effective_to?->toDateString(),
         ];
@@ -133,6 +219,7 @@ class Index extends Component
             'skills'           => $this->csvToArray($data['skills'] ?? ''),
             'responsibilities' => $this->csvToArray($data['responsibilities'] ?? ''),
             'status'           => $data['status'],
+            'owner_entity_id'  => $data['owner_entity_id'] !== '' ? (int) $data['owner_entity_id'] : null,
             'effective_from'   => $data['effective_from'] ?: null,
             'effective_to'     => $data['effective_to'] ?: null,
         ];

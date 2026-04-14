@@ -31,6 +31,7 @@ class OrganizationInterlink extends Model
         'valid_from',
         'valid_to',
         'metadata',
+        'owner_entity_id',
     ];
 
     protected $casts = [
@@ -60,6 +61,11 @@ class OrganizationInterlink extends Model
                 $interlink->team_id = Auth::user()?->currentTeamRelation?->id;
             }
         });
+    }
+
+    public function ownerEntity(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationEntity::class, 'owner_entity_id');
     }
 
     public function category(): BelongsTo

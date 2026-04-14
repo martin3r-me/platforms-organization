@@ -31,6 +31,7 @@ class OrganizationRole extends Model
         'slug',
         'description',
         'status',
+        'owner_entity_id',
     ];
 
     protected static function booted(): void
@@ -80,6 +81,11 @@ class OrganizationRole extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(\Platform\Core\Models\User::class);
+    }
+
+    public function ownerEntity(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationEntity::class, 'owner_entity_id');
     }
 
     public function assignments(): HasMany

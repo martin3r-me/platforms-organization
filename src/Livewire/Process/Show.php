@@ -15,6 +15,8 @@ use Platform\Organization\Models\OrganizationProcessImprovement;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationVsmSystem;
+use Platform\Organization\Services\ProcessCertificateService;
+use Illuminate\Support\Str;
 
 class Show extends Component
 {
@@ -395,6 +397,34 @@ class Show extends Component
         }
 
         return $matrix;
+    }
+
+    #[Computed]
+    public function certificateData(): array
+    {
+        return ProcessCertificateService::compute($this->process);
+    }
+
+    public function generatePublicLink(): void
+    {
+        $this->process->update([
+            'public_token' => Str::random(48),
+            'public_token_expires_at' => now()->addYear(),
+        ]);
+
+        $this->process->refresh();
+        $this->dispatch('toast', message: 'Öffentlicher Link erstellt');
+    }
+
+    public function revokePublicLink(): void
+    {
+        $this->process->update([
+            'public_token' => null,
+            'public_token_expires_at' => null,
+        ]);
+
+        $this->process->refresh();
+        $this->dispatch('toast', message: 'Öffentlicher Link widerrufen');
     }
 
     #[Computed]

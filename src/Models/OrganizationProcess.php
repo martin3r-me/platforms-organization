@@ -38,13 +38,16 @@ class OrganizationProcess extends Model
         'action_plan',
         'standardization_notes',
         'hourly_rate',
+        'public_token',
+        'public_token_expires_at',
     ];
 
     protected $casts = [
-        'is_active'   => 'boolean',
-        'version'     => 'integer',
-        'metadata'    => 'array',
-        'hourly_rate' => 'decimal:2',
+        'is_active'                => 'boolean',
+        'version'                  => 'integer',
+        'metadata'                 => 'array',
+        'hourly_rate'              => 'decimal:2',
+        'public_token_expires_at'  => 'datetime',
     ];
 
     protected static function booted(): void

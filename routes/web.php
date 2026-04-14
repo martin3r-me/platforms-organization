@@ -28,6 +28,7 @@ use Platform\Organization\Livewire\JobProfile\Index as JobProfileIndex;
 use Platform\Organization\Livewire\Role\Index as RoleIndex;
 use Platform\Organization\Livewire\Process\Index as ProcessIndex;
 use Platform\Organization\Livewire\Process\Show as ProcessShow;
+use Platform\Organization\Http\Controllers\ProcessCertificatePdfController;
 
 Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organization.dashboard');
 
@@ -82,3 +83,4 @@ Route::get('/roles', RoleIndex::class)->name('organization.roles.index');
 // Prozesse
 Route::get('/processes', ProcessIndex::class)->name('organization.processes.index');
 Route::get('/processes/{process}', ProcessShow::class)->name('organization.processes.show');
+Route::get('/processes/{process}/certificate.pdf', ProcessCertificatePdfController::class)->name('organization.processes.certificate-pdf');

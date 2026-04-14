@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+    <meta charset="UTF-8">
+    <title>Prozessausweis – {{ $data['process']['name'] }}</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body { font-family: 'DejaVu Sans', sans-serif; font-size: 10px; color: #1e293b; background: #fff; }
+        .page { padding: 28px 32px; }
+
+        /* Header */
+        .header { border-bottom: 3px solid #1e293b; padding-bottom: 12px; margin-bottom: 16px; }
+        .header-title { font-size: 22px; font-weight: bold; letter-spacing: 3px; color: #1e293b; text-transform: uppercase; }
+        .header-sub { font-size: 13px; color: #475569; margin-top: 4px; }
+        .header-code { font-size: 10px; color: #94a3b8; font-family: monospace; }
+
+        /* Meta row */
+        .meta-row { display: table; width: 100%; margin-bottom: 16px; }
+        .meta-cell { display: table-cell; width: 25%; padding: 6px 8px; background: #f8fafc; border: 1px solid #e2e8f0; }
+        .meta-label { font-size: 8px; text-transform: uppercase; letter-spacing: 0.5px; color: #94a3b8; font-weight: bold; }
+        .meta-value { font-size: 10px; font-weight: bold; color: #1e293b; margin-top: 2px; }
+
+        /* Efficiency scale */
+        .efficiency-section { margin-bottom: 16px; }
+        .efficiency-title { font-size: 11px; font-weight: bold; color: #1e293b; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.5px; }
+        .scale-table { width: 100%; border-collapse: collapse; }
+        .scale-table td { padding: 0; height: 28px; text-align: center; font-size: 11px; font-weight: bold; color: #fff; }
+        .scale-arrow { width: 100%; height: 20px; position: relative; margin-top: 2px; }
+        .efficiency-result { margin-top: 8px; padding: 8px 12px; border-radius: 4px; display: inline-block; }
+        .efficiency-result-class { font-size: 28px; font-weight: bold; }
+        .efficiency-result-label { font-size: 10px; margin-left: 8px; }
+        .efficiency-result-percent { font-size: 12px; color: #64748b; margin-left: 12px; }
+
+        /* KPI grid */
+        .kpi-grid { display: table; width: 100%; margin-bottom: 16px; }
+        .kpi-cell { display: table-cell; width: 25%; padding: 8px; text-align: center; border: 1px solid #e2e8f0; background: #fff; }
+        .kpi-value { font-size: 20px; font-weight: bold; color: #1e293b; }
+        .kpi-label { font-size: 8px; text-transform: uppercase; color: #94a3b8; letter-spacing: 0.5px; }
+        .kpi-detail { font-size: 8px; color: #64748b; margin-top: 2px; }
+
+        /* Bars */
+        .section-title { font-size: 10px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; color: #1e293b; margin-bottom: 8px; border-bottom: 1px solid #e2e8f0; padding-bottom: 4px; }
+        .bar-row { margin-bottom: 6px; }
+        .bar-label { font-size: 9px; color: #475569; margin-bottom: 2px; }
+        .bar-track { width: 100%; height: 14px; background: #f1f5f9; border-radius: 3px; overflow: hidden; }
+        .bar-fill { height: 14px; border-radius: 3px; min-width: 2px; }
+        .bar-info { font-size: 8px; color: #64748b; margin-top: 1px; }
+
+        /* Two columns */
+        .two-col { display: table; width: 100%; margin-bottom: 16px; }
+        .col-left { display: table-cell; width: 48%; vertical-align: top; padding-right: 12px; }
+        .col-right { display: table-cell; width: 48%; vertical-align: top; padding-left: 12px; }
+
+        /* Action items */
+        .action-badge { display: inline-block; padding: 3px 8px; border-radius: 10px; font-size: 9px; font-weight: bold; margin-right: 4px; margin-bottom: 4px; }
+
+        /* Footer */
+        .footer { border-top: 2px solid #1e293b; padding-top: 8px; margin-top: 16px; font-size: 8px; color: #94a3b8; }
+        .footer-row { display: table; width: 100%; }
+        .footer-left { display: table-cell; width: 50%; }
+        .footer-right { display: table-cell; width: 50%; text-align: right; }
+        .checksum { font-family: monospace; font-size: 7px; color: #cbd5e1; word-break: break-all; }
+    </style>
+</head>
+<body>
+<div class="page">
+    {{-- Header --}}
+    <div class="header">
+        <div class="header-title">Prozessausweis</div>
+        <div class="header-sub">{{ $data['process']['name'] }}</div>
+        @if($data['process']['code'])
+            <div class="header-code">{{ $data['process']['code'] }} &middot; Version {{ $data['process']['version'] }}</div>
+        @else
+            <div class="header-code">Version {{ $data['process']['version'] }}</div>
+        @endif
+    </div>
+
+    {{-- Meta --}}
+    <div class="meta-row">
+        <div class="meta-cell">
+            <div class="meta-label">Owner</div>
+            <div class="meta-value">{{ $data['process']['owner'] ?? '–' }}</div>
+        </div>
+        <div class="meta-cell">
+            <div class="meta-label">VSM System</div>
+            <div class="meta-value">{{ $data['process']['vsm_system'] ?? '–' }}</div>
+        </div>
+        <div class="meta-cell">
+            <div class="meta-label">Status</div>
+            <div class="meta-value">{{ ucfirst($data['process']['status']) }}</div>
+        </div>
+        <div class="meta-cell">
+            <div class="meta-label">Team</div>
+            <div class="meta-value">{{ $data['process']['team'] ?? '–' }}</div>
+        </div>
+    </div>
+
+    {{-- Efficiency Scale --}}
+    <div class="efficiency-section">
+        <div class="efficiency-title">Effizienzklasse</div>
+
+        @php
+            $scaleClasses = [
+                ['class' => 'A+', 'color' => '#16a34a', 'width' => '10%'],
+                ['class' => 'A',  'color' => '#22c55e', 'width' => '11%'],
+                ['class' => 'B',  'color' => '#84cc16', 'width' => '12%'],
+                ['class' => 'C',  'color' => '#eab308', 'width' => '13%'],
+                ['class' => 'D',  'color' => '#f97316', 'width' => '14%'],
+                ['class' => 'E',  'color' => '#ef4444', 'width' => '14%'],
+                ['class' => 'F',  'color' => '#dc2626', 'width' => '13%'],
+                ['class' => 'G',  'color' => '#991b1b', 'width' => '13%'],
+            ];
+            $currentClass = $data['efficiency_class']['class'];
+        @endphp
+
+        <table class="scale-table">
+            <tr>
+                @foreach($scaleClasses as $sc)
+                    <td style="background: {{ $sc['color'] }}; width: {{ $sc['width'] }};{{ $sc['class'] === $currentClass ? ' border: 3px solid #1e293b; font-size: 14px;' : '' }}">
+                        {{ $sc['class'] }}
+                    </td>
+                @endforeach
+            </tr>
+        </table>
+
+        <div class="efficiency-result" style="background: {{ $data['efficiency_class']['color'] }}20; border: 2px solid {{ $data['efficiency_class']['color'] }};">
+            <span class="efficiency-result-class" style="color: {{ $data['efficiency_class']['color'] }};">{{ $data['efficiency_class']['class'] }}</span>
+            <span class="efficiency-result-label" style="color: {{ $data['efficiency_class']['color'] }};">{{ $data['efficiency_class']['label'] }}</span>
+            <span class="efficiency-result-percent">({{ $data['efficiency_percent'] }}%)</span>
+        </div>
+    </div>
+
+    {{-- KPI Grid --}}
+    <div class="kpi-grid">
+        <div class="kpi-cell">
+            <div class="kpi-label">Steps</div>
+            <div class="kpi-value">{{ $data['kpis']['total_steps'] }}</div>
+            <div class="kpi-detail">Prozessschritte</div>
+        </div>
+        <div class="kpi-cell">
+            <div class="kpi-label">Durchlaufzeit</div>
+            <div class="kpi-value">{{ $data['kpis']['lead_time'] }}</div>
+            <div class="kpi-detail">Min. ({{ $data['kpis']['total_duration'] }} Arbeit + {{ $data['kpis']['total_wait'] }} Warten)</div>
+        </div>
+        <div class="kpi-cell">
+            <div class="kpi-label">Effizienz</div>
+            <div class="kpi-value" style="color: {{ $data['efficiency_class']['color'] }};">{{ $data['efficiency_percent'] }}%</div>
+            <div class="kpi-detail">Anteil aktiver Arbeit</div>
+        </div>
+        <div class="kpi-cell">
+            <div class="kpi-label">LLM-Quote</div>
+            <div class="kpi-value" style="color: {{ $data['kpis']['llm_quote'] >= 70 ? '#16a34a' : ($data['kpis']['llm_quote'] >= 30 ? '#3b82f6' : '#64748b') }};">{{ $data['kpis']['llm_quote'] }}%</div>
+            <div class="kpi-detail">{{ $data['kpis']['llm_count'] }} von {{ $data['kpis']['total_steps'] }} Steps</div>
+        </div>
+    </div>
+
+    {{-- Two columns: COREFIT + Automation --}}
+    <div class="two-col">
+        <div class="col-left">
+            <div class="section-title">COREFIT-Verteilung</div>
+            @php
+                $corefitColors = ['core' => '#22c55e', 'context' => '#eab308', 'no_fit' => '#ef4444'];
+                $corefitLabels = ['core' => 'Core', 'context' => 'Context', 'no_fit' => 'No Fit'];
+            @endphp
+            @foreach(['core', 'context', 'no_fit'] as $cf)
+                <div class="bar-row">
+                    <div class="bar-label">{{ $corefitLabels[$cf] }} ({{ $data['corefit'][$cf]['count'] }})</div>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: {{ max(1, $data['corefit'][$cf]['percent']) }}%; background: {{ $corefitColors[$cf] }};"></div>
+                    </div>
+                    <div class="bar-info">{{ $data['corefit'][$cf]['percent'] }}% &middot; {{ $data['corefit'][$cf]['minutes'] }} Min.</div>
+                </div>
+            @endforeach
+        </div>
+        <div class="col-right">
+            <div class="section-title">Automatisierungsgrad</div>
+            @php
+                $autoColors = ['human' => '#94a3b8', 'llm_assisted' => '#3b82f6', 'llm_autonomous' => '#22c55e', 'hybrid' => '#eab308'];
+                $autoLabels = ['human' => 'Human', 'llm_assisted' => 'LLM-Assisted', 'llm_autonomous' => 'LLM-Autonomous', 'hybrid' => 'Hybrid'];
+            @endphp
+            @foreach(['human', 'llm_assisted', 'llm_autonomous', 'hybrid'] as $al)
+                <div class="bar-row">
+                    <div class="bar-label">{{ $autoLabels[$al] }} ({{ $data['automation'][$al]['count'] }})</div>
+                    <div class="bar-track">
+                        <div class="bar-fill" style="width: {{ max(1, $data['automation'][$al]['percent']) }}%; background: {{ $autoColors[$al] }};"></div>
+                    </div>
+                    <div class="bar-info">{{ $data['automation'][$al]['percent'] }}% &middot; {{ $data['automation'][$al]['minutes'] }} Min.</div>
+                </div>
+            @endforeach
+        </div>
+    </div>
+
+    {{-- Handlungsbedarf --}}
+    <div style="margin-bottom: 16px;">
+        <div class="section-title">Handlungsbedarf</div>
+        @if($data['kpis']['total_steps'] > 0)
+            @if($data['action_items']['eliminate'] > 0)
+                <span class="action-badge" style="background: #fef2f2; color: #b91c1c; border: 1px solid #fecaca;">{{ $data['action_items']['eliminate'] }} eliminieren</span>
+            @endif
+            @if($data['action_items']['automate'] > 0)
+                <span class="action-badge" style="background: #fff7ed; color: #c2410c; border: 1px solid #fed7aa;">{{ $data['action_items']['automate'] }} automatisieren</span>
+            @endif
+            @if($data['action_items']['invest'] > 0)
+                <span class="action-badge" style="background: #eff6ff; color: #1d4ed8; border: 1px solid #bfdbfe;">{{ $data['action_items']['invest'] }} investieren</span>
+            @endif
+            @if($data['action_items']['optimal'] > 0)
+                <span class="action-badge" style="background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0;">{{ $data['action_items']['optimal'] }} optimal/gut</span>
+            @endif
+            @if(array_sum($data['action_items']) === 0)
+                <span style="font-size: 9px; color: #94a3b8;">Keine Daten</span>
+            @endif
+        @else
+            <span style="font-size: 9px; color: #94a3b8;">Keine Prozessschritte vorhanden</span>
+        @endif
+    </div>
+
+    {{-- Description --}}
+    @if($data['process']['description'])
+        <div style="margin-bottom: 16px;">
+            <div class="section-title">Beschreibung</div>
+            <div style="font-size: 9px; color: #475569; line-height: 1.4;">{{ \Illuminate\Support\Str::limit($data['process']['description'], 500) }}</div>
+        </div>
+    @endif
+
+    {{-- Footer --}}
+    <div class="footer">
+        <div class="footer-row">
+            <div class="footer-left">
+                Erstellt am {{ $data['meta']['generated_at_formatted'] }}
+            </div>
+            <div class="footer-right">
+                Prozessausweis &middot; {{ $data['process']['team'] ?? '' }}
+            </div>
+        </div>
+        <div class="checksum" style="margin-top: 4px;">
+            Prüfsumme: {{ $data['meta']['checksum'] }}
+        </div>
+    </div>
+</div>
+</body>
+</html>

@@ -38,6 +38,7 @@
                 ['value' => 'outputs', 'label' => 'Outputs', 'count' => $this->outputs->count()],
                 ['value' => 'improvements', 'label' => 'Verbesserungen', 'count' => $this->processImprovements->count()],
                 ['value' => 'snapshots', 'label' => 'Snapshots', 'count' => $this->processSnapshots->count()],
+                ['value' => 'certificate', 'label' => 'Ausweis'],
             ];
         @endphp
         <div class="px-4 py-2 bg-[var(--ui-surface)] border-b border-[var(--ui-border)]/40">
@@ -146,54 +147,266 @@
     </x-slot>
 
     <x-ui-page-container>
-        {{-- ── Tab: Details ────────────────────────────────── --}}
+        {{-- ── Tab: Details (Dashboard) ────────────────────────────────── --}}
         @if($activeTab === 'details')
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-1">Grunddaten</h2>
-                <p class="text-xs text-[var(--ui-muted)] mb-4">Allgemeine Informationen zum Prozess. Name und Status sind Pflichtfelder.</p>
-                <div class="space-y-4">
-                    <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required placeholder="Aussagekräftiger Prozessname" />
-                    <x-ui-input-text name="code" label="Code" wire:model.live="form.code" placeholder="Optionales Kürzel, z.B. PRO-001" />
-                    <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" placeholder="Kurze Zusammenfassung: Was macht dieser Prozess und warum existiert er?" />
+            @php
+                $metrics = $this->corefitMetrics;
+                $autoMetrics = $this->automationMetrics;
+                $matrix = $this->efficiencyMatrix;
+                $dashSteps = $this->steps;
+                $dashTotal = $dashSteps->count();
+                $dashLlm = $dashSteps->whereIn('automation_level', ['llm_assisted', 'llm_autonomous', 'hybrid'])->count();
+                $dashLlmQuote = $dashTotal > 0 ? round(($dashLlm / $dashTotal) * 100) : 0;
 
-                    <div class="grid grid-cols-2 gap-4">
-                        <x-ui-input-select
-                            name="status"
-                            label="Status"
-                            :options="[
-                                ['value' => 'draft', 'label' => 'Entwurf'],
-                                ['value' => 'active', 'label' => 'Aktiv'],
-                                ['value' => 'deprecated', 'label' => 'Veraltet'],
-                            ]"
-                            wire:model.live="form.status"
-                        />
-                        <x-ui-input-text name="version" label="Version" type="number" wire:model.live="form.version" min="1" />
+                // Handlungsbedarf from efficiency matrix
+                $recommendations = [
+                    'core' => ['human' => 'Investieren', 'llm_assisted' => 'Gut', 'llm_autonomous' => 'Optimal', 'hybrid' => 'Gut'],
+                    'context' => ['human' => 'Automatisieren', 'llm_assisted' => 'Akzeptabel', 'llm_autonomous' => 'Akzeptabel', 'hybrid' => 'Akzeptabel'],
+                    'no_fit' => ['human' => 'Eliminieren', 'llm_assisted' => 'Eliminieren', 'llm_autonomous' => 'Eliminieren', 'hybrid' => 'Eliminieren'],
+                ];
+                $dashEliminate = 0; $dashAutomate = 0; $dashOptimal = 0;
+                foreach ($matrix as $cf => $autos) {
+                    foreach ($autos as $al => $cell) {
+                        if ($cell['count'] === 0) continue;
+                        $rec = $recommendations[$cf][$al] ?? '';
+                        if ($rec === 'Eliminieren') $dashEliminate += $cell['count'];
+                        elseif ($rec === 'Automatisieren') $dashAutomate += $cell['count'];
+                        elseif (in_array($rec, ['Optimal', 'Gut'])) $dashOptimal += $cell['count'];
+                    }
+                }
+            @endphp
+
+            {{-- 1. Grunddaten (kompakt, 2-spaltig) --}}
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-5 mb-6">
+                <div class="grid grid-cols-5 gap-4">
+                    {{-- Links ~60% --}}
+                    <div class="col-span-3 space-y-3">
+                        <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required placeholder="Aussagekräftiger Prozessname" />
+                        <x-ui-input-text name="code" label="Code" wire:model.live="form.code" placeholder="Optionales Kürzel, z.B. PRO-001" />
+                        <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" rows="2" placeholder="Kurze Zusammenfassung: Was macht dieser Prozess und warum existiert er?" />
                     </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <x-ui-input-select
-                            name="owner_entity_id"
-                            label="Owner (Entity)"
-                            :options="$this->groupedEntityOptions"
-                            nullable
-                            nullLabel="– Kein Owner –"
-                            wire:model.live="form.owner_entity_id"
-                        />
-                        <x-ui-input-select
-                            name="vsm_system_id"
-                            label="VSM System"
-                            :options="$this->availableVsmSystems->map(fn($v) => ['value' => (string) $v->id, 'label' => $v->name])->toArray()"
-                            nullable
-                            nullLabel="– Kein VSM System –"
-                            wire:model.live="form.vsm_system_id"
-                        />
-                    </div>
-
-                    <div class="flex items-center">
-                        <input type="checkbox" wire:model.live="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                        <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv geschaltet</label>
+                    {{-- Rechts ~40% --}}
+                    <div class="col-span-2 space-y-3">
+                        <div class="grid grid-cols-2 gap-3">
+                            <x-ui-input-select
+                                name="status"
+                                label="Status"
+                                :options="[
+                                    ['value' => 'draft', 'label' => 'Entwurf'],
+                                    ['value' => 'active', 'label' => 'Aktiv'],
+                                    ['value' => 'deprecated', 'label' => 'Veraltet'],
+                                ]"
+                                wire:model.live="form.status"
+                            />
+                            <x-ui-input-text name="version" label="Version" type="number" wire:model.live="form.version" min="1" />
+                        </div>
+                        <div class="grid grid-cols-2 gap-3">
+                            <x-ui-input-select
+                                name="owner_entity_id"
+                                label="Owner"
+                                :options="$this->groupedEntityOptions"
+                                nullable
+                                nullLabel="– Kein Owner –"
+                                wire:model.live="form.owner_entity_id"
+                            />
+                            <x-ui-input-select
+                                name="vsm_system_id"
+                                label="VSM System"
+                                :options="$this->availableVsmSystems->map(fn($v) => ['value' => (string) $v->id, 'label' => $v->name])->toArray()"
+                                nullable
+                                nullLabel="– Kein VSM System –"
+                                wire:model.live="form.vsm_system_id"
+                            />
+                        </div>
+                        <div class="flex items-center pt-1">
+                            <input type="checkbox" wire:model.live="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                            <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv geschaltet</label>
+                        </div>
                     </div>
                 </div>
+            </div>
+
+            {{-- 2. KPI-Kacheln (4er-Grid) --}}
+            <div class="grid grid-cols-4 gap-4 mb-6">
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
+                    <div class="flex items-center gap-2 mb-1">
+                        @svg('heroicon-o-queue-list', 'w-4 h-4 text-[var(--ui-muted)]')
+                        <h3 class="text-sm font-medium text-[var(--ui-muted)]">Steps</h3>
+                    </div>
+                    <p class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $metrics['total_steps'] }}</p>
+                    <p class="text-xs text-[var(--ui-muted)]">Prozessschritte gesamt</p>
+                </div>
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
+                    <div class="flex items-center gap-2 mb-1">
+                        @svg('heroicon-o-clock', 'w-4 h-4 text-[var(--ui-muted)]')
+                        <h3 class="text-sm font-medium text-[var(--ui-muted)]">Durchlaufzeit</h3>
+                    </div>
+                    <p class="text-2xl font-bold text-[var(--ui-info)]">{{ $metrics['lead_time'] }}</p>
+                    <p class="text-xs text-[var(--ui-muted)]">Min. (Bearbeitung + Wartezeit)</p>
+                </div>
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
+                    <div class="flex items-center gap-2 mb-1">
+                        @svg('heroicon-o-bolt', 'w-4 h-4 text-[var(--ui-muted)]')
+                        <h3 class="text-sm font-medium text-[var(--ui-muted)]">Effizienz</h3>
+                    </div>
+                    <p class="text-2xl font-bold {{ $metrics['efficiency'] >= 70 ? 'text-[var(--ui-success)]' : ($metrics['efficiency'] >= 40 ? 'text-[var(--ui-warning)]' : 'text-[var(--ui-danger)]') }}">{{ $metrics['efficiency'] }}%</p>
+                    <p class="text-xs text-[var(--ui-muted)]">Anteil aktiver Arbeit</p>
+                </div>
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-4">
+                    <div class="flex items-center gap-2 mb-1">
+                        @svg('heroicon-o-cpu-chip', 'w-4 h-4 text-[var(--ui-muted)]')
+                        <h3 class="text-sm font-medium text-[var(--ui-muted)]">LLM-Quote</h3>
+                    </div>
+                    <p class="text-2xl font-bold {{ $dashLlmQuote >= 70 ? 'text-[var(--ui-success)]' : ($dashLlmQuote >= 30 ? 'text-[var(--ui-info)]' : 'text-[var(--ui-secondary)]') }}">{{ $dashLlmQuote }}%</p>
+                    <p class="text-xs text-[var(--ui-muted)]">{{ $dashLlm }} von {{ $dashTotal }} Steps</p>
+                </div>
+            </div>
+
+            {{-- 3. Zwei-Spalten: COREFIT Mini + Steps Preview --}}
+            <div class="grid grid-cols-2 gap-6 mb-6">
+                {{-- Links: COREFIT Mini --}}
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-semibold text-[var(--ui-secondary)]">COREFIT-Verteilung</h3>
+                        <button wire:click="$set('activeTab', 'corefit')" class="text-xs text-[var(--ui-info)] hover:underline">Analyse öffnen</button>
+                    </div>
+
+                    @if($metrics['total_steps'] > 0)
+                        <div class="space-y-3 mb-4">
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-[var(--ui-secondary)]">Core <span class="text-[var(--ui-muted)] font-normal">({{ $metrics['core']['count'] }})</span></span>
+                                    <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['core']['percent'] }}%</span>
+                                </div>
+                                <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2">
+                                    <div class="bg-[var(--ui-success)] h-2 rounded-full" style="width: {{ min(100, $metrics['core']['percent']) }}%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-[var(--ui-secondary)]">Context <span class="text-[var(--ui-muted)] font-normal">({{ $metrics['context']['count'] }})</span></span>
+                                    <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['context']['percent'] }}%</span>
+                                </div>
+                                <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2">
+                                    <div class="bg-[var(--ui-warning)] h-2 rounded-full" style="width: {{ min(100, $metrics['context']['percent']) }}%"></div>
+                                </div>
+                            </div>
+                            <div>
+                                <div class="flex justify-between text-sm mb-1">
+                                    <span class="text-[var(--ui-secondary)]">No Fit <span class="text-[var(--ui-muted)] font-normal">({{ $metrics['no_fit']['count'] }})</span></span>
+                                    <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['no_fit']['percent'] }}%</span>
+                                </div>
+                                <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2">
+                                    <div class="bg-[var(--ui-danger)] h-2 rounded-full" style="width: {{ min(100, $metrics['no_fit']['percent']) }}%"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- Handlungsbedarf --}}
+                        <div class="pt-3 border-t border-[var(--ui-border)]/40">
+                            <h4 class="text-xs font-semibold text-[var(--ui-secondary)] uppercase tracking-wider mb-2">Handlungsbedarf</h4>
+                            <div class="flex flex-wrap gap-2">
+                                @if($dashEliminate > 0)
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-medium text-red-700">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>{{ $dashEliminate }} eliminieren
+                                    </span>
+                                @endif
+                                @if($dashAutomate > 0)
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-orange-50 border border-orange-200 text-xs font-medium text-orange-700">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span>{{ $dashAutomate }} automatisieren
+                                    </span>
+                                @endif
+                                @if($dashOptimal > 0)
+                                    <span class="inline-flex items-center gap-1 px-2 py-1 rounded-full bg-green-50 border border-green-200 text-xs font-medium text-green-700">
+                                        <span class="w-1.5 h-1.5 rounded-full bg-green-600"></span>{{ $dashOptimal }} optimal/gut
+                                    </span>
+                                @endif
+                            </div>
+                        </div>
+                    @else
+                        <p class="text-sm text-[var(--ui-muted)]">Keine Schritte vorhanden. Erst Steps anlegen, um die COREFIT-Verteilung zu sehen.</p>
+                    @endif
+                </div>
+
+                {{-- Rechts: Steps Preview --}}
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-5">
+                    <div class="flex items-center justify-between mb-4">
+                        <h3 class="text-sm font-semibold text-[var(--ui-secondary)]">Prozessschritte</h3>
+                        @if($dashTotal > 0)
+                            <button wire:click="$set('activeTab', 'steps')" class="text-xs text-[var(--ui-info)] hover:underline">Alle {{ $dashTotal }} Steps</button>
+                        @endif
+                    </div>
+
+                    @if($dashTotal > 0)
+                        <div class="space-y-1.5">
+                            @foreach($dashSteps->take(8) as $step)
+                                <div class="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-[var(--ui-muted-5)]">
+                                    <span class="text-xs font-mono text-[var(--ui-muted)] w-5 text-right">{{ $step->position }}</span>
+                                    <span class="text-sm text-[var(--ui-secondary)] flex-1 truncate">{{ $step->name }}</span>
+                                    {{-- CoreFit Badge --}}
+                                    @if($step->corefit_classification === 'core')
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">Core</span>
+                                    @elseif($step->corefit_classification === 'context')
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">Ctx</span>
+                                    @else
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-200">NF</span>
+                                    @endif
+                                    {{-- Automation Badge --}}
+                                    @if($step->automation_level === 'llm_autonomous')
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">LLM</span>
+                                    @elseif($step->automation_level === 'llm_assisted')
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">Asst</span>
+                                    @elseif($step->automation_level === 'hybrid')
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">Hyb</span>
+                                    @else
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-600 border border-gray-200">H</span>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                        @if($dashTotal > 8)
+                            <div class="mt-2 pt-2 border-t border-[var(--ui-border)]/40">
+                                <button wire:click="$set('activeTab', 'steps')" class="text-xs text-[var(--ui-info)] hover:underline">+ {{ $dashTotal - 8 }} weitere Steps anzeigen</button>
+                            </div>
+                        @endif
+                    @else
+                        <div class="text-center py-6">
+                            <p class="text-sm text-[var(--ui-muted)] mb-2">Noch keine Schritte vorhanden.</p>
+                            <button wire:click="$set('activeTab', 'steps')" class="text-sm text-[var(--ui-info)] hover:underline font-medium">Jetzt anlegen</button>
+                        </div>
+                    @endif
+                </div>
+            </div>
+
+            {{-- 4. Quick-Links (3er-Grid) --}}
+            <div class="grid grid-cols-3 gap-4">
+                <button wire:click="$set('activeTab', 'improvements')" class="bg-white rounded-lg border border-[var(--ui-border)] p-4 text-left hover:border-[var(--ui-info)] transition-colors">
+                    <div class="flex items-center gap-2 mb-2">
+                        @svg('heroicon-o-light-bulb', 'w-4 h-4 text-[var(--ui-warning)]')
+                        <h3 class="text-sm font-semibold text-[var(--ui-secondary)]">Verbesserungen</h3>
+                    </div>
+                    @php $improvementCount = $this->processImprovements->count(); @endphp
+                    <p class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $improvementCount }}</p>
+                    <p class="text-xs text-[var(--ui-muted)]">{{ $improvementCount === 1 ? 'Verbesserung' : 'Verbesserungen' }} erfasst</p>
+                </button>
+                <button wire:click="$set('activeTab', 'snapshots')" class="bg-white rounded-lg border border-[var(--ui-border)] p-4 text-left hover:border-[var(--ui-info)] transition-colors">
+                    <div class="flex items-center gap-2 mb-2">
+                        @svg('heroicon-o-camera', 'w-4 h-4 text-[var(--ui-info)]')
+                        <h3 class="text-sm font-semibold text-[var(--ui-secondary)]">Snapshots</h3>
+                    </div>
+                    @php $snapshotCount = $this->processSnapshots->count(); @endphp
+                    <p class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $snapshotCount }}</p>
+                    <p class="text-xs text-[var(--ui-muted)]">{{ $snapshotCount === 1 ? 'Version' : 'Versionen' }} gespeichert</p>
+                </button>
+                <button wire:click="$set('activeTab', 'flows')" class="bg-white rounded-lg border border-[var(--ui-border)] p-4 text-left hover:border-[var(--ui-info)] transition-colors">
+                    <div class="flex items-center gap-2 mb-2">
+                        @svg('heroicon-o-arrows-right-left', 'w-4 h-4 text-[var(--ui-success)]')
+                        <h3 class="text-sm font-semibold text-[var(--ui-secondary)]">Flows</h3>
+                    </div>
+                    @php $flowCount = $this->flows->count(); @endphp
+                    <p class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $flowCount }}</p>
+                    <p class="text-xs text-[var(--ui-muted)]">{{ $flowCount === 1 ? 'Verbindung' : 'Verbindungen' }}</p>
+                </button>
             </div>
         @endif
 
@@ -1052,6 +1265,206 @@
                     @endforelse
                 </x-ui-table-body>
             </x-ui-table>
+        @endif
+
+        {{-- ── Tab: Ausweis (Certificate) ───────────────────────── --}}
+        @if($activeTab === 'certificate')
+            @php $certData = $this->certificateData; @endphp
+
+            {{-- Actions --}}
+            <div class="flex items-center gap-3 mb-6">
+                <a href="{{ route('organization.processes.certificate-pdf', $process) }}"
+                   class="inline-flex items-center gap-2 px-4 py-2 bg-[var(--ui-primary)] text-white rounded-lg text-sm font-medium hover:opacity-90 transition-opacity">
+                    @svg('heroicon-o-arrow-down-tray', 'w-4 h-4')
+                    PDF herunterladen
+                </a>
+
+                @if($process->public_token && $process->public_token_expires_at?->isFuture())
+                    <div class="flex items-center gap-2 px-4 py-2 bg-green-50 border border-green-200 rounded-lg text-sm">
+                        @svg('heroicon-o-link', 'w-4 h-4 text-green-600')
+                        <span class="text-green-700 font-medium">Link aktiv</span>
+                        <span class="text-green-600 text-xs">bis {{ $process->public_token_expires_at->format('d.m.Y') }}</span>
+                    </div>
+                    <button
+                        onclick="navigator.clipboard.writeText('{{ route('organization.certificate.public', $process->public_token) }}'); $wire.dispatch('toast', {message: 'Link kopiert!'})"
+                        class="inline-flex items-center gap-1.5 px-3 py-2 border border-[var(--ui-border)] rounded-lg text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)] transition-colors"
+                    >
+                        @svg('heroicon-o-clipboard-document', 'w-4 h-4')
+                        Kopieren
+                    </button>
+                    <x-ui-confirm-button
+                        variant="danger-outline"
+                        size="sm"
+                        wire:click="revokePublicLink"
+                        confirm-text="Link wirklich widerrufen?"
+                    >
+                        @svg('heroicon-o-x-mark', 'w-4 h-4')
+                        <span>Widerrufen</span>
+                    </x-ui-confirm-button>
+                @else
+                    <x-ui-button variant="secondary-outline" size="sm" wire:click="generatePublicLink">
+                        @svg('heroicon-o-link', 'w-4 h-4')
+                        <span>Öffentlichen Link erstellen</span>
+                    </x-ui-button>
+                @endif
+            </div>
+
+            {{-- Live Preview --}}
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-8 shadow-sm">
+                {{-- Header --}}
+                <div class="border-b-[3px] border-gray-800 pb-3 mb-5">
+                    <h1 class="text-2xl font-bold tracking-widest text-gray-800 uppercase">Prozessausweis</h1>
+                    <p class="text-base text-gray-500 mt-1">{{ $certData['process']['name'] }}</p>
+                    <p class="text-xs text-gray-400 font-mono">
+                        @if($certData['process']['code']){{ $certData['process']['code'] }} &middot; @endif
+                        Version {{ $certData['process']['version'] }}
+                    </p>
+                </div>
+
+                {{-- Meta --}}
+                <div class="grid grid-cols-4 gap-0 mb-5">
+                    @foreach([
+                        ['label' => 'Owner', 'value' => $certData['process']['owner'] ?? '–'],
+                        ['label' => 'VSM System', 'value' => $certData['process']['vsm_system'] ?? '–'],
+                        ['label' => 'Status', 'value' => ucfirst($certData['process']['status'])],
+                        ['label' => 'Team', 'value' => $certData['process']['team'] ?? '–'],
+                    ] as $meta)
+                        <div class="p-3 bg-gray-50 border border-gray-200">
+                            <div class="text-[10px] uppercase tracking-wider text-gray-400 font-bold">{{ $meta['label'] }}</div>
+                            <div class="text-sm font-bold text-gray-800 mt-0.5">{{ $meta['value'] }}</div>
+                        </div>
+                    @endforeach
+                </div>
+
+                {{-- Efficiency Scale --}}
+                <div class="mb-5">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-800 mb-2">Effizienzklasse</h3>
+                    @php
+                        $scaleClasses = [
+                            ['class' => 'A+', 'color' => '#16a34a'],
+                            ['class' => 'A',  'color' => '#22c55e'],
+                            ['class' => 'B',  'color' => '#84cc16'],
+                            ['class' => 'C',  'color' => '#eab308'],
+                            ['class' => 'D',  'color' => '#f97316'],
+                            ['class' => 'E',  'color' => '#ef4444'],
+                            ['class' => 'F',  'color' => '#dc2626'],
+                            ['class' => 'G',  'color' => '#991b1b'],
+                        ];
+                        $currentClass = $certData['efficiency_class']['class'];
+                    @endphp
+                    <div class="flex h-8 rounded overflow-hidden mb-2">
+                        @foreach($scaleClasses as $sc)
+                            <div class="flex-1 flex items-center justify-center text-white text-xs font-bold {{ $sc['class'] === $currentClass ? 'ring-2 ring-gray-800 ring-inset text-sm' : '' }}"
+                                 style="background: {{ $sc['color'] }};">
+                                {{ $sc['class'] }}
+                            </div>
+                        @endforeach
+                    </div>
+                    <div class="inline-flex items-center gap-3 px-3 py-2 rounded-md border-2" style="background: {{ $certData['efficiency_class']['color'] }}15; border-color: {{ $certData['efficiency_class']['color'] }};">
+                        <span class="text-3xl font-bold" style="color: {{ $certData['efficiency_class']['color'] }};">{{ $certData['efficiency_class']['class'] }}</span>
+                        <span class="text-sm font-medium" style="color: {{ $certData['efficiency_class']['color'] }};">{{ $certData['efficiency_class']['label'] }}</span>
+                        <span class="text-sm text-gray-500">({{ $certData['efficiency_percent'] }}%)</span>
+                    </div>
+                </div>
+
+                {{-- KPI Grid --}}
+                <div class="grid grid-cols-4 gap-0 mb-5">
+                    @foreach([
+                        ['label' => 'Steps', 'value' => $certData['kpis']['total_steps'], 'detail' => 'Prozessschritte', 'color' => 'text-gray-800'],
+                        ['label' => 'Durchlaufzeit', 'value' => $certData['kpis']['lead_time'], 'detail' => 'Min. (' . $certData['kpis']['total_duration'] . ' Arbeit + ' . $certData['kpis']['total_wait'] . ' Warten)', 'color' => 'text-gray-800'],
+                        ['label' => 'Effizienz', 'value' => $certData['efficiency_percent'] . '%', 'detail' => 'Anteil aktiver Arbeit', 'color' => ''],
+                        ['label' => 'LLM-Quote', 'value' => $certData['kpis']['llm_quote'] . '%', 'detail' => $certData['kpis']['llm_count'] . ' von ' . $certData['kpis']['total_steps'] . ' Steps', 'color' => ''],
+                    ] as $kpi)
+                        <div class="p-3 border border-gray-200 text-center">
+                            <div class="text-[10px] uppercase tracking-wider text-gray-400 font-bold">{{ $kpi['label'] }}</div>
+                            <div class="text-xl font-bold {{ $kpi['color'] ?: 'text-gray-800' }} mt-1">{{ $kpi['value'] }}</div>
+                            <div class="text-[10px] text-gray-500">{{ $kpi['detail'] }}</div>
+                        </div>
+                    @endforeach
+                </div>
+
+                {{-- COREFIT + Automation --}}
+                <div class="grid grid-cols-2 gap-6 mb-5">
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-gray-800 mb-2 pb-1 border-b border-gray-200">COREFIT-Verteilung</h3>
+                        @php
+                            $cfColors = ['core' => '#22c55e', 'context' => '#eab308', 'no_fit' => '#ef4444'];
+                            $cfLabels = ['core' => 'Core', 'context' => 'Context', 'no_fit' => 'No Fit'];
+                        @endphp
+                        @foreach(['core', 'context', 'no_fit'] as $cf)
+                            <div class="mb-2">
+                                <div class="flex justify-between text-xs text-gray-600 mb-0.5">
+                                    <span>{{ $cfLabels[$cf] }} ({{ $certData['corefit'][$cf]['count'] }})</span>
+                                    <span class="font-medium">{{ $certData['corefit'][$cf]['percent'] }}%</span>
+                                </div>
+                                <div class="w-full h-3 bg-gray-100 rounded-sm overflow-hidden">
+                                    <div class="h-3 rounded-sm" style="width: {{ max(1, $certData['corefit'][$cf]['percent']) }}%; background: {{ $cfColors[$cf] }};"></div>
+                                </div>
+                                <div class="text-[10px] text-gray-400 mt-0.5">{{ $certData['corefit'][$cf]['minutes'] }} Min.</div>
+                            </div>
+                        @endforeach
+                    </div>
+                    <div>
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-gray-800 mb-2 pb-1 border-b border-gray-200">Automatisierungsgrad</h3>
+                        @php
+                            $alColors = ['human' => '#94a3b8', 'llm_assisted' => '#3b82f6', 'llm_autonomous' => '#22c55e', 'hybrid' => '#eab308'];
+                            $alLabels = ['human' => 'Human', 'llm_assisted' => 'LLM-Assisted', 'llm_autonomous' => 'LLM-Autonomous', 'hybrid' => 'Hybrid'];
+                        @endphp
+                        @foreach(['human', 'llm_assisted', 'llm_autonomous', 'hybrid'] as $al)
+                            <div class="mb-2">
+                                <div class="flex justify-between text-xs text-gray-600 mb-0.5">
+                                    <span>{{ $alLabels[$al] }} ({{ $certData['automation'][$al]['count'] }})</span>
+                                    <span class="font-medium">{{ $certData['automation'][$al]['percent'] }}%</span>
+                                </div>
+                                <div class="w-full h-3 bg-gray-100 rounded-sm overflow-hidden">
+                                    <div class="h-3 rounded-sm" style="width: {{ max(1, $certData['automation'][$al]['percent']) }}%; background: {{ $alColors[$al] }};"></div>
+                                </div>
+                                <div class="text-[10px] text-gray-400 mt-0.5">{{ $certData['automation'][$al]['minutes'] }} Min.</div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+
+                {{-- Handlungsbedarf --}}
+                <div class="mb-5">
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-800 mb-2 pb-1 border-b border-gray-200">Handlungsbedarf</h3>
+                    @if($certData['kpis']['total_steps'] > 0)
+                        <div class="flex flex-wrap gap-2">
+                            @if($certData['action_items']['eliminate'] > 0)
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-red-50 border border-red-200 text-xs font-medium text-red-700">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-red-500"></span>{{ $certData['action_items']['eliminate'] }} eliminieren
+                                </span>
+                            @endif
+                            @if($certData['action_items']['automate'] > 0)
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-orange-50 border border-orange-200 text-xs font-medium text-orange-700">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-orange-500"></span>{{ $certData['action_items']['automate'] }} automatisieren
+                                </span>
+                            @endif
+                            @if($certData['action_items']['invest'] > 0)
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-blue-50 border border-blue-200 text-xs font-medium text-blue-700">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-blue-500"></span>{{ $certData['action_items']['invest'] }} investieren
+                                </span>
+                            @endif
+                            @if($certData['action_items']['optimal'] > 0)
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full bg-green-50 border border-green-200 text-xs font-medium text-green-700">
+                                    <span class="w-1.5 h-1.5 rounded-full bg-green-600"></span>{{ $certData['action_items']['optimal'] }} optimal/gut
+                                </span>
+                            @endif
+                        </div>
+                    @else
+                        <p class="text-sm text-gray-400">Keine Prozessschritte vorhanden</p>
+                    @endif
+                </div>
+
+                {{-- Footer --}}
+                <div class="border-t-2 border-gray-800 pt-2 flex justify-between text-[10px] text-gray-400">
+                    <span>Erstellt am {{ $certData['meta']['generated_at_formatted'] }}</span>
+                    <span>Prozessausweis &middot; {{ $certData['process']['team'] ?? '' }}</span>
+                </div>
+                <div class="text-[9px] text-gray-300 font-mono mt-1 break-all">
+                    Prüfsumme: {{ $certData['meta']['checksum'] }}
+                </div>
+            </div>
         @endif
     </x-ui-page-container>
 

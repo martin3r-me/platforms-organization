@@ -291,14 +291,17 @@ class OrganizationServiceProvider extends ServiceProvider
             // Process Step Tools
             $registry->register(new \Platform\Organization\Tools\ListProcessStepsTool());
             $registry->register(new \Platform\Organization\Tools\CreateProcessStepTool());
+            $registry->register(new \Platform\Organization\Tools\BulkCreateProcessStepsTool());
             $registry->register(new \Platform\Organization\Tools\UpdateProcessStepTool());
             $registry->register(new \Platform\Organization\Tools\DeleteProcessStepTool());
 
             // Process Flow Tools (Verbindungen zwischen Steps)
             $registry->register(new \Platform\Organization\Tools\ListProcessFlowsTool());
             $registry->register(new \Platform\Organization\Tools\CreateProcessFlowTool());
+            $registry->register(new \Platform\Organization\Tools\BulkCreateProcessFlowsTool());
             $registry->register(new \Platform\Organization\Tools\UpdateProcessFlowTool());
             $registry->register(new \Platform\Organization\Tools\DeleteProcessFlowTool());
+            $registry->register(new \Platform\Organization\Tools\BulkDeleteProcessFlowsTool());
 
             // Process Trigger Tools
             $registry->register(new \Platform\Organization\Tools\ListProcessTriggersTool());

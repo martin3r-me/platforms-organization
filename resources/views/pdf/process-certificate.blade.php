@@ -229,7 +229,7 @@
 
     {{-- Steps List --}}
     @if(count($data['steps_list']) > 0)
-        <div style="margin-bottom: 16px;">
+        <div style="margin-bottom: 16px; page-break-before: always;">
             <div class="section-title">Prozessschritte ({{ count($data['steps_list']) }})</div>
             <table class="steps-table">
                 <thead>

@@ -56,10 +56,7 @@
                         </x-ui-badge>
                     @endif
                     @if($process->vsmSystem)
-                        <x-ui-badge variant="muted" size="sm">
-                            @svg('heroicon-o-circle-stack', 'w-3 h-3')
-                            {{ $process->vsmSystem->name }}
-                        </x-ui-badge>
+                        <x-ui-badge variant="{{ $process->vsmSystem->color() }}" size="sm">{{ $process->vsmSystem->name }}</x-ui-badge>
                     @endif
                 </div>
                 @if($process->description)

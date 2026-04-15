@@ -57,6 +57,22 @@ class OrganizationVsmSystem extends Model
     }
 
     /**
+     * VSM-Farbe basierend auf System-Code
+     */
+    public function color(): string
+    {
+        return match ($this->code) {
+            'S1'    => 'success',
+            'S2'    => 'info',
+            'S3'    => 'warning',
+            'S3*'   => 'warning',
+            'S4'    => 'primary',
+            'S5'    => 'danger',
+            default => 'muted',
+        };
+    }
+
+    /**
      * Organisationseinheiten, die diesem VSM-System zugeordnet sind
      */
     public function entities()

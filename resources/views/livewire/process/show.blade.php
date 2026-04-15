@@ -19,6 +19,64 @@
                     <span>Speichern</span>
                 </x-ui-button>
             @endif
+            {{-- Ausweis Flyout --}}
+            <div x-data="{ open: false }" class="relative">
+                <x-ui-button variant="secondary-outline" size="sm" @click="open = !open">
+                    @svg('heroicon-o-identification', 'w-4 h-4')
+                    <span>Ausweis</span>
+                    @svg('heroicon-o-chevron-down', 'w-3 h-3')
+                </x-ui-button>
+                <div
+                    x-show="open"
+                    x-transition:enter="transition ease-out duration-100"
+                    x-transition:enter-start="opacity-0 scale-95"
+                    x-transition:enter-end="opacity-100 scale-100"
+                    x-transition:leave="transition ease-in duration-75"
+                    x-transition:leave-start="opacity-100 scale-100"
+                    x-transition:leave-end="opacity-0 scale-95"
+                    @click.outside="open = false"
+                    class="absolute right-0 mt-1 w-56 rounded-lg bg-[var(--ui-surface)] shadow-lg ring-1 ring-[var(--ui-border)] z-50 py-1"
+                    style="display: none;"
+                >
+                    <a href="{{ route('organization.processes.certificate-pdf', $process) }}"
+                       class="flex items-center gap-2 px-3 py-2 text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)] transition-colors">
+                        @svg('heroicon-o-arrow-down-tray', 'w-4 h-4 text-[var(--ui-muted)]')
+                        PDF herunterladen
+                    </a>
+                    <div class="border-t border-[var(--ui-border)]/40 my-1"></div>
+                    @if($process->public_token && $process->public_token_expires_at?->isFuture())
+                        <button
+                            @click="navigator.clipboard.writeText('{{ route('organization.certificate.public', $process->public_token) }}'); $wire.dispatch('toast', {message: 'Link kopiert!'}); open = false"
+                            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)] transition-colors text-left"
+                        >
+                            @svg('heroicon-o-clipboard-document', 'w-4 h-4 text-green-500')
+                            Link kopieren
+                        </button>
+                        <div class="px-3 py-1">
+                            <span class="text-[10px] text-[var(--ui-muted)]">Gültig bis {{ $process->public_token_expires_at->format('d.m.Y') }}</span>
+                        </div>
+                        <button
+                            wire:click="revokePublicLink"
+                            wire:confirm="Link wirklich widerrufen?"
+                            @click="open = false"
+                            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--ui-danger)] hover:bg-[var(--ui-muted-5)] transition-colors text-left"
+                        >
+                            @svg('heroicon-o-x-mark', 'w-4 h-4')
+                            Link widerrufen
+                        </button>
+                    @else
+                        <button
+                            wire:click="generatePublicLink"
+                            @click="open = false"
+                            class="flex items-center gap-2 w-full px-3 py-2 text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)] transition-colors text-left"
+                        >
+                            @svg('heroicon-o-link', 'w-4 h-4 text-[var(--ui-muted)]')
+                            Öffentlichen Link erstellen
+                        </button>
+                    @endif
+                </div>
+            </div>
+
             <x-ui-confirm-button
                 variant="danger-outline"
                 size="sm"
@@ -1294,39 +1352,6 @@
         {{-- ── Tab: Ausweis (Certificate) ───────────────────────── --}}
         @if($activeTab === 'certificate')
             @php $certData = $this->certificateData; @endphp
-
-            {{-- Actions --}}
-            <div class="flex items-center gap-2 mb-6">
-                <a href="{{ route('organization.processes.certificate-pdf', $process) }}"
-                   class="inline-flex items-center gap-1.5 px-3 py-1.5 bg-[var(--ui-primary)] text-white rounded-md text-sm font-medium hover:opacity-90 transition-opacity">
-                    @svg('heroicon-o-arrow-down-tray', 'w-4 h-4')
-                    <span>PDF</span>
-                </a>
-
-                @if($process->public_token && $process->public_token_expires_at?->isFuture())
-                    <button
-                        onclick="navigator.clipboard.writeText('{{ route('organization.certificate.public', $process->public_token) }}'); $wire.dispatch('toast', {message: 'Link kopiert!'})"
-                        class="inline-flex items-center gap-1.5 px-3 py-1.5 border border-green-300 bg-green-50 rounded-md text-sm text-green-700 hover:bg-green-100 transition-colors"
-                    >
-                        @svg('heroicon-o-clipboard-document', 'w-3.5 h-3.5')
-                        <span>Link kopieren</span>
-                    </button>
-                    <span class="text-xs text-[var(--ui-muted)]">bis {{ $process->public_token_expires_at->format('d.m.Y') }}</span>
-                    <x-ui-confirm-button
-                        variant="danger-outline"
-                        size="xs"
-                        wire:click="revokePublicLink"
-                        confirm-text="Link wirklich widerrufen?"
-                    >
-                        @svg('heroicon-o-x-mark', 'w-3.5 h-3.5')
-                    </x-ui-confirm-button>
-                @else
-                    <x-ui-button variant="secondary-outline" size="sm" wire:click="generatePublicLink">
-                        @svg('heroicon-o-link', 'w-4 h-4')
-                        <span>Link erstellen</span>
-                    </x-ui-button>
-                @endif
-            </div>
 
             {{-- Live Preview --}}
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-8 shadow-sm">

@@ -5,6 +5,7 @@ namespace Platform\Organization\Livewire\Process;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Platform\Organization\Enums\ProcessCategory;
 use Platform\Organization\Models\OrganizationProcess;
 use Platform\Organization\Models\OrganizationProcessStep;
 use Platform\Organization\Models\OrganizationProcessFlow;
@@ -106,6 +107,10 @@ class Show extends Component
             'code'                  => $this->process->code ?? '',
             'description'           => $this->process->description ?? '',
             'status'                => $this->process->status ?? 'draft',
+            'process_category'      => (string) ($this->process->process_category?->value ?? ''),
+            'is_focus'              => (bool) $this->process->is_focus,
+            'focus_reason'          => (string) ($this->process->focus_reason ?? ''),
+            'focus_until'           => $this->process->focus_until?->format('Y-m-d'),
             'owner_entity_id'       => (string) ($this->process->owner_entity_id ?? ''),
             'vsm_system_id'         => (string) ($this->process->vsm_system_id ?? ''),
             'version'               => (string) ($this->process->version ?? '1'),
@@ -128,6 +133,10 @@ class Show extends Component
                $this->form['code'] !== ($this->process->code ?? '') ||
                $this->form['description'] !== ($this->process->description ?? '') ||
                $this->form['status'] !== ($this->process->status ?? 'draft') ||
+               $this->form['process_category'] !== (string) ($this->process->process_category?->value ?? '') ||
+               $this->form['is_focus'] !== (bool) $this->process->is_focus ||
+               $this->form['focus_reason'] !== (string) ($this->process->focus_reason ?? '') ||
+               $this->form['focus_until'] !== $this->process->focus_until?->format('Y-m-d') ||
                $this->form['owner_entity_id'] != ($this->process->owner_entity_id ?? '') ||
                $this->form['vsm_system_id'] != ($this->process->vsm_system_id ?? '') ||
                (int) $this->form['version'] !== ($this->process->version ?? 1) ||
@@ -454,6 +463,10 @@ class Show extends Component
             'form.code'                  => 'nullable|string|max:100',
             'form.description'           => 'nullable|string',
             'form.status'                => 'required|in:draft,active,deprecated',
+            'form.process_category'      => 'nullable|in:core,support,management',
+            'form.is_focus'              => 'boolean',
+            'form.focus_reason'          => 'nullable|string',
+            'form.focus_until'           => 'nullable|date',
             'form.owner_entity_id'       => 'nullable|integer|exists:organization_entities,id',
             'form.vsm_system_id'         => 'nullable|integer|exists:organization_vsm_systems,id',
             'form.version'               => 'required|integer|min:1',
@@ -473,6 +486,10 @@ class Show extends Component
             'code'                  => $this->form['code'] !== '' ? $this->form['code'] : null,
             'description'           => $this->form['description'] !== '' ? $this->form['description'] : null,
             'status'                => $this->form['status'],
+            'process_category'      => $this->form['process_category'] !== '' ? $this->form['process_category'] : null,
+            'is_focus'              => (bool) $this->form['is_focus'],
+            'focus_reason'          => $this->form['is_focus'] && $this->form['focus_reason'] !== '' ? $this->form['focus_reason'] : null,
+            'focus_until'           => $this->form['is_focus'] && $this->form['focus_until'] ? $this->form['focus_until'] : null,
             'owner_entity_id'       => $this->form['owner_entity_id'] !== '' ? (int) $this->form['owner_entity_id'] : null,
             'vsm_system_id'         => $this->form['vsm_system_id'] !== '' ? (int) $this->form['vsm_system_id'] : null,
             'version'               => (int) $this->form['version'],

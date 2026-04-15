@@ -198,7 +198,16 @@
                                 ]"
                                 wire:model.live="form.status"
                             />
-                            <x-ui-input-text name="version" label="Version" type="number" wire:model.live="form.version" min="1" />
+                            <x-ui-input-select
+                                name="process_category"
+                                label="Kategorie"
+                                :options="\Platform\Organization\Enums\ProcessCategory::cases()"
+                                optionValue="value"
+                                optionLabel="label"
+                                wire:model.live="form.process_category"
+                                :nullable="true"
+                                nullLabel="– Keine Kategorie –"
+                            />
                         </div>
                         <div class="grid grid-cols-2 gap-3">
                             <x-ui-input-select
@@ -218,9 +227,24 @@
                                 wire:model.live="form.vsm_system_id"
                             />
                         </div>
-                        <div class="flex items-center pt-1">
-                            <input type="checkbox" wire:model.live="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                            <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv geschaltet</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <x-ui-input-text name="version" label="Version" type="number" wire:model.live="form.version" min="1" />
+                            <div class="flex items-center pt-6">
+                                <input type="checkbox" wire:model.live="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                                <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv geschaltet</label>
+                            </div>
+                        </div>
+                        <div class="space-y-2">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="checkbox" wire:model.live="form.is_focus" class="rounded border-gray-300 text-yellow-500 focus:ring-yellow-500" />
+                                <span class="text-sm font-medium text-[var(--ui-secondary)]">Fokus-Prozess</span>
+                            </label>
+                            @if($form['is_focus'])
+                                <div class="grid grid-cols-2 gap-3">
+                                    <x-ui-input-textarea name="focus_reason" label="Fokus-Begründung" wire:model.live="form.focus_reason" rows="2" placeholder="Warum im Fokus?" />
+                                    <x-ui-input-text type="date" name="focus_until" label="Fokus bis" wire:model.live="form.focus_until" />
+                                </div>
+                            @endif
                         </div>
                     </div>
                 </div>

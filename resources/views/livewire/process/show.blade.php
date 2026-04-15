@@ -1019,6 +1019,9 @@
                                 @else
                                     <x-ui-badge variant="muted" size="sm">Human</x-ui-badge>
                                 @endif
+                                @if($step->llm_tools && count($step->llm_tools) > 0)
+                                    <span class="text-[10px] text-[var(--ui-muted)]">{{ count($step->llm_tools) }} Tools</span>
+                                @endif
                             </x-ui-table-cell>
                             <x-ui-table-cell compact="true">
                                 <div class="flex gap-1 justify-end">
@@ -1699,6 +1702,37 @@
                 />
                 <p class="text-xs text-[var(--ui-muted)] mt-1">Human = Mensch, LLM-Assisted = KI-unterstützt, LLM-Autonomous = KI-autonom, Hybrid = Mensch + KI gemeinsam</p>
             </div>
+
+            @if(in_array($stepForm['automation_level'], ['llm_assisted', 'llm_autonomous', 'hybrid']))
+                <div class="border border-[var(--ui-border)]/40 rounded-lg p-4 space-y-3">
+                    <div class="flex items-center justify-between">
+                        <label class="text-sm font-medium text-[var(--ui-secondary)]">MCP Tools</label>
+                        <button type="button" wire:click="addLlmTool" class="text-xs text-[var(--ui-primary)] hover:underline">+ Tool hinzufügen</button>
+                    </div>
+                    @foreach($stepForm['llm_tools'] as $i => $tool)
+                        <div wire:key="llm-tool-{{ $i }}" class="grid grid-cols-12 gap-2 items-start">
+                            <div class="col-span-4">
+                                <input type="text" wire:model="stepForm.llm_tools.{{ $i }}.tool_name" placeholder="Tool-Name (z.B. planner.projects.GET)" class="w-full text-sm rounded-md border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-fg)] shadow-sm focus:border-[var(--ui-primary)] focus:ring focus:ring-[var(--ui-primary)]/20 px-2.5 py-1.5" />
+                                @error("stepForm.llm_tools.{$i}.tool_name") <span class="text-xs text-red-500">{{ $message }}</span> @enderror
+                            </div>
+                            <div class="col-span-4">
+                                <input type="text" wire:model="stepForm.llm_tools.{{ $i }}.description" placeholder="Beschreibung" class="w-full text-sm rounded-md border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-fg)] shadow-sm focus:border-[var(--ui-primary)] focus:ring focus:ring-[var(--ui-primary)]/20 px-2.5 py-1.5" />
+                            </div>
+                            <div class="col-span-3">
+                                <input type="text" wire:model="stepForm.llm_tools.{{ $i }}.mcp_server" placeholder="MCP Server" class="w-full text-sm rounded-md border-[var(--ui-border)] bg-[var(--ui-bg)] text-[var(--ui-fg)] shadow-sm focus:border-[var(--ui-primary)] focus:ring focus:ring-[var(--ui-primary)]/20 px-2.5 py-1.5" />
+                            </div>
+                            <div class="col-span-1 flex justify-center pt-1.5">
+                                <button type="button" wire:click="removeLlmTool({{ $i }})" class="text-red-400 hover:text-red-600">
+                                    @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                </button>
+                            </div>
+                        </div>
+                    @endforeach
+                    @if(empty($stepForm['llm_tools']))
+                        <p class="text-xs text-[var(--ui-muted)] text-center py-2">Keine MCP Tools konfiguriert. Klicke oben auf "+ Tool hinzufügen".</p>
+                    @endif
+                </div>
+            @endif
 
             <div class="grid grid-cols-2 gap-4">
                 <x-ui-input-text name="duration_target_minutes" label="Dauer (Min.)" type="number" wire:model.live="stepForm.duration_target_minutes" min="0" placeholder="Aktive Bearbeitungszeit" />

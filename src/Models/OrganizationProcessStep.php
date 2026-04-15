@@ -30,6 +30,7 @@ class OrganizationProcessStep extends Model
         'wait_target_minutes',
         'corefit_classification',
         'automation_level',
+        'llm_tools',
         'sub_process_id',
         'is_active',
         'metadata',
@@ -41,6 +42,7 @@ class OrganizationProcessStep extends Model
         'wait_target_minutes'     => 'integer',
         'is_active'               => 'boolean',
         'metadata'                => 'array',
+        'llm_tools'               => 'array',
     ];
 
     protected static function booted(): void

@@ -38,6 +38,7 @@ class Show extends Component
         'corefit_classification' => 'core',
         'automation_level' => 'human',
         'is_active' => true,
+        'llm_tools' => [],
     ];
 
     // Flow CRUD
@@ -534,6 +535,7 @@ class Show extends Component
             'corefit_classification' => 'core',
             'automation_level' => 'human',
             'is_active' => true,
+            'llm_tools' => [],
         ];
         $this->stepModalShow = true;
     }
@@ -555,6 +557,7 @@ class Show extends Component
             'corefit_classification'  => $step->corefit_classification ?? 'core',
             'automation_level'        => $step->automation_level ?? 'human',
             'is_active'               => $step->is_active,
+            'llm_tools'               => $step->llm_tools ?? [],
         ];
         $this->stepModalShow = true;
     }
@@ -571,6 +574,10 @@ class Show extends Component
             'stepForm.corefit_classification'  => 'required|in:core,context,no_fit',
             'stepForm.automation_level'        => 'required|in:human,llm_assisted,llm_autonomous,hybrid',
             'stepForm.is_active'               => 'boolean',
+            'stepForm.llm_tools'               => 'nullable|array',
+            'stepForm.llm_tools.*.tool_name'   => 'required|string|max:255',
+            'stepForm.llm_tools.*.description'  => 'nullable|string|max:500',
+            'stepForm.llm_tools.*.mcp_server'   => 'nullable|string|max:255',
         ]);
 
         $payload = [
@@ -582,6 +589,7 @@ class Show extends Component
             'wait_target_minutes'     => $this->stepForm['wait_target_minutes'] !== '' ? (int) $this->stepForm['wait_target_minutes'] : null,
             'corefit_classification'  => $this->stepForm['corefit_classification'],
             'automation_level'        => $this->stepForm['automation_level'],
+            'llm_tools'               => !empty($this->stepForm['llm_tools']) ? $this->stepForm['llm_tools'] : null,
             'is_active'               => $this->stepForm['is_active'],
         ];
 
@@ -606,6 +614,17 @@ class Show extends Component
         $this->process->steps()->where('id', $id)->delete();
         $this->dispatch('toast', message: 'Schritt gelöscht');
         unset($this->steps, $this->corefitMetrics, $this->automationMetrics, $this->efficiencyMatrix);
+    }
+
+    public function addLlmTool(): void
+    {
+        $this->stepForm['llm_tools'][] = ['tool_name' => '', 'description' => '', 'mcp_server' => ''];
+    }
+
+    public function removeLlmTool(int $index): void
+    {
+        unset($this->stepForm['llm_tools'][$index]);
+        $this->stepForm['llm_tools'] = array_values($this->stepForm['llm_tools']);
     }
 
     // ── Flow CRUD ───────────────────────────────────────────────

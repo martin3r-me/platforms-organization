@@ -43,6 +43,31 @@ class Index extends Component
         'focusFilter'    => ['except' => false],
     ];
 
+    public function updatedSearch(): void
+    {
+        unset($this->processes, $this->processTree);
+    }
+
+    public function updatedStatusFilter(): void
+    {
+        unset($this->processes, $this->processTree);
+    }
+
+    public function updatedCategoryFilter(): void
+    {
+        unset($this->processes, $this->processTree);
+    }
+
+    public function updatedVsmFilter(): void
+    {
+        unset($this->processes, $this->processTree);
+    }
+
+    public function updatedFocusFilter(): void
+    {
+        unset($this->processes, $this->processTree);
+    }
+
     protected function rules(): array
     {
         return [

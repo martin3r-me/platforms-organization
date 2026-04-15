@@ -1,5 +1,5 @@
 {{-- Entity group header --}}
-<div style="padding-left: {{ $node['depth'] * 24 }}px;">
+<div wire:key="node-{{ $node['entity']?->id ?? 'unowned' }}-{{ $node['depth'] }}" style="padding-left: {{ $node['depth'] * 24 }}px;">
     <div class="flex items-center gap-2 py-2 px-3 {{ $node['depth'] === 0 ? 'bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40 rounded-lg mt-2' : '' }}">
         @if($node['depth'] === 0)
             @svg('heroicon-o-building-office-2', 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
@@ -26,7 +26,7 @@
 
 {{-- Direct processes of this entity --}}
 @foreach($node['processes'] as $process)
-    <div style="padding-left: {{ ($node['depth'] + 1) * 24 }}px;">
+    <div wire:key="process-{{ $process->id }}" style="padding-left: {{ ($node['depth'] + 1) * 24 }}px;">
         <div class="flex items-center gap-3 py-2 px-3 hover:bg-[var(--ui-muted-5)] rounded transition-colors group">
             <div class="flex-1 min-w-0">
                 <div class="flex items-center gap-2">
@@ -36,6 +36,11 @@
                     </a>
                     @if($process->code)
                         <code class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">{{ $process->code }}</code>
+                    @endif
+                    @if($process->is_focus)
+                        <span class="text-yellow-500" title="{{ $process->focus_reason ?? 'Fokus-Prozess' }}">
+                            @svg('heroicon-s-star', 'w-4 h-4')
+                        </span>
                     @endif
                     @if($process->status === 'active')
                         <x-ui-badge variant="success" size="sm">Aktiv</x-ui-badge>
@@ -50,10 +55,11 @@
                             {{ $process->process_category->label() }}
                         </x-ui-badge>
                     @endif
-                    @if($process->is_focus)
-                        <span class="text-yellow-500" title="{{ $process->focus_reason ?? 'Fokus-Prozess' }}">
-                            @svg('heroicon-s-star', 'w-4 h-4')
-                        </span>
+                    @if($process->vsmSystem)
+                        <x-ui-badge variant="muted" size="sm">
+                            @svg('heroicon-o-circle-stack', 'w-3 h-3')
+                            {{ $process->vsmSystem->name }}
+                        </x-ui-badge>
                     @endif
                 </div>
                 @if($process->description)
@@ -95,4 +101,6 @@
 @endforeach
 
 {{-- Recursive children --}}
-@each('organization::livewire.process.partials.tree-node', $node['children'], 'node')
+@foreach($node['children'] as $childNode)
+    @include('organization::livewire.process.partials.tree-node', ['node' => $childNode])
+@endforeach

@@ -10,6 +10,7 @@
         ]">
             <x-slot name="left">
                 <x-ui-input-select
+                    wire:key="filter-status"
                     name="statusFilter"
                     :options="['draft' => 'Entwurf', 'active' => 'Aktiv', 'deprecated' => 'Veraltet']"
                     wire:model.live="statusFilter"
@@ -18,6 +19,7 @@
                     size="xs"
                 />
                 <x-ui-input-select
+                    wire:key="filter-category"
                     name="categoryFilter"
                     :options="\Platform\Organization\Enums\ProcessCategory::cases()"
                     optionValue="value"
@@ -28,6 +30,7 @@
                     size="xs"
                 />
                 <x-ui-input-select
+                    wire:key="filter-vsm"
                     name="vsmFilter"
                     :options="$this->availableVsmSystems"
                     optionValue="id"
@@ -37,7 +40,7 @@
                     nullLabel="Alle VSM Systeme"
                     size="xs"
                 />
-                <button wire:click="$toggle('focusFilter')" class="inline-flex items-center gap-1 text-xs px-3 py-1 rounded-lg border transition-all duration-200 {{ $focusFilter ? 'bg-[rgb(var(--ui-warning-rgb))] text-[color:var(--ui-on-warning)] border-2 border-[rgb(var(--ui-warning-rgb))] shadow-sm font-semibold ring-2 ring-[rgb(var(--ui-warning-rgb))] ring-opacity-20' : 'bg-white/50 backdrop-blur-sm text-[color:var(--ui-secondary)] border border-white/40 hover:bg-[rgba(var(--ui-warning-rgb),0.05)] hover:border-[rgb(var(--ui-warning-rgb))]' }}">
+                <button wire:key="filter-focus" wire:click="$toggle('focusFilter')" class="inline-flex items-center gap-1 text-xs px-3 py-1 rounded-lg border transition-all duration-200 {{ $focusFilter ? 'bg-[rgb(var(--ui-warning-rgb))] text-[color:var(--ui-on-warning)] border-2 border-[rgb(var(--ui-warning-rgb))] shadow-sm font-semibold ring-2 ring-[rgb(var(--ui-warning-rgb))] ring-opacity-20' : 'bg-white/50 backdrop-blur-sm text-[color:var(--ui-secondary)] border border-white/40 hover:bg-[rgba(var(--ui-warning-rgb),0.05)] hover:border-[rgb(var(--ui-warning-rgb))]' }}">
                     @svg('heroicon-o-star', 'w-3.5 h-3.5')
                     Fokus
                 </button>
@@ -71,16 +74,18 @@
         @php $tree = $this->processTree; @endphp
 
         @if(count($tree) === 0 && $this->processes->isEmpty())
-            <div class="text-center text-[var(--ui-muted)] py-12">Keine Prozesse gefunden.</div>
+            <div wire:key="empty-state" class="text-center text-[var(--ui-muted)] py-12">Keine Prozesse gefunden.</div>
         @else
-            <div class="space-y-1">
-                @each('organization::livewire.process.partials.tree-node', $tree, 'node')
+            <div wire:key="process-tree" class="space-y-1">
+                @foreach($tree as $node)
+                    @include('organization::livewire.process.partials.tree-node', ['node' => $node])
+                @endforeach
             </div>
         @endif
     </x-ui-page-container>
 
     <!-- Create/Edit Modal -->
-    <x-ui-modal wire:model="modalShow" size="lg">
+    <x-ui-modal wire:model="modalShow" size="lg" wire:key="process-modal-{{ $editingId ?? 'create' }}">
         <x-slot name="header">
             {{ $editingId ? 'Prozess bearbeiten' : 'Neuen Prozess erstellen' }}
         </x-slot>

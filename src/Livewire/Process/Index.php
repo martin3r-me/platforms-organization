@@ -83,8 +83,8 @@ class Index extends Component
             $q->where('process_category', $this->categoryFilter);
         }
 
-        if ($this->vsmFilter !== '') {
-            $q->where('vsm_system_id', (int) $this->vsmFilter);
+        if ($this->vsmFilter !== '' && $this->vsmFilter !== null) {
+            $q->where('vsm_system_id', $this->vsmFilter);
         }
 
         if ($this->focusFilter) {

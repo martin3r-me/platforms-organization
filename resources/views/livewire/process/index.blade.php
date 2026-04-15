@@ -14,10 +14,8 @@
                     :options="['draft' => 'Entwurf', 'active' => 'Aktiv', 'deprecated' => 'Veraltet']"
                     wire:model.live="statusFilter"
                     :nullable="true"
-                    nullLabel="Status"
-                    displayMode="badges"
-                    badgeSize="xs"
-                    variant="secondary"
+                    nullLabel="Alle Status"
+                    size="xs"
                 />
                 <x-ui-input-select
                     name="categoryFilter"
@@ -26,10 +24,8 @@
                     optionLabel="label"
                     wire:model.live="categoryFilter"
                     :nullable="true"
-                    nullLabel="Kategorie"
-                    displayMode="badges"
-                    badgeSize="xs"
-                    variant="secondary"
+                    nullLabel="Alle Kategorien"
+                    size="xs"
                 />
                 <x-ui-input-select
                     name="vsmFilter"
@@ -38,9 +34,8 @@
                     optionLabel="name"
                     wire:model.live="vsmFilter"
                     :nullable="true"
-                    nullLabel="VSM System"
+                    nullLabel="Alle VSM Systeme"
                     size="xs"
-                    displayMode="dropdown"
                 />
                 <button wire:click="$toggle('focusFilter')" class="inline-flex items-center gap-1 text-xs px-3 py-1 rounded-lg border transition-all duration-200 {{ $focusFilter ? 'bg-[rgb(var(--ui-warning-rgb))] text-[color:var(--ui-on-warning)] border-2 border-[rgb(var(--ui-warning-rgb))] shadow-sm font-semibold ring-2 ring-[rgb(var(--ui-warning-rgb))] ring-opacity-20' : 'bg-white/50 backdrop-blur-sm text-[color:var(--ui-secondary)] border border-white/40 hover:bg-[rgba(var(--ui-warning-rgb),0.05)] hover:border-[rgb(var(--ui-warning-rgb))]' }}">
                     @svg('heroicon-o-star', 'w-3.5 h-3.5')
@@ -97,30 +92,27 @@
 
             <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" rows="3" />
 
-            <x-ui-input-select
-                name="form.status"
-                label="Status"
-                :options="['draft' => 'Entwurf', 'active' => 'Aktiv', 'deprecated' => 'Veraltet']"
-                wire:model.live="form.status"
-                displayMode="badges"
-                badgeSize="sm"
-                variant="primary"
-                :required="true"
-            />
-
-            <x-ui-input-select
-                name="form.process_category"
-                label="Kategorie"
-                :options="\Platform\Organization\Enums\ProcessCategory::cases()"
-                optionValue="value"
-                optionLabel="label"
-                wire:model.live="form.process_category"
-                :nullable="true"
-                nullLabel="– Keine Kategorie –"
-                displayMode="badges"
-                badgeSize="sm"
-                variant="primary"
-            />
+            <div class="grid grid-cols-2 gap-4">
+                <x-ui-input-select
+                    name="form.status"
+                    label="Status"
+                    :options="['draft' => 'Entwurf', 'active' => 'Aktiv', 'deprecated' => 'Veraltet']"
+                    wire:model.live="form.status"
+                    :required="true"
+                    size="sm"
+                />
+                <x-ui-input-select
+                    name="form.process_category"
+                    label="Kategorie"
+                    :options="\Platform\Organization\Enums\ProcessCategory::cases()"
+                    optionValue="value"
+                    optionLabel="label"
+                    wire:model.live="form.process_category"
+                    :nullable="true"
+                    nullLabel="– Keine Kategorie –"
+                    size="sm"
+                />
+            </div>
 
             <div class="space-y-3">
                 <label class="flex items-center gap-2 cursor-pointer">

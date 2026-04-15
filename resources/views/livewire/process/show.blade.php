@@ -9,6 +9,8 @@
             ['label' => 'Prozesse', 'href' => route('organization.processes.index')],
             ['label' => $process->name],
         ]">
+            <div class="flex-1"></div>
+
             @if($this->isDirty)
                 <x-ui-button variant="secondary-ghost" size="sm" wire:click="loadForm">
                     @svg('heroicon-o-x-mark', 'w-4 h-4')
@@ -19,13 +21,19 @@
                     <span>Speichern</span>
                 </x-ui-button>
             @endif
-            {{-- Ausweis Flyout --}}
-            <div x-data="{ open: false }" class="relative">
-                <x-ui-button variant="secondary-outline" size="sm" @click="open = !open">
+
+            {{-- Ausweis Split Button --}}
+            <div x-data="{ open: false }" class="relative inline-flex">
+                <x-ui-button variant="secondary-outline" size="sm" wire:click="$set('activeTab', 'certificate')" class="rounded-r-none border-r-0">
                     @svg('heroicon-o-identification', 'w-4 h-4')
                     <span>Ausweis</span>
-                    @svg('heroicon-o-chevron-down', 'w-3 h-3')
                 </x-ui-button>
+                <button
+                    @click="open = !open"
+                    class="inline-flex items-center px-1.5 border border-[var(--ui-border)] rounded-r-md hover:bg-[var(--ui-muted-5)] transition-colors"
+                >
+                    @svg('heroicon-o-chevron-down', 'w-3 h-3 text-[var(--ui-secondary)]')
+                </button>
                 <div
                     x-show="open"
                     x-transition:enter="transition ease-out duration-100"
@@ -35,7 +43,7 @@
                     x-transition:leave-start="opacity-100 scale-100"
                     x-transition:leave-end="opacity-0 scale-95"
                     @click.outside="open = false"
-                    class="absolute right-0 mt-1 w-56 rounded-lg bg-[var(--ui-surface)] shadow-lg ring-1 ring-[var(--ui-border)] z-50 py-1"
+                    class="absolute right-0 mt-1 w-56 rounded-lg bg-[var(--ui-surface)] shadow-lg ring-1 ring-[var(--ui-border)] z-50 py-1 top-full"
                     style="display: none;"
                 >
                     <a href="{{ route('organization.processes.certificate-pdf', $process) }}"
@@ -100,7 +108,7 @@
             ];
         @endphp
         <div class="px-4 py-2 bg-[var(--ui-surface)] border-b border-[var(--ui-border)]/40">
-            <x-ui-tab :tabs="$tabItems" model="activeTab" :showCounts="true" />
+            <x-ui-tab :tabs="$tabItems" model="activeTab" :showCounts="true" size="xs" />
         </div>
     </x-slot>
 
@@ -1354,7 +1362,7 @@
             @php $certData = $this->certificateData; @endphp
 
             {{-- Live Preview --}}
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-8 shadow-sm">
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-8 shadow-sm mt-6">
                 {{-- Header --}}
                 <div class="border-b-[3px] border-gray-800 pb-3 mb-5">
                     <h1 class="text-2xl font-bold tracking-widest text-gray-800 uppercase">Prozessausweis</h1>

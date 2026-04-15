@@ -9,19 +9,40 @@
             ['label' => 'Prozesse'],
         ]">
             <x-slot name="left">
-                <select wire:model.live="statusFilter" class="text-xs rounded-md border-gray-300 shadow-sm py-1 pl-2 pr-7">
-                    <option value="">Alle Status</option>
-                    <option value="draft">Entwurf</option>
-                    <option value="active">Aktiv</option>
-                    <option value="deprecated">Veraltet</option>
-                </select>
-                <select wire:model.live="categoryFilter" class="text-xs rounded-md border-gray-300 shadow-sm py-1 pl-2 pr-7">
-                    <option value="">Alle Kategorien</option>
-                    @foreach(\Platform\Organization\Enums\ProcessCategory::cases() as $cat)
-                        <option value="{{ $cat->value }}">{{ $cat->label() }}</option>
-                    @endforeach
-                </select>
-                <button wire:click="$toggle('focusFilter')" class="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md border transition-colors {{ $focusFilter ? 'bg-yellow-100 border-yellow-400 text-yellow-800' : 'border-gray-300 text-gray-600 hover:bg-gray-50' }}">
+                <x-ui-input-select
+                    name="statusFilter"
+                    :options="['draft' => 'Entwurf', 'active' => 'Aktiv', 'deprecated' => 'Veraltet']"
+                    wire:model.live="statusFilter"
+                    :nullable="true"
+                    nullLabel="Status"
+                    displayMode="badges"
+                    badgeSize="xs"
+                    variant="secondary"
+                />
+                <x-ui-input-select
+                    name="categoryFilter"
+                    :options="\Platform\Organization\Enums\ProcessCategory::cases()"
+                    optionValue="value"
+                    optionLabel="label"
+                    wire:model.live="categoryFilter"
+                    :nullable="true"
+                    nullLabel="Kategorie"
+                    displayMode="badges"
+                    badgeSize="xs"
+                    variant="secondary"
+                />
+                <x-ui-input-select
+                    name="vsmFilter"
+                    :options="$this->availableVsmSystems"
+                    optionValue="id"
+                    optionLabel="name"
+                    wire:model.live="vsmFilter"
+                    :nullable="true"
+                    nullLabel="VSM System"
+                    size="xs"
+                    displayMode="dropdown"
+                />
+                <button wire:click="$toggle('focusFilter')" class="inline-flex items-center gap-1 text-xs px-3 py-1 rounded-lg border transition-all duration-200 {{ $focusFilter ? 'bg-[rgb(var(--ui-warning-rgb))] text-[color:var(--ui-on-warning)] border-2 border-[rgb(var(--ui-warning-rgb))] shadow-sm font-semibold ring-2 ring-[rgb(var(--ui-warning-rgb))] ring-opacity-20' : 'bg-white/50 backdrop-blur-sm text-[color:var(--ui-secondary)] border border-white/40 hover:bg-[rgba(var(--ui-warning-rgb),0.05)] hover:border-[rgb(var(--ui-warning-rgb))]' }}">
                     @svg('heroicon-o-star', 'w-3.5 h-3.5')
                     Fokus
                 </button>
@@ -76,25 +97,30 @@
 
             <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" rows="3" />
 
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                    <select wire:model.live="form.status" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="draft">Entwurf</option>
-                        <option value="active">Aktiv</option>
-                        <option value="deprecated">Veraltet</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Kategorie</label>
-                    <select wire:model.live="form.process_category" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">– Keine Kategorie –</option>
-                        @foreach(\Platform\Organization\Enums\ProcessCategory::cases() as $cat)
-                            <option value="{{ $cat->value }}">{{ $cat->label() }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
+            <x-ui-input-select
+                name="form.status"
+                label="Status"
+                :options="['draft' => 'Entwurf', 'active' => 'Aktiv', 'deprecated' => 'Veraltet']"
+                wire:model.live="form.status"
+                displayMode="badges"
+                badgeSize="sm"
+                variant="primary"
+                :required="true"
+            />
+
+            <x-ui-input-select
+                name="form.process_category"
+                label="Kategorie"
+                :options="\Platform\Organization\Enums\ProcessCategory::cases()"
+                optionValue="value"
+                optionLabel="label"
+                wire:model.live="form.process_category"
+                :nullable="true"
+                nullLabel="– Keine Kategorie –"
+                displayMode="badges"
+                badgeSize="sm"
+                variant="primary"
+            />
 
             <div class="space-y-3">
                 <label class="flex items-center gap-2 cursor-pointer">
@@ -108,24 +134,28 @@
             </div>
 
             <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Owner (Entity)</label>
-                    <select wire:model.live="form.owner_entity_id" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">– Kein Owner –</option>
-                        @foreach($this->availableEntities as $entity)
-                            <option value="{{ $entity->id }}">{{ $entity->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">VSM System</label>
-                    <select wire:model.live="form.vsm_system_id" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">– Kein VSM System –</option>
-                        @foreach($this->availableVsmSystems as $vsm)
-                            <option value="{{ $vsm->id }}">{{ $vsm->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
+                <x-ui-input-select
+                    name="form.owner_entity_id"
+                    label="Owner (Entity)"
+                    :options="$this->availableEntities"
+                    optionValue="id"
+                    optionLabel="name"
+                    wire:model.live="form.owner_entity_id"
+                    :nullable="true"
+                    nullLabel="– Kein Owner –"
+                    size="sm"
+                />
+                <x-ui-input-select
+                    name="form.vsm_system_id"
+                    label="VSM System"
+                    :options="$this->availableVsmSystems"
+                    optionValue="id"
+                    optionLabel="name"
+                    wire:model.live="form.vsm_system_id"
+                    :nullable="true"
+                    nullLabel="– Kein VSM System –"
+                    size="sm"
+                />
             </div>
         </form>
 

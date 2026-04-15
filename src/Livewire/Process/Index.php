@@ -16,6 +16,7 @@ class Index extends Component
     public string $search = '';
     public string $statusFilter = '';
     public string $categoryFilter = '';
+    public string $vsmFilter = '';
     public bool $focusFilter = false;
 
     public bool $modalShow = false;
@@ -38,6 +39,7 @@ class Index extends Component
         'search'         => ['except' => ''],
         'statusFilter'   => ['except' => ''],
         'categoryFilter' => ['except' => ''],
+        'vsmFilter'      => ['except' => ''],
         'focusFilter'    => ['except' => false],
     ];
 
@@ -79,6 +81,10 @@ class Index extends Component
 
         if ($this->categoryFilter !== '') {
             $q->where('process_category', $this->categoryFilter);
+        }
+
+        if ($this->vsmFilter !== '') {
+            $q->where('vsm_system_id', (int) $this->vsmFilter);
         }
 
         if ($this->focusFilter) {

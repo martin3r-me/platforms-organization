@@ -9,6 +9,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
+use Platform\Organization\Enums\ProcessCategory;
 use Symfony\Component\Uid\UuidV7;
 
 class OrganizationProcess extends Model
@@ -40,6 +41,10 @@ class OrganizationProcess extends Model
         'hourly_rate',
         'public_token',
         'public_token_expires_at',
+        'process_category',
+        'is_focus',
+        'focus_reason',
+        'focus_until',
     ];
 
     protected $casts = [
@@ -48,6 +53,9 @@ class OrganizationProcess extends Model
         'metadata'                 => 'array',
         'hourly_rate'              => 'decimal:2',
         'public_token_expires_at'  => 'datetime',
+        'process_category'         => ProcessCategory::class,
+        'is_focus'                 => 'boolean',
+        'focus_until'              => 'date',
     ];
 
     protected static function booted(): void

@@ -44,6 +44,17 @@
                     @else
                         <x-ui-badge variant="danger" size="sm">Veraltet</x-ui-badge>
                     @endif
+                    @if($process->process_category)
+                        <x-ui-badge variant="{{ $process->process_category->color() }}" size="sm">
+                            @svg($process->process_category->icon(), 'w-3 h-3')
+                            {{ $process->process_category->label() }}
+                        </x-ui-badge>
+                    @endif
+                    @if($process->is_focus)
+                        <span class="text-yellow-500" title="{{ $process->focus_reason ?? 'Fokus-Prozess' }}">
+                            @svg('heroicon-s-star', 'w-4 h-4')
+                        </span>
+                    @endif
                 </div>
                 @if($process->description)
                     <div class="text-xs text-[var(--ui-muted)] ml-5.5 truncate">{{ \Illuminate\Support\Str::limit($process->description, 80) }}</div>

@@ -5,6 +5,7 @@ namespace Platform\Organization\Livewire\Process;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Platform\Organization\Enums\ProcessCategory;
 use Platform\Organization\Models\OrganizationProcess;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
@@ -14,6 +15,8 @@ class Index extends Component
 {
     public string $search = '';
     public string $statusFilter = '';
+    public string $categoryFilter = '';
+    public bool $focusFilter = false;
 
     public bool $modalShow = false;
     public ?int $editingId = null;
@@ -23,13 +26,19 @@ class Index extends Component
         'code' => '',
         'description' => '',
         'status' => 'draft',
+        'process_category' => '',
+        'is_focus' => false,
+        'focus_reason' => '',
+        'focus_until' => null,
         'owner_entity_id' => '',
         'vsm_system_id' => '',
     ];
 
     protected $queryString = [
-        'search'       => ['except' => ''],
-        'statusFilter' => ['except' => ''],
+        'search'         => ['except' => ''],
+        'statusFilter'   => ['except' => ''],
+        'categoryFilter' => ['except' => ''],
+        'focusFilter'    => ['except' => false],
     ];
 
     protected function rules(): array
@@ -38,9 +47,13 @@ class Index extends Component
             'form.name'            => ['required', 'string', 'max:255'],
             'form.code'            => ['nullable', 'string', 'max:100'],
             'form.description'     => ['nullable', 'string'],
-            'form.status'          => ['required', 'in:draft,active,deprecated'],
-            'form.owner_entity_id' => ['nullable', 'integer', 'exists:organization_entities,id'],
-            'form.vsm_system_id'   => ['nullable', 'integer', 'exists:organization_vsm_systems,id'],
+            'form.status'           => ['required', 'in:draft,active,deprecated'],
+            'form.process_category' => ['nullable', 'in:core,support,management'],
+            'form.is_focus'         => ['boolean'],
+            'form.focus_reason'     => ['nullable', 'string'],
+            'form.focus_until'      => ['nullable', 'date'],
+            'form.owner_entity_id'  => ['nullable', 'integer', 'exists:organization_entities,id'],
+            'form.vsm_system_id'    => ['nullable', 'integer', 'exists:organization_vsm_systems,id'],
         ];
     }
 
@@ -62,6 +75,14 @@ class Index extends Component
 
         if ($this->statusFilter !== '') {
             $q->where('status', $this->statusFilter);
+        }
+
+        if ($this->categoryFilter !== '') {
+            $q->where('process_category', $this->categoryFilter);
+        }
+
+        if ($this->focusFilter) {
+            $q->where('is_focus', true);
         }
 
         return $q->with(['ownerEntity', 'vsmSystem', 'steps:id,process_id,automation_level'])->orderBy('name')->get();
@@ -191,12 +212,16 @@ class Index extends Component
         $this->resetValidation();
         $this->editingId = $process->id;
         $this->form = [
-            'name'            => (string) $process->name,
-            'code'            => (string) ($process->code ?? ''),
-            'description'     => (string) ($process->description ?? ''),
-            'status'          => (string) ($process->status ?? 'draft'),
-            'owner_entity_id' => (string) ($process->owner_entity_id ?? ''),
-            'vsm_system_id'   => (string) ($process->vsm_system_id ?? ''),
+            'name'             => (string) $process->name,
+            'code'             => (string) ($process->code ?? ''),
+            'description'      => (string) ($process->description ?? ''),
+            'status'           => (string) ($process->status ?? 'draft'),
+            'process_category' => (string) ($process->process_category?->value ?? ''),
+            'is_focus'         => (bool) $process->is_focus,
+            'focus_reason'     => (string) ($process->focus_reason ?? ''),
+            'focus_until'      => $process->focus_until?->format('Y-m-d'),
+            'owner_entity_id'  => (string) ($process->owner_entity_id ?? ''),
+            'vsm_system_id'    => (string) ($process->vsm_system_id ?? ''),
         ];
         $this->modalShow = true;
     }
@@ -206,12 +231,16 @@ class Index extends Component
         $data = $this->validate()['form'];
 
         $payload = [
-            'name'            => trim($data['name']),
-            'code'            => $data['code'] !== '' ? $data['code'] : null,
-            'description'     => $data['description'] !== '' ? $data['description'] : null,
-            'status'          => $data['status'],
-            'owner_entity_id' => $data['owner_entity_id'] !== '' ? (int) $data['owner_entity_id'] : null,
-            'vsm_system_id'   => $data['vsm_system_id'] !== '' ? (int) $data['vsm_system_id'] : null,
+            'name'             => trim($data['name']),
+            'code'             => $data['code'] !== '' ? $data['code'] : null,
+            'description'      => $data['description'] !== '' ? $data['description'] : null,
+            'status'           => $data['status'],
+            'process_category' => $data['process_category'] !== '' ? $data['process_category'] : null,
+            'is_focus'         => (bool) $data['is_focus'],
+            'focus_reason'     => $data['is_focus'] && $data['focus_reason'] !== '' ? $data['focus_reason'] : null,
+            'focus_until'      => $data['is_focus'] && $data['focus_until'] ? $data['focus_until'] : null,
+            'owner_entity_id'  => $data['owner_entity_id'] !== '' ? (int) $data['owner_entity_id'] : null,
+            'vsm_system_id'    => $data['vsm_system_id'] !== '' ? (int) $data['vsm_system_id'] : null,
         ];
 
         if ($this->editingId) {

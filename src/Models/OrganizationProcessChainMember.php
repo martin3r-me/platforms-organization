@@ -8,36 +8,33 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
-use Platform\Organization\Enums\ProcessFlowKind;
+use Platform\Organization\Enums\ChainMemberRole;
 use Symfony\Component\Uid\UuidV7;
 
-class OrganizationProcessFlow extends Model
+class OrganizationProcessChainMember extends Model
 {
     use SoftDeletes;
 
-    protected $table = 'organization_process_flows';
+    protected $table = 'organization_process_chain_members';
 
     protected $fillable = [
         'uuid',
         'team_id',
         'user_id',
+        'chain_id',
         'process_id',
-        'from_step_id',
-        'to_step_id',
-        'condition_label',
-        'condition_expression',
-        'flow_kind',
-        'priority',
-        'is_default',
+        'position',
+        'role',
+        'is_required',
+        'notes',
         'metadata',
     ];
 
     protected $casts = [
-        'condition_expression' => 'array',
-        'is_default'           => 'boolean',
-        'metadata'             => 'array',
-        'flow_kind'            => ProcessFlowKind::class,
-        'priority'             => 'integer',
+        'position'    => 'integer',
+        'role'        => ChainMemberRole::class,
+        'is_required' => 'boolean',
+        'metadata'    => 'array',
     ];
 
     protected static function booted(): void
@@ -58,21 +55,25 @@ class OrganizationProcessFlow extends Model
                 $model->team_id = Auth::user()?->currentTeamRelation?->id;
             }
         });
+
+        // Keep chain endpoint cache in sync
+        static::saved(function (self $model) {
+            $model->chain?->syncEndpointsFromMembers();
+        });
+
+        static::deleted(function (self $model) {
+            $model->chain?->syncEndpointsFromMembers();
+        });
+    }
+
+    public function chain(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationProcessChain::class, 'chain_id');
     }
 
     public function process(): BelongsTo
     {
         return $this->belongsTo(OrganizationProcess::class, 'process_id');
-    }
-
-    public function fromStep(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationProcessStep::class, 'from_step_id');
-    }
-
-    public function toStep(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationProcessStep::class, 'to_step_id');
     }
 
     public function team(): BelongsTo
@@ -83,20 +84,5 @@ class OrganizationProcessFlow extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function scopeActive($query)
-    {
-        return $query->whereNull('deleted_at');
-    }
-
-    public function scopeForTeam($query, int $teamId)
-    {
-        return $query->where('team_id', $teamId);
-    }
-
-    public function scopeOrderedByPriority($query)
-    {
-        return $query->orderBy('priority')->orderBy('id');
     }
 }

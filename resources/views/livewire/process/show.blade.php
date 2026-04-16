@@ -100,8 +100,7 @@
                 ['value' => 'corefit', 'label' => 'COREFIT'],
                 ['value' => 'steps', 'label' => 'Steps', 'count' => $this->steps->count()],
                 ['value' => 'flows', 'label' => 'Flows', 'count' => $this->flows->count()],
-                ['value' => 'triggers', 'label' => 'Triggers', 'count' => $this->triggers->count()],
-                ['value' => 'outputs', 'label' => 'Outputs', 'count' => $this->outputs->count()],
+                ['value' => 'chaining', 'label' => 'Verkettung', 'count' => $this->triggers->count() + $this->outputs->count()],
                 ['value' => 'improvements', 'label' => 'Verbesserungen', 'count' => $this->processImprovements->count()],
                 ['value' => 'snapshots', 'label' => 'Snapshots', 'count' => $this->processSnapshots->count()],
                 ['value' => 'certificate', 'label' => 'Ausweis'],
@@ -110,6 +109,20 @@
         <div class="px-4 py-2 bg-[var(--ui-surface)] border-b border-[var(--ui-border)]/40">
             <x-ui-tab :tabs="$tabItems" model="activeTab" :showCounts="true" size="xs" />
         </div>
+        @if($this->chains->isNotEmpty())
+            <div class="px-4 py-2 bg-[var(--ui-info)]/5 border-b border-[var(--ui-border)]/40 flex items-center gap-2 flex-wrap">
+                @svg('heroicon-o-link', 'w-4 h-4 text-[var(--ui-info)]')
+                <span class="text-xs text-[var(--ui-muted)]">Teil von:</span>
+                @foreach($this->chains as $chain)
+                    <x-ui-badge variant="info" size="sm">
+                        {{ $chain->name }}
+                        @if($chain->pivot?->role && $chain->pivot->role !== 'middle')
+                            <span class="text-[10px] opacity-70 ml-1">({{ $chain->pivot->role }})</span>
+                        @endif
+                    </x-ui-badge>
+                @endforeach
+            </div>
+        @endif
     </x-slot>
 
     <x-slot name="sidebar">
@@ -1001,6 +1014,15 @@
                                 @if($step->description)
                                     <div class="text-xs text-[var(--ui-muted)]">{{ \Illuminate\Support\Str::limit($step->description, 60) }}</div>
                                 @endif
+                                @if($step->step_type === 'subprocess' && $step->sub_process_id && $step->subProcess)
+                                    <div class="mt-0.5">
+                                        <a href="{{ route('organization.processes.show', $step->subProcess) }}" wire:navigate
+                                           class="inline-flex items-center gap-1 text-[10px] text-[var(--ui-primary)] hover:underline">
+                                            @svg('heroicon-o-arrow-turn-down-right', 'w-3 h-3')
+                                            <span>Sub-Prozess: {{ $step->subProcess->name }}</span>
+                                        </a>
+                                    </div>
+                                @endif
                             </x-ui-table-cell>
                             <x-ui-table-cell compact="true">
                                 <x-ui-badge variant="info" size="sm">{{ ucfirst($step->step_type ?? 'task') }}</x-ui-badge>
@@ -1113,133 +1135,158 @@
             </x-ui-table>
         @endif
 
-        {{-- ── Tab: Triggers ───────────────────────────────── --}}
-        @if($activeTab === 'triggers')
-            <div class="flex justify-end mb-4">
-                <x-ui-button variant="primary" size="sm" wire:click="createTrigger">
-                    @svg('heroicon-o-plus', 'w-4 h-4')
-                    <span>Neuer Trigger</span>
-                </x-ui-button>
+        {{-- ── Tab: Verkettung (Triggers + Outputs) ───────────── --}}
+        @if($activeTab === 'chaining')
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {{-- ─── Eingehend: Triggers ─── --}}
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] flex items-center gap-2">
+                            @svg('heroicon-o-arrow-left-circle', 'w-4 h-4')
+                            Eingehend (Triggers)
+                            <span class="text-xs text-[var(--ui-muted)] font-normal">({{ $this->triggers->count() }})</span>
+                        </h3>
+                        <x-ui-button variant="primary" size="xs" wire:click="createTrigger">
+                            @svg('heroicon-o-plus', 'w-3 h-3')
+                            <span>Neu</span>
+                        </x-ui-button>
+                    </div>
+
+                    <x-ui-table compact="true">
+                        <x-ui-table-header>
+                            <x-ui-table-header-cell compact="true">Label</x-ui-table-header-cell>
+                            <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
+                            <x-ui-table-header-cell compact="true">Quelle</x-ui-table-header-cell>
+                            <x-ui-table-header-cell compact="true"></x-ui-table-header-cell>
+                        </x-ui-table-header>
+                        <x-ui-table-body>
+                            @forelse($this->triggers as $trigger)
+                                <x-ui-table-row compact="true">
+                                    <x-ui-table-cell compact="true">
+                                        <div class="font-medium">{{ $trigger->label }}</div>
+                                        @if($trigger->description)
+                                            <div class="text-xs text-[var(--ui-muted)]">{{ \Illuminate\Support\Str::limit($trigger->description, 60) }}</div>
+                                        @endif
+                                    </x-ui-table-cell>
+                                    <x-ui-table-cell compact="true">
+                                        <x-ui-badge variant="info" size="sm">{{ ucfirst(str_replace('_', ' ', $trigger->trigger_type)) }}</x-ui-badge>
+                                    </x-ui-table-cell>
+                                    <x-ui-table-cell compact="true">
+                                        @if($trigger->entityType)
+                                            <span class="text-sm">
+                                                <x-ui-badge variant="muted" size="sm">Typ</x-ui-badge>
+                                                {{ $trigger->entityType->name }}
+                                            </span>
+                                        @elseif($trigger->entity)
+                                            <span class="text-sm">{{ $trigger->entity->name }}</span>
+                                        @elseif($trigger->sourceProcess)
+                                            <a href="{{ route('organization.processes.show', $trigger->sourceProcess) }}"
+                                               class="text-sm font-medium text-[var(--ui-primary)] hover:underline inline-flex items-center gap-1"
+                                               wire:navigate>
+                                                @svg('heroicon-o-arrow-left-circle', 'w-3.5 h-3.5')
+                                                <span>{{ $trigger->sourceProcess->name }}</span>
+                                            </a>
+                                        @elseif($trigger->interlink)
+                                            <span class="text-sm">{{ $trigger->interlink->name }}</span>
+                                        @elseif($trigger->schedule_expression)
+                                            <code class="text-xs">{{ $trigger->schedule_expression }}</code>
+                                        @else
+                                            <span class="text-xs text-[var(--ui-muted)]">–</span>
+                                        @endif
+                                    </x-ui-table-cell>
+                                    <x-ui-table-cell compact="true">
+                                        <div class="flex gap-1 justify-end">
+                                            <x-ui-button size="xs" variant="secondary-outline" wire:click="editTrigger({{ $trigger->id }})">
+                                                @svg('heroicon-o-pencil-square', 'w-4 h-4')
+                                            </x-ui-button>
+                                            <x-ui-confirm-button size="xs" variant="danger-outline" wire:click="deleteTrigger({{ $trigger->id }})" confirm-text="Trigger wirklich löschen?">
+                                                @svg('heroicon-o-trash', 'w-4 h-4')
+                                            </x-ui-confirm-button>
+                                        </div>
+                                    </x-ui-table-cell>
+                                </x-ui-table-row>
+                            @empty
+                                <x-ui-table-row compact="true">
+                                    <x-ui-table-cell compact="true" colspan="4">
+                                        <div class="text-center text-[var(--ui-muted)] py-6">Keine Triggers vorhanden.</div>
+                                    </x-ui-table-cell>
+                                </x-ui-table-row>
+                            @endforelse
+                        </x-ui-table-body>
+                    </x-ui-table>
+                </div>
+
+                {{-- ─── Ausgehend: Outputs ─── --}}
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] flex items-center gap-2">
+                            @svg('heroicon-o-arrow-right-circle', 'w-4 h-4')
+                            Ausgehend (Outputs)
+                            <span class="text-xs text-[var(--ui-muted)] font-normal">({{ $this->outputs->count() }})</span>
+                        </h3>
+                        <x-ui-button variant="primary" size="xs" wire:click="createOutput">
+                            @svg('heroicon-o-plus', 'w-3 h-3')
+                            <span>Neu</span>
+                        </x-ui-button>
+                    </div>
+
+                    <x-ui-table compact="true">
+                        <x-ui-table-header>
+                            <x-ui-table-header-cell compact="true">Label</x-ui-table-header-cell>
+                            <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
+                            <x-ui-table-header-cell compact="true">Ziel</x-ui-table-header-cell>
+                            <x-ui-table-header-cell compact="true"></x-ui-table-header-cell>
+                        </x-ui-table-header>
+                        <x-ui-table-body>
+                            @forelse($this->outputs as $output)
+                                <x-ui-table-row compact="true">
+                                    <x-ui-table-cell compact="true">
+                                        <div class="font-medium">{{ $output->label }}</div>
+                                        @if($output->description)
+                                            <div class="text-xs text-[var(--ui-muted)]">{{ \Illuminate\Support\Str::limit($output->description, 60) }}</div>
+                                        @endif
+                                    </x-ui-table-cell>
+                                    <x-ui-table-cell compact="true">
+                                        <x-ui-badge variant="info" size="sm">{{ ucfirst(str_replace('_', ' ', $output->output_type)) }}</x-ui-badge>
+                                    </x-ui-table-cell>
+                                    <x-ui-table-cell compact="true">
+                                        @if($output->entity)
+                                            <span class="text-sm">{{ $output->entity->name }}</span>
+                                        @elseif($output->targetProcess)
+                                            <a href="{{ route('organization.processes.show', $output->targetProcess) }}"
+                                               class="text-sm font-medium text-[var(--ui-primary)] hover:underline inline-flex items-center gap-1"
+                                               wire:navigate>
+                                                @svg('heroicon-o-arrow-right-circle', 'w-3.5 h-3.5')
+                                                <span>{{ $output->targetProcess->name }}</span>
+                                            </a>
+                                        @elseif($output->interlink)
+                                            <span class="text-sm">{{ $output->interlink->name }}</span>
+                                        @else
+                                            <span class="text-xs text-[var(--ui-muted)]">–</span>
+                                        @endif
+                                    </x-ui-table-cell>
+                                    <x-ui-table-cell compact="true">
+                                        <div class="flex gap-1 justify-end">
+                                            <x-ui-button size="xs" variant="secondary-outline" wire:click="editOutput({{ $output->id }})">
+                                                @svg('heroicon-o-pencil-square', 'w-4 h-4')
+                                            </x-ui-button>
+                                            <x-ui-confirm-button size="xs" variant="danger-outline" wire:click="deleteOutput({{ $output->id }})" confirm-text="Output wirklich löschen?">
+                                                @svg('heroicon-o-trash', 'w-4 h-4')
+                                            </x-ui-confirm-button>
+                                        </div>
+                                    </x-ui-table-cell>
+                                </x-ui-table-row>
+                            @empty
+                                <x-ui-table-row compact="true">
+                                    <x-ui-table-cell compact="true" colspan="4">
+                                        <div class="text-center text-[var(--ui-muted)] py-6">Keine Outputs vorhanden.</div>
+                                    </x-ui-table-cell>
+                                </x-ui-table-row>
+                            @endforelse
+                        </x-ui-table-body>
+                    </x-ui-table>
+                </div>
             </div>
-
-            <x-ui-table compact="true">
-                <x-ui-table-header>
-                    <x-ui-table-header-cell compact="true">Label</x-ui-table-header-cell>
-                    <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
-                    <x-ui-table-header-cell compact="true">Quelle</x-ui-table-header-cell>
-                    <x-ui-table-header-cell compact="true"></x-ui-table-header-cell>
-                </x-ui-table-header>
-                <x-ui-table-body>
-                    @forelse($this->triggers as $trigger)
-                        <x-ui-table-row compact="true">
-                            <x-ui-table-cell compact="true">
-                                <div class="font-medium">{{ $trigger->label }}</div>
-                                @if($trigger->description)
-                                    <div class="text-xs text-[var(--ui-muted)]">{{ \Illuminate\Support\Str::limit($trigger->description, 60) }}</div>
-                                @endif
-                            </x-ui-table-cell>
-                            <x-ui-table-cell compact="true">
-                                <x-ui-badge variant="info" size="sm">{{ ucfirst(str_replace('_', ' ', $trigger->trigger_type)) }}</x-ui-badge>
-                            </x-ui-table-cell>
-                            <x-ui-table-cell compact="true">
-                                @if($trigger->entityType)
-                                    <span class="text-sm">
-                                        <x-ui-badge variant="muted" size="sm">Typ</x-ui-badge>
-                                        {{ $trigger->entityType->name }}
-                                    </span>
-                                @elseif($trigger->entity)
-                                    <span class="text-sm">{{ $trigger->entity->name }}</span>
-                                @elseif($trigger->sourceProcess)
-                                    <span class="text-sm">{{ $trigger->sourceProcess->name }}</span>
-                                @elseif($trigger->interlink)
-                                    <span class="text-sm">{{ $trigger->interlink->name }}</span>
-                                @elseif($trigger->schedule_expression)
-                                    <code class="text-xs">{{ $trigger->schedule_expression }}</code>
-                                @else
-                                    <span class="text-xs text-[var(--ui-muted)]">–</span>
-                                @endif
-                            </x-ui-table-cell>
-                            <x-ui-table-cell compact="true">
-                                <div class="flex gap-1 justify-end">
-                                    <x-ui-button size="xs" variant="secondary-outline" wire:click="editTrigger({{ $trigger->id }})">
-                                        @svg('heroicon-o-pencil-square', 'w-4 h-4')
-                                    </x-ui-button>
-                                    <x-ui-confirm-button size="xs" variant="danger-outline" wire:click="deleteTrigger({{ $trigger->id }})" confirm-text="Trigger wirklich löschen?">
-                                        @svg('heroicon-o-trash', 'w-4 h-4')
-                                    </x-ui-confirm-button>
-                                </div>
-                            </x-ui-table-cell>
-                        </x-ui-table-row>
-                    @empty
-                        <x-ui-table-row compact="true">
-                            <x-ui-table-cell compact="true" colspan="4">
-                                <div class="text-center text-[var(--ui-muted)] py-6">Keine Triggers vorhanden.</div>
-                            </x-ui-table-cell>
-                        </x-ui-table-row>
-                    @endforelse
-                </x-ui-table-body>
-            </x-ui-table>
-        @endif
-
-        {{-- ── Tab: Outputs ────────────────────────────────── --}}
-        @if($activeTab === 'outputs')
-            <div class="flex justify-end mb-4">
-                <x-ui-button variant="primary" size="sm" wire:click="createOutput">
-                    @svg('heroicon-o-plus', 'w-4 h-4')
-                    <span>Neuer Output</span>
-                </x-ui-button>
-            </div>
-
-            <x-ui-table compact="true">
-                <x-ui-table-header>
-                    <x-ui-table-header-cell compact="true">Label</x-ui-table-header-cell>
-                    <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
-                    <x-ui-table-header-cell compact="true">Ziel</x-ui-table-header-cell>
-                    <x-ui-table-header-cell compact="true"></x-ui-table-header-cell>
-                </x-ui-table-header>
-                <x-ui-table-body>
-                    @forelse($this->outputs as $output)
-                        <x-ui-table-row compact="true">
-                            <x-ui-table-cell compact="true">
-                                <div class="font-medium">{{ $output->label }}</div>
-                                @if($output->description)
-                                    <div class="text-xs text-[var(--ui-muted)]">{{ \Illuminate\Support\Str::limit($output->description, 60) }}</div>
-                                @endif
-                            </x-ui-table-cell>
-                            <x-ui-table-cell compact="true">
-                                <x-ui-badge variant="info" size="sm">{{ ucfirst(str_replace('_', ' ', $output->output_type)) }}</x-ui-badge>
-                            </x-ui-table-cell>
-                            <x-ui-table-cell compact="true">
-                                @if($output->entity)
-                                    <span class="text-sm">{{ $output->entity->name }}</span>
-                                @elseif($output->targetProcess)
-                                    <span class="text-sm">{{ $output->targetProcess->name }}</span>
-                                @elseif($output->interlink)
-                                    <span class="text-sm">{{ $output->interlink->name }}</span>
-                                @else
-                                    <span class="text-xs text-[var(--ui-muted)]">–</span>
-                                @endif
-                            </x-ui-table-cell>
-                            <x-ui-table-cell compact="true">
-                                <div class="flex gap-1 justify-end">
-                                    <x-ui-button size="xs" variant="secondary-outline" wire:click="editOutput({{ $output->id }})">
-                                        @svg('heroicon-o-pencil-square', 'w-4 h-4')
-                                    </x-ui-button>
-                                    <x-ui-confirm-button size="xs" variant="danger-outline" wire:click="deleteOutput({{ $output->id }})" confirm-text="Output wirklich löschen?">
-                                        @svg('heroicon-o-trash', 'w-4 h-4')
-                                    </x-ui-confirm-button>
-                                </div>
-                            </x-ui-table-cell>
-                        </x-ui-table-row>
-                    @empty
-                        <x-ui-table-row compact="true">
-                            <x-ui-table-cell compact="true" colspan="4">
-                                <div class="text-center text-[var(--ui-muted)] py-6">Keine Outputs vorhanden.</div>
-                            </x-ui-table-cell>
-                        </x-ui-table-row>
-                    @endforelse
-                </x-ui-table-body>
-            </x-ui-table>
         @endif
 
         {{-- ── Tab: Verbesserungen ──────────────────────────── --}}

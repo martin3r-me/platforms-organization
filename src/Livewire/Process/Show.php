@@ -98,6 +98,12 @@ class Show extends Component
     public function mount(OrganizationProcess $process)
     {
         $this->process = $process->load(['ownerEntity', 'vsmSystem', 'user']);
+
+        // Backward-compat: alte Tab-Namen (triggers/outputs) → chaining
+        if (in_array($this->activeTab, ['triggers', 'outputs'], true)) {
+            $this->activeTab = 'chaining';
+        }
+
         $this->loadForm();
     }
 
@@ -155,7 +161,19 @@ class Show extends Component
     #[Computed]
     public function steps()
     {
-        return $this->process->steps()->orderBy('position')->get();
+        return $this->process->steps()
+            ->with(['subProcess:id,name,code'])
+            ->orderBy('position')
+            ->get();
+    }
+
+    #[Computed]
+    public function chains()
+    {
+        return $this->process->chains()
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get();
     }
 
     #[Computed]

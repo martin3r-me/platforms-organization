@@ -7,6 +7,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Tools\Concerns\HasStandardizedWriteOperations;
+use Platform\Organization\Enums\ProcessFlowKind;
 use Platform\Organization\Models\OrganizationProcessFlow;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
@@ -35,6 +36,8 @@ class UpdateProcessFlowTool implements ToolContract, ToolMetadataContract
                 'to_step_id'           => ['type' => 'integer'],
                 'condition_label'      => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'condition_expression' => ['type' => 'object', 'description' => 'null zum Leeren.'],
+                'flow_kind'            => ['type' => 'string', 'description' => 'sequence | conditional | exception | loop_back | compensation.'],
+                'priority'             => ['type' => 'integer', 'description' => '0-255.'],
                 'is_default'           => ['type' => 'boolean'],
                 'metadata'             => ['type' => 'object'],
             ],
@@ -85,6 +88,20 @@ class UpdateProcessFlowTool implements ToolContract, ToolMetadataContract
             }
             if (array_key_exists('condition_expression', $arguments)) {
                 $update['condition_expression'] = $arguments['condition_expression'];
+            }
+            if (array_key_exists('flow_kind', $arguments)) {
+                $val = (string) ($arguments['flow_kind'] ?? '');
+                if ($val === '' || ! in_array($val, ProcessFlowKind::values(), true)) {
+                    return ToolResult::error('VALIDATION_ERROR', 'Ungültiger flow_kind. Erlaubt: '.implode(', ', ProcessFlowKind::values()));
+                }
+                $update['flow_kind'] = $val;
+            }
+            if (array_key_exists('priority', $arguments)) {
+                $val = (int) $arguments['priority'];
+                if ($val < 0 || $val > 255) {
+                    return ToolResult::error('VALIDATION_ERROR', 'priority muss zwischen 0 und 255 liegen.');
+                }
+                $update['priority'] = $val;
             }
             if (array_key_exists('is_default', $arguments)) {
                 $update['is_default'] = (bool) $arguments['is_default'];

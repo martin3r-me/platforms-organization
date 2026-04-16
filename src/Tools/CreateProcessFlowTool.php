@@ -6,6 +6,7 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Organization\Enums\ProcessFlowKind;
 use Platform\Organization\Models\OrganizationProcessFlow;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
@@ -34,6 +35,8 @@ class CreateProcessFlowTool implements ToolContract, ToolMetadataContract
                 'to_step_id'           => ['type' => 'integer', 'description' => 'ERFORDERLICH: Ziel-Schritt.'],
                 'condition_label'      => ['type' => 'string', 'description' => 'Optional: Beschriftung der Bedingung.'],
                 'condition_expression' => ['type' => 'object', 'description' => 'Optional: JSON-Bedingung.'],
+                'flow_kind'            => ['type' => 'string', 'description' => 'Optional: sequence | conditional | exception | loop_back | compensation. Default: sequence.'],
+                'priority'             => ['type' => 'integer', 'description' => 'Optional: Reihenfolge-Priorität (0-255). Default: 100.'],
                 'is_default'           => ['type' => 'boolean', 'description' => 'Optional: Default true.'],
                 'metadata'             => ['type' => 'object'],
             ],
@@ -58,6 +61,15 @@ class CreateProcessFlowTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'process_id, from_step_id und to_step_id sind erforderlich.');
             }
 
+            $flowKind = (string) ($arguments['flow_kind'] ?? 'sequence');
+            if (! in_array($flowKind, ProcessFlowKind::values(), true)) {
+                return ToolResult::error('VALIDATION_ERROR', 'Ungültiger flow_kind. Erlaubt: '.implode(', ', ProcessFlowKind::values()));
+            }
+            $priority = array_key_exists('priority', $arguments) ? (int) $arguments['priority'] : 100;
+            if ($priority < 0 || $priority > 255) {
+                return ToolResult::error('VALIDATION_ERROR', 'priority muss zwischen 0 und 255 liegen.');
+            }
+
             $flow = OrganizationProcessFlow::create([
                 'team_id'              => $rootTeamId,
                 'user_id'              => $context->user?->id,
@@ -66,6 +78,8 @@ class CreateProcessFlowTool implements ToolContract, ToolMetadataContract
                 'to_step_id'           => $toStepId,
                 'condition_label'      => ($arguments['condition_label'] ?? null) ?: null,
                 'condition_expression' => $arguments['condition_expression'] ?? null,
+                'flow_kind'            => $flowKind,
+                'priority'             => $priority,
                 'is_default'           => $arguments['is_default'] ?? true,
                 'metadata'             => $arguments['metadata'] ?? null,
             ]);

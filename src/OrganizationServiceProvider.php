@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Platform\Organization\Console\Commands\DetectProcessChainsCommand;
 use Platform\Organization\Console\Commands\GenerateReportsCommand;
 use Platform\Organization\Console\Commands\NormalizeEntityLinkTypesCommand;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
@@ -28,6 +29,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 GenerateReportsCommand::class,
                 SnapshotEntitiesCommand::class,
                 NormalizeEntityLinkTypesCommand::class,
+                DetectProcessChainsCommand::class,
             ]);
         }
 
@@ -43,8 +45,10 @@ class OrganizationServiceProvider extends ServiceProvider
             'organization_person_job_profile' => \Platform\Organization\Models\OrganizationPersonJobProfile::class,
             'organization_role'               => \Platform\Organization\Models\OrganizationRole::class,
             'organization_role_assignment'    => \Platform\Organization\Models\OrganizationRoleAssignment::class,
-            'organization_process'            => \Platform\Organization\Models\OrganizationProcess::class,
-            'organization_process_step'       => \Platform\Organization\Models\OrganizationProcessStep::class,
+            'organization_process'               => \Platform\Organization\Models\OrganizationProcess::class,
+            'organization_process_step'          => \Platform\Organization\Models\OrganizationProcessStep::class,
+            'organization_process_chain'         => \Platform\Organization\Models\OrganizationProcessChain::class,
+            'organization_process_chain_member'  => \Platform\Organization\Models\OrganizationProcessChainMember::class,
         ]);
 
         // Schritt 1: Config laden
@@ -148,6 +152,11 @@ class OrganizationServiceProvider extends ServiceProvider
 
         Schedule::command('organization:snapshot-entities --period=evening')
             ->dailyAt('18:00')
+            ->withoutOverlapping();
+
+        Schedule::command('organization:detect-process-chains')
+            ->dailyAt('02:00')
+            ->onOneServer()
             ->withoutOverlapping();
     }
 
@@ -338,6 +347,15 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\ListProcessImprovementsTool());
             $registry->register(new \Platform\Organization\Tools\UpdateProcessImprovementTool());
             $registry->register(new \Platform\Organization\Tools\DeleteProcessImprovementTool());
+
+            // Process Chain Tools (Sprint 1: BPMN-Prozessketten)
+            $registry->register(new \Platform\Organization\Tools\ListProcessChainsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateProcessChainTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateProcessChainTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteProcessChainTool());
+            $registry->register(new \Platform\Organization\Tools\AddProcessToChainTool());
+            $registry->register(new \Platform\Organization\Tools\RemoveProcessFromChainTool());
+            $registry->register(new \Platform\Organization\Tools\DetectProcessChainsTool());
 
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);

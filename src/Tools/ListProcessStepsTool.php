@@ -28,12 +28,14 @@ class ListProcessStepsTool implements ToolContract, ToolMetadataContract
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['team_id', 'process_id', 'step_type', 'is_active', 'corefit_classification']),
+            $this->getStandardGetSchema(['team_id', 'process_id', 'step_type', 'gateway_type', 'event_type', 'is_active', 'corefit_classification']),
             [
                 'properties' => [
                     'team_id'                => ['type' => 'integer'],
                     'process_id'             => ['type' => 'integer', 'description' => 'EMPFOHLEN: Filter nach Prozess.'],
-                    'step_type'              => ['type' => 'string', 'description' => 'Optional: action | gateway | wait | subprocess.'],
+                    'step_type'              => ['type' => 'string', 'description' => 'Optional: action | gateway | wait | subprocess | event.'],
+                    'gateway_type'           => ['type' => 'string', 'description' => 'Optional: exclusive | parallel | inclusive | event_based.'],
+                    'event_type'             => ['type' => 'string', 'description' => 'Optional: start | end | intermediate_throw | intermediate_catch | timer | message | error | escalation.'],
                     'is_active'              => ['type' => 'boolean'],
                     'corefit_classification' => ['type' => 'string', 'description' => 'Optional: green | yellow | red.'],
                 ],
@@ -58,6 +60,12 @@ class ListProcessStepsTool implements ToolContract, ToolMetadataContract
             if (! empty($arguments['step_type'])) {
                 $q->where('step_type', (string) $arguments['step_type']);
             }
+            if (! empty($arguments['gateway_type'])) {
+                $q->where('gateway_type', (string) $arguments['gateway_type']);
+            }
+            if (! empty($arguments['event_type'])) {
+                $q->where('event_type', (string) $arguments['event_type']);
+            }
             if (array_key_exists('is_active', $arguments)) {
                 $q->where('is_active', (bool) $arguments['is_active']);
             }
@@ -65,7 +73,7 @@ class ListProcessStepsTool implements ToolContract, ToolMetadataContract
                 $q->where('corefit_classification', (string) $arguments['corefit_classification']);
             }
 
-            $this->applyStandardFilters($q, $arguments, ['team_id', 'process_id', 'step_type', 'is_active', 'corefit_classification', 'created_at']);
+            $this->applyStandardFilters($q, $arguments, ['team_id', 'process_id', 'step_type', 'gateway_type', 'event_type', 'is_active', 'corefit_classification', 'created_at']);
             $this->applyStandardSearch($q, $arguments, ['name', 'description']);
             $this->applyStandardSort($q, $arguments, ['position', 'name', 'id', 'created_at'], 'position', 'asc');
 
@@ -78,6 +86,8 @@ class ListProcessStepsTool implements ToolContract, ToolMetadataContract
                 'description'             => $s->description,
                 'position'                => $s->position,
                 'step_type'               => $s->step_type,
+                'gateway_type'            => $s->gateway_type instanceof \BackedEnum ? $s->gateway_type->value : $s->gateway_type,
+                'event_type'              => $s->event_type instanceof \BackedEnum ? $s->event_type->value : $s->event_type,
                 'duration_target_minutes' => $s->duration_target_minutes,
                 'wait_target_minutes'     => $s->wait_target_minutes,
                 'corefit_classification'  => $s->corefit_classification,

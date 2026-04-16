@@ -4,6 +4,7 @@ namespace Platform\Organization\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
@@ -126,6 +127,23 @@ class OrganizationProcess extends Model
     public function improvements(): HasMany
     {
         return $this->hasMany(OrganizationProcessImprovement::class, 'process_id');
+    }
+
+    public function chains(): BelongsToMany
+    {
+        return $this->belongsToMany(
+            OrganizationProcessChain::class,
+            'organization_process_chain_members',
+            'process_id',
+            'chain_id'
+        )
+            ->withPivot(['id', 'uuid', 'position', 'role', 'is_required', 'notes', 'metadata'])
+            ->withTimestamps();
+    }
+
+    public function chainMemberships(): HasMany
+    {
+        return $this->hasMany(OrganizationProcessChainMember::class, 'process_id');
     }
 
     public function scopeActive($query)

@@ -7,6 +7,8 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Tools\Concerns\HasStandardizedWriteOperations;
+use Platform\Organization\Enums\ProcessEventType;
+use Platform\Organization\Enums\ProcessGatewayType;
 use Platform\Organization\Models\OrganizationProcessStep;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
@@ -35,6 +37,8 @@ class UpdateProcessStepTool implements ToolContract, ToolMetadataContract
                 'description'             => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'position'                => ['type' => 'integer'],
                 'step_type'               => ['type' => 'string'],
+                'gateway_type'            => ['type' => 'string', 'description' => 'exclusive | parallel | inclusive | event_based. "" zum Leeren.'],
+                'event_type'              => ['type' => 'string', 'description' => 'start | end | intermediate_throw | intermediate_catch | timer | message | error | escalation. "" zum Leeren.'],
                 'duration_target_minutes' => ['type' => 'integer', 'description' => '0 oder null zum Leeren.'],
                 'wait_target_minutes'     => ['type' => 'integer', 'description' => '0 oder null zum Leeren.'],
                 'corefit_classification'  => ['type' => 'string', 'description' => '"" zum Leeren.'],
@@ -92,6 +96,30 @@ class UpdateProcessStepTool implements ToolContract, ToolMetadataContract
             if (array_key_exists('step_type', $arguments)) {
                 $update['step_type'] = (string) $arguments['step_type'];
             }
+            if (array_key_exists('gateway_type', $arguments)) {
+                $val = (string) ($arguments['gateway_type'] ?? '');
+                if ($val !== '' && ! in_array($val, ProcessGatewayType::values(), true)) {
+                    return ToolResult::error('VALIDATION_ERROR', 'Ungültiger gateway_type. Erlaubt: '.implode(', ', ProcessGatewayType::values()));
+                }
+                $update['gateway_type'] = $val === '' ? null : $val;
+            }
+            if (array_key_exists('event_type', $arguments)) {
+                $val = (string) ($arguments['event_type'] ?? '');
+                if ($val !== '' && ! in_array($val, ProcessEventType::values(), true)) {
+                    return ToolResult::error('VALIDATION_ERROR', 'Ungültiger event_type. Erlaubt: '.implode(', ', ProcessEventType::values()));
+                }
+                $update['event_type'] = $val === '' ? null : $val;
+            }
+
+            // Validate: when effective step_type is 'gateway', gateway_type must be set
+            $effectiveStepType = $update['step_type'] ?? $step->step_type;
+            $effectiveGatewayType = array_key_exists('gateway_type', $update)
+                ? $update['gateway_type']
+                : ($step->gateway_type instanceof \BackedEnum ? $step->gateway_type->value : $step->gateway_type);
+            if ($effectiveStepType === 'gateway' && ! $effectiveGatewayType) {
+                return ToolResult::error('VALIDATION_ERROR', 'gateway_type ist bei step_type=gateway erforderlich.');
+            }
+
             foreach (['duration_target_minutes', 'wait_target_minutes'] as $field) {
                 if (array_key_exists($field, $arguments)) {
                     $val = $arguments[$field];

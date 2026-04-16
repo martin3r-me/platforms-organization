@@ -28,13 +28,15 @@ class ListProcessFlowsTool implements ToolContract, ToolMetadataContract
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['team_id', 'process_id', 'from_step_id', 'to_step_id']),
+            $this->getStandardGetSchema(['team_id', 'process_id', 'from_step_id', 'to_step_id', 'flow_kind', 'priority']),
             [
                 'properties' => [
                     'team_id'      => ['type' => 'integer'],
                     'process_id'   => ['type' => 'integer', 'description' => 'EMPFOHLEN: Filter nach Prozess.'],
                     'from_step_id' => ['type' => 'integer', 'description' => 'Optional: Filter nach Quell-Schritt.'],
                     'to_step_id'   => ['type' => 'integer', 'description' => 'Optional: Filter nach Ziel-Schritt.'],
+                    'flow_kind'    => ['type' => 'string', 'description' => 'Optional: sequence | conditional | exception | loop_back | compensation.'],
+                    'priority'     => ['type' => 'integer', 'description' => 'Optional: exakte Priorität.'],
                 ],
             ]
         );
@@ -60,9 +62,15 @@ class ListProcessFlowsTool implements ToolContract, ToolMetadataContract
             if (! empty($arguments['to_step_id'])) {
                 $q->where('to_step_id', (int) $arguments['to_step_id']);
             }
+            if (! empty($arguments['flow_kind'])) {
+                $q->where('flow_kind', (string) $arguments['flow_kind']);
+            }
+            if (array_key_exists('priority', $arguments) && $arguments['priority'] !== null && $arguments['priority'] !== '') {
+                $q->where('priority', (int) $arguments['priority']);
+            }
 
-            $this->applyStandardFilters($q, $arguments, ['team_id', 'process_id', 'from_step_id', 'to_step_id', 'created_at']);
-            $this->applyStandardSort($q, $arguments, ['id', 'created_at'], 'id', 'asc');
+            $this->applyStandardFilters($q, $arguments, ['team_id', 'process_id', 'from_step_id', 'to_step_id', 'flow_kind', 'priority', 'created_at']);
+            $this->applyStandardSort($q, $arguments, ['id', 'priority', 'created_at'], 'priority', 'asc');
 
             $result = $this->applyStandardPaginationResult($q, $arguments);
             $items = $result['data']->map(fn (OrganizationProcessFlow $f) => [
@@ -73,6 +81,8 @@ class ListProcessFlowsTool implements ToolContract, ToolMetadataContract
                 'to_step_id'           => $f->to_step_id,
                 'condition_label'      => $f->condition_label,
                 'condition_expression' => $f->condition_expression,
+                'flow_kind'            => $f->flow_kind instanceof \BackedEnum ? $f->flow_kind->value : $f->flow_kind,
+                'priority'             => $f->priority,
                 'is_default'           => $f->is_default,
                 'team_id'              => $f->team_id,
             ])->values()->toArray();

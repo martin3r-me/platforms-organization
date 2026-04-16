@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
+use Platform\Organization\Enums\ProcessEventType;
+use Platform\Organization\Enums\ProcessGatewayType;
 use Symfony\Component\Uid\UuidV7;
 
 class OrganizationProcessStep extends Model
@@ -26,6 +28,8 @@ class OrganizationProcessStep extends Model
         'description',
         'position',
         'step_type',
+        'gateway_type',
+        'event_type',
         'duration_target_minutes',
         'wait_target_minutes',
         'corefit_classification',
@@ -43,6 +47,8 @@ class OrganizationProcessStep extends Model
         'is_active'               => 'boolean',
         'metadata'                => 'array',
         'llm_tools'               => 'array',
+        'gateway_type'            => ProcessGatewayType::class,
+        'event_type'              => ProcessEventType::class,
     ];
 
     protected static function booted(): void

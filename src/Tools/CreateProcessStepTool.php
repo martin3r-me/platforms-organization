@@ -6,6 +6,8 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Organization\Enums\ProcessEventType;
+use Platform\Organization\Enums\ProcessGatewayType;
 use Platform\Organization\Models\OrganizationProcessStep;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
@@ -33,7 +35,9 @@ class CreateProcessStepTool implements ToolContract, ToolMetadataContract
                 'name'                    => ['type' => 'string', 'description' => 'ERFORDERLICH.'],
                 'description'             => ['type' => 'string'],
                 'position'                => ['type' => 'integer', 'description' => 'ERFORDERLICH: Reihenfolge im Prozess.'],
-                'step_type'               => ['type' => 'string', 'description' => 'Optional: action | gateway | wait | subprocess. Default: action.'],
+                'step_type'               => ['type' => 'string', 'description' => 'Optional: action | gateway | wait | subprocess | event. Default: action.'],
+                'gateway_type'            => ['type' => 'string', 'description' => 'ERFORDERLICH wenn step_type=gateway: exclusive | parallel | inclusive | event_based.'],
+                'event_type'              => ['type' => 'string', 'description' => 'Optional (für step_type=event): start | end | intermediate_throw | intermediate_catch | timer | message | error | escalation.'],
                 'duration_target_minutes' => ['type' => 'integer', 'description' => 'Optional: Soll-Dauer in Minuten.'],
                 'wait_target_minutes'     => ['type' => 'integer', 'description' => 'Optional: Soll-Wartezeit in Minuten.'],
                 'corefit_classification'  => ['type' => 'string', 'description' => 'Optional: green | yellow | red.'],
@@ -69,6 +73,20 @@ class CreateProcessStepTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'position ist erforderlich.');
             }
 
+            $stepType = (string) ($arguments['step_type'] ?? 'action');
+            $gatewayType = ($arguments['gateway_type'] ?? null) ?: null;
+            $eventType = ($arguments['event_type'] ?? null) ?: null;
+
+            if ($stepType === 'gateway' && ! $gatewayType) {
+                return ToolResult::error('VALIDATION_ERROR', 'gateway_type ist bei step_type=gateway erforderlich.');
+            }
+            if ($gatewayType && ! in_array($gatewayType, ProcessGatewayType::values(), true)) {
+                return ToolResult::error('VALIDATION_ERROR', 'Ungültiger gateway_type. Erlaubt: '.implode(', ', ProcessGatewayType::values()));
+            }
+            if ($eventType && ! in_array($eventType, ProcessEventType::values(), true)) {
+                return ToolResult::error('VALIDATION_ERROR', 'Ungültiger event_type. Erlaubt: '.implode(', ', ProcessEventType::values()));
+            }
+
             $step = OrganizationProcessStep::create([
                 'team_id'                 => $rootTeamId,
                 'user_id'                 => $context->user?->id,
@@ -76,7 +94,9 @@ class CreateProcessStepTool implements ToolContract, ToolMetadataContract
                 'name'                    => $name,
                 'description'             => ($arguments['description'] ?? null) ?: null,
                 'position'                => (int) $position,
-                'step_type'               => ($arguments['step_type'] ?? 'action'),
+                'step_type'               => $stepType,
+                'gateway_type'            => $gatewayType,
+                'event_type'              => $eventType,
                 'duration_target_minutes' => isset($arguments['duration_target_minutes']) ? (int) $arguments['duration_target_minutes'] : null,
                 'wait_target_minutes'     => isset($arguments['wait_target_minutes']) ? (int) $arguments['wait_target_minutes'] : null,
                 'corefit_classification'  => ($arguments['corefit_classification'] ?? null) ?: null,

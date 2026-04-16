@@ -336,7 +336,7 @@
                     @php
                         $catLabels = ['cost' => 'Kosten', 'quality' => 'Qualität', 'speed' => 'Speed', 'risk' => 'Risiko', 'standardization' => 'Standard'];
                         $prioColors = ['critical' => ['bg' => '#fef2f2', 'color' => '#b91c1c'], 'high' => ['bg' => '#fff7ed', 'color' => '#c2410c'], 'medium' => ['bg' => '#fef9c3', 'color' => '#a16207'], 'low' => ['bg' => '#f1f5f9', 'color' => '#64748b']];
-                        $statusLabels = ['identified' => 'Erkannt', 'planned' => 'Geplant', 'in_progress' => 'In Arbeit', 'completed' => 'Erledigt', 'rejected' => 'Abgelehnt'];
+                        $statusLabels = ['identified' => 'Erkannt', 'planned' => 'Geplant', 'in_progress' => 'In Arbeit', 'on_hold' => 'Pausiert', 'completed' => 'Umgesetzt', 'under_observation' => 'In Beobachtung', 'validated' => 'Validiert', 'failed' => 'Wirkungslos', 'rejected' => 'Abgelehnt'];
                     @endphp
                     @foreach($data['improvements_list'] as $imp)
                         <tr>

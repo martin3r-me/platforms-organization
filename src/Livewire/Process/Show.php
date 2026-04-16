@@ -463,7 +463,7 @@ class Show extends Component
             'form.name'                  => 'required|string|max:255',
             'form.code'                  => 'nullable|string|max:100',
             'form.description'           => 'nullable|string',
-            'form.status'                => 'required|in:draft,active,deprecated',
+            'form.status'                => 'required|in:draft,under_review,pilot,active,deprecated',
             'form.process_category'      => 'nullable|in:core,support,management',
             'form.is_focus'              => 'boolean',
             'form.focus_reason'          => 'nullable|string',
@@ -998,7 +998,7 @@ class Show extends Component
             'improvementForm.description'      => 'nullable|string',
             'improvementForm.category'         => 'required|in:cost,quality,speed,risk,standardization',
             'improvementForm.priority'         => 'required|in:low,medium,high,critical',
-            'improvementForm.status'           => 'required|in:identified,planned,in_progress,completed,rejected',
+            'improvementForm.status'           => 'required|in:identified,planned,in_progress,on_hold,completed,under_observation,validated,failed,rejected',
             'improvementForm.expected_outcome' => 'nullable|string',
             'improvementForm.actual_outcome'   => 'nullable|string',
         ]);
@@ -1013,20 +1013,25 @@ class Show extends Component
             'actual_outcome'   => $this->improvementForm['actual_outcome'] !== '' ? $this->improvementForm['actual_outcome'] : null,
         ];
 
-        if ($this->improvementForm['status'] === 'completed') {
-            $payload['completed_at'] = now();
-        }
+        // States that imply the improvement has been implemented (completion timestamp set)
+        $completedStates = ['completed', 'under_observation', 'validated', 'failed'];
 
         if ($this->editingImprovementId) {
             $imp = $this->process->improvements()->find($this->editingImprovementId);
             if ($imp) {
-                if ($this->improvementForm['status'] !== 'completed') {
+                if (in_array($this->improvementForm['status'], $completedStates, true)) {
+                    // Preserve existing completed_at, set now() if not yet set
+                    $payload['completed_at'] = $imp->completed_at ?? now();
+                } else {
                     $payload['completed_at'] = null;
                 }
                 $imp->update($payload);
             }
             $this->dispatch('toast', message: 'Verbesserung aktualisiert');
         } else {
+            if (in_array($this->improvementForm['status'], $completedStates, true)) {
+                $payload['completed_at'] = now();
+            }
             $this->process->improvements()->create(array_merge($payload, [
                 'team_id' => Auth::user()->currentTeam->id,
                 'user_id' => Auth::id(),

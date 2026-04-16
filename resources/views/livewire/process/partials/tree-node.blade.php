@@ -44,6 +44,10 @@
                     @endif
                     @if($process->status === 'active')
                         <x-ui-badge variant="success" size="sm">Aktiv</x-ui-badge>
+                    @elseif($process->status === 'pilot')
+                        <x-ui-badge variant="info" size="sm">Pilot</x-ui-badge>
+                    @elseif($process->status === 'under_review')
+                        <x-ui-badge variant="warning" size="sm">In Prüfung</x-ui-badge>
                     @elseif($process->status === 'draft')
                         <x-ui-badge variant="muted" size="sm">Entwurf</x-ui-badge>
                     @else

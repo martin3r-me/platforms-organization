@@ -120,6 +120,10 @@
                     <div class="space-y-2">
                         @if($process->status === 'active')
                             <x-ui-badge variant="success" size="sm">Aktiv</x-ui-badge>
+                        @elseif($process->status === 'pilot')
+                            <x-ui-badge variant="info" size="sm">Pilot</x-ui-badge>
+                        @elseif($process->status === 'under_review')
+                            <x-ui-badge variant="warning" size="sm">In Prüfung</x-ui-badge>
                         @elseif($process->status === 'draft')
                             <x-ui-badge variant="muted" size="sm">Entwurf</x-ui-badge>
                         @else
@@ -936,14 +940,22 @@
                                                 'identified' => 'identifiziert',
                                                 'planned' => 'geplant',
                                                 'in_progress' => 'in Arbeit',
-                                                'completed' => 'abgeschlossen',
+                                                'on_hold' => 'pausiert',
+                                                'completed' => 'umgesetzt',
+                                                'under_observation' => 'in Beobachtung',
+                                                'validated' => 'validiert',
+                                                'failed' => 'wirkungslos',
                                                 'rejected' => 'abgelehnt',
                                             ];
                                             $statusVariants = [
                                                 'identified' => 'muted',
                                                 'planned' => 'info',
                                                 'in_progress' => 'warning',
-                                                'completed' => 'success',
+                                                'on_hold' => 'muted',
+                                                'completed' => 'info',
+                                                'under_observation' => 'warning',
+                                                'validated' => 'success',
+                                                'failed' => 'danger',
                                                 'rejected' => 'danger',
                                             ];
                                         @endphp
@@ -1271,10 +1283,18 @@
                                 @endif
                             </x-ui-table-cell>
                             <x-ui-table-cell compact="true">
-                                @if($imp->status === 'completed')
-                                    <x-ui-badge variant="success" size="sm">Abgeschlossen</x-ui-badge>
+                                @if($imp->status === 'validated')
+                                    <x-ui-badge variant="success" size="sm">Validiert</x-ui-badge>
+                                @elseif($imp->status === 'failed')
+                                    <x-ui-badge variant="danger" size="sm">Wirkungslos</x-ui-badge>
+                                @elseif($imp->status === 'under_observation')
+                                    <x-ui-badge variant="warning" size="sm">In Beobachtung</x-ui-badge>
+                                @elseif($imp->status === 'completed')
+                                    <x-ui-badge variant="info" size="sm">Umgesetzt</x-ui-badge>
                                 @elseif($imp->status === 'in_progress')
                                     <x-ui-badge variant="warning" size="sm">In Arbeit</x-ui-badge>
+                                @elseif($imp->status === 'on_hold')
+                                    <x-ui-badge variant="muted" size="sm">Pausiert</x-ui-badge>
                                 @elseif($imp->status === 'planned')
                                     <x-ui-badge variant="info" size="sm">Geplant</x-ui-badge>
                                 @elseif($imp->status === 'rejected')
@@ -1593,7 +1613,7 @@
                         <h3 class="text-xs font-bold uppercase tracking-wider text-gray-800 mb-2 pb-1 border-b border-gray-200">Verbesserungen ({{ count($certData['improvements_list']) }})</h3>
                         @php
                             $catLabels = ['cost' => 'Kosten', 'quality' => 'Qualität', 'speed' => 'Speed', 'risk' => 'Risiko', 'standardization' => 'Standard'];
-                            $statusLabels = ['identified' => 'Erkannt', 'planned' => 'Geplant', 'in_progress' => 'In Arbeit', 'completed' => 'Erledigt', 'rejected' => 'Abgelehnt'];
+                            $statusLabels = ['identified' => 'Erkannt', 'planned' => 'Geplant', 'in_progress' => 'In Arbeit', 'on_hold' => 'Pausiert', 'completed' => 'Umgesetzt', 'under_observation' => 'In Beobachtung', 'validated' => 'Validiert', 'failed' => 'Wirkungslos', 'rejected' => 'Abgelehnt'];
                         @endphp
                         <table class="w-full text-left">
                             <thead>
@@ -2020,7 +2040,11 @@
                             ['value' => 'identified', 'label' => 'Identifiziert'],
                             ['value' => 'planned', 'label' => 'Geplant'],
                             ['value' => 'in_progress', 'label' => 'In Arbeit'],
-                            ['value' => 'completed', 'label' => 'Abgeschlossen'],
+                            ['value' => 'on_hold', 'label' => 'Pausiert'],
+                            ['value' => 'completed', 'label' => 'Umgesetzt'],
+                            ['value' => 'under_observation', 'label' => 'In Beobachtung'],
+                            ['value' => 'validated', 'label' => 'Validiert'],
+                            ['value' => 'failed', 'label' => 'Wirkungslos'],
                             ['value' => 'rejected', 'label' => 'Abgelehnt'],
                         ]"
                         wire:model.live="improvementForm.status"

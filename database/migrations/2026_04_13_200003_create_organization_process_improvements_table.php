@@ -18,7 +18,7 @@ return new class extends Migration
             $table->text('description')->nullable();
             $table->string('category');  // cost | quality | speed | risk | standardization
             $table->string('priority')->default('medium');  // low | medium | high | critical
-            $table->string('status')->default('identified');  // identified | planned | in_progress | completed | rejected
+            $table->string('status')->default('identified');  // identified | planned | in_progress | on_hold | completed | under_observation | validated | failed | rejected
             $table->text('expected_outcome')->nullable();
             $table->text('actual_outcome')->nullable();
             $table->foreignId('before_snapshot_id')->nullable()->constrained('organization_process_snapshots')->nullOnDelete();

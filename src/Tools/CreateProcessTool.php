@@ -20,7 +20,7 @@ class CreateProcessTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /organization/processes - Erstellt eine Prozess-Definition. Status: draft | active | deprecated.';
+        return 'POST /organization/processes - Erstellt eine Prozess-Definition. Status: draft | under_review | pilot | active | deprecated.';
     }
 
     public function getSchema(): array
@@ -34,7 +34,7 @@ class CreateProcessTool implements ToolContract, ToolMetadataContract
                 'description'     => ['type' => 'string'],
                 'owner_entity_id' => ['type' => 'integer', 'description' => 'Optional: Owner-Entity (Abteilung, Person, etc.).'],
                 'vsm_system_id'   => ['type' => 'integer', 'description' => 'Optional: VSM-System-Zuordnung.'],
-                'status'          => ['type' => 'string', 'description' => 'Optional: draft | active | deprecated. Default: draft.'],
+                'status'          => ['type' => 'string', 'description' => 'Optional: draft | under_review | pilot | active | deprecated. Default: draft.'],
                 'version'         => ['type' => 'integer', 'description' => 'Optional: Default 1.'],
                 'is_active'       => ['type' => 'boolean', 'description' => 'Optional: Default true.'],
                 'metadata'        => ['type' => 'object', 'description' => 'Optional: Freie JSON-Metadaten.'],

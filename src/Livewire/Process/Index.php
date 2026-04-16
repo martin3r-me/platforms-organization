@@ -74,7 +74,7 @@ class Index extends Component
             'form.name'            => ['required', 'string', 'max:255'],
             'form.code'            => ['nullable', 'string', 'max:100'],
             'form.description'     => ['nullable', 'string'],
-            'form.status'           => ['required', 'in:draft,active,deprecated'],
+            'form.status'           => ['required', 'in:draft,under_review,pilot,active,deprecated'],
             'form.process_category' => ['nullable', 'in:core,support,management'],
             'form.is_focus'         => ['boolean'],
             'form.focus_reason'     => ['nullable', 'string'],

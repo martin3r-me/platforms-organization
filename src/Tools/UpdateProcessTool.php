@@ -36,7 +36,7 @@ class UpdateProcessTool implements ToolContract, ToolMetadataContract
                 'description'     => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'owner_entity_id' => ['type' => 'integer', 'description' => '0 oder null zum Leeren.'],
                 'vsm_system_id'   => ['type' => 'integer', 'description' => '0 oder null zum Leeren.'],
-                'status'          => ['type' => 'string', 'description' => 'draft | active | deprecated.'],
+                'status'          => ['type' => 'string', 'description' => 'draft | under_review | pilot | active | deprecated.'],
                 'version'         => ['type' => 'integer'],
                 'is_active'       => ['type' => 'boolean'],
                 'metadata'              => ['type' => 'object'],

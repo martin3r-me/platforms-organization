@@ -22,7 +22,7 @@ class UpdateProcessImprovementTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'PUT /organization/process_improvements/{id} - Aktualisiert eine Verbesserung. Status-Workflow: identified → planned → in_progress → completed/rejected.';
+        return 'PUT /organization/process_improvements/{id} - Aktualisiert eine Verbesserung. Status-Workflow: identified → planned → in_progress → completed → under_observation → validated/failed. Alternativ: on_hold (Pause), rejected (verworfen).';
     }
 
     public function getSchema(): array
@@ -35,7 +35,7 @@ class UpdateProcessImprovementTool implements ToolContract, ToolMetadataContract
                 'description'       => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'category'          => ['type' => 'string', 'description' => 'cost | quality | speed | risk | standardization.'],
                 'priority'          => ['type' => 'string', 'description' => 'low | medium | high | critical.'],
-                'status'            => ['type' => 'string', 'description' => 'identified | planned | in_progress | completed | rejected.'],
+                'status'            => ['type' => 'string', 'description' => 'identified | planned | in_progress | on_hold | completed | under_observation | validated | failed | rejected.'],
                 'expected_outcome'  => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'actual_outcome'    => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'after_snapshot_id' => ['type' => 'integer', 'description' => 'Snapshot-ID für Nachher-Zustand. 0 oder null zum Leeren.'],
@@ -107,14 +107,15 @@ class UpdateProcessImprovementTool implements ToolContract, ToolMetadataContract
 
             if (array_key_exists('status', $arguments)) {
                 $val = (string) $arguments['status'];
-                if (! in_array($val, ['identified', 'planned', 'in_progress', 'completed', 'rejected'])) {
+                if (! in_array($val, ['identified', 'planned', 'in_progress', 'on_hold', 'completed', 'under_observation', 'validated', 'failed', 'rejected'])) {
                     return ToolResult::error('VALIDATION_ERROR', 'Ungültiger status.');
                 }
                 $update['status'] = $val;
-                if ($val === 'completed' && ! $improvement->completed_at) {
+                $completedStates = ['completed', 'under_observation', 'validated', 'failed'];
+                if (in_array($val, $completedStates, true) && ! $improvement->completed_at) {
                     $update['completed_at'] = now();
                 }
-                if ($val !== 'completed') {
+                if (! in_array($val, $completedStates, true)) {
                     $update['completed_at'] = null;
                 }
             }

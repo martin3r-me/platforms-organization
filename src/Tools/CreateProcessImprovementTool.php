@@ -35,7 +35,7 @@ class CreateProcessImprovementTool implements ToolContract, ToolMetadataContract
                 'description'        => ['type' => 'string'],
                 'category'           => ['type' => 'string', 'description' => 'ERFORDERLICH: cost | quality | speed | risk | standardization.'],
                 'priority'           => ['type' => 'string', 'description' => 'Optional: low | medium | high | critical. Default: medium.'],
-                'status'             => ['type' => 'string', 'description' => 'Optional: identified | planned | in_progress | completed | rejected. Default: identified.'],
+                'status'             => ['type' => 'string', 'description' => 'Optional: identified | planned | in_progress | on_hold | completed | under_observation | validated | failed | rejected. Default: identified.'],
                 'expected_outcome'   => ['type' => 'string'],
                 'before_snapshot_id' => ['type' => 'integer', 'description' => 'Optional: Snapshot-ID für Vorher-Zustand.'],
                 'metadata'           => ['type' => 'object'],
@@ -77,7 +77,7 @@ class CreateProcessImprovementTool implements ToolContract, ToolMetadataContract
             }
 
             $status = $arguments['status'] ?? 'identified';
-            if (! in_array($status, ['identified', 'planned', 'in_progress', 'completed', 'rejected'])) {
+            if (! in_array($status, ['identified', 'planned', 'in_progress', 'on_hold', 'completed', 'under_observation', 'validated', 'failed', 'rejected'])) {
                 $status = 'identified';
             }
 

@@ -31,7 +31,7 @@ class ListProcessImprovementsTool implements ToolContract, ToolMetadataContract
             'properties' => [
                 'team_id'    => ['type' => 'integer'],
                 'process_id' => ['type' => 'integer', 'description' => 'ERFORDERLICH.'],
-                'status'     => ['type' => 'string', 'description' => 'Optional: identified | planned | in_progress | completed | rejected.'],
+                'status'     => ['type' => 'string', 'description' => 'Optional: identified | planned | in_progress | on_hold | completed | under_observation | validated | failed | rejected.'],
                 'category'   => ['type' => 'string', 'description' => 'Optional: cost | quality | speed | risk | standardization.'],
                 'priority'   => ['type' => 'string', 'description' => 'Optional: low | medium | high | critical.'],
             ],

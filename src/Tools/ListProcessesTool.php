@@ -32,7 +32,7 @@ class ListProcessesTool implements ToolContract, ToolMetadataContract
             [
                 'properties' => [
                     'team_id'         => ['type' => 'integer'],
-                    'status'          => ['type' => 'string', 'description' => 'Optional: draft | active | deprecated.'],
+                    'status'          => ['type' => 'string', 'description' => 'Optional: draft | under_review | pilot | active | deprecated.'],
                     'is_active'       => ['type' => 'boolean', 'description' => 'Optional: Default true.'],
                     'owner_entity_id' => ['type' => 'integer', 'description' => 'Optional: Filter nach Owner-Entity.'],
                     'vsm_system_id'   => ['type' => 'integer', 'description' => 'Optional: Filter nach VSM-System.'],

@@ -12,7 +12,7 @@
                 <x-ui-input-select
                     wire:key="filter-status"
                     name="statusFilter"
-                    :options="['draft' => 'Entwurf', 'active' => 'Aktiv', 'deprecated' => 'Veraltet']"
+                    :options="['draft' => 'Entwurf', 'under_review' => 'In Prüfung', 'pilot' => 'Pilot', 'active' => 'Aktiv', 'deprecated' => 'Veraltet']"
                     wire:model.live="statusFilter"
                     :nullable="true"
                     nullLabel="Alle Status"
@@ -101,7 +101,7 @@
                 <x-ui-input-select
                     name="form.status"
                     label="Status"
-                    :options="['draft' => 'Entwurf', 'active' => 'Aktiv', 'deprecated' => 'Veraltet']"
+                    :options="['draft' => 'Entwurf', 'under_review' => 'In Prüfung', 'pilot' => 'Pilot', 'active' => 'Aktiv', 'deprecated' => 'Veraltet']"
                     wire:model.live="form.status"
                     :required="true"
                     size="sm"

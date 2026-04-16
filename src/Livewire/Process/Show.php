@@ -99,9 +99,9 @@ class Show extends Component
     {
         $this->process = $process->load(['ownerEntity', 'vsmSystem', 'user']);
 
-        // Backward-compat: alte Tab-Namen (triggers/outputs) → chaining
-        if (in_array($this->activeTab, ['triggers', 'outputs'], true)) {
-            $this->activeTab = 'chaining';
+        // Backward-compat: alter zusammengeführter Tab (chaining) → triggers
+        if ($this->activeTab === 'chaining') {
+            $this->activeTab = 'triggers';
         }
 
         $this->loadForm();

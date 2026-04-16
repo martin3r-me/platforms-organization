@@ -277,6 +277,8 @@
                                 label="Status"
                                 :options="[
                                     ['value' => 'draft', 'label' => 'Entwurf'],
+                                    ['value' => 'under_review', 'label' => 'In Prüfung'],
+                                    ['value' => 'pilot', 'label' => 'Pilot'],
                                     ['value' => 'active', 'label' => 'Aktiv'],
                                     ['value' => 'deprecated', 'label' => 'Veraltet'],
                                 ]"

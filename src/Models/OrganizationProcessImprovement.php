@@ -32,11 +32,16 @@ class OrganizationProcessImprovement extends Model
         'after_snapshot_id',
         'completed_at',
         'metadata',
+        'target_step_id',
+        'projected_duration_target_minutes',
+        'projected_automation_level',
+        'projected_complexity',
     ];
 
     protected $casts = [
-        'completed_at' => 'datetime',
-        'metadata'     => 'array',
+        'completed_at'                     => 'datetime',
+        'metadata'                         => 'array',
+        'projected_duration_target_minutes' => 'integer',
     ];
 
     protected static function booted(): void
@@ -80,6 +85,11 @@ class OrganizationProcessImprovement extends Model
     public function afterSnapshot(): BelongsTo
     {
         return $this->belongsTo(OrganizationProcessSnapshot::class, 'after_snapshot_id');
+    }
+
+    public function targetStep(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationProcessStep::class, 'target_step_id');
     }
 
     public function scopeForProcess($query, int $processId)

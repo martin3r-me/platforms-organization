@@ -2,6 +2,7 @@
 
 namespace Platform\Organization\Services;
 
+use Platform\Organization\Enums\ProcessFrequency;
 use Platform\Organization\Models\OrganizationProcess;
 
 class ProcessCertificateService
@@ -93,6 +94,52 @@ class ProcessCertificateService
             }
         }
 
+        // Cost metrics
+        $frequency = $process->frequency;
+        $costMetrics = null;
+        if ($frequency && $hourlyRate > 0 && $totalDuration > 0) {
+            $costPerRun = round(($totalDuration / 60) * $hourlyRate, 2);
+            $costPerMonth = round($costPerRun * $frequency->monthlyFactor(), 2);
+            $costPerYear = round($costPerMonth * 12, 2);
+            $costMetrics = [
+                'cost_per_run' => $costPerRun,
+                'cost_per_month' => $costPerMonth,
+                'cost_per_year' => $costPerYear,
+                'frequency_label' => $frequency->label(),
+                'runs_per_month' => $frequency->monthlyFactor(),
+            ];
+        }
+
+        // Automation score
+        $automationScoreData = null;
+        if ($totalSteps > 0) {
+            $weightedSum = 0;
+            $weightSum = 0;
+            foreach ($steps as $s) {
+                $al = $s->automation_level ?? 'human';
+                $complexity = $s->complexity;
+                $pts = $complexity ? $complexity->points() : 1;
+                $sc = match ($al) {
+                    'llm_autonomous' => 100,
+                    'llm_assisted' => 85,
+                    'hybrid' => 70,
+                    default => $complexity ? (int) round(15 + ($complexity->points() / 13) * 80) : 30,
+                };
+                $weightedSum += $sc * $pts;
+                $weightSum += $pts;
+            }
+            $score = $weightSum > 0 ? (int) round($weightedSum / $weightSum) : 0;
+            $grade = match (true) {
+                $score >= 90 => 'A+',
+                $score >= 75 => 'A',
+                $score >= 60 => 'B',
+                $score >= 40 => 'C',
+                $score >= 20 => 'D',
+                default => 'F',
+            };
+            $automationScoreData = ['score' => $score, 'grade' => $grade];
+        }
+
         $now = now();
 
         return [
@@ -126,6 +173,8 @@ class ProcessCertificateService
             'corefit' => $corefit,
             'automation' => $automation,
             'action_items' => $actionItems,
+            'cost_metrics' => $costMetrics,
+            'automation_score' => $automationScoreData,
             'steps_list' => $steps->map(fn ($s) => [
                 'position' => $s->position,
                 'name' => $s->name,

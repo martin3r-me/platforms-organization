@@ -223,6 +223,29 @@
                         </div>
                     </div>
                 @endif
+                @php $sidebarCosts = $this->costMetrics; @endphp
+                @if($sidebarCosts['cost_per_run'] > 0)
+                    <div>
+                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Prozesskosten</h3>
+                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 space-y-2">
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-[var(--ui-muted)]">Pro Durchlauf</span>
+                                <span class="text-sm text-[var(--ui-secondary)]">{{ number_format($sidebarCosts['cost_per_run'], 2, ',', '.') }} &euro;</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-[var(--ui-muted)]">Pro Monat</span>
+                                <span class="text-sm font-bold text-[var(--ui-secondary)]">{{ number_format($sidebarCosts['cost_per_month'], 2, ',', '.') }} &euro;</span>
+                            </div>
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-[var(--ui-muted)]">Pro Jahr</span>
+                                <span class="text-base font-bold text-[var(--ui-secondary)]">{{ number_format($sidebarCosts['cost_per_year'], 2, ',', '.') }} &euro;</span>
+                            </div>
+                            <div class="pt-1 border-t border-[var(--ui-border)]/30">
+                                <span class="text-[10px] text-[var(--ui-muted)]">~{{ $sidebarCosts['runs_per_month'] }} Durchläufe/Monat</span>
+                            </div>
+                        </div>
+                    </div>
+                @endif
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Details</h3>
                     <div class="space-y-3">
@@ -950,12 +973,25 @@
                 @endif
             </div>
 
-            {{-- Stundensatz --}}
+            {{-- Kostenbasis --}}
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mb-6">
                 <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1">Kostenbasis</h3>
                 <p class="text-xs text-[var(--ui-muted)] mb-4">Der Stundensatz wird mit der Dauer jedes Schritts multipliziert, um die Prozesskosten pro Klassifikation zu berechnen.</p>
-                <div class="max-w-xs">
+                <div class="grid grid-cols-2 gap-4 max-w-lg">
                     <x-ui-input-text name="hourly_rate" label="Stundensatz (EUR/h)" type="number" wire:model.live="form.hourly_rate" min="0" step="0.01" placeholder="z.B. 85.00" />
+                    <x-ui-input-select
+                        name="frequency"
+                        label="Häufigkeit"
+                        :options="[
+                            ['value' => '', 'label' => '– Keine Angabe –'],
+                            ['value' => 'rare', 'label' => 'Selten (~6×/Jahr)'],
+                            ['value' => 'occasional', 'label' => 'Gelegentlich (~1×/Monat)'],
+                            ['value' => 'regular', 'label' => 'Regelmäßig (~1×/Woche)'],
+                            ['value' => 'frequent', 'label' => 'Häufig (~1×/Tag)'],
+                            ['value' => 'very_frequent', 'label' => 'Sehr häufig (mehrfach/Tag)'],
+                        ]"
+                        wire:model.live="form.frequency"
+                    />
                 </div>
             </div>
 
@@ -1332,20 +1368,28 @@
                 </x-ui-button>
             </div>
 
+            @php $impSimulations = $this->improvementSimulations; @endphp
             <x-ui-table compact="true">
                 <x-ui-table-header>
                     <x-ui-table-header-cell compact="true">Titel</x-ui-table-header-cell>
                     <x-ui-table-header-cell compact="true">Kategorie</x-ui-table-header-cell>
                     <x-ui-table-header-cell compact="true">Priorität</x-ui-table-header-cell>
                     <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Projektion</x-ui-table-header-cell>
                     <x-ui-table-header-cell compact="true"></x-ui-table-header-cell>
                 </x-ui-table-header>
                 <x-ui-table-body>
                     @forelse($this->processImprovements as $imp)
+                        @php $sim = $impSimulations['simulations'][$imp->id] ?? null; @endphp
                         <x-ui-table-row compact="true">
                             <x-ui-table-cell compact="true">
                                 <div class="font-medium">{{ $imp->title }}</div>
-                                @if($imp->description)
+                                @if($imp->target_step_id)
+                                    @php $targetStepName = $this->steps->firstWhere('id', $imp->target_step_id)?->name; @endphp
+                                    @if($targetStepName)
+                                        <div class="text-[10px] text-[var(--ui-info)]">@svg('heroicon-o-arrow-right', 'w-3 h-3 inline') {{ $targetStepName }}</div>
+                                    @endif
+                                @elseif($imp->description)
                                     <div class="text-xs text-[var(--ui-muted)]">{{ \Illuminate\Support\Str::limit($imp->description, 60) }}</div>
                                 @endif
                             </x-ui-table-cell>
@@ -1385,6 +1429,24 @@
                                 @endif
                             </x-ui-table-cell>
                             <x-ui-table-cell compact="true">
+                                @if($sim)
+                                    <div class="flex flex-wrap gap-1">
+                                        @if($sim['score_delta'] !== 0)
+                                            <x-ui-badge variant="{{ $sim['score_delta'] > 0 ? 'success' : 'danger' }}" size="sm">
+                                                Score {{ $sim['score_delta'] > 0 ? '+' : '' }}{{ $sim['score_delta'] }}
+                                            </x-ui-badge>
+                                        @endif
+                                        @if($sim['cost_saving_per_month'] > 0)
+                                            <x-ui-badge variant="success" size="sm">
+                                                -{{ number_format($sim['cost_saving_per_month'], 0, ',', '.') }} &euro;/Mo
+                                            </x-ui-badge>
+                                        @endif
+                                    </div>
+                                @else
+                                    <span class="text-xs text-[var(--ui-muted)]">&ndash;</span>
+                                @endif
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
                                 <div class="flex gap-1 justify-end">
                                     <x-ui-button size="xs" variant="secondary-outline" wire:click="editImprovement({{ $imp->id }})">
                                         @svg('heroicon-o-pencil-square', 'w-4 h-4')
@@ -1397,13 +1459,30 @@
                         </x-ui-table-row>
                     @empty
                         <x-ui-table-row compact="true">
-                            <x-ui-table-cell compact="true" colspan="5">
+                            <x-ui-table-cell compact="true" colspan="6">
                                 <div class="text-center text-[var(--ui-muted)] py-6">Keine Verbesserungen vorhanden.</div>
                             </x-ui-table-cell>
                         </x-ui-table-row>
                     @endforelse
                 </x-ui-table-body>
             </x-ui-table>
+
+            {{-- Improvement Summary Block --}}
+            @if($impSimulations['total_cost_savings_per_month'] > 0)
+                <div class="mt-4 p-4 bg-green-50 border border-green-200 rounded-lg">
+                    <h4 class="text-sm font-semibold text-green-800 mb-2">Gesamtpotenzial (wenn alle Projektionen umgesetzt)</h4>
+                    <div class="flex gap-6">
+                        <div>
+                            <span class="text-xs text-green-600">Ersparnis/Monat</span>
+                            <div class="text-lg font-bold text-green-700">{{ number_format($impSimulations['total_cost_savings_per_month'], 2, ',', '.') }} &euro;</div>
+                        </div>
+                        <div>
+                            <span class="text-xs text-green-600">Ersparnis/Jahr</span>
+                            <div class="text-lg font-bold text-green-700">{{ number_format($impSimulations['total_cost_savings_per_year'], 2, ',', '.') }} &euro;</div>
+                        </div>
+                    </div>
+                </div>
+            @endif
         @endif
 
         {{-- ── Tab: Snapshots ────────────────────────────────── --}}
@@ -1524,13 +1603,20 @@
                 </div>
 
                 {{-- KPI Grid --}}
-                <div class="grid grid-cols-4 gap-0 mb-5">
-                    @foreach([
+                @php
+                    $certAutoScore = $certData['automation_score'] ?? null;
+                    $certKpis = [
                         ['label' => 'Steps', 'value' => $certData['kpis']['total_steps'], 'detail' => 'Prozessschritte', 'color' => 'text-gray-800'],
                         ['label' => 'Durchlaufzeit', 'value' => $certData['kpis']['lead_time'], 'detail' => 'Min. (' . $certData['kpis']['total_duration'] . ' Arbeit + ' . $certData['kpis']['total_wait'] . ' Warten)', 'color' => 'text-gray-800'],
                         ['label' => 'Effizienz', 'value' => $certData['efficiency_percent'] . '%', 'detail' => 'Anteil aktiver Arbeit', 'color' => ''],
                         ['label' => 'LLM-Quote', 'value' => $certData['kpis']['llm_quote'] . '%', 'detail' => $certData['kpis']['llm_count'] . ' von ' . $certData['kpis']['total_steps'] . ' Steps', 'color' => ''],
-                    ] as $kpi)
+                    ];
+                    if ($certAutoScore) {
+                        $certKpis[] = ['label' => 'Automation-Score', 'value' => $certAutoScore['score'] . '/100', 'detail' => 'Note: ' . $certAutoScore['grade'], 'color' => 'text-gray-800'];
+                    }
+                @endphp
+                <div class="grid grid-cols-{{ count($certKpis) <= 4 ? '4' : '5' }} gap-0 mb-5">
+                    @foreach($certKpis as $kpi)
                         <div class="p-3 border border-gray-200 text-center">
                             <div class="text-[10px] uppercase tracking-wider text-gray-400 font-bold">{{ $kpi['label'] }}</div>
                             <div class="text-xl font-bold {{ $kpi['color'] ?: 'text-gray-800' }} mt-1">{{ $kpi['value'] }}</div>
@@ -1538,6 +1624,31 @@
                         </div>
                     @endforeach
                 </div>
+
+                {{-- Kostenanalyse --}}
+                @if(isset($certData['cost_metrics']) && $certData['cost_metrics']['cost_per_run'] > 0)
+                    <div class="mb-5">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-gray-800 mb-2 pb-1 border-b border-gray-200">Kostenanalyse</h3>
+                        <div class="grid grid-cols-4 gap-0">
+                            <div class="p-3 border border-gray-200 text-center">
+                                <div class="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Häufigkeit</div>
+                                <div class="text-sm font-bold text-gray-800 mt-1">{{ $certData['cost_metrics']['frequency_label'] }}</div>
+                            </div>
+                            <div class="p-3 border border-gray-200 text-center">
+                                <div class="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Kosten/Durchlauf</div>
+                                <div class="text-lg font-bold text-gray-800 mt-1">{{ number_format($certData['cost_metrics']['cost_per_run'], 2, ',', '.') }} &euro;</div>
+                            </div>
+                            <div class="p-3 border border-gray-200 text-center">
+                                <div class="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Kosten/Monat</div>
+                                <div class="text-lg font-bold text-gray-800 mt-1">{{ number_format($certData['cost_metrics']['cost_per_month'], 2, ',', '.') }} &euro;</div>
+                            </div>
+                            <div class="p-3 border border-gray-200 text-center">
+                                <div class="text-[10px] uppercase tracking-wider text-gray-400 font-bold">Kosten/Jahr</div>
+                                <div class="text-lg font-bold text-gray-800 mt-1">{{ number_format($certData['cost_metrics']['cost_per_year'], 2, ',', '.') }} &euro;</div>
+                            </div>
+                        </div>
+                    </div>
+                @endif
 
                 {{-- COREFIT + Automation --}}
                 <div class="grid grid-cols-2 gap-6 mb-5">
@@ -2150,6 +2261,57 @@
                         wire:model.live="improvementForm.status"
                     />
                     <p class="text-xs text-[var(--ui-muted)] mt-1">Aktueller Stand der Umsetzung</p>
+                </div>
+            </div>
+
+            {{-- Score-Simulation --}}
+            <div x-data="{ showProjection: $wire.entangle('improvementForm.target_step_id').live !== '' }" class="border border-[var(--ui-border)]/40 rounded-lg">
+                <button type="button" @click="showProjection = !showProjection" class="w-full flex items-center justify-between px-4 py-3 text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)] transition-colors rounded-lg">
+                    <span class="font-medium">Score-Simulation (optional)</span>
+                    <span x-text="showProjection ? '−' : '+'" class="text-lg text-[var(--ui-muted)]"></span>
+                </button>
+                <div x-show="showProjection" x-transition class="px-4 pb-4 space-y-3">
+                    <p class="text-xs text-[var(--ui-muted)]">Wähle einen Ziel-Step und definiere die projizierten Werte nach Umsetzung der Verbesserung.</p>
+                    <x-ui-input-select
+                        name="imp_target_step"
+                        label="Ziel-Step"
+                        :options="array_merge(
+                            [['value' => '', 'label' => '– Kein Ziel-Step –']],
+                            $this->steps->map(fn($s) => ['value' => (string) $s->id, 'label' => '#' . $s->position . ' ' . $s->name])->toArray()
+                        )"
+                        wire:model.live="improvementForm.target_step_id"
+                    />
+                    @if($improvementForm['target_step_id'] !== '')
+                        <div class="grid grid-cols-3 gap-3">
+                            <x-ui-input-text name="proj_duration" label="Neue Dauer (Min.)" type="number" wire:model.live="improvementForm.projected_duration_target_minutes" min="0" placeholder="Unverändert" />
+                            <x-ui-input-select
+                                name="proj_automation"
+                                label="Neuer Automationsgrad"
+                                :options="[
+                                    ['value' => '', 'label' => 'Unverändert'],
+                                    ['value' => 'human', 'label' => 'Human'],
+                                    ['value' => 'llm_assisted', 'label' => 'LLM-Assisted'],
+                                    ['value' => 'llm_autonomous', 'label' => 'LLM-Autonomous'],
+                                    ['value' => 'hybrid', 'label' => 'Hybrid'],
+                                ]"
+                                wire:model.live="improvementForm.projected_automation_level"
+                            />
+                            <x-ui-input-select
+                                name="proj_complexity"
+                                label="Neue Komplexität"
+                                :options="[
+                                    ['value' => '', 'label' => 'Unverändert'],
+                                    ['value' => 'xs', 'label' => 'XS – Trivial'],
+                                    ['value' => 's', 'label' => 'S – Einfach'],
+                                    ['value' => 'm', 'label' => 'M – Mittel'],
+                                    ['value' => 'l', 'label' => 'L – Komplex'],
+                                    ['value' => 'xl', 'label' => 'XL – Sehr komplex'],
+                                    ['value' => 'xxl', 'label' => 'XXL – Extrem komplex'],
+                                ]"
+                                wire:model.live="improvementForm.projected_complexity"
+                            />
+                        </div>
+                    @endif
                 </div>
             </div>
 

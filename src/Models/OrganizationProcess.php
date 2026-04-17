@@ -11,6 +11,7 @@ use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
 use Platform\Organization\Enums\ProcessCategory;
+use Platform\Organization\Enums\ProcessFrequency;
 use Symfony\Component\Uid\UuidV7;
 
 class OrganizationProcess extends Model
@@ -40,6 +41,7 @@ class OrganizationProcess extends Model
         'action_plan',
         'standardization_notes',
         'hourly_rate',
+        'frequency',
         'public_token',
         'public_token_expires_at',
         'process_category',
@@ -53,6 +55,7 @@ class OrganizationProcess extends Model
         'version'                  => 'integer',
         'metadata'                 => 'array',
         'hourly_rate'              => 'decimal:2',
+        'frequency'                => ProcessFrequency::class,
         'public_token_expires_at'  => 'datetime',
         'process_category'         => ProcessCategory::class,
         'is_focus'                 => 'boolean',

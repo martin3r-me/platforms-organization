@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Platform\Organization\Enums\ProcessCategory;
+use Platform\Organization\Enums\ProcessFrequency;
 use Platform\Organization\Enums\StepComplexity;
 use Platform\Organization\Models\OrganizationProcess;
 use Platform\Organization\Models\OrganizationProcessStep;
@@ -95,6 +96,10 @@ class Show extends Component
         'status' => 'identified',
         'expected_outcome' => '',
         'actual_outcome' => '',
+        'target_step_id' => '',
+        'projected_duration_target_minutes' => '',
+        'projected_automation_level' => '',
+        'projected_complexity' => '',
     ];
 
     public function mount(OrganizationProcess $process)
@@ -125,6 +130,7 @@ class Show extends Component
             'version'               => (string) ($this->process->version ?? '1'),
             'is_active'             => $this->process->is_active,
             'hourly_rate'           => (string) ($this->process->hourly_rate ?? ''),
+            'frequency'             => (string) ($this->process->frequency?->value ?? ''),
             'target_description'    => $this->process->target_description ?? '',
             'value_proposition'     => $this->process->value_proposition ?? '',
             'cost_analysis'         => $this->process->cost_analysis ?? '',
@@ -151,6 +157,7 @@ class Show extends Component
                (int) $this->form['version'] !== ($this->process->version ?? 1) ||
                $this->form['is_active'] !== $this->process->is_active ||
                $this->form['hourly_rate'] !== (string) ($this->process->hourly_rate ?? '') ||
+               $this->form['frequency'] !== (string) ($this->process->frequency?->value ?? '') ||
                $this->form['target_description'] !== ($this->process->target_description ?? '') ||
                $this->form['value_proposition'] !== ($this->process->value_proposition ?? '') ||
                $this->form['cost_analysis'] !== ($this->process->cost_analysis ?? '') ||
@@ -515,6 +522,126 @@ class Show extends Component
     }
 
     #[Computed]
+    public function costMetrics(): array
+    {
+        $steps = $this->steps;
+        $totalDuration = $steps->sum('duration_target_minutes') ?? 0;
+        $hourlyRate = (float) ($this->form['hourly_rate'] ?? 0);
+        $frequencyValue = $this->form['frequency'] ?? '';
+        $frequency = $frequencyValue !== '' ? ProcessFrequency::tryFrom($frequencyValue) : null;
+
+        if ($hourlyRate <= 0 || $totalDuration <= 0 || ! $frequency) {
+            return [
+                'cost_per_run' => 0,
+                'cost_per_month' => 0,
+                'cost_per_year' => 0,
+                'frequency_label' => $frequency?->label() ?? null,
+                'runs_per_month' => $frequency?->monthlyFactor() ?? null,
+            ];
+        }
+
+        $costPerRun = round(($totalDuration / 60) * $hourlyRate, 2);
+        $costPerMonth = round($costPerRun * $frequency->monthlyFactor(), 2);
+        $costPerYear = round($costPerMonth * 12, 2);
+
+        return [
+            'cost_per_run' => $costPerRun,
+            'cost_per_month' => $costPerMonth,
+            'cost_per_year' => $costPerYear,
+            'frequency_label' => $frequency->label(),
+            'runs_per_month' => $frequency->monthlyFactor(),
+        ];
+    }
+
+    #[Computed]
+    public function improvementSimulations(): array
+    {
+        $improvements = $this->processImprovements;
+        $steps = $this->steps;
+        $hourlyRate = (float) ($this->form['hourly_rate'] ?? 0);
+        $frequencyValue = $this->form['frequency'] ?? '';
+        $frequency = $frequencyValue !== '' ? ProcessFrequency::tryFrom($frequencyValue) : null;
+        $monthlyFactor = $frequency?->monthlyFactor() ?? 0;
+
+        $currentScore = $this->automationScore;
+        $simulations = [];
+
+        foreach ($improvements as $imp) {
+            if (! $imp->target_step_id) {
+                continue;
+            }
+
+            // Clone steps and overlay projected values on the target step
+            $simulatedSteps = $steps->map(function ($step) use ($imp) {
+                if ($step->id !== $imp->target_step_id) {
+                    return $step;
+                }
+
+                $clone = clone $step;
+                if ($imp->projected_duration_target_minutes !== null) {
+                    $clone->duration_target_minutes = $imp->projected_duration_target_minutes;
+                }
+                if ($imp->projected_automation_level !== null) {
+                    $clone->automation_level = $imp->projected_automation_level;
+                }
+                if ($imp->projected_complexity !== null) {
+                    $clone->complexity = StepComplexity::tryFrom($imp->projected_complexity);
+                }
+
+                return $clone;
+            });
+
+            // Recalculate automation score with simulated steps
+            $weightedSum = 0;
+            $weightSum = 0;
+            foreach ($simulatedSteps as $step) {
+                $automationLevel = $step->automation_level ?? 'human';
+                $complexity = $step->complexity;
+                $points = $complexity ? $complexity->points() : 1;
+
+                $score = match ($automationLevel) {
+                    'llm_autonomous' => 100,
+                    'llm_assisted' => 85,
+                    'hybrid' => 70,
+                    default => $complexity
+                        ? (int) round(15 + ($complexity->points() / 13) * 80)
+                        : 30,
+                };
+
+                $weightedSum += $score * $points;
+                $weightSum += $points;
+            }
+            $projectedScore = $weightSum > 0 ? (int) round($weightedSum / $weightSum) : 0;
+            $scoreDelta = $projectedScore - ($currentScore['score'] ?? 0);
+
+            // Cost delta
+            $originalDuration = $steps->sum('duration_target_minutes') ?? 0;
+            $simulatedDuration = $simulatedSteps->sum('duration_target_minutes') ?? 0;
+            $durationDelta = $originalDuration - $simulatedDuration;
+            $costSavingPerRun = $hourlyRate > 0 ? round(($durationDelta / 60) * $hourlyRate, 2) : 0;
+            $costSavingPerMonth = round($costSavingPerRun * $monthlyFactor, 2);
+
+            $simulations[$imp->id] = [
+                'score_delta' => $scoreDelta,
+                'projected_score' => $projectedScore,
+                'cost_saving_per_run' => $costSavingPerRun,
+                'cost_saving_per_month' => $costSavingPerMonth,
+                'duration_delta' => $durationDelta,
+            ];
+        }
+
+        // Totals: aggregate all simulations (theoretical maximum if all applied)
+        $totalCostSavingsPerMonth = collect($simulations)->sum('cost_saving_per_month');
+        $totalCostSavingsPerYear = round($totalCostSavingsPerMonth * 12, 2);
+
+        return [
+            'simulations' => $simulations,
+            'total_cost_savings_per_month' => $totalCostSavingsPerMonth,
+            'total_cost_savings_per_year' => $totalCostSavingsPerYear,
+        ];
+    }
+
+    #[Computed]
     public function efficiencyMatrix(): array
     {
         $steps = $this->steps;
@@ -607,6 +734,7 @@ class Show extends Component
             'form.version'               => 'required|integer|min:1',
             'form.is_active'             => 'boolean',
             'form.hourly_rate'           => 'nullable|numeric|min:0',
+            'form.frequency'             => 'nullable|in:' . implode(',', ProcessFrequency::values()),
             'form.target_description'    => 'nullable|string',
             'form.value_proposition'     => 'nullable|string',
             'form.cost_analysis'         => 'nullable|string',
@@ -630,6 +758,7 @@ class Show extends Component
             'version'               => (int) $this->form['version'],
             'is_active'             => $this->form['is_active'],
             'hourly_rate'           => $this->form['hourly_rate'] !== '' ? (float) $this->form['hourly_rate'] : null,
+            'frequency'             => $this->form['frequency'] !== '' ? $this->form['frequency'] : null,
             'target_description'    => $this->form['target_description'] !== '' ? $this->form['target_description'] : null,
             'value_proposition'     => $this->form['value_proposition'] !== '' ? $this->form['value_proposition'] : null,
             'cost_analysis'         => $this->form['cost_analysis'] !== '' ? $this->form['cost_analysis'] : null,
@@ -641,7 +770,7 @@ class Show extends Component
 
         $this->process->refresh();
         $this->loadForm();
-        unset($this->corefitMetrics);
+        unset($this->corefitMetrics, $this->costMetrics, $this->improvementSimulations);
         $this->dispatch('toast', message: 'Prozess gespeichert');
     }
 
@@ -744,14 +873,14 @@ class Show extends Component
         }
 
         $this->stepModalShow = false;
-        unset($this->steps, $this->corefitMetrics, $this->automationMetrics, $this->efficiencyMatrix, $this->complexityMetrics, $this->automationScore);
+        unset($this->steps, $this->corefitMetrics, $this->automationMetrics, $this->efficiencyMatrix, $this->complexityMetrics, $this->automationScore, $this->costMetrics, $this->improvementSimulations);
     }
 
     public function deleteStep(int $id): void
     {
         $this->process->steps()->where('id', $id)->delete();
         $this->dispatch('toast', message: 'Schritt gelöscht');
-        unset($this->steps, $this->corefitMetrics, $this->automationMetrics, $this->efficiencyMatrix, $this->complexityMetrics, $this->automationScore);
+        unset($this->steps, $this->corefitMetrics, $this->automationMetrics, $this->efficiencyMatrix, $this->complexityMetrics, $this->automationScore, $this->costMetrics, $this->improvementSimulations);
     }
 
     public function addLlmTool(): void
@@ -1134,6 +1263,8 @@ class Show extends Component
             'title' => '', 'description' => '', 'category' => 'speed',
             'priority' => 'medium', 'status' => 'identified',
             'expected_outcome' => '', 'actual_outcome' => '',
+            'target_step_id' => '', 'projected_duration_target_minutes' => '',
+            'projected_automation_level' => '', 'projected_complexity' => '',
         ];
         $this->improvementModalShow = true;
     }
@@ -1146,13 +1277,17 @@ class Show extends Component
         $this->resetValidation();
         $this->editingImprovementId = $imp->id;
         $this->improvementForm = [
-            'title'            => $imp->title,
-            'description'      => $imp->description ?? '',
-            'category'         => $imp->category,
-            'priority'         => $imp->priority,
-            'status'           => $imp->status,
-            'expected_outcome' => $imp->expected_outcome ?? '',
-            'actual_outcome'   => $imp->actual_outcome ?? '',
+            'title'                             => $imp->title,
+            'description'                       => $imp->description ?? '',
+            'category'                          => $imp->category,
+            'priority'                          => $imp->priority,
+            'status'                            => $imp->status,
+            'expected_outcome'                  => $imp->expected_outcome ?? '',
+            'actual_outcome'                    => $imp->actual_outcome ?? '',
+            'target_step_id'                    => (string) ($imp->target_step_id ?? ''),
+            'projected_duration_target_minutes' => (string) ($imp->projected_duration_target_minutes ?? ''),
+            'projected_automation_level'        => (string) ($imp->projected_automation_level ?? ''),
+            'projected_complexity'              => (string) ($imp->projected_complexity ?? ''),
         ];
         $this->improvementModalShow = true;
     }
@@ -1160,23 +1295,31 @@ class Show extends Component
     public function storeImprovement(): void
     {
         $this->validate([
-            'improvementForm.title'            => 'required|string|max:255',
-            'improvementForm.description'      => 'nullable|string',
-            'improvementForm.category'         => 'required|in:cost,quality,speed,risk,standardization',
-            'improvementForm.priority'         => 'required|in:low,medium,high,critical',
-            'improvementForm.status'           => 'required|in:identified,planned,in_progress,on_hold,completed,under_observation,validated,failed,rejected',
-            'improvementForm.expected_outcome' => 'nullable|string',
-            'improvementForm.actual_outcome'   => 'nullable|string',
+            'improvementForm.title'                             => 'required|string|max:255',
+            'improvementForm.description'                       => 'nullable|string',
+            'improvementForm.category'                          => 'required|in:cost,quality,speed,risk,standardization',
+            'improvementForm.priority'                          => 'required|in:low,medium,high,critical',
+            'improvementForm.status'                            => 'required|in:identified,planned,in_progress,on_hold,completed,under_observation,validated,failed,rejected',
+            'improvementForm.expected_outcome'                  => 'nullable|string',
+            'improvementForm.actual_outcome'                    => 'nullable|string',
+            'improvementForm.target_step_id'                    => 'nullable|integer|exists:organization_process_steps,id',
+            'improvementForm.projected_duration_target_minutes' => 'nullable|integer|min:0',
+            'improvementForm.projected_automation_level'        => 'nullable|in:human,llm_assisted,llm_autonomous,hybrid',
+            'improvementForm.projected_complexity'              => 'nullable|in:' . implode(',', StepComplexity::values()),
         ]);
 
         $payload = [
-            'title'            => $this->improvementForm['title'],
-            'description'      => $this->improvementForm['description'] !== '' ? $this->improvementForm['description'] : null,
-            'category'         => $this->improvementForm['category'],
-            'priority'         => $this->improvementForm['priority'],
-            'status'           => $this->improvementForm['status'],
-            'expected_outcome' => $this->improvementForm['expected_outcome'] !== '' ? $this->improvementForm['expected_outcome'] : null,
-            'actual_outcome'   => $this->improvementForm['actual_outcome'] !== '' ? $this->improvementForm['actual_outcome'] : null,
+            'title'                             => $this->improvementForm['title'],
+            'description'                       => $this->improvementForm['description'] !== '' ? $this->improvementForm['description'] : null,
+            'category'                          => $this->improvementForm['category'],
+            'priority'                          => $this->improvementForm['priority'],
+            'status'                            => $this->improvementForm['status'],
+            'expected_outcome'                  => $this->improvementForm['expected_outcome'] !== '' ? $this->improvementForm['expected_outcome'] : null,
+            'actual_outcome'                    => $this->improvementForm['actual_outcome'] !== '' ? $this->improvementForm['actual_outcome'] : null,
+            'target_step_id'                    => $this->improvementForm['target_step_id'] !== '' ? (int) $this->improvementForm['target_step_id'] : null,
+            'projected_duration_target_minutes' => $this->improvementForm['projected_duration_target_minutes'] !== '' ? (int) $this->improvementForm['projected_duration_target_minutes'] : null,
+            'projected_automation_level'        => $this->improvementForm['projected_automation_level'] !== '' ? $this->improvementForm['projected_automation_level'] : null,
+            'projected_complexity'              => $this->improvementForm['projected_complexity'] !== '' ? $this->improvementForm['projected_complexity'] : null,
         ];
 
         // States that imply the improvement has been implemented (completion timestamp set)
@@ -1206,13 +1349,13 @@ class Show extends Component
         }
 
         $this->improvementModalShow = false;
-        unset($this->processImprovements, $this->improvementsByCategory);
+        unset($this->processImprovements, $this->improvementsByCategory, $this->improvementSimulations);
     }
 
     public function deleteImprovement(int $id): void
     {
         $this->process->improvements()->where('id', $id)->delete();
-        unset($this->processImprovements, $this->improvementsByCategory);
+        unset($this->processImprovements, $this->improvementsByCategory, $this->improvementSimulations);
         $this->dispatch('toast', message: 'Verbesserung gelöscht');
     }
 

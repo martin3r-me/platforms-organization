@@ -11,6 +11,7 @@ use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
 use Platform\Organization\Enums\ProcessEventType;
 use Platform\Organization\Enums\ProcessGatewayType;
+use Platform\Organization\Enums\StepComplexity;
 use Symfony\Component\Uid\UuidV7;
 
 class OrganizationProcessStep extends Model
@@ -34,6 +35,7 @@ class OrganizationProcessStep extends Model
         'wait_target_minutes',
         'corefit_classification',
         'automation_level',
+        'complexity',
         'llm_tools',
         'sub_process_id',
         'is_active',
@@ -49,6 +51,7 @@ class OrganizationProcessStep extends Model
         'llm_tools'               => 'array',
         'gateway_type'            => ProcessGatewayType::class,
         'event_type'              => ProcessEventType::class,
+        'complexity'              => StepComplexity::class,
     ];
 
     protected static function booted(): void

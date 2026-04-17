@@ -185,6 +185,44 @@
                         </div>
                     </div>
                 @endif
+                @php
+                    $sidebarAutoScore = $this->automationScore;
+                    $sidebarComplexity = $this->complexityMetrics;
+                @endphp
+                @if($sidebarAutoScore['score'] !== null)
+                    <div>
+                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Automation-Score</h3>
+                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-2xl font-bold text-[var(--ui-{{ $sidebarAutoScore['color'] }})]">{{ $sidebarAutoScore['label'] }}</span>
+                                <span class="text-sm text-[var(--ui-muted)]">{{ $sidebarAutoScore['score'] }}/100</span>
+                            </div>
+                            <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2">
+                                <div class="h-2 rounded-full bg-[var(--ui-{{ $sidebarAutoScore['color'] }})]" style="width: {{ $sidebarAutoScore['score'] }}%"></div>
+                            </div>
+                            <p class="text-[10px] text-[var(--ui-muted)] mt-1.5">Gewichteter Score: Einfach + Human = niedrig, Komplex + Human = OK</p>
+                        </div>
+                    </div>
+                @endif
+                @if($sidebarComplexity['count_with'] > 0)
+                    <div>
+                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Komplexität</h3>
+                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                            <div class="flex items-center justify-between mb-2">
+                                <span class="text-xs text-[var(--ui-muted)]">{{ $sidebarComplexity['count_with'] }} von {{ $sidebarComplexity['total'] }} bewertet</span>
+                                <span class="text-lg font-bold text-[var(--ui-secondary)]">Ø {{ $sidebarComplexity['avg_label'] }}</span>
+                            </div>
+                            <div class="flex flex-wrap gap-x-3 gap-y-1 text-[10px] text-[var(--ui-muted)]">
+                                @foreach($sidebarComplexity['distribution'] as $key => $dist)
+                                    @if($dist['count'] > 0)
+                                        <span>{{ $dist['label'] }}: {{ $dist['count'] }}</span>
+                                    @endif
+                                @endforeach
+                            </div>
+                            <p class="text-[10px] text-[var(--ui-muted)] mt-1">Ø {{ $sidebarComplexity['avg_points'] }} Punkte · {{ $sidebarComplexity['total_points'] }} Punkte gesamt</p>
+                        </div>
+                    </div>
+                @endif
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Details</h3>
                     <div class="space-y-3">
@@ -1001,6 +1039,7 @@
                     <x-ui-table-header-cell compact="true">Pos</x-ui-table-header-cell>
                     <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
                     <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Kompl.</x-ui-table-header-cell>
                     <x-ui-table-header-cell compact="true">Dauer</x-ui-table-header-cell>
                     <x-ui-table-header-cell compact="true">CoreFit</x-ui-table-header-cell>
                     <x-ui-table-header-cell compact="true">Automation</x-ui-table-header-cell>
@@ -1029,6 +1068,13 @@
                             </x-ui-table-cell>
                             <x-ui-table-cell compact="true">
                                 <x-ui-badge variant="info" size="sm">{{ ucfirst($step->step_type ?? 'task') }}</x-ui-badge>
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                @if($step->complexity)
+                                    <x-ui-badge variant="secondary" size="sm">{{ strtoupper($step->complexity->value) }}</x-ui-badge>
+                                @else
+                                    <span class="text-xs text-[var(--ui-muted)]">–</span>
+                                @endif
                             </x-ui-table-cell>
                             <x-ui-table-cell compact="true">
                                 @if($step->duration_target_minutes)
@@ -1073,7 +1119,7 @@
                         </x-ui-table-row>
                     @empty
                         <x-ui-table-row compact="true">
-                            <x-ui-table-cell compact="true" colspan="7">
+                            <x-ui-table-cell compact="true" colspan="8">
                                 <div class="text-center text-[var(--ui-muted)] py-6">Keine Schritte vorhanden.</div>
                             </x-ui-table-cell>
                         </x-ui-table-row>
@@ -1743,19 +1789,38 @@
                 </div>
             </div>
 
-            <div>
-                <x-ui-input-select
-                    name="automation_level"
-                    label="Automatisierungsgrad"
-                    :options="[
-                        ['value' => 'human', 'label' => 'Human'],
-                        ['value' => 'llm_assisted', 'label' => 'LLM-Assisted'],
-                        ['value' => 'llm_autonomous', 'label' => 'LLM-Autonomous'],
-                        ['value' => 'hybrid', 'label' => 'Hybrid'],
-                    ]"
-                    wire:model.live="stepForm.automation_level"
-                />
-                <p class="text-xs text-[var(--ui-muted)] mt-1">Human = Mensch, LLM-Assisted = KI-unterstützt, LLM-Autonomous = KI-autonom, Hybrid = Mensch + KI gemeinsam</p>
+            <div class="grid grid-cols-2 gap-4">
+                <div>
+                    <x-ui-input-select
+                        name="automation_level"
+                        label="Automatisierungsgrad"
+                        :options="[
+                            ['value' => 'human', 'label' => 'Human'],
+                            ['value' => 'llm_assisted', 'label' => 'LLM-Assisted'],
+                            ['value' => 'llm_autonomous', 'label' => 'LLM-Autonomous'],
+                            ['value' => 'hybrid', 'label' => 'Hybrid'],
+                        ]"
+                        wire:model.live="stepForm.automation_level"
+                    />
+                    <p class="text-xs text-[var(--ui-muted)] mt-1">Human = Mensch, LLM-Assisted = KI-unterstützt, LLM-Autonomous = KI-autonom, Hybrid = Mensch + KI gemeinsam</p>
+                </div>
+                <div>
+                    <x-ui-input-select
+                        name="complexity"
+                        label="Komplexität"
+                        :options="[
+                            ['value' => '', 'label' => '– Keine –'],
+                            ['value' => 'xs', 'label' => 'XS – Trivial (1)'],
+                            ['value' => 's', 'label' => 'S – Einfach (2)'],
+                            ['value' => 'm', 'label' => 'M – Mittel (3)'],
+                            ['value' => 'l', 'label' => 'L – Komplex (5)'],
+                            ['value' => 'xl', 'label' => 'XL – Sehr komplex (8)'],
+                            ['value' => 'xxl', 'label' => 'XXL – Extrem komplex (13)'],
+                        ]"
+                        wire:model.live="stepForm.complexity"
+                    />
+                    <p class="text-xs text-[var(--ui-muted)] mt-1">T-Shirt-Größe mit Fibonacci-Punkten. Beeinflusst den Automation-Score.</p>
+                </div>
             </div>
 
             @if(in_array($stepForm['automation_level'], ['llm_assisted', 'llm_autonomous', 'hybrid']))

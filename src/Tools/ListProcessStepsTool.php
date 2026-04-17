@@ -22,13 +22,13 @@ class ListProcessStepsTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/process-steps - Listet Prozess-Schritte. Filter: process_id (empfohlen), step_type, is_active, corefit_classification.';
+        return 'GET /organization/process-steps - Listet Prozess-Schritte. Filter: process_id (empfohlen), step_type, is_active, corefit_classification, complexity.';
     }
 
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['team_id', 'process_id', 'step_type', 'gateway_type', 'event_type', 'is_active', 'corefit_classification']),
+            $this->getStandardGetSchema(['team_id', 'process_id', 'step_type', 'gateway_type', 'event_type', 'is_active', 'corefit_classification', 'complexity']),
             [
                 'properties' => [
                     'team_id'                => ['type' => 'integer'],
@@ -38,6 +38,7 @@ class ListProcessStepsTool implements ToolContract, ToolMetadataContract
                     'event_type'             => ['type' => 'string', 'description' => 'Optional: start | end | intermediate_throw | intermediate_catch | timer | message | error | escalation.'],
                     'is_active'              => ['type' => 'boolean'],
                     'corefit_classification' => ['type' => 'string', 'description' => 'Optional: green | yellow | red.'],
+                    'complexity'             => ['type' => 'string', 'description' => 'Optional: xs | s | m | l | xl | xxl.'],
                 ],
             ]
         );
@@ -72,8 +73,11 @@ class ListProcessStepsTool implements ToolContract, ToolMetadataContract
             if (! empty($arguments['corefit_classification'])) {
                 $q->where('corefit_classification', (string) $arguments['corefit_classification']);
             }
+            if (! empty($arguments['complexity'])) {
+                $q->where('complexity', (string) $arguments['complexity']);
+            }
 
-            $this->applyStandardFilters($q, $arguments, ['team_id', 'process_id', 'step_type', 'gateway_type', 'event_type', 'is_active', 'corefit_classification', 'created_at']);
+            $this->applyStandardFilters($q, $arguments, ['team_id', 'process_id', 'step_type', 'gateway_type', 'event_type', 'is_active', 'corefit_classification', 'complexity', 'created_at']);
             $this->applyStandardSearch($q, $arguments, ['name', 'description']);
             $this->applyStandardSort($q, $arguments, ['position', 'name', 'id', 'created_at'], 'position', 'asc');
 
@@ -91,6 +95,8 @@ class ListProcessStepsTool implements ToolContract, ToolMetadataContract
                 'duration_target_minutes' => $s->duration_target_minutes,
                 'wait_target_minutes'     => $s->wait_target_minutes,
                 'corefit_classification'  => $s->corefit_classification,
+                'automation_level'        => $s->automation_level,
+                'complexity'              => $s->complexity instanceof \BackedEnum ? $s->complexity->value : $s->complexity,
                 'sub_process_id'          => $s->sub_process_id,
                 'is_active'               => $s->is_active,
                 'team_id'                 => $s->team_id,

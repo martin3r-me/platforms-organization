@@ -9,6 +9,7 @@ use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Tools\Concerns\HasStandardizedWriteOperations;
 use Platform\Organization\Enums\ProcessEventType;
 use Platform\Organization\Enums\ProcessGatewayType;
+use Platform\Organization\Enums\StepComplexity;
 use Platform\Organization\Models\OrganizationProcessStep;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
@@ -43,6 +44,7 @@ class UpdateProcessStepTool implements ToolContract, ToolMetadataContract
                 'wait_target_minutes'     => ['type' => 'integer', 'description' => '0 oder null zum Leeren.'],
                 'corefit_classification'  => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'automation_level'        => ['type' => 'string', 'description' => 'human | llm_assisted | llm_autonomous | hybrid. "" zum Leeren.'],
+                'complexity'              => ['type' => 'string', 'description' => 'T-Shirt-Größe: xs | s | m | l | xl | xxl. "" zum Leeren.'],
                 'sub_process_id'          => ['type' => 'integer', 'description' => 'Verknüpfter Sub-Prozess. 0 oder null zum Leeren.'],
                 'is_active'               => ['type' => 'boolean'],
                 'metadata'                => ['type' => 'object'],
@@ -133,6 +135,13 @@ class UpdateProcessStepTool implements ToolContract, ToolMetadataContract
             if (array_key_exists('automation_level', $arguments)) {
                 $val = (string) ($arguments['automation_level'] ?? '');
                 $update['automation_level'] = $val === '' ? null : $val;
+            }
+            if (array_key_exists('complexity', $arguments)) {
+                $val = (string) ($arguments['complexity'] ?? '');
+                if ($val !== '' && ! in_array($val, StepComplexity::values(), true)) {
+                    return ToolResult::error('VALIDATION_ERROR', 'Ungültige complexity. Erlaubt: '.implode(', ', StepComplexity::values()));
+                }
+                $update['complexity'] = $val === '' ? null : $val;
             }
             if (array_key_exists('sub_process_id', $arguments)) {
                 $val = $arguments['sub_process_id'];

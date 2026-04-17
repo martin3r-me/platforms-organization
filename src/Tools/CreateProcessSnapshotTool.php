@@ -72,7 +72,7 @@ class CreateProcessSnapshotTool implements ToolContract, ToolMetadataContract
                     'id', 'name', 'description', 'position', 'step_type',
                     'gateway_type', 'event_type',
                     'duration_target_minutes', 'wait_target_minutes',
-                    'corefit_classification', 'automation_level', 'llm_tools',
+                    'corefit_classification', 'automation_level', 'complexity', 'llm_tools',
                     'sub_process_id', 'is_active',
                 ]))->values()->toArray(),
                 'flows'    => $process->flows->map(fn ($f) => $f->only([
@@ -102,6 +102,32 @@ class CreateProcessSnapshotTool implements ToolContract, ToolMetadataContract
             $corefitCounts = $steps->groupBy('corefit_classification')->map->count();
             $automationCounts = $steps->groupBy('automation_level')->map->count();
 
+            // Complexity metrics
+            $withComplexity = $steps->filter(fn ($s) => $s->complexity !== null);
+            $complexityCount = $withComplexity->count();
+            $totalComplexityPoints = $withComplexity->sum(fn ($s) => $s->complexity->points());
+            $avgComplexityPoints = $complexityCount > 0 ? round($totalComplexityPoints / $complexityCount, 1) : null;
+
+            // Automation score
+            $snapshotAutomationScore = null;
+            if ($steps->count() > 0) {
+                $wSum = 0;
+                $wWeight = 0;
+                foreach ($steps as $s) {
+                    $al = $s->automation_level ?? 'human';
+                    $pts = $s->complexity ? $s->complexity->points() : 1;
+                    $sc = match ($al) {
+                        'llm_autonomous' => 100,
+                        'llm_assisted' => 85,
+                        'hybrid' => 70,
+                        default => $s->complexity ? (int) round(15 + ($s->complexity->points() / 13) * 80) : 30,
+                    };
+                    $wSum += $sc * $pts;
+                    $wWeight += $pts;
+                }
+                $snapshotAutomationScore = $wWeight > 0 ? (int) round($wSum / $wWeight) : null;
+            }
+
             $gatewayCount = $steps->filter(fn ($s) => $s->step_type === 'gateway')->count();
             $eventCount = $steps->filter(fn ($s) => in_array($s->step_type, ['event', 'start', 'end'], true) || ! empty($s->event_type))->count();
             $loopBackCount = $flows->filter(fn ($f) => ($f->flow_kind instanceof \BackedEnum ? $f->flow_kind->value : $f->flow_kind) === 'loop_back')->count();
@@ -120,6 +146,8 @@ class CreateProcessSnapshotTool implements ToolContract, ToolMetadataContract
                 'loop_back_count'  => $loopBackCount,
                 'exception_count'  => $exceptionCount,
                 'chain_count'      => $chainCount,
+                'avg_complexity_points' => $avgComplexityPoints,
+                'automation_score'      => $snapshotAutomationScore,
                 'corefit' => [
                     'core'    => $corefitCounts->get('core', 0),
                     'context' => $corefitCounts->get('context', 0),

@@ -8,6 +8,7 @@ use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Enums\ProcessEventType;
 use Platform\Organization\Enums\ProcessGatewayType;
+use Platform\Organization\Enums\StepComplexity;
 use Platform\Organization\Models\OrganizationProcessStep;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
@@ -42,6 +43,7 @@ class CreateProcessStepTool implements ToolContract, ToolMetadataContract
                 'wait_target_minutes'     => ['type' => 'integer', 'description' => 'Optional: Soll-Wartezeit in Minuten.'],
                 'corefit_classification'  => ['type' => 'string', 'description' => 'Optional: green | yellow | red.'],
                 'automation_level'        => ['type' => 'string', 'description' => 'Optional: human | llm_assisted | llm_autonomous | hybrid.'],
+                'complexity'              => ['type' => 'string', 'description' => 'Optional: T-Shirt-Größe. xs | s | m | l | xl | xxl.'],
                 'sub_process_id'          => ['type' => 'integer', 'description' => 'Optional: Verknüpfter Sub-Prozess (bei step_type=subprocess).'],
                 'is_active'               => ['type' => 'boolean', 'description' => 'Optional: Default true.'],
                 'metadata'                => ['type' => 'object'],
@@ -87,6 +89,11 @@ class CreateProcessStepTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'Ungültiger event_type. Erlaubt: '.implode(', ', ProcessEventType::values()));
             }
 
+            $complexity = ($arguments['complexity'] ?? null) ?: null;
+            if ($complexity && ! in_array($complexity, StepComplexity::values(), true)) {
+                return ToolResult::error('VALIDATION_ERROR', 'Ungültige complexity. Erlaubt: '.implode(', ', StepComplexity::values()));
+            }
+
             $step = OrganizationProcessStep::create([
                 'team_id'                 => $rootTeamId,
                 'user_id'                 => $context->user?->id,
@@ -101,6 +108,7 @@ class CreateProcessStepTool implements ToolContract, ToolMetadataContract
                 'wait_target_minutes'     => isset($arguments['wait_target_minutes']) ? (int) $arguments['wait_target_minutes'] : null,
                 'corefit_classification'  => ($arguments['corefit_classification'] ?? null) ?: null,
                 'automation_level'        => ($arguments['automation_level'] ?? null) ?: null,
+                'complexity'              => $complexity,
                 'sub_process_id'          => ! empty($arguments['sub_process_id']) ? (int) $arguments['sub_process_id'] : null,
                 'is_active'               => $arguments['is_active'] ?? true,
                 'metadata'                => $arguments['metadata'] ?? null,

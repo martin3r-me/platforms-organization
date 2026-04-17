@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Platform\Organization\Enums\ProcessCategory;
+use Platform\Organization\Enums\StepComplexity;
 use Platform\Organization\Models\OrganizationProcess;
 use Platform\Organization\Models\OrganizationProcessStep;
 use Platform\Organization\Models\OrganizationProcessFlow;
@@ -37,6 +38,7 @@ class Show extends Component
         'wait_target_minutes' => '',
         'corefit_classification' => 'core',
         'automation_level' => 'human',
+        'complexity' => '',
         'is_active' => true,
         'llm_tools' => [],
     ];
@@ -399,6 +401,120 @@ class Show extends Component
     }
 
     #[Computed]
+    public function complexityMetrics(): array
+    {
+        $steps = $this->steps;
+        $totalSteps = $steps->count();
+
+        if ($totalSteps === 0) {
+            return [
+                'total' => 0,
+                'count_with' => 0,
+                'distribution' => [],
+                'avg_label' => null,
+                'total_points' => 0,
+            ];
+        }
+
+        $distribution = [];
+        foreach (StepComplexity::cases() as $case) {
+            $count = $steps->filter(fn ($s) => $s->complexity === $case)->count();
+            $distribution[$case->value] = [
+                'count' => $count,
+                'label' => strtoupper($case->value),
+                'points' => $case->points(),
+            ];
+        }
+
+        $withComplexity = $steps->filter(fn ($s) => $s->complexity !== null);
+        $countWith = $withComplexity->count();
+        $totalPoints = $withComplexity->sum(fn ($s) => $s->complexity->points());
+        $avgPoints = $countWith > 0 ? round($totalPoints / $countWith, 1) : 0;
+
+        // Find closest T-shirt size for average
+        $avgLabel = null;
+        if ($countWith > 0) {
+            $closest = null;
+            $closestDiff = PHP_INT_MAX;
+            foreach (StepComplexity::cases() as $case) {
+                $diff = abs($case->points() - $avgPoints);
+                if ($diff < $closestDiff) {
+                    $closestDiff = $diff;
+                    $closest = $case;
+                }
+            }
+            $avgLabel = $closest ? strtoupper($closest->value) : null;
+        }
+
+        return [
+            'total' => $totalSteps,
+            'count_with' => $countWith,
+            'distribution' => $distribution,
+            'avg_label' => $avgLabel,
+            'avg_points' => $avgPoints,
+            'total_points' => $totalPoints,
+        ];
+    }
+
+    #[Computed]
+    public function automationScore(): array
+    {
+        $steps = $this->steps;
+        $totalSteps = $steps->count();
+
+        if ($totalSteps === 0) {
+            return ['score' => null, 'label' => null, 'color' => null, 'step_scores' => []];
+        }
+
+        $stepScores = [];
+        $weightedSum = 0;
+        $weightSum = 0;
+
+        foreach ($steps as $step) {
+            $automationLevel = $step->automation_level ?? 'human';
+            $complexity = $step->complexity;
+            $points = $complexity ? $complexity->points() : 1;
+
+            $score = match ($automationLevel) {
+                'llm_autonomous' => 100,
+                'llm_assisted' => 85,
+                'hybrid' => 70,
+                default => $complexity
+                    ? (int) round(15 + ($complexity->points() / 13) * 80)
+                    : 30,
+            };
+
+            $stepScores[] = [
+                'id' => $step->id,
+                'name' => $step->name,
+                'score' => $score,
+                'weight' => $points,
+            ];
+
+            $weightedSum += $score * $points;
+            $weightSum += $points;
+        }
+
+        $processScore = $weightSum > 0 ? (int) round($weightedSum / $weightSum) : 0;
+
+        [$label, $color] = match (true) {
+            $processScore >= 90 => ['A+', 'success'],
+            $processScore >= 75 => ['A', 'success'],
+            $processScore >= 60 => ['B', 'info'],
+            $processScore >= 40 => ['C', 'warning'],
+            $processScore >= 20 => ['D', 'danger'],
+            default => ['F', 'danger'],
+        };
+
+        return [
+            'score' => $processScore,
+            'label' => $label,
+            'color' => $color,
+            'step_scores' => $stepScores,
+        ];
+    }
+
+    #[Computed]
     public function efficiencyMatrix(): array
     {
         $steps = $this->steps;
@@ -552,6 +668,7 @@ class Show extends Component
             'wait_target_minutes' => '',
             'corefit_classification' => 'core',
             'automation_level' => 'human',
+            'complexity' => '',
             'is_active' => true,
             'llm_tools' => [],
         ];
@@ -574,6 +691,7 @@ class Show extends Component
             'wait_target_minutes'     => (string) ($step->wait_target_minutes ?? ''),
             'corefit_classification'  => $step->corefit_classification ?? 'core',
             'automation_level'        => $step->automation_level ?? 'human',
+            'complexity'              => $step->complexity?->value ?? '',
             'is_active'               => $step->is_active,
             'llm_tools'               => $step->llm_tools ?? [],
         ];
@@ -591,6 +709,7 @@ class Show extends Component
             'stepForm.wait_target_minutes'     => 'nullable|integer|min:0',
             'stepForm.corefit_classification'  => 'required|in:core,context,no_fit',
             'stepForm.automation_level'        => 'required|in:human,llm_assisted,llm_autonomous,hybrid',
+            'stepForm.complexity'              => 'nullable|in:xs,s,m,l,xl,xxl',
             'stepForm.is_active'               => 'boolean',
             'stepForm.llm_tools'               => 'nullable|array',
             'stepForm.llm_tools.*.tool_name'   => 'required|string|max:255',
@@ -607,6 +726,7 @@ class Show extends Component
             'wait_target_minutes'     => $this->stepForm['wait_target_minutes'] !== '' ? (int) $this->stepForm['wait_target_minutes'] : null,
             'corefit_classification'  => $this->stepForm['corefit_classification'],
             'automation_level'        => $this->stepForm['automation_level'],
+            'complexity'              => $this->stepForm['complexity'] !== '' ? $this->stepForm['complexity'] : null,
             'llm_tools'               => !empty($this->stepForm['llm_tools']) ? $this->stepForm['llm_tools'] : null,
             'is_active'               => $this->stepForm['is_active'],
         ];
@@ -624,14 +744,14 @@ class Show extends Component
         }
 
         $this->stepModalShow = false;
-        unset($this->steps, $this->corefitMetrics, $this->automationMetrics, $this->efficiencyMatrix);
+        unset($this->steps, $this->corefitMetrics, $this->automationMetrics, $this->efficiencyMatrix, $this->complexityMetrics, $this->automationScore);
     }
 
     public function deleteStep(int $id): void
     {
         $this->process->steps()->where('id', $id)->delete();
         $this->dispatch('toast', message: 'Schritt gelöscht');
-        unset($this->steps, $this->corefitMetrics, $this->automationMetrics, $this->efficiencyMatrix);
+        unset($this->steps, $this->corefitMetrics, $this->automationMetrics, $this->efficiencyMatrix, $this->complexityMetrics, $this->automationScore);
     }
 
     public function addLlmTool(): void
@@ -917,7 +1037,7 @@ class Show extends Component
             'steps'    => $process->steps->map(fn ($s) => $s->only([
                 'id', 'name', 'description', 'position', 'step_type',
                 'duration_target_minutes', 'wait_target_minutes',
-                'corefit_classification', 'automation_level', 'is_active',
+                'corefit_classification', 'automation_level', 'complexity', 'is_active',
             ]))->values()->toArray(),
             'flows'    => $process->flows->map(fn ($f) => $f->only([
                 'id', 'from_step_id', 'to_step_id', 'condition_label', 'is_default',
@@ -935,6 +1055,32 @@ class Show extends Component
         $steps = $process->steps;
         $corefitCounts = $steps->groupBy('corefit_classification')->map->count();
         $automationCounts = $steps->groupBy('automation_level')->map->count();
+        // Complexity metrics for snapshot
+        $withComplexity = $steps->filter(fn ($s) => $s->complexity !== null);
+        $complexityCount = $withComplexity->count();
+        $totalComplexityPoints = $withComplexity->sum(fn ($s) => $s->complexity->points());
+        $avgComplexityPoints = $complexityCount > 0 ? round($totalComplexityPoints / $complexityCount, 1) : null;
+
+        // Automation score for snapshot
+        $snapshotAutomationScore = null;
+        if ($steps->count() > 0) {
+            $weightedSum = 0;
+            $weightSum = 0;
+            foreach ($steps as $s) {
+                $al = $s->automation_level ?? 'human';
+                $pts = $s->complexity ? $s->complexity->points() : 1;
+                $sc = match ($al) {
+                    'llm_autonomous' => 100,
+                    'llm_assisted' => 85,
+                    'hybrid' => 70,
+                    default => $s->complexity ? (int) round(15 + ($s->complexity->points() / 13) * 80) : 30,
+                };
+                $weightedSum += $sc * $pts;
+                $weightSum += $pts;
+            }
+            $snapshotAutomationScore = $weightSum > 0 ? (int) round($weightedSum / $weightSum) : null;
+        }
+
         $metrics = [
             'total_steps'    => $steps->count(),
             'total_flows'    => $process->flows->count(),
@@ -942,6 +1088,8 @@ class Show extends Component
             'total_outputs'  => $process->outputs->count(),
             'total_duration' => $steps->sum('duration_target_minutes') ?? 0,
             'total_wait'     => $steps->sum('wait_target_minutes') ?? 0,
+            'avg_complexity_points' => $avgComplexityPoints,
+            'automation_score'      => $snapshotAutomationScore,
             'corefit' => [
                 'core'    => $corefitCounts->get('core', 0),
                 'context' => $corefitCounts->get('context', 0),

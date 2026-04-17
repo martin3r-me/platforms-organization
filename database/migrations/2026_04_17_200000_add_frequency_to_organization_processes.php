@@ -8,15 +8,19 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('organization_processes', function (Blueprint $table) {
-            $table->string('frequency')->nullable()->after('hourly_rate');
-        });
+        if (! Schema::hasColumn('organization_processes', 'frequency')) {
+            Schema::table('organization_processes', function (Blueprint $table) {
+                $table->string('frequency')->nullable()->after('hourly_rate');
+            });
+        }
     }
 
     public function down(): void
     {
-        Schema::table('organization_processes', function (Blueprint $table) {
-            $table->dropColumn('frequency');
-        });
+        if (Schema::hasColumn('organization_processes', 'frequency')) {
+            Schema::table('organization_processes', function (Blueprint $table) {
+                $table->dropColumn('frequency');
+            });
+        }
     }
 };

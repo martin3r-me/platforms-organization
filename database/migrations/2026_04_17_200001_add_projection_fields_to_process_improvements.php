@@ -8,23 +8,70 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('organization_process_improvements', function (Blueprint $table) {
-            $table->foreignId('target_step_id')->nullable()->after('metadata')
-                ->constrained('organization_process_steps')->nullOnDelete();
-            $table->integer('projected_duration_target_minutes')->nullable()->after('target_step_id');
-            $table->string('projected_automation_level')->nullable()->after('projected_duration_target_minutes');
-            $table->string('projected_complexity')->nullable()->after('projected_automation_level');
+        $table = 'organization_process_improvements';
 
-            $table->index(['process_id', 'target_step_id'], 'org_proc_improv_process_target_step_idx');
+        if (! Schema::hasColumn($table, 'target_step_id')) {
+            Schema::table($table, function (Blueprint $t) {
+                $t->foreignId('target_step_id')->nullable()->after('metadata')
+                    ->constrained('organization_process_steps')->nullOnDelete();
+            });
+        }
+
+        if (! Schema::hasColumn($table, 'projected_duration_target_minutes')) {
+            Schema::table($table, function (Blueprint $t) {
+                $t->integer('projected_duration_target_minutes')->nullable()->after('target_step_id');
+            });
+        }
+
+        if (! Schema::hasColumn($table, 'projected_automation_level')) {
+            Schema::table($table, function (Blueprint $t) {
+                $t->string('projected_automation_level')->nullable()->after('projected_duration_target_minutes');
+            });
+        }
+
+        if (! Schema::hasColumn($table, 'projected_complexity')) {
+            Schema::table($table, function (Blueprint $t) {
+                $t->string('projected_complexity')->nullable()->after('projected_automation_level');
+            });
+        }
+
+        // Add composite index if not exists
+        Schema::table($table, function (Blueprint $t) {
+            try {
+                $t->index(['process_id', 'target_step_id'], 'org_proc_improv_process_target_step_idx');
+            } catch (\Exception $e) {
+                // Index already exists
+            }
         });
     }
 
     public function down(): void
     {
-        Schema::table('organization_process_improvements', function (Blueprint $table) {
-            $table->dropIndex('org_proc_improv_process_target_step_idx');
-            $table->dropConstrainedForeignId('target_step_id');
-            $table->dropColumn(['projected_duration_target_minutes', 'projected_automation_level', 'projected_complexity']);
+        $table = 'organization_process_improvements';
+
+        Schema::table($table, function (Blueprint $t) {
+            try {
+                $t->dropIndex('org_proc_improv_process_target_step_idx');
+            } catch (\Exception $e) {
+            }
         });
+
+        if (Schema::hasColumn($table, 'target_step_id')) {
+            Schema::table($table, function (Blueprint $t) {
+                $t->dropConstrainedForeignId('target_step_id');
+            });
+        }
+
+        $drops = [];
+        foreach (['projected_duration_target_minutes', 'projected_automation_level', 'projected_complexity'] as $col) {
+            if (Schema::hasColumn($table, $col)) {
+                $drops[] = $col;
+            }
+        }
+        if ($drops) {
+            Schema::table($table, function (Blueprint $t) use ($drops) {
+                $t->dropColumn($drops);
+            });
+        }
     }
 };

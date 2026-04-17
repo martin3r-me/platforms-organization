@@ -15,14 +15,14 @@ return new class extends Migration
             $table->string('projected_automation_level')->nullable()->after('projected_duration_target_minutes');
             $table->string('projected_complexity')->nullable()->after('projected_automation_level');
 
-            $table->index(['process_id', 'target_step_id']);
+            $table->index(['process_id', 'target_step_id'], 'org_proc_improv_process_target_step_idx');
         });
     }
 
     public function down(): void
     {
         Schema::table('organization_process_improvements', function (Blueprint $table) {
-            $table->dropIndex(['process_id', 'target_step_id']);
+            $table->dropIndex('org_proc_improv_process_target_step_idx');
             $table->dropConstrainedForeignId('target_step_id');
             $table->dropColumn(['projected_duration_target_minutes', 'projected_automation_level', 'projected_complexity']);
         });

@@ -101,6 +101,7 @@ class Show extends Component
         'projected_duration_target_minutes' => '',
         'projected_automation_level' => '',
         'projected_complexity' => '',
+        'projected_hourly_rate' => '',
     ];
 
     public function mount(OrganizationProcess $process)
@@ -615,11 +616,18 @@ class Show extends Component
             $projectedScore = $weightSum > 0 ? (int) round($weightedSum / $weightSum) : 0;
             $scoreDelta = $projectedScore - ($currentScore['score'] ?? 0);
 
-            // Cost delta
+            // Cost delta — use projected hourly rate if set, otherwise process rate
+            $effectiveRate = $imp->projected_hourly_rate !== null ? (float) $imp->projected_hourly_rate : $hourlyRate;
             $originalDuration = $steps->sum('duration_target_minutes') ?? 0;
             $simulatedDuration = $simulatedSteps->sum('duration_target_minutes') ?? 0;
             $durationDelta = $originalDuration - $simulatedDuration;
-            $costSavingPerRun = $hourlyRate > 0 ? round(($durationDelta / 60) * $hourlyRate, 2) : 0;
+
+            // Cost saving = time saved at effective rate + rate difference on remaining time
+            $timeSaving = $effectiveRate > 0 ? round(($durationDelta / 60) * $effectiveRate, 2) : 0;
+            $rateSaving = ($imp->projected_hourly_rate !== null && $hourlyRate > 0)
+                ? round((($hourlyRate - $effectiveRate) / 60) * $simulatedDuration, 2)
+                : 0;
+            $costSavingPerRun = $timeSaving + $rateSaving;
             $costSavingPerMonth = round($costSavingPerRun * $monthlyFactor, 2);
 
             $simulations[$imp->id] = [
@@ -1265,6 +1273,7 @@ class Show extends Component
             'priority' => 'medium', 'status' => 'identified',
             'target_step_id' => '', 'projected_duration_target_minutes' => '',
             'projected_automation_level' => '', 'projected_complexity' => '',
+            'projected_hourly_rate' => '',
         ];
         $this->improvementModalShow = true;
     }
@@ -1285,6 +1294,7 @@ class Show extends Component
             'projected_duration_target_minutes' => (string) ($imp->projected_duration_target_minutes ?? ''),
             'projected_automation_level'        => (string) ($imp->projected_automation_level ?? ''),
             'projected_complexity'              => (string) ($imp->projected_complexity ?? ''),
+            'projected_hourly_rate'             => (string) ($imp->projected_hourly_rate ?? ''),
         ];
         $this->improvementModalShow = true;
     }
@@ -1300,6 +1310,7 @@ class Show extends Component
             'improvementForm.projected_duration_target_minutes' => 'nullable|integer|min:0',
             'improvementForm.projected_automation_level'        => 'nullable|in:' . implode(',', AutomationLevel::values()),
             'improvementForm.projected_complexity'              => 'nullable|in:' . implode(',', StepComplexity::values()),
+            'improvementForm.projected_hourly_rate'             => 'nullable|numeric|min:0',
         ]);
 
         $payload = [
@@ -1311,6 +1322,7 @@ class Show extends Component
             'projected_duration_target_minutes' => $this->improvementForm['projected_duration_target_minutes'] !== '' ? (int) $this->improvementForm['projected_duration_target_minutes'] : null,
             'projected_automation_level'        => $this->improvementForm['projected_automation_level'] !== '' ? $this->improvementForm['projected_automation_level'] : null,
             'projected_complexity'              => $this->improvementForm['projected_complexity'] !== '' ? $this->improvementForm['projected_complexity'] : null,
+            'projected_hourly_rate'             => $this->improvementForm['projected_hourly_rate'] !== '' ? (float) $this->improvementForm['projected_hourly_rate'] : null,
         ];
 
         // States that imply the improvement has been implemented (completion timestamp set)

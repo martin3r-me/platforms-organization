@@ -39,7 +39,12 @@ class CreateProcessImprovementTool implements ToolContract, ToolMetadataContract
                 'status'             => ['type' => 'string', 'description' => 'Optional: identified | planned | in_progress | on_hold | completed | under_observation | validated | failed | rejected. Default: identified.'],
                 'expected_outcome'   => ['type' => 'string'],
                 'before_snapshot_id' => ['type' => 'integer', 'description' => 'Optional: Snapshot-ID für Vorher-Zustand.'],
-                'metadata'           => ['type' => 'object'],
+                'target_step_id'                    => ['type' => 'integer', 'description' => 'Optional: Ziel-Step-ID für Projektion.'],
+                'projected_duration_target_minutes' => ['type' => 'integer', 'description' => 'Optional: Projizierte neue Dauer in Minuten.'],
+                'projected_automation_level'        => ['type' => 'string', 'description' => 'Optional: human | llm_assisted | llm_autonomous | hybrid.'],
+                'projected_complexity'              => ['type' => 'string', 'description' => 'Optional: xs | s | m | l | xl | xxl.'],
+                'projected_hourly_rate'             => ['type' => 'number', 'description' => 'Optional: Projizierter Stundensatz in EUR.'],
+                'metadata'                          => ['type' => 'object'],
             ],
             'required' => ['process_id', 'title', 'category'],
         ];
@@ -92,8 +97,13 @@ class CreateProcessImprovementTool implements ToolContract, ToolMetadataContract
                 'priority'           => $priority,
                 'status'             => $status,
                 'expected_outcome'   => ($arguments['expected_outcome'] ?? null) ?: null,
-                'before_snapshot_id' => ! empty($arguments['before_snapshot_id']) ? (int) $arguments['before_snapshot_id'] : null,
-                'metadata'           => $arguments['metadata'] ?? null,
+                'before_snapshot_id'                => ! empty($arguments['before_snapshot_id']) ? (int) $arguments['before_snapshot_id'] : null,
+                'target_step_id'                    => ! empty($arguments['target_step_id']) ? (int) $arguments['target_step_id'] : null,
+                'projected_duration_target_minutes' => isset($arguments['projected_duration_target_minutes']) ? (int) $arguments['projected_duration_target_minutes'] : null,
+                'projected_automation_level'        => ! empty($arguments['projected_automation_level']) ? $arguments['projected_automation_level'] : null,
+                'projected_complexity'              => ! empty($arguments['projected_complexity']) ? $arguments['projected_complexity'] : null,
+                'projected_hourly_rate'             => isset($arguments['projected_hourly_rate']) ? (float) $arguments['projected_hourly_rate'] : null,
+                'metadata'                          => $arguments['metadata'] ?? null,
             ]);
 
             return ToolResult::success([

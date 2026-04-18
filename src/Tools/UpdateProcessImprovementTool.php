@@ -40,7 +40,12 @@ class UpdateProcessImprovementTool implements ToolContract, ToolMetadataContract
                 'expected_outcome'  => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'actual_outcome'    => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'after_snapshot_id' => ['type' => 'integer', 'description' => 'Snapshot-ID für Nachher-Zustand. 0 oder null zum Leeren.'],
-                'metadata'          => ['type' => 'object'],
+                'target_step_id'                    => ['type' => 'integer', 'description' => 'Ziel-Step-ID. 0 oder null zum Leeren.'],
+                'projected_duration_target_minutes' => ['type' => 'integer', 'description' => 'Projizierte Dauer in Minuten. 0 oder null zum Leeren.'],
+                'projected_automation_level'        => ['type' => 'string', 'description' => 'human | llm_assisted | llm_autonomous | hybrid. "" zum Leeren.'],
+                'projected_complexity'              => ['type' => 'string', 'description' => 'xs | s | m | l | xl | xxl. "" zum Leeren.'],
+                'projected_hourly_rate'             => ['type' => 'number', 'description' => 'Projizierter Stundensatz in EUR. 0 oder null zum Leeren.'],
+                'metadata'                          => ['type' => 'object'],
             ],
             'required' => ['improvement_id'],
         ]);
@@ -119,6 +124,31 @@ class UpdateProcessImprovementTool implements ToolContract, ToolMetadataContract
                 if (! $statusEnum->isCompleted()) {
                     $update['completed_at'] = null;
                 }
+            }
+
+            if (array_key_exists('target_step_id', $arguments)) {
+                $val = $arguments['target_step_id'];
+                $update['target_step_id'] = (! empty($val) && (int) $val > 0) ? (int) $val : null;
+            }
+
+            if (array_key_exists('projected_duration_target_minutes', $arguments)) {
+                $val = $arguments['projected_duration_target_minutes'];
+                $update['projected_duration_target_minutes'] = (! empty($val) && (int) $val > 0) ? (int) $val : null;
+            }
+
+            if (array_key_exists('projected_automation_level', $arguments)) {
+                $val = (string) ($arguments['projected_automation_level'] ?? '');
+                $update['projected_automation_level'] = $val !== '' ? $val : null;
+            }
+
+            if (array_key_exists('projected_complexity', $arguments)) {
+                $val = (string) ($arguments['projected_complexity'] ?? '');
+                $update['projected_complexity'] = $val !== '' ? $val : null;
+            }
+
+            if (array_key_exists('projected_hourly_rate', $arguments)) {
+                $val = $arguments['projected_hourly_rate'];
+                $update['projected_hourly_rate'] = (! empty($val) && (float) $val > 0) ? (float) $val : null;
             }
 
             if (array_key_exists('after_snapshot_id', $arguments)) {

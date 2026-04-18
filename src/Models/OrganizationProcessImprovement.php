@@ -37,6 +37,7 @@ class OrganizationProcessImprovement extends Model
         'projected_duration_target_minutes',
         'projected_automation_level',
         'projected_complexity',
+        'projected_hourly_rate',
     ];
 
     protected $casts = [
@@ -44,6 +45,7 @@ class OrganizationProcessImprovement extends Model
         'metadata'                         => 'array',
         'status'                           => ImprovementStatus::class,
         'projected_duration_target_minutes' => 'integer',
+        'projected_hourly_rate'             => 'decimal:2',
     ];
 
     protected static function booted(): void

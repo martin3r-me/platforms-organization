@@ -2236,7 +2236,7 @@
                 />
             </div>
 
-            {{-- Projektion: Was ändert sich? --}}
+            {{-- Aktueller Step-Zustand (nur wenn Step gewählt) --}}
             @if($improvementForm['target_step_id'] !== '')
                 @php
                     $targetStep = $this->steps->firstWhere('id', (int) $improvementForm['target_step_id']);
@@ -2251,46 +2251,49 @@
                             </div>
                             <div>
                                 <span class="text-[var(--ui-muted)]">Automation:</span>
-                                <span class="font-medium text-[var(--ui-secondary)]">{{ $targetStep->automation_level ?? '–' }}</span>
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $targetStep->automation_level?->label() ?? '–' }}</span>
                             </div>
                             <div>
                                 <span class="text-[var(--ui-muted)]">Komplexität:</span>
-                                <span class="font-medium text-[var(--ui-secondary)]">{{ $targetStep->complexity ?? '–' }}</span>
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $targetStep->complexity ? strtoupper($targetStep->complexity->value) : '–' }}</span>
                             </div>
                         </div>
                     </div>
                 @endif
-
-                <div class="grid grid-cols-3 gap-3">
-                    <x-ui-input-text name="proj_duration" label="Neue Dauer (Min.)" type="number" wire:model.live="improvementForm.projected_duration_target_minutes" min="0" placeholder="Unverändert" />
-                    <x-ui-input-select
-                        name="proj_automation"
-                        label="Neuer Automationsgrad"
-                        :options="[
-                            ['value' => '', 'label' => 'Unverändert'],
-                            ['value' => 'human', 'label' => 'Human'],
-                            ['value' => 'llm_assisted', 'label' => 'LLM-Assisted'],
-                            ['value' => 'llm_autonomous', 'label' => 'LLM-Autonomous'],
-                            ['value' => 'hybrid', 'label' => 'Hybrid'],
-                        ]"
-                        wire:model.live="improvementForm.projected_automation_level"
-                    />
-                    <x-ui-input-select
-                        name="proj_complexity"
-                        label="Neue Komplexität"
-                        :options="[
-                            ['value' => '', 'label' => 'Unverändert'],
-                            ['value' => 'xs', 'label' => 'XS – Trivial'],
-                            ['value' => 's', 'label' => 'S – Einfach'],
-                            ['value' => 'm', 'label' => 'M – Mittel'],
-                            ['value' => 'l', 'label' => 'L – Komplex'],
-                            ['value' => 'xl', 'label' => 'XL – Sehr komplex'],
-                            ['value' => 'xxl', 'label' => 'XXL – Extrem komplex'],
-                        ]"
-                        wire:model.live="improvementForm.projected_complexity"
-                    />
-                </div>
             @endif
+
+            {{-- Projektion: Was ändert sich? (immer sichtbar) --}}
+            <div class="grid grid-cols-2 gap-3">
+                <x-ui-input-text name="proj_duration" label="Neue Dauer (Min.)" type="number" wire:model.live="improvementForm.projected_duration_target_minutes" min="0" placeholder="{{ $improvementForm['target_step_id'] !== '' ? ($this->steps->firstWhere('id', (int) $improvementForm['target_step_id'])?->duration_target_minutes ?? 'Unverändert') : 'Unverändert' }}" />
+                <x-ui-input-text name="proj_hourly_rate" label="Neuer Stundensatz (€)" type="number" wire:model.live="improvementForm.projected_hourly_rate" min="0" step="0.01" placeholder="{{ $this->form['hourly_rate'] !== '' ? $this->form['hourly_rate'] . ' (aktuell)' : 'Unverändert' }}" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <x-ui-input-select
+                    name="proj_automation"
+                    label="Neuer Automationsgrad"
+                    :options="[
+                        ['value' => '', 'label' => 'Unverändert'],
+                        ['value' => 'human', 'label' => 'Human'],
+                        ['value' => 'llm_assisted', 'label' => 'LLM-Assisted'],
+                        ['value' => 'llm_autonomous', 'label' => 'LLM-Autonomous'],
+                        ['value' => 'hybrid', 'label' => 'Hybrid'],
+                    ]"
+                    wire:model.live="improvementForm.projected_automation_level"
+                />
+                <x-ui-input-select
+                    name="proj_complexity"
+                    label="Neue Komplexität"
+                    :options="[
+                        ['value' => '', 'label' => 'Unverändert'],
+                        ['value' => 'xs', 'label' => 'XS – Trivial'],
+                        ['value' => 's', 'label' => 'S – Einfach'],
+                        ['value' => 'm', 'label' => 'M – Mittel'],
+                        ['value' => 'l', 'label' => 'L – Komplex'],
+                        ['value' => 'xl', 'label' => 'XL – Sehr komplex'],
+                        ['value' => 'xxl', 'label' => 'XXL – Extrem komplex'],
+                    ]"
+                    wire:model.live="improvementForm.projected_complexity"
+                />
 
             <div class="grid grid-cols-2 gap-4">
                 <x-ui-input-select

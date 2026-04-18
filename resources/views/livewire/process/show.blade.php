@@ -1711,6 +1711,9 @@
                             </x-ui-table-cell>
                             <x-ui-table-cell compact="true">
                                 <div class="flex gap-1 justify-end" @click.stop>
+                                    <x-ui-button size="xs" variant="secondary-outline" wire:click="setActiveRun({{ $run->id }})">
+                                        @svg('heroicon-o-chevron-down', 'w-4 h-4')
+                                    </x-ui-button>
                                     <x-ui-confirm-button size="xs" variant="danger-outline" wire:click="deleteRun({{ $run->id }})" confirm-text="Durchlauf wirklich löschen?">
                                         @svg('heroicon-o-trash', 'w-4 h-4')
                                     </x-ui-confirm-button>

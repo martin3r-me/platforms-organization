@@ -42,17 +42,7 @@
                             @svg('heroicon-s-star', 'w-4 h-4')
                         </span>
                     @endif
-                    @if($process->status === 'active')
-                        <x-ui-badge variant="success" size="sm">Aktiv</x-ui-badge>
-                    @elseif($process->status === 'pilot')
-                        <x-ui-badge variant="info" size="sm">Pilot</x-ui-badge>
-                    @elseif($process->status === 'under_review')
-                        <x-ui-badge variant="warning" size="sm">In Prüfung</x-ui-badge>
-                    @elseif($process->status === 'draft')
-                        <x-ui-badge variant="muted" size="sm">Entwurf</x-ui-badge>
-                    @else
-                        <x-ui-badge variant="danger" size="sm">Veraltet</x-ui-badge>
-                    @endif
+                    <x-ui-badge variant="{{ $process->status?->color() ?? 'muted' }}" size="sm">{{ $process->status?->label() ?? $process->status }}</x-ui-badge>
                     @if($process->process_category)
                         <x-ui-badge variant="{{ $process->process_category->color() }}" size="sm">
                             @svg($process->process_category->icon(), 'w-3 h-3')
@@ -74,7 +64,7 @@
             {{-- LLM Quote --}}
             @php
                 $totalSteps = $process->steps->count();
-                $llmSteps = $process->steps->whereIn('automation_level', ['llm_assisted', 'llm_autonomous', 'hybrid'])->count();
+                $llmSteps = $process->steps->filter(fn ($s) => $s->automation_level?->isLlm())->count();
                 $llmQuote = $totalSteps > 0 ? round(($llmSteps / $totalSteps) * 100) : 0;
             @endphp
             <div class="flex items-center gap-1.5 flex-shrink-0 w-20">

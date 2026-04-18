@@ -7,6 +7,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Tools\Concerns\HasStandardizedWriteOperations;
+use Platform\Organization\Enums\ImprovementStatus;
 use Platform\Organization\Models\OrganizationProcessImprovement;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
@@ -107,15 +108,15 @@ class UpdateProcessImprovementTool implements ToolContract, ToolMetadataContract
 
             if (array_key_exists('status', $arguments)) {
                 $val = (string) $arguments['status'];
-                if (! in_array($val, ['identified', 'planned', 'in_progress', 'on_hold', 'completed', 'under_observation', 'validated', 'failed', 'rejected'])) {
+                $statusEnum = ImprovementStatus::tryFrom($val);
+                if (! $statusEnum) {
                     return ToolResult::error('VALIDATION_ERROR', 'Ungültiger status.');
                 }
                 $update['status'] = $val;
-                $completedStates = ['completed', 'under_observation', 'validated', 'failed'];
-                if (in_array($val, $completedStates, true) && ! $improvement->completed_at) {
+                if ($statusEnum->isCompleted() && ! $improvement->completed_at) {
                     $update['completed_at'] = now();
                 }
-                if (! in_array($val, $completedStates, true)) {
+                if (! $statusEnum->isCompleted()) {
                     $update['completed_at'] = null;
                 }
             }
@@ -138,7 +139,7 @@ class UpdateProcessImprovementTool implements ToolContract, ToolMetadataContract
                 'id'       => $improvement->id,
                 'uuid'     => $improvement->uuid,
                 'title'    => $improvement->title,
-                'status'   => $improvement->status,
+                'status'   => $improvement->status?->value,
                 'priority' => $improvement->priority,
                 'category' => $improvement->category,
                 'message'  => 'Verbesserung aktualisiert.',

@@ -12,6 +12,7 @@ use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
 use Platform\Organization\Enums\ProcessCategory;
 use Platform\Organization\Enums\ProcessFrequency;
+use Platform\Organization\Enums\ProcessStatus;
 use Symfony\Component\Uid\UuidV7;
 
 class OrganizationProcess extends Model
@@ -55,6 +56,7 @@ class OrganizationProcess extends Model
         'version'                  => 'integer',
         'metadata'                 => 'array',
         'hourly_rate'              => 'decimal:2',
+        'status'                   => ProcessStatus::class,
         'frequency'                => ProcessFrequency::class,
         'public_token_expires_at'  => 'datetime',
         'process_category'         => ProcessCategory::class,

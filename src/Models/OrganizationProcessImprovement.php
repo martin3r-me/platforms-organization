@@ -8,6 +8,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
+use Platform\Organization\Enums\ImprovementStatus;
 use Symfony\Component\Uid\UuidV7;
 
 class OrganizationProcessImprovement extends Model
@@ -41,6 +42,7 @@ class OrganizationProcessImprovement extends Model
     protected $casts = [
         'completed_at'                     => 'datetime',
         'metadata'                         => 'array',
+        'status'                           => ImprovementStatus::class,
         'projected_duration_target_minutes' => 'integer',
     ];
 

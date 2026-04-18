@@ -2,6 +2,8 @@
 
 namespace Platform\Organization\Services;
 
+use Platform\Organization\Enums\AutomationLevel;
+use Platform\Organization\Enums\CorefitClassification;
 use Platform\Organization\Enums\ProcessFrequency;
 use Platform\Organization\Models\OrganizationProcess;
 
@@ -24,9 +26,9 @@ class ProcessCertificateService
         $efficiency = $leadTime > 0 ? round(($totalDuration / $leadTime) * 100, 1) : 0;
 
         // COREFIT distribution
-        $corefitGrouped = $steps->groupBy('corefit_classification');
+        $corefitGrouped = $steps->groupBy(fn ($s) => $s->corefit_classification?->value ?? 'core');
         $corefit = [];
-        foreach (['core', 'context', 'no_fit'] as $classification) {
+        foreach (CorefitClassification::values() as $classification) {
             $group = $corefitGrouped->get($classification, collect());
             $count = $group->count();
             $minutes = $group->sum('duration_target_minutes') ?? 0;
@@ -42,16 +44,16 @@ class ProcessCertificateService
         }
 
         // Automation distribution
-        $autoGrouped = $steps->groupBy('automation_level');
+        $autoGrouped = $steps->groupBy(fn ($s) => $s->automation_level?->value ?? 'human');
         $automation = [];
         $llmCount = 0;
-        foreach (['human', 'llm_assisted', 'llm_autonomous', 'hybrid'] as $level) {
+        foreach (AutomationLevel::values() as $level) {
             $group = $autoGrouped->get($level, collect());
             $count = $group->count();
             $minutes = $group->sum('duration_target_minutes') ?? 0;
             $percent = $totalSteps > 0 ? round(($count / $totalSteps) * 100, 1) : 0;
 
-            if (in_array($level, ['llm_assisted', 'llm_autonomous', 'hybrid'])) {
+            if (AutomationLevel::tryFrom($level)?->isLlm()) {
                 $llmCount += $count;
             }
 
@@ -75,11 +77,11 @@ class ProcessCertificateService
         ];
 
         $actionItems = ['eliminate' => 0, 'automate' => 0, 'invest' => 0, 'optimal' => 0];
-        foreach (['core', 'context', 'no_fit'] as $cf) {
-            foreach (['human', 'llm_assisted', 'llm_autonomous', 'hybrid'] as $al) {
+        foreach (CorefitClassification::values() as $cf) {
+            foreach (AutomationLevel::values() as $al) {
                 $cellCount = $steps->filter(fn ($s) =>
-                    ($s->corefit_classification ?? 'core') === $cf &&
-                    ($s->automation_level ?? 'human') === $al
+                    ($s->corefit_classification?->value ?? 'core') === $cf &&
+                    ($s->automation_level?->value ?? 'human') === $al
                 )->count();
 
                 if ($cellCount === 0) continue;
@@ -116,13 +118,13 @@ class ProcessCertificateService
             $weightedSum = 0;
             $weightSum = 0;
             foreach ($steps as $s) {
-                $al = $s->automation_level ?? 'human';
+                $al = $s->automation_level ?? AutomationLevel::HUMAN;
                 $complexity = $s->complexity;
                 $pts = $complexity ? $complexity->points() : 1;
                 $sc = match ($al) {
-                    'llm_autonomous' => 100,
-                    'llm_assisted' => 85,
-                    'hybrid' => 70,
+                    AutomationLevel::LLM_AUTONOMOUS => 100,
+                    AutomationLevel::LLM_ASSISTED => 85,
+                    AutomationLevel::HYBRID => 70,
                     default => $complexity ? (int) round(15 + ($complexity->points() / 13) * 80) : 30,
                 };
                 $weightedSum += $sc * $pts;
@@ -147,7 +149,7 @@ class ProcessCertificateService
                 'name' => $process->name,
                 'code' => $process->code,
                 'version' => $process->version ?? 1,
-                'status' => $process->status ?? 'draft',
+                'status' => $process->status?->value ?? 'draft',
                 'description' => $process->description,
                 'owner' => $process->ownerEntity?->name,
                 'vsm_system' => $process->vsmSystem?->name,
@@ -178,8 +180,8 @@ class ProcessCertificateService
             'steps_list' => $steps->map(fn ($s) => [
                 'position' => $s->position,
                 'name' => $s->name,
-                'corefit' => $s->corefit_classification ?? 'core',
-                'automation' => $s->automation_level ?? 'human',
+                'corefit' => $s->corefit_classification?->value ?? 'core',
+                'automation' => $s->automation_level?->value ?? 'human',
                 'duration' => $s->duration_target_minutes,
                 'wait' => $s->wait_target_minutes,
             ])->values()->toArray(),
@@ -189,7 +191,7 @@ class ProcessCertificateService
                     'title' => $i->title,
                     'category' => $i->category,
                     'priority' => $i->priority,
-                    'status' => $i->status,
+                    'status' => $i->status?->value,
                 ])->values()->toArray(),
             'meta' => [
                 'generated_at' => $now->toIso8601String(),

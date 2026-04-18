@@ -9,6 +9,8 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
+use Platform\Organization\Enums\AutomationLevel;
+use Platform\Organization\Enums\CorefitClassification;
 use Platform\Organization\Enums\ProcessEventType;
 use Platform\Organization\Enums\ProcessGatewayType;
 use Platform\Organization\Enums\StepComplexity;
@@ -49,6 +51,8 @@ class OrganizationProcessStep extends Model
         'is_active'               => 'boolean',
         'metadata'                => 'array',
         'llm_tools'               => 'array',
+        'corefit_classification'  => CorefitClassification::class,
+        'automation_level'        => AutomationLevel::class,
         'gateway_type'            => ProcessGatewayType::class,
         'event_type'              => ProcessEventType::class,
         'complexity'              => StepComplexity::class,

@@ -5,8 +5,12 @@ namespace Platform\Organization\Livewire\Process;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Platform\Organization\Enums\AutomationLevel;
+use Platform\Organization\Enums\CorefitClassification;
+use Platform\Organization\Enums\ImprovementStatus;
 use Platform\Organization\Enums\ProcessCategory;
 use Platform\Organization\Enums\ProcessFrequency;
+use Platform\Organization\Enums\ProcessStatus;
 use Platform\Organization\Enums\StepComplexity;
 use Platform\Organization\Models\OrganizationProcess;
 use Platform\Organization\Models\OrganizationProcessStep;
@@ -117,7 +121,7 @@ class Show extends Component
             'name'                  => $this->process->name,
             'code'                  => $this->process->code ?? '',
             'description'           => $this->process->description ?? '',
-            'status'                => $this->process->status ?? 'draft',
+            'status'                => $this->process->status?->value ?? 'draft',
             'process_category'      => (string) ($this->process->process_category?->value ?? ''),
             'is_focus'              => (bool) $this->process->is_focus,
             'focus_reason'          => (string) ($this->process->focus_reason ?? ''),
@@ -144,7 +148,7 @@ class Show extends Component
         return $this->form['name'] !== ($this->process->name ?? '') ||
                $this->form['code'] !== ($this->process->code ?? '') ||
                $this->form['description'] !== ($this->process->description ?? '') ||
-               $this->form['status'] !== ($this->process->status ?? 'draft') ||
+               $this->form['status'] !== ($this->process->status?->value ?? 'draft') ||
                $this->form['process_category'] !== (string) ($this->process->process_category?->value ?? '') ||
                $this->form['is_focus'] !== (bool) $this->process->is_focus ||
                $this->form['focus_reason'] !== (string) ($this->process->focus_reason ?? '') ||
@@ -331,7 +335,7 @@ class Show extends Component
         $hourlyRate = (float) ($this->form['hourly_rate'] ?? 0);
         $minuteRate = $hourlyRate > 0 ? $hourlyRate / 60 : 0;
 
-        $grouped = $steps->groupBy('corefit_classification');
+        $grouped = $steps->groupBy(fn ($s) => $s->corefit_classification?->value ?? 'core');
         $totalDuration = $steps->sum('duration_target_minutes') ?? 0;
         $totalWait = $steps->sum('wait_target_minutes') ?? 0;
         $leadTime = $totalDuration + $totalWait;
@@ -346,7 +350,7 @@ class Show extends Component
         ];
 
         $totalCost = 0;
-        foreach (['core', 'context', 'no_fit'] as $classification) {
+        foreach (CorefitClassification::values() as $classification) {
             $group = $grouped->get($classification, collect());
             $count = $group->count();
             $minutes = $group->sum('duration_target_minutes') ?? 0;
@@ -385,10 +389,10 @@ class Show extends Component
             ];
         }
 
-        $grouped = $steps->groupBy('automation_level');
+        $grouped = $steps->groupBy(fn ($s) => $s->automation_level?->value ?? 'human');
         $result = [];
 
-        foreach (['human', 'llm_assisted', 'llm_autonomous', 'hybrid'] as $level) {
+        foreach (AutomationLevel::values() as $level) {
             $group = $grouped->get($level, collect());
             $count = $group->count();
             $minutes = $group->sum('duration_target_minutes') ?? 0;
@@ -475,14 +479,14 @@ class Show extends Component
         $weightSum = 0;
 
         foreach ($steps as $step) {
-            $automationLevel = $step->automation_level ?? 'human';
+            $automationLevel = $step->automation_level ?? AutomationLevel::HUMAN;
             $complexity = $step->complexity;
             $points = $complexity ? $complexity->points() : 1;
 
             $score = match ($automationLevel) {
-                'llm_autonomous' => 100,
-                'llm_assisted' => 85,
-                'hybrid' => 70,
+                AutomationLevel::LLM_AUTONOMOUS => 100,
+                AutomationLevel::LLM_ASSISTED => 85,
+                AutomationLevel::HYBRID => 70,
                 default => $complexity
                     ? (int) round(15 + ($complexity->points() / 13) * 80)
                     : 30,
@@ -579,7 +583,7 @@ class Show extends Component
                     $clone->duration_target_minutes = $imp->projected_duration_target_minutes;
                 }
                 if ($imp->projected_automation_level !== null) {
-                    $clone->automation_level = $imp->projected_automation_level;
+                    $clone->automation_level = AutomationLevel::tryFrom($imp->projected_automation_level) ?? $clone->automation_level;
                 }
                 if ($imp->projected_complexity !== null) {
                     $clone->complexity = StepComplexity::tryFrom($imp->projected_complexity);
@@ -592,14 +596,14 @@ class Show extends Component
             $weightedSum = 0;
             $weightSum = 0;
             foreach ($simulatedSteps as $step) {
-                $automationLevel = $step->automation_level ?? 'human';
+                $automationLevel = $step->automation_level ?? AutomationLevel::HUMAN;
                 $complexity = $step->complexity;
                 $points = $complexity ? $complexity->points() : 1;
 
                 $score = match ($automationLevel) {
-                    'llm_autonomous' => 100,
-                    'llm_assisted' => 85,
-                    'hybrid' => 70,
+                    AutomationLevel::LLM_AUTONOMOUS => 100,
+                    AutomationLevel::LLM_ASSISTED => 85,
+                    AutomationLevel::HYBRID => 70,
                     default => $complexity
                         ? (int) round(15 + ($complexity->points() / 13) * 80)
                         : 30,
@@ -646,11 +650,11 @@ class Show extends Component
         $minuteRate = $hourlyRate > 0 ? $hourlyRate / 60 : 0;
 
         $matrix = [];
-        foreach (['core', 'context', 'no_fit'] as $corefit) {
-            foreach (['human', 'llm_assisted', 'llm_autonomous', 'hybrid'] as $auto) {
+        foreach (CorefitClassification::values() as $corefit) {
+            foreach (AutomationLevel::values() as $auto) {
                 $group = $steps->filter(fn($s) =>
-                    ($s->corefit_classification ?? 'core') === $corefit &&
-                    ($s->automation_level ?? 'human') === $auto
+                    ($s->corefit_classification?->value ?? 'core') === $corefit &&
+                    ($s->automation_level?->value ?? 'human') === $auto
                 );
                 $count = $group->count();
                 $minutes = $group->sum('duration_target_minutes') ?? 0;
@@ -703,7 +707,7 @@ class Show extends Component
 
         foreach (['cost', 'quality', 'speed', 'risk', 'standardization'] as $category) {
             $catImprovements = $improvements->where('category', $category);
-            $statusCounts = $catImprovements->groupBy('status')->map->count();
+            $statusCounts = $catImprovements->groupBy(fn ($i) => $i->status?->value ?? 'identified')->map->count();
             $grouped[$category] = [
                 'total' => $catImprovements->count(),
                 'statuses' => $statusCounts->toArray(),
@@ -721,7 +725,7 @@ class Show extends Component
             'form.name'                  => 'required|string|max:255',
             'form.code'                  => 'nullable|string|max:100',
             'form.description'           => 'nullable|string',
-            'form.status'                => 'required|in:draft,under_review,pilot,active,deprecated',
+            'form.status'                => 'required|in:' . implode(',', ProcessStatus::values()),
             'form.process_category'      => 'nullable|in:core,support,management',
             'form.is_focus'              => 'boolean',
             'form.focus_reason'          => 'nullable|string',
@@ -815,8 +819,8 @@ class Show extends Component
             'step_type'               => $step->step_type ?? 'task',
             'duration_target_minutes' => (string) ($step->duration_target_minutes ?? ''),
             'wait_target_minutes'     => (string) ($step->wait_target_minutes ?? ''),
-            'corefit_classification'  => $step->corefit_classification ?? 'core',
-            'automation_level'        => $step->automation_level ?? 'human',
+            'corefit_classification'  => $step->corefit_classification?->value ?? 'core',
+            'automation_level'        => $step->automation_level?->value ?? 'human',
             'complexity'              => $step->complexity?->value ?? '',
             'is_active'               => $step->is_active,
             'llm_tools'               => $step->llm_tools ?? [],
@@ -833,9 +837,9 @@ class Show extends Component
             'stepForm.step_type'               => 'required|in:task,decision,event,subprocess',
             'stepForm.duration_target_minutes' => 'nullable|integer|min:0',
             'stepForm.wait_target_minutes'     => 'nullable|integer|min:0',
-            'stepForm.corefit_classification'  => 'required|in:core,context,no_fit',
-            'stepForm.automation_level'        => 'required|in:human,llm_assisted,llm_autonomous,hybrid',
-            'stepForm.complexity'              => 'nullable|in:xs,s,m,l,xl,xxl',
+            'stepForm.corefit_classification'  => 'required|in:' . implode(',', CorefitClassification::values()),
+            'stepForm.automation_level'        => 'required|in:' . implode(',', AutomationLevel::values()),
+            'stepForm.complexity'              => 'nullable|in:' . implode(',', StepComplexity::values()),
             'stepForm.is_active'               => 'boolean',
             'stepForm.llm_tools'               => 'nullable|array',
             'stepForm.llm_tools.*.tool_name'   => 'required|string|max:255',
@@ -1179,8 +1183,8 @@ class Show extends Component
         ];
 
         $steps = $process->steps;
-        $corefitCounts = $steps->groupBy('corefit_classification')->map->count();
-        $automationCounts = $steps->groupBy('automation_level')->map->count();
+        $corefitCounts = $steps->groupBy(fn ($s) => $s->corefit_classification?->value ?? 'core')->map->count();
+        $automationCounts = $steps->groupBy(fn ($s) => $s->automation_level?->value ?? 'human')->map->count();
         // Complexity metrics for snapshot
         $withComplexity = $steps->filter(fn ($s) => $s->complexity !== null);
         $complexityCount = $withComplexity->count();
@@ -1193,12 +1197,12 @@ class Show extends Component
             $weightedSum = 0;
             $weightSum = 0;
             foreach ($steps as $s) {
-                $al = $s->automation_level ?? 'human';
+                $al = $s->automation_level ?? AutomationLevel::HUMAN;
                 $pts = $s->complexity ? $s->complexity->points() : 1;
                 $sc = match ($al) {
-                    'llm_autonomous' => 100,
-                    'llm_assisted' => 85,
-                    'hybrid' => 70,
+                    AutomationLevel::LLM_AUTONOMOUS => 100,
+                    AutomationLevel::LLM_ASSISTED => 85,
+                    AutomationLevel::HYBRID => 70,
                     default => $s->complexity ? (int) round(15 + ($s->complexity->points() / 13) * 80) : 30,
                 };
                 $weightedSum += $sc * $pts;
@@ -1276,7 +1280,7 @@ class Show extends Component
             'title'                             => $imp->title,
             'category'                          => $imp->category,
             'priority'                          => $imp->priority,
-            'status'                            => $imp->status,
+            'status'                            => $imp->status?->value ?? 'identified',
             'target_step_id'                    => (string) ($imp->target_step_id ?? ''),
             'projected_duration_target_minutes' => (string) ($imp->projected_duration_target_minutes ?? ''),
             'projected_automation_level'        => (string) ($imp->projected_automation_level ?? ''),
@@ -1291,10 +1295,10 @@ class Show extends Component
             'improvementForm.title'                             => 'required|string|max:255',
             'improvementForm.category'                          => 'required|in:cost,quality,speed,risk,standardization',
             'improvementForm.priority'                          => 'required|in:low,medium,high,critical',
-            'improvementForm.status'                            => 'required|in:identified,planned,in_progress,on_hold,completed,under_observation,validated,failed,rejected',
+            'improvementForm.status'                            => 'required|in:' . implode(',', ImprovementStatus::values()),
             'improvementForm.target_step_id'                    => 'nullable|integer|exists:organization_process_steps,id',
             'improvementForm.projected_duration_target_minutes' => 'nullable|integer|min:0',
-            'improvementForm.projected_automation_level'        => 'nullable|in:human,llm_assisted,llm_autonomous,hybrid',
+            'improvementForm.projected_automation_level'        => 'nullable|in:' . implode(',', AutomationLevel::values()),
             'improvementForm.projected_complexity'              => 'nullable|in:' . implode(',', StepComplexity::values()),
         ]);
 
@@ -1310,12 +1314,13 @@ class Show extends Component
         ];
 
         // States that imply the improvement has been implemented (completion timestamp set)
-        $completedStates = ['completed', 'under_observation', 'validated', 'failed'];
+        $statusEnum = ImprovementStatus::tryFrom($this->improvementForm['status']);
+        $isCompleted = $statusEnum?->isCompleted() ?? false;
 
         if ($this->editingImprovementId) {
             $imp = $this->process->improvements()->find($this->editingImprovementId);
             if ($imp) {
-                if (in_array($this->improvementForm['status'], $completedStates, true)) {
+                if ($isCompleted) {
                     // Preserve existing completed_at, set now() if not yet set
                     $payload['completed_at'] = $imp->completed_at ?? now();
                 } else {
@@ -1325,7 +1330,7 @@ class Show extends Component
             }
             $this->dispatch('toast', message: 'Verbesserung aktualisiert');
         } else {
-            if (in_array($this->improvementForm['status'], $completedStates, true)) {
+            if ($isCompleted) {
                 $payload['completed_at'] = now();
             }
             $this->process->improvements()->create(array_merge($payload, [

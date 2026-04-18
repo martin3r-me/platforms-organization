@@ -6,6 +6,7 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Organization\Enums\ImprovementStatus;
 use Platform\Organization\Models\OrganizationProcess;
 use Platform\Organization\Models\OrganizationProcessImprovement;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
@@ -77,7 +78,7 @@ class CreateProcessImprovementTool implements ToolContract, ToolMetadataContract
             }
 
             $status = $arguments['status'] ?? 'identified';
-            if (! in_array($status, ['identified', 'planned', 'in_progress', 'on_hold', 'completed', 'under_observation', 'validated', 'failed', 'rejected'])) {
+            if (! ImprovementStatus::tryFrom($status)) {
                 $status = 'identified';
             }
 
@@ -101,7 +102,7 @@ class CreateProcessImprovementTool implements ToolContract, ToolMetadataContract
                 'title'      => $improvement->title,
                 'category'   => $improvement->category,
                 'priority'   => $improvement->priority,
-                'status'     => $improvement->status,
+                'status'     => $improvement->status?->value,
                 'process_id' => $improvement->process_id,
                 'message'    => 'Verbesserung erstellt.',
             ]);

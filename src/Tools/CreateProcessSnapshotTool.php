@@ -6,6 +6,7 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Organization\Enums\AutomationLevel;
 use Platform\Organization\Models\OrganizationProcess;
 use Platform\Organization\Models\OrganizationProcessSnapshot;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
@@ -99,8 +100,8 @@ class CreateProcessSnapshotTool implements ToolContract, ToolMetadataContract
             $flows = $process->flows;
             $totalDuration = $steps->sum('duration_target_minutes') ?? 0;
             $totalWait = $steps->sum('wait_target_minutes') ?? 0;
-            $corefitCounts = $steps->groupBy('corefit_classification')->map->count();
-            $automationCounts = $steps->groupBy('automation_level')->map->count();
+            $corefitCounts = $steps->groupBy(fn ($s) => $s->corefit_classification?->value ?? 'core')->map->count();
+            $automationCounts = $steps->groupBy(fn ($s) => $s->automation_level?->value ?? 'human')->map->count();
 
             // Complexity metrics
             $withComplexity = $steps->filter(fn ($s) => $s->complexity !== null);
@@ -114,12 +115,12 @@ class CreateProcessSnapshotTool implements ToolContract, ToolMetadataContract
                 $wSum = 0;
                 $wWeight = 0;
                 foreach ($steps as $s) {
-                    $al = $s->automation_level ?? 'human';
+                    $al = $s->automation_level ?? AutomationLevel::HUMAN;
                     $pts = $s->complexity ? $s->complexity->points() : 1;
                     $sc = match ($al) {
-                        'llm_autonomous' => 100,
-                        'llm_assisted' => 85,
-                        'hybrid' => 70,
+                        AutomationLevel::LLM_AUTONOMOUS => 100,
+                        AutomationLevel::LLM_ASSISTED => 85,
+                        AutomationLevel::HYBRID => 70,
                         default => $s->complexity ? (int) round(15 + ($s->complexity->points() / 13) * 80) : 30,
                     };
                     $wSum += $sc * $pts;

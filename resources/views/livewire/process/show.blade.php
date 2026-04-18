@@ -22,7 +22,7 @@
                 </x-ui-button>
             @endif
 
-            <x-ui-button variant="primary" size="sm" wire:click="createRun">
+            <x-ui-button variant="primary" size="sm" wire:click="startRun">
                 @svg('heroicon-o-play', 'w-4 h-4')
                 <span>Durchlauf starten</span>
                 @if($this->activeRunCount > 0)
@@ -290,7 +290,7 @@
                     @endforelse
                     <button
                         type="button"
-                        wire:click="createRun"
+                        wire:click="startRun"
                         class="w-full py-2 px-4 border-2 border-dashed border-[var(--ui-border)]/60 rounded-lg text-xs text-[var(--ui-muted)] hover:border-[var(--ui-warning)] hover:text-[var(--ui-secondary)] transition-colors flex items-center justify-center gap-1"
                     >
                         @svg('heroicon-o-play', 'w-3.5 h-3.5')
@@ -1539,7 +1539,7 @@
         {{-- ── Tab: Durchläufe ────────────────────────────────── --}}
         @if($activeTab === 'runs')
             <div class="flex justify-end mb-4">
-                <x-ui-button variant="primary" size="sm" wire:click="createRun">
+                <x-ui-button variant="primary" size="sm" wire:click="startRun">
                     @svg('heroicon-o-play', 'w-4 h-4')
                     <span>Durchlauf starten</span>
                 </x-ui-button>
@@ -2607,25 +2607,4 @@
         </x-slot>
     </x-ui-modal>
 
-    {{-- ── Run Modal (Start) ─────────────────────────────────── --}}
-    <x-ui-modal wire:model="runModalShow" size="md">
-        <x-slot name="header">
-            Durchlauf starten
-        </x-slot>
-
-        <div class="space-y-4">
-            <p class="text-sm text-[var(--ui-secondary)]">
-                Ein neuer Durchlauf mit <strong>{{ $this->steps->where('is_active', true)->count() }}</strong> Schritten wird erstellt.
-            </p>
-            <x-ui-input-textarea name="run_notes" label="Notizen / Kontext (optional)" wire:model="runNotes" rows="2" placeholder="z.B. Kunde, Auftragsnummer..." />
-        </div>
-
-        <x-slot name="footer">
-            <x-ui-button type="button" variant="secondary-outline" wire:click="$set('runModalShow', false)">Abbrechen</x-ui-button>
-            <x-ui-button type="button" variant="primary" wire:click="startRun">
-                @svg('heroicon-o-play', 'w-4 h-4')
-                Starten
-            </x-ui-button>
-        </x-slot>
-    </x-ui-modal>
 </x-ui-page>

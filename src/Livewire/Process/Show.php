@@ -93,9 +93,7 @@ class Show extends Component
     public bool $snapshotModalShow = false;
     public string $snapshotLabel = '';
 
-    // Run CRUD
-    public bool $runModalShow = false;
-    public string $runNotes = '';
+    // Run
     public ?int $activeRunId = null;
 
     // Improvement CRUD
@@ -1436,13 +1434,6 @@ class Show extends Component
 
     // ── Run CRUD ─────────────────────────────────────────────
 
-    public function createRun(): void
-    {
-        $this->runNotes = '';
-        $this->runModalShow = true;
-        $this->dispatch('toast', message: 'Modal sollte jetzt offen sein (runModalShow = true)');
-    }
-
     public function openActiveRun(int $runId): void
     {
         $this->activeRunId = $runId;
@@ -1466,7 +1457,6 @@ class Show extends Component
             'team_id'    => Auth::user()->currentTeam->id,
             'user_id'    => Auth::id(),
             'status'     => 'active',
-            'notes'      => $this->runNotes !== '' ? $this->runNotes : null,
             'started_at' => now(),
         ]);
 
@@ -1478,7 +1468,6 @@ class Show extends Component
             ]);
         }
 
-        $this->runModalShow = false;
         $this->activeRunId = $run->id;
         $this->activeTab = 'runs';
         $this->invalidateRunCaches();

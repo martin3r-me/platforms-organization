@@ -1592,8 +1592,15 @@ class Show extends Component
             }
         }
 
-        unset($this->steps, $this->corefitMetrics, $this->automationMetrics, $this->costMetrics, $this->improvementSimulations, $this->efficiencyMatrix);
-        $this->dispatch('toast', message: "{$updated} Steps mit Durchschnittswerten aktualisiert");
+        // Alle abhängigen Caches invalidieren
+        unset($this->steps, $this->corefitMetrics, $this->automationMetrics, $this->costMetrics, $this->improvementSimulations, $this->efficiencyMatrix, $this->complexityMetrics, $this->automationScore);
+        $this->invalidateRunCaches();
+
+        // Auto-Snapshot erstellen
+        $this->snapshotLabel = 'Soll-Zeiten aus Ø ' . $completedRuns->count() . ' Durchläufen übernommen';
+        $this->storeSnapshot();
+
+        $this->dispatch('toast', message: "{$updated} Steps aktualisiert + Snapshot erstellt");
     }
 
     private function checkRunAutoComplete(OrganizationProcessRun $run): void

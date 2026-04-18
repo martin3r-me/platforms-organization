@@ -40,21 +40,54 @@
             <span x-show="!collapsed" class="truncate">Organisationseinheiten</span>
         </a>
 
-        {{-- Prozesse --}}
+    </div>
+
+    {{-- Abschnitt: Prozesse --}}
+    @php $pCounts = $this->processCounts; @endphp
+    <div>
+        <h4 x-show="!collapsed" class="px-4 py-3 text-xs tracking-wide font-semibold text-[color:var(--ui-muted)] uppercase">Prozesse</h4>
+
+        {{-- Alle Prozesse --}}
         <a href="{{ route('organization.processes.index') }}"
            class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
            :class="[
-               window.location.pathname.includes('/processes') ||
-               window.location.pathname.endsWith('/processes') ||
-               window.location.pathname.endsWith('/processes/')
+               window.location.pathname.endsWith('/processes') || window.location.pathname.endsWith('/processes/')
                    ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
                    : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
                collapsed ? 'justify-center' : 'gap-3'
            ]"
            wire:navigate>
             <x-heroicon-o-arrow-path class="w-6 h-6 flex-shrink-0"/>
-            <span x-show="!collapsed" class="truncate">Prozesse</span>
+            <span x-show="!collapsed" class="truncate">Alle Prozesse</span>
+            @if(array_sum($pCounts) > 0)
+                <span x-show="!collapsed" class="ml-auto text-xs px-1.5 py-0.5 rounded-full bg-[color:var(--ui-muted-5)] text-[color:var(--ui-muted)]">{{ array_sum($pCounts) }}</span>
+            @endif
         </a>
+
+        {{-- Status-Links --}}
+        @foreach([
+            'draft'        => ['label' => 'Entwurf',     'icon' => 'pencil-square'],
+            'under_review' => ['label' => 'In Prüfung',  'icon' => 'magnifying-glass'],
+            'pilot'        => ['label' => 'Pilot',        'icon' => 'beaker'],
+            'active'       => ['label' => 'Aktiv',        'icon' => 'check-circle'],
+            'deprecated'   => ['label' => 'Veraltet',     'icon' => 'archive-box'],
+        ] as $statusKey => $statusMeta)
+            @if(($pCounts[$statusKey] ?? 0) > 0)
+                <a href="{{ route('organization.processes.status', $statusKey) }}"
+                   class="relative flex items-center px-3 py-1.5 my-0.5 rounded-md text-sm transition"
+                   :class="[
+                       window.location.pathname.includes('/processes/status/{{ $statusKey }}')
+                           ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                           : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+                       collapsed ? 'justify-center' : 'gap-3'
+                   ]"
+                   wire:navigate>
+                    <x-dynamic-component :component="'heroicon-o-' . $statusMeta['icon']" class="w-5 h-5 flex-shrink-0"/>
+                    <span x-show="!collapsed" class="truncate">{{ $statusMeta['label'] }}</span>
+                    <span x-show="!collapsed" class="ml-auto text-xs px-1.5 py-0.5 rounded-full bg-[color:var(--ui-muted-5)] text-[color:var(--ui-muted)]">{{ $pCounts[$statusKey] }}</span>
+                </a>
+            @endif
+        @endforeach
     </div>
 
     {{-- Abschnitt: Verbindungen --}}

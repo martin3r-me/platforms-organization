@@ -18,6 +18,7 @@ class Index extends Component
     public string $categoryFilter = '';
     public string $vsmFilter = '';
     public bool $focusFilter = false;
+    public bool $statusFromRoute = false;
 
     public bool $modalShow = false;
     public ?int $editingId = null;
@@ -37,11 +38,18 @@ class Index extends Component
 
     protected $queryString = [
         'search'         => ['except' => ''],
-        'statusFilter'   => ['except' => ''],
         'categoryFilter' => ['except' => ''],
         'vsmFilter'      => ['except' => ''],
         'focusFilter'    => ['except' => false],
     ];
+
+    public function mount(?string $status = null): void
+    {
+        if ($status && in_array($status, ['draft', 'under_review', 'pilot', 'active', 'deprecated'], true)) {
+            $this->statusFilter = $status;
+            $this->statusFromRoute = true;
+        }
+    }
 
     public function updatedSearch(): void
     {

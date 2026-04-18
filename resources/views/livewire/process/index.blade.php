@@ -4,10 +4,18 @@
     </x-slot>
 
     <x-slot name="actionbar">
-        <x-ui-page-actionbar :breadcrumbs="[
+        <x-ui-page-actionbar :breadcrumbs="array_filter([
             ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Prozesse'],
-        ]">
+            ['label' => 'Prozesse', 'href' => $statusFromRoute ? route('organization.processes.index') : null],
+            $statusFromRoute ? ['label' => match($statusFilter) {
+                'draft' => 'Entwurf',
+                'under_review' => 'In Prüfung',
+                'pilot' => 'Pilot',
+                'active' => 'Aktiv',
+                'deprecated' => 'Veraltet',
+                default => $statusFilter,
+            }] : null,
+        ])">
             <x-slot name="left">
                 <x-ui-input-select
                     wire:key="filter-status"

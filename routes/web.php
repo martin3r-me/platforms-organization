@@ -82,5 +82,7 @@ Route::get('/roles', RoleIndex::class)->name('organization.roles.index');
 
 // Prozesse
 Route::get('/processes', ProcessIndex::class)->name('organization.processes.index');
+Route::get('/processes/status/{status}', ProcessIndex::class)->name('organization.processes.status')
+    ->whereIn('status', ['draft', 'under_review', 'pilot', 'active', 'deprecated']);
 Route::get('/processes/{process}', ProcessShow::class)->name('organization.processes.show');
 Route::get('/processes/{process}/certificate.pdf', ProcessCertificatePdfController::class)->name('organization.processes.certificate-pdf');

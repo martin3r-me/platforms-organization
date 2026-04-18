@@ -1442,36 +1442,8 @@ class Show extends Component
 
     public function startRun(): void
     {
-        $activeSteps = $this->process->steps()
-            ->where('is_active', true)
-            ->orderBy('position')
-            ->get();
-
-        if ($activeSteps->isEmpty()) {
-            $this->dispatch('toast', message: 'Keine aktiven Steps vorhanden');
-            return;
-        }
-
-        $run = OrganizationProcessRun::create([
-            'process_id' => $this->process->id,
-            'team_id'    => Auth::user()->currentTeam->id,
-            'user_id'    => Auth::id(),
-            'status'     => 'active',
-            'started_at' => now(),
-        ]);
-
-        foreach ($activeSteps as $step) {
-            $run->runSteps()->create([
-                'process_step_id' => $step->id,
-                'position'        => $step->position,
-                'status'          => 'pending',
-            ]);
-        }
-
-        $this->activeRunId = $run->id;
-        $this->activeTab = 'runs';
-        $this->invalidateRunCaches();
-        $this->dispatch('toast', message: 'Durchlauf gestartet');
+        // DEBUG: Isolation test — only toast, no state changes, no DB
+        $this->dispatch('toast', message: 'startRun aufgerufen!');
     }
 
     public function completeStep(int $runStepId, ?int $activeDuration = null, ?int $waitOverride = null): void

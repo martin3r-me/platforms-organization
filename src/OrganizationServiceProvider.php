@@ -107,6 +107,12 @@ class OrganizationServiceProvider extends ServiceProvider
         // Tools registrieren (loose gekoppelt - für AI/Chat)
         $this->registerTools();
 
+        // Error Reporter Registration
+        try {
+            resolve(\Platform\Core\Services\ErrorReporterRegistry::class)
+                ->register('organization', 'Platform\\Organization');
+        } catch (\Throwable $e) {}
+
         // Scheduler registrieren
         $this->registerSchedule();
     }

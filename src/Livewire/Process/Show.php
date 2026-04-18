@@ -1468,7 +1468,9 @@ class Show extends Component
             ]);
         }
 
-        $this->activeTab = 'runs'; // DEBUG: jetzt auf runs-tab
+        $this->activeRunId = $run->id;
+        $this->activeTab = 'runs';
+        $this->invalidateRunCaches();
     }
 
     public function completeStep(int $runStepId, ?int $activeDuration = null, ?int $waitOverride = null): void

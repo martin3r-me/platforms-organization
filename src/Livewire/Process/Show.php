@@ -1448,7 +1448,7 @@ class Show extends Component
             ->get();
 
         if ($activeSteps->isEmpty()) {
-            $this->activeTab = 'snapshots'; // DEBUG: sichtbares Feedback
+            $this->dispatch('toast', message: 'Keine aktiven Steps vorhanden');
             return;
         }
 
@@ -1471,6 +1471,7 @@ class Show extends Component
         $this->activeRunId = $run->id;
         $this->activeTab = 'runs';
         $this->invalidateRunCaches();
+        $this->dispatch('toast', message: 'Durchlauf gestartet');
     }
 
     public function completeStep(int $runStepId, ?int $activeDuration = null, ?int $waitOverride = null): void

@@ -90,12 +90,9 @@ class Show extends Component
     public ?int $editingImprovementId = null;
     public array $improvementForm = [
         'title' => '',
-        'description' => '',
         'category' => 'speed',
         'priority' => 'medium',
         'status' => 'identified',
-        'expected_outcome' => '',
-        'actual_outcome' => '',
         'target_step_id' => '',
         'projected_duration_target_minutes' => '',
         'projected_automation_level' => '',
@@ -1260,9 +1257,8 @@ class Show extends Component
         $this->resetValidation();
         $this->editingImprovementId = null;
         $this->improvementForm = [
-            'title' => '', 'description' => '', 'category' => 'speed',
+            'title' => '', 'category' => 'speed',
             'priority' => 'medium', 'status' => 'identified',
-            'expected_outcome' => '', 'actual_outcome' => '',
             'target_step_id' => '', 'projected_duration_target_minutes' => '',
             'projected_automation_level' => '', 'projected_complexity' => '',
         ];
@@ -1278,12 +1274,9 @@ class Show extends Component
         $this->editingImprovementId = $imp->id;
         $this->improvementForm = [
             'title'                             => $imp->title,
-            'description'                       => $imp->description ?? '',
             'category'                          => $imp->category,
             'priority'                          => $imp->priority,
             'status'                            => $imp->status,
-            'expected_outcome'                  => $imp->expected_outcome ?? '',
-            'actual_outcome'                    => $imp->actual_outcome ?? '',
             'target_step_id'                    => (string) ($imp->target_step_id ?? ''),
             'projected_duration_target_minutes' => (string) ($imp->projected_duration_target_minutes ?? ''),
             'projected_automation_level'        => (string) ($imp->projected_automation_level ?? ''),
@@ -1296,12 +1289,9 @@ class Show extends Component
     {
         $this->validate([
             'improvementForm.title'                             => 'required|string|max:255',
-            'improvementForm.description'                       => 'nullable|string',
             'improvementForm.category'                          => 'required|in:cost,quality,speed,risk,standardization',
             'improvementForm.priority'                          => 'required|in:low,medium,high,critical',
             'improvementForm.status'                            => 'required|in:identified,planned,in_progress,on_hold,completed,under_observation,validated,failed,rejected',
-            'improvementForm.expected_outcome'                  => 'nullable|string',
-            'improvementForm.actual_outcome'                    => 'nullable|string',
             'improvementForm.target_step_id'                    => 'nullable|integer|exists:organization_process_steps,id',
             'improvementForm.projected_duration_target_minutes' => 'nullable|integer|min:0',
             'improvementForm.projected_automation_level'        => 'nullable|in:human,llm_assisted,llm_autonomous,hybrid',
@@ -1310,12 +1300,9 @@ class Show extends Component
 
         $payload = [
             'title'                             => $this->improvementForm['title'],
-            'description'                       => $this->improvementForm['description'] !== '' ? $this->improvementForm['description'] : null,
             'category'                          => $this->improvementForm['category'],
             'priority'                          => $this->improvementForm['priority'],
             'status'                            => $this->improvementForm['status'],
-            'expected_outcome'                  => $this->improvementForm['expected_outcome'] !== '' ? $this->improvementForm['expected_outcome'] : null,
-            'actual_outcome'                    => $this->improvementForm['actual_outcome'] !== '' ? $this->improvementForm['actual_outcome'] : null,
             'target_step_id'                    => $this->improvementForm['target_step_id'] !== '' ? (int) $this->improvementForm['target_step_id'] : null,
             'projected_duration_target_minutes' => $this->improvementForm['projected_duration_target_minutes'] !== '' ? (int) $this->improvementForm['projected_duration_target_minutes'] : null,
             'projected_automation_level'        => $this->improvementForm['projected_automation_level'] !== '' ? $this->improvementForm['projected_automation_level'] : null,

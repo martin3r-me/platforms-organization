@@ -2210,113 +2210,117 @@
         </x-slot>
 
         <form wire:submit.prevent="storeImprovement" class="space-y-4">
-            <x-ui-input-text name="imp_title" label="Titel" wire:model.live="improvementForm.title" required placeholder="Kurzer, aussagekräftiger Titel der Verbesserung" />
-            <x-ui-input-textarea name="imp_description" label="Beschreibung" wire:model.live="improvementForm.description" rows="2" placeholder="Was genau soll verbessert werden und warum?" />
+            <x-ui-input-text name="imp_title" label="Titel" wire:model.live="improvementForm.title" required placeholder="z.B. Rechnungsprüfung automatisieren" />
 
-            <div class="grid grid-cols-3 gap-4">
-                <div>
-                    <x-ui-input-select
-                        name="imp_category"
-                        label="Kategorie"
-                        :options="[
-                            ['value' => 'cost', 'label' => 'Kosten'],
-                            ['value' => 'quality', 'label' => 'Qualität'],
-                            ['value' => 'speed', 'label' => 'Geschwindigkeit'],
-                            ['value' => 'risk', 'label' => 'Risiko'],
-                            ['value' => 'standardization', 'label' => 'Standardisierung'],
-                        ]"
-                        wire:model.live="improvementForm.category"
-                    />
-                    <p class="text-xs text-[var(--ui-muted)] mt-1">In welchem Bereich wirkt die Verbesserung?</p>
-                </div>
-                <div>
-                    <x-ui-input-select
-                        name="imp_priority"
-                        label="Priorität"
-                        :options="[
-                            ['value' => 'low', 'label' => 'Niedrig'],
-                            ['value' => 'medium', 'label' => 'Mittel'],
-                            ['value' => 'high', 'label' => 'Hoch'],
-                            ['value' => 'critical', 'label' => 'Kritisch'],
-                        ]"
-                        wire:model.live="improvementForm.priority"
-                    />
-                    <p class="text-xs text-[var(--ui-muted)] mt-1">Wie dringend ist die Umsetzung?</p>
-                </div>
-                <div>
-                    <x-ui-input-select
-                        name="imp_status"
-                        label="Status"
-                        :options="[
-                            ['value' => 'identified', 'label' => 'Identifiziert'],
-                            ['value' => 'planned', 'label' => 'Geplant'],
-                            ['value' => 'in_progress', 'label' => 'In Arbeit'],
-                            ['value' => 'on_hold', 'label' => 'Pausiert'],
-                            ['value' => 'completed', 'label' => 'Umgesetzt'],
-                            ['value' => 'under_observation', 'label' => 'In Beobachtung'],
-                            ['value' => 'validated', 'label' => 'Validiert'],
-                            ['value' => 'failed', 'label' => 'Wirkungslos'],
-                            ['value' => 'rejected', 'label' => 'Abgelehnt'],
-                        ]"
-                        wire:model.live="improvementForm.status"
-                    />
-                    <p class="text-xs text-[var(--ui-muted)] mt-1">Aktueller Stand der Umsetzung</p>
-                </div>
+            <div class="grid grid-cols-2 gap-4">
+                <x-ui-input-select
+                    name="imp_target_step"
+                    label="Ziel-Step"
+                    :options="array_merge(
+                        [['value' => '', 'label' => '– Step wählen –']],
+                        $this->steps->map(fn($s) => ['value' => (string) $s->id, 'label' => '#' . $s->position . ' ' . $s->name])->toArray()
+                    )"
+                    wire:model.live="improvementForm.target_step_id"
+                />
+                <x-ui-input-select
+                    name="imp_category"
+                    label="Kategorie"
+                    :options="[
+                        ['value' => 'speed', 'label' => 'Geschwindigkeit'],
+                        ['value' => 'cost', 'label' => 'Kosten'],
+                        ['value' => 'quality', 'label' => 'Qualität'],
+                        ['value' => 'risk', 'label' => 'Risiko'],
+                        ['value' => 'standardization', 'label' => 'Standardisierung'],
+                    ]"
+                    wire:model.live="improvementForm.category"
+                />
             </div>
 
-            {{-- Score-Simulation --}}
-            <div x-data="{ showProjection: $wire.entangle('improvementForm.target_step_id').live !== '' }" class="border border-[var(--ui-border)]/40 rounded-lg">
-                <button type="button" @click="showProjection = !showProjection" class="w-full flex items-center justify-between px-4 py-3 text-sm text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)] transition-colors rounded-lg">
-                    <span class="font-medium">Score-Simulation (optional)</span>
-                    <span x-text="showProjection ? '−' : '+'" class="text-lg text-[var(--ui-muted)]"></span>
-                </button>
-                <div x-show="showProjection" x-transition class="px-4 pb-4 space-y-3">
-                    <p class="text-xs text-[var(--ui-muted)]">Wähle einen Ziel-Step und definiere die projizierten Werte nach Umsetzung der Verbesserung.</p>
-                    <x-ui-input-select
-                        name="imp_target_step"
-                        label="Ziel-Step"
-                        :options="array_merge(
-                            [['value' => '', 'label' => '– Kein Ziel-Step –']],
-                            $this->steps->map(fn($s) => ['value' => (string) $s->id, 'label' => '#' . $s->position . ' ' . $s->name])->toArray()
-                        )"
-                        wire:model.live="improvementForm.target_step_id"
-                    />
-                    @if($improvementForm['target_step_id'] !== '')
-                        <div class="grid grid-cols-3 gap-3">
-                            <x-ui-input-text name="proj_duration" label="Neue Dauer (Min.)" type="number" wire:model.live="improvementForm.projected_duration_target_minutes" min="0" placeholder="Unverändert" />
-                            <x-ui-input-select
-                                name="proj_automation"
-                                label="Neuer Automationsgrad"
-                                :options="[
-                                    ['value' => '', 'label' => 'Unverändert'],
-                                    ['value' => 'human', 'label' => 'Human'],
-                                    ['value' => 'llm_assisted', 'label' => 'LLM-Assisted'],
-                                    ['value' => 'llm_autonomous', 'label' => 'LLM-Autonomous'],
-                                    ['value' => 'hybrid', 'label' => 'Hybrid'],
-                                ]"
-                                wire:model.live="improvementForm.projected_automation_level"
-                            />
-                            <x-ui-input-select
-                                name="proj_complexity"
-                                label="Neue Komplexität"
-                                :options="[
-                                    ['value' => '', 'label' => 'Unverändert'],
-                                    ['value' => 'xs', 'label' => 'XS – Trivial'],
-                                    ['value' => 's', 'label' => 'S – Einfach'],
-                                    ['value' => 'm', 'label' => 'M – Mittel'],
-                                    ['value' => 'l', 'label' => 'L – Komplex'],
-                                    ['value' => 'xl', 'label' => 'XL – Sehr komplex'],
-                                    ['value' => 'xxl', 'label' => 'XXL – Extrem komplex'],
-                                ]"
-                                wire:model.live="improvementForm.projected_complexity"
-                            />
+            {{-- Projektion: Was ändert sich? --}}
+            @if($improvementForm['target_step_id'] !== '')
+                @php
+                    $targetStep = $this->steps->firstWhere('id', (int) $improvementForm['target_step_id']);
+                @endphp
+                @if($targetStep)
+                    <div class="p-3 rounded-lg bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
+                        <p class="text-xs font-medium text-[var(--ui-muted)] mb-2 uppercase tracking-wider">Aktuell: {{ $targetStep->name }}</p>
+                        <div class="grid grid-cols-3 gap-3 text-sm">
+                            <div>
+                                <span class="text-[var(--ui-muted)]">Dauer:</span>
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $targetStep->duration_target_minutes ?? '–' }} Min.</span>
+                            </div>
+                            <div>
+                                <span class="text-[var(--ui-muted)]">Automation:</span>
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $targetStep->automation_level ?? '–' }}</span>
+                            </div>
+                            <div>
+                                <span class="text-[var(--ui-muted)]">Komplexität:</span>
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $targetStep->complexity ?? '–' }}</span>
+                            </div>
                         </div>
-                    @endif
-                </div>
-            </div>
+                    </div>
+                @endif
 
-            <x-ui-input-textarea name="expected_outcome" label="Erwartetes Ergebnis" wire:model.live="improvementForm.expected_outcome" rows="2" placeholder="Welche messbare Verbesserung wird erwartet?" />
-            <x-ui-input-textarea name="actual_outcome" label="Tatsächliches Ergebnis" wire:model.live="improvementForm.actual_outcome" rows="2" placeholder="Was wurde tatsächlich erreicht? (nach Abschluss ausfüllen)" />
+                <div class="grid grid-cols-3 gap-3">
+                    <x-ui-input-text name="proj_duration" label="Neue Dauer (Min.)" type="number" wire:model.live="improvementForm.projected_duration_target_minutes" min="0" placeholder="Unverändert" />
+                    <x-ui-input-select
+                        name="proj_automation"
+                        label="Neuer Automationsgrad"
+                        :options="[
+                            ['value' => '', 'label' => 'Unverändert'],
+                            ['value' => 'human', 'label' => 'Human'],
+                            ['value' => 'llm_assisted', 'label' => 'LLM-Assisted'],
+                            ['value' => 'llm_autonomous', 'label' => 'LLM-Autonomous'],
+                            ['value' => 'hybrid', 'label' => 'Hybrid'],
+                        ]"
+                        wire:model.live="improvementForm.projected_automation_level"
+                    />
+                    <x-ui-input-select
+                        name="proj_complexity"
+                        label="Neue Komplexität"
+                        :options="[
+                            ['value' => '', 'label' => 'Unverändert'],
+                            ['value' => 'xs', 'label' => 'XS – Trivial'],
+                            ['value' => 's', 'label' => 'S – Einfach'],
+                            ['value' => 'm', 'label' => 'M – Mittel'],
+                            ['value' => 'l', 'label' => 'L – Komplex'],
+                            ['value' => 'xl', 'label' => 'XL – Sehr komplex'],
+                            ['value' => 'xxl', 'label' => 'XXL – Extrem komplex'],
+                        ]"
+                        wire:model.live="improvementForm.projected_complexity"
+                    />
+                </div>
+            @endif
+
+            <div class="grid grid-cols-2 gap-4">
+                <x-ui-input-select
+                    name="imp_priority"
+                    label="Priorität"
+                    :options="[
+                        ['value' => 'low', 'label' => 'Niedrig'],
+                        ['value' => 'medium', 'label' => 'Mittel'],
+                        ['value' => 'high', 'label' => 'Hoch'],
+                        ['value' => 'critical', 'label' => 'Kritisch'],
+                    ]"
+                    wire:model.live="improvementForm.priority"
+                />
+                <x-ui-input-select
+                    name="imp_status"
+                    label="Status"
+                    :options="[
+                        ['value' => 'identified', 'label' => 'Identifiziert'],
+                        ['value' => 'planned', 'label' => 'Geplant'],
+                        ['value' => 'in_progress', 'label' => 'In Arbeit'],
+                        ['value' => 'on_hold', 'label' => 'Pausiert'],
+                        ['value' => 'completed', 'label' => 'Umgesetzt'],
+                        ['value' => 'under_observation', 'label' => 'In Beobachtung'],
+                        ['value' => 'validated', 'label' => 'Validiert'],
+                        ['value' => 'failed', 'label' => 'Wirkungslos'],
+                        ['value' => 'rejected', 'label' => 'Abgelehnt'],
+                    ]"
+                    wire:model.live="improvementForm.status"
+                />
+            </div>
         </form>
 
         <x-slot name="footer">

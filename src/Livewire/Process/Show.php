@@ -1458,6 +1458,18 @@ class Show extends Component
         $this->runModalShow = true;
     }
 
+    public function openActiveRun(int $runId): void
+    {
+        $this->activeRunId = $runId;
+        $this->activeTab = 'runs';
+    }
+
+    public function startRunWithNotes(string $notes = ''): void
+    {
+        $this->runNotes = $notes;
+        $this->startRun();
+    }
+
     public function startRun(): void
     {
         $activeSteps = $this->process->steps()

@@ -324,35 +324,51 @@ class Show extends Component
     #[Computed]
     public function activeRuns()
     {
-        return $this->process->runs()
-            ->where('status', 'active')
-            ->with(['runSteps.processStep', 'user'])
-            ->orderByDesc('started_at')
-            ->get();
+        try {
+            return $this->process->runs()
+                ->where('status', 'active')
+                ->with(['runSteps.processStep', 'user'])
+                ->orderByDesc('started_at')
+                ->get();
+        } catch (\Throwable) {
+            return collect();
+        }
     }
 
     #[Computed]
     public function allRuns()
     {
-        return $this->process->runs()
-            ->with(['runSteps.processStep', 'user'])
-            ->orderByDesc('started_at')
-            ->get();
+        try {
+            return $this->process->runs()
+                ->with(['runSteps.processStep', 'user'])
+                ->orderByDesc('started_at')
+                ->get();
+        } catch (\Throwable) {
+            return collect();
+        }
     }
 
     #[Computed]
     public function activeRunCount(): int
     {
-        return $this->process->runs()->where('status', 'active')->count();
+        try {
+            return $this->process->runs()->where('status', 'active')->count();
+        } catch (\Throwable) {
+            return 0;
+        }
     }
 
     #[Computed]
     public function runAnalytics(): array
     {
-        $completedRuns = $this->process->runs()
-            ->where('status', 'completed')
-            ->with('runSteps')
-            ->get();
+        try {
+            $completedRuns = $this->process->runs()
+                ->where('status', 'completed')
+                ->with('runSteps')
+                ->get();
+        } catch (\Throwable) {
+            return ['total_completed' => 0];
+        }
 
         $totalCompleted = $completedRuns->count();
         if ($totalCompleted === 0) {

@@ -124,11 +124,7 @@ class Index extends Component
             $q->where('is_focus', true);
         }
 
-        try {
-            $q->withCount(['runs as active_runs_count' => fn ($rq) => $rq->where('status', 'active')]);
-        } catch (\Throwable) {
-            // Table may not exist yet before migration
-        }
+        $q->withCount(['runs as active_runs_count' => fn ($rq) => $rq->where('status', 'active')]);
 
         return $q->with(['ownerEntity', 'vsmSystem', 'steps:id,process_id,automation_level'])
             ->orderBy('name')

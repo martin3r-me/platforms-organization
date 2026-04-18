@@ -22,7 +22,7 @@
                 </x-ui-button>
             @endif
 
-            <x-ui-button variant="primary" size="sm" @click="$dispatch('open-run-modal')">
+            <x-ui-button variant="primary" size="sm" wire:click="createRun">
                 @svg('heroicon-o-play', 'w-4 h-4')
                 <span>Durchlauf starten</span>
                 @if($this->activeRunCount > 0)
@@ -290,7 +290,7 @@
                     @endforelse
                     <button
                         type="button"
-                        @click="$dispatch('open-run-modal')"
+                        wire:click="createRun"
                         class="w-full py-2 px-4 border-2 border-dashed border-[var(--ui-border)]/60 rounded-lg text-xs text-[var(--ui-muted)] hover:border-[var(--ui-warning)] hover:text-[var(--ui-secondary)] transition-colors flex items-center justify-center gap-1"
                     >
                         @svg('heroicon-o-play', 'w-3.5 h-3.5')
@@ -1539,7 +1539,7 @@
         {{-- ── Tab: Durchläufe ────────────────────────────────── --}}
         @if($activeTab === 'runs')
             <div class="flex justify-end mb-4">
-                <x-ui-button variant="primary" size="sm" @click="$dispatch('open-run-modal')">
+                <x-ui-button variant="primary" size="sm" wire:click="createRun">
                     @svg('heroicon-o-play', 'w-4 h-4')
                     <span>Durchlauf starten</span>
                 </x-ui-button>
@@ -2607,54 +2607,25 @@
         </x-slot>
     </x-ui-modal>
 
-    {{-- ── Run Modal (Start) — Alpine-only open/close ──────── --}}
-    <div
-        x-data="{ showRunModal: false, runNotes: '' }"
-        x-on:open-run-modal.window="showRunModal = true; runNotes = ''"
-        x-show="showRunModal"
-        x-cloak
-    >
-        <div class="fixed inset-0 z-[100] flex items-center justify-center p-4"
-            x-transition:enter="transition ease-out duration-300"
-            x-transition:enter-start="opacity-0"
-            x-transition:enter-end="opacity-100"
-            x-transition:leave="transition ease-in duration-200"
-            x-transition:leave-start="opacity-100"
-            x-transition:leave-end="opacity-0"
-        >
-            <div class="absolute inset-0 backdrop-blur-md bg-black/50 z-[90]" @click="showRunModal = false"></div>
-            <div class="relative z-[100] w-full max-w-2xl rounded-xl bg-[var(--ui-surface)] shadow-2xl border border-[var(--ui-border)]/60"
-                x-transition:enter="transition ease-out duration-300"
-                x-transition:enter-start="opacity-0 scale-95"
-                x-transition:enter-end="opacity-100 scale-100"
-                x-transition:leave="transition ease-in duration-200"
-                x-transition:leave-start="opacity-100 scale-100"
-                x-transition:leave-end="opacity-0 scale-95"
-                @keydown.escape.window="showRunModal = false"
-            >
-                <div class="px-6 py-4 border-b border-[var(--ui-border)]/60 flex items-center justify-between">
-                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Durchlauf starten</h2>
-                    <button @click="showRunModal = false" class="p-2 text-[var(--ui-muted)] hover:text-[var(--ui-danger)] rounded-lg transition-all">
-                        @svg('heroicon-o-x-mark', 'w-5 h-5')
-                    </button>
-                </div>
-                <div class="p-6 space-y-4">
-                    <p class="text-sm text-[var(--ui-secondary)]">
-                        Ein neuer Durchlauf mit <strong>{{ $this->steps->where('is_active', true)->count() }}</strong> Schritten wird erstellt.
-                    </p>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Notizen / Kontext (optional)</label>
-                        <textarea x-model="runNotes" rows="2" placeholder="z.B. Kunde, Auftragsnummer..." class="w-full text-sm px-3 py-2 rounded-lg border border-[var(--ui-border)] focus:border-[var(--ui-info)] focus:ring-1 focus:ring-[var(--ui-info)] bg-[var(--ui-surface)]"></textarea>
-                    </div>
-                </div>
-                <div class="px-6 py-4 border-t border-[var(--ui-border)]/60 flex justify-end gap-3">
-                    <x-ui-button type="button" variant="secondary-outline" @click="showRunModal = false">Abbrechen</x-ui-button>
-                    <x-ui-button type="button" variant="primary" @click="$wire.call('startRunWithNotes', runNotes); showRunModal = false">
-                        @svg('heroicon-o-play', 'w-4 h-4 mr-2')
-                        Starten
-                    </x-ui-button>
-                </div>
-            </div>
+    {{-- ── Run Modal (Start) ─────────────────────────────────── --}}
+    <x-ui-modal wire:model="runModalShow" size="md">
+        <x-slot name="header">
+            Durchlauf starten
+        </x-slot>
+
+        <div class="space-y-4">
+            <p class="text-sm text-[var(--ui-secondary)]">
+                Ein neuer Durchlauf mit <strong>{{ $this->steps->where('is_active', true)->count() }}</strong> Schritten wird erstellt.
+            </p>
+            <x-ui-input-textarea name="run_notes" label="Notizen / Kontext (optional)" wire:model="runNotes" rows="2" placeholder="z.B. Kunde, Auftragsnummer..." />
         </div>
-    </div>
+
+        <x-slot name="footer">
+            <x-ui-button type="button" variant="secondary-outline" wire:click="$set('runModalShow', false)">Abbrechen</x-ui-button>
+            <x-ui-button type="button" variant="primary" wire:click="startRun">
+                @svg('heroicon-o-play', 'w-4 h-4')
+                Starten
+            </x-ui-button>
+        </x-slot>
+    </x-ui-modal>
 </x-ui-page>

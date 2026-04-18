@@ -324,51 +324,35 @@ class Show extends Component
     #[Computed]
     public function activeRuns()
     {
-        try {
-            return $this->process->runs()
-                ->where('status', 'active')
-                ->with(['runSteps.processStep', 'user'])
-                ->orderByDesc('started_at')
-                ->get();
-        } catch (\Throwable) {
-            return collect();
-        }
+        return $this->process->runs()
+            ->where('status', 'active')
+            ->with(['runSteps.processStep', 'user'])
+            ->orderByDesc('started_at')
+            ->get();
     }
 
     #[Computed]
     public function allRuns()
     {
-        try {
-            return $this->process->runs()
-                ->with(['runSteps.processStep', 'user'])
-                ->orderByDesc('started_at')
-                ->get();
-        } catch (\Throwable) {
-            return collect();
-        }
+        return $this->process->runs()
+            ->with(['runSteps.processStep', 'user'])
+            ->orderByDesc('started_at')
+            ->get();
     }
 
     #[Computed]
     public function activeRunCount(): int
     {
-        try {
-            return $this->process->runs()->where('status', 'active')->count();
-        } catch (\Throwable) {
-            return 0;
-        }
+        return $this->process->runs()->where('status', 'active')->count();
     }
 
     #[Computed]
     public function runAnalytics(): array
     {
-        try {
-            $completedRuns = $this->process->runs()
-                ->where('status', 'completed')
-                ->with('runSteps')
-                ->get();
-        } catch (\Throwable) {
-            return ['total_completed' => 0];
-        }
+        $completedRuns = $this->process->runs()
+            ->where('status', 'completed')
+            ->with('runSteps')
+            ->get();
 
         $totalCompleted = $completedRuns->count();
         if ($totalCompleted === 0) {
@@ -1462,12 +1446,6 @@ class Show extends Component
     {
         $this->activeRunId = $runId;
         $this->activeTab = 'runs';
-    }
-
-    public function startRunWithNotes(string $notes = ''): void
-    {
-        $this->runNotes = $notes;
-        $this->startRun();
     }
 
     public function startRun(): void

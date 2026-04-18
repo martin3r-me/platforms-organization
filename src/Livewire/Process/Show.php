@@ -1442,7 +1442,33 @@ class Show extends Component
 
     public function startRun(): void
     {
-        $this->activeTab = 'snapshots';
+        $activeSteps = $this->process->steps()
+            ->where('is_active', true)
+            ->orderBy('position')
+            ->get();
+
+        if ($activeSteps->isEmpty()) {
+            $this->activeTab = 'snapshots'; // DEBUG: sichtbares Feedback
+            return;
+        }
+
+        $run = OrganizationProcessRun::create([
+            'process_id' => $this->process->id,
+            'team_id'    => Auth::user()->currentTeam->id,
+            'user_id'    => Auth::id(),
+            'status'     => 'active',
+            'started_at' => now(),
+        ]);
+
+        foreach ($activeSteps as $step) {
+            $run->runSteps()->create([
+                'process_step_id' => $step->id,
+                'position'        => $step->position,
+                'status'          => 'pending',
+            ]);
+        }
+
+        $this->activeTab = 'snapshots'; // DEBUG: landing page
     }
 
     public function completeStep(int $runStepId, ?int $activeDuration = null, ?int $waitOverride = null): void

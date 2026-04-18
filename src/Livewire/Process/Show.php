@@ -19,9 +19,13 @@ use Platform\Organization\Models\OrganizationProcessTrigger;
 use Platform\Organization\Models\OrganizationProcessOutput;
 use Platform\Organization\Models\OrganizationProcessSnapshot;
 use Platform\Organization\Models\OrganizationProcessImprovement;
+use Platform\Organization\Models\OrganizationProcessRun;
+use Platform\Organization\Models\OrganizationProcessRunStep;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationVsmSystem;
+use Platform\Organization\Enums\RunStatus;
+use Platform\Organization\Enums\RunStepStatus;
 use Platform\Organization\Services\ProcessCertificateService;
 use Illuminate\Support\Str;
 
@@ -88,6 +92,11 @@ class Show extends Component
     // Snapshot
     public bool $snapshotModalShow = false;
     public string $snapshotLabel = '';
+
+    // Run CRUD
+    public bool $runModalShow = false;
+    public string $runNotes = '';
+    public ?int $activeRunId = null;
 
     // Improvement CRUD
     public bool $improvementModalShow = false;
@@ -310,6 +319,68 @@ class Show extends Component
     public function processImprovements()
     {
         return $this->process->improvements()->orderByDesc('created_at')->get();
+    }
+
+    #[Computed]
+    public function activeRuns()
+    {
+        return $this->process->runs()
+            ->where('status', 'active')
+            ->with(['runSteps.processStep', 'user'])
+            ->orderByDesc('started_at')
+            ->get();
+    }
+
+    #[Computed]
+    public function allRuns()
+    {
+        return $this->process->runs()
+            ->with(['runSteps.processStep', 'user'])
+            ->orderByDesc('started_at')
+            ->get();
+    }
+
+    #[Computed]
+    public function activeRunCount(): int
+    {
+        return $this->process->runs()->where('status', 'active')->count();
+    }
+
+    #[Computed]
+    public function runAnalytics(): array
+    {
+        $completedRuns = $this->process->runs()
+            ->where('status', 'completed')
+            ->with('runSteps')
+            ->get();
+
+        $totalCompleted = $completedRuns->count();
+        if ($totalCompleted === 0) {
+            return ['total_completed' => 0];
+        }
+
+        $avgActive = $completedRuns->avg(fn ($r) => $r->runSteps->sum('active_duration_minutes'));
+        $avgWait = $completedRuns->avg(fn ($r) => $r->runSteps->sum('wait_duration_minutes'));
+        $avgLeadTime = $avgActive + $avgWait;
+
+        $steps = $this->steps;
+        $targetActive = $steps->sum('duration_target_minutes') ?? 0;
+        $targetWait = $steps->sum('wait_target_minutes') ?? 0;
+        $targetLeadTime = $targetActive + $targetWait;
+
+        $efficiencyDelta = $targetLeadTime > 0
+            ? round((($avgLeadTime - $targetLeadTime) / $targetLeadTime) * 100, 1)
+            : 0;
+
+        return [
+            'total_completed'       => $totalCompleted,
+            'avg_active_minutes'    => round($avgActive, 1),
+            'avg_wait_minutes'      => round($avgWait, 1),
+            'avg_lead_time_minutes' => round($avgLeadTime, 1),
+            'target_active_minutes' => $targetActive,
+            'target_wait_minutes'   => $targetWait,
+            'efficiency_delta'      => $efficiencyDelta,
+        ];
     }
 
     #[Computed]
@@ -1361,6 +1432,147 @@ class Show extends Component
         $this->process->improvements()->where('id', $id)->delete();
         unset($this->processImprovements, $this->improvementsByCategory, $this->improvementSimulations);
         $this->dispatch('toast', message: 'Verbesserung gelöscht');
+    }
+
+    // ── Run CRUD ─────────────────────────────────────────────
+
+    public function createRun(): void
+    {
+        $this->runNotes = '';
+        $this->runModalShow = true;
+    }
+
+    public function startRun(): void
+    {
+        $activeSteps = $this->process->steps()
+            ->where('is_active', true)
+            ->orderBy('position')
+            ->get();
+
+        if ($activeSteps->isEmpty()) {
+            $this->dispatch('toast', message: 'Keine aktiven Steps vorhanden');
+            return;
+        }
+
+        $run = OrganizationProcessRun::create([
+            'process_id' => $this->process->id,
+            'team_id'    => Auth::user()->currentTeam->id,
+            'user_id'    => Auth::id(),
+            'status'     => 'active',
+            'notes'      => $this->runNotes !== '' ? $this->runNotes : null,
+            'started_at' => now(),
+        ]);
+
+        foreach ($activeSteps as $step) {
+            $run->runSteps()->create([
+                'process_step_id' => $step->id,
+                'position'        => $step->position,
+                'status'          => 'pending',
+            ]);
+        }
+
+        $this->runModalShow = false;
+        $this->activeRunId = $run->id;
+        $this->activeTab = 'runs';
+        $this->invalidateRunCaches();
+        $this->dispatch('toast', message: 'Durchlauf gestartet');
+    }
+
+    public function completeStep(int $runStepId, ?int $activeDuration = null, ?int $waitOverride = null): void
+    {
+        $runStep = OrganizationProcessRunStep::with('run')->find($runStepId);
+        if (! $runStep || $runStep->run->process_id !== $this->process->id) return;
+        if ($runStep->status !== RunStepStatus::PENDING) return;
+
+        $updates = [
+            'status'     => 'completed',
+            'checked_at' => now(),
+            'active_duration_minutes' => $activeDuration,
+        ];
+
+        if ($waitOverride !== null) {
+            $updates['wait_duration_minutes'] = $waitOverride;
+            $updates['wait_override'] = true;
+        } else {
+            $previousStep = $runStep->run->runSteps()
+                ->where('position', '<', $runStep->position)
+                ->whereNotNull('checked_at')
+                ->orderByDesc('position')
+                ->first();
+
+            if ($previousStep && $previousStep->checked_at) {
+                $totalMinutesSince = (int) $previousStep->checked_at->diffInMinutes(now());
+                $waitMinutes = max(0, $totalMinutesSince - ($activeDuration ?? 0));
+                $updates['wait_duration_minutes'] = $waitMinutes;
+            }
+        }
+
+        $runStep->update($updates);
+        $this->checkRunAutoComplete($runStep->run);
+        $this->invalidateRunCaches();
+    }
+
+    public function skipStep(int $runStepId): void
+    {
+        $runStep = OrganizationProcessRunStep::with('run')->find($runStepId);
+        if (! $runStep || $runStep->run->process_id !== $this->process->id) return;
+        if ($runStep->status !== RunStepStatus::PENDING) return;
+
+        $runStep->update([
+            'status'     => 'skipped',
+            'checked_at' => now(),
+        ]);
+
+        $this->checkRunAutoComplete($runStep->run);
+        $this->invalidateRunCaches();
+    }
+
+    public function cancelRun(int $runId): void
+    {
+        $run = $this->process->runs()->where('id', $runId)->where('status', 'active')->first();
+        if (! $run) return;
+
+        $run->update([
+            'status'       => 'cancelled',
+            'cancelled_at' => now(),
+        ]);
+
+        $this->invalidateRunCaches();
+        $this->dispatch('toast', message: 'Durchlauf abgebrochen');
+    }
+
+    public function deleteRun(int $runId): void
+    {
+        $this->process->runs()->where('id', $runId)->delete();
+        if ($this->activeRunId === $runId) {
+            $this->activeRunId = null;
+        }
+        $this->invalidateRunCaches();
+        $this->dispatch('toast', message: 'Durchlauf gelöscht');
+    }
+
+    public function setActiveRun(?int $runId): void
+    {
+        $this->activeRunId = $runId;
+    }
+
+    private function checkRunAutoComplete(OrganizationProcessRun $run): void
+    {
+        $allSteps = $run->runSteps()->get();
+        $allDone = $allSteps->every(fn ($s) => in_array($s->status->value, ['completed', 'skipped']));
+
+        if ($allDone) {
+            $run->update([
+                'status'       => 'completed',
+                'completed_at' => now(),
+            ]);
+            $this->dispatch('toast', message: 'Durchlauf abgeschlossen');
+        }
+    }
+
+    private function invalidateRunCaches(): void
+    {
+        unset($this->activeRuns, $this->allRuns, $this->activeRunCount, $this->runAnalytics);
     }
 
     public function render()

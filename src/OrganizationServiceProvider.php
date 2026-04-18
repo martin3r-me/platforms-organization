@@ -49,6 +49,8 @@ class OrganizationServiceProvider extends ServiceProvider
             'organization_process_step'          => \Platform\Organization\Models\OrganizationProcessStep::class,
             'organization_process_chain'         => \Platform\Organization\Models\OrganizationProcessChain::class,
             'organization_process_chain_member'  => \Platform\Organization\Models\OrganizationProcessChainMember::class,
+            'organization_process_run'           => \Platform\Organization\Models\OrganizationProcessRun::class,
+            'organization_process_run_step'      => \Platform\Organization\Models\OrganizationProcessRunStep::class,
         ]);
 
         // Schritt 1: Config laden
@@ -356,6 +358,12 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\AddProcessToChainTool());
             $registry->register(new \Platform\Organization\Tools\RemoveProcessFromChainTool());
             $registry->register(new \Platform\Organization\Tools\DetectProcessChainsTool());
+
+            // Process Run Tools (Execution Tracking)
+            $registry->register(new \Platform\Organization\Tools\ListProcessRunsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateProcessRunTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateProcessRunTool());
+            $registry->register(new \Platform\Organization\Tools\CompleteProcessRunStepTool());
 
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);

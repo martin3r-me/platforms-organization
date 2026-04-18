@@ -103,6 +103,7 @@
                 ['value' => 'triggers', 'label' => 'Triggers', 'count' => $this->triggers->count()],
                 ['value' => 'outputs', 'label' => 'Outputs', 'count' => $this->outputs->count()],
                 ['value' => 'improvements', 'label' => 'Verbesserungen', 'count' => $this->processImprovements->count()],
+                ['value' => 'runs', 'label' => 'Durchläufe', 'count' => $this->allRuns->count()],
                 ['value' => 'snapshots', 'label' => 'Snapshots', 'count' => $this->processSnapshots->count()],
                 ['value' => 'certificate', 'label' => 'Ausweis'],
             ];
@@ -246,6 +247,48 @@
                         </div>
                     </div>
                 @endif
+                {{-- Aktive Durchläufe --}}
+                <div>
+                    <div class="flex items-center justify-between mb-3">
+                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider">Aktive Durchläufe</h3>
+                        @if($this->activeRunCount > 0)
+                            <x-ui-badge variant="warning" size="sm">{{ $this->activeRunCount }}</x-ui-badge>
+                        @endif
+                    </div>
+                    @forelse($this->activeRuns as $aRun)
+                        @php
+                            $aRunTotal = $aRun->runSteps->count();
+                            $aRunDone = $aRun->runSteps->whereIn('status', [\Platform\Organization\Enums\RunStepStatus::COMPLETED, \Platform\Organization\Enums\RunStepStatus::SKIPPED])->count();
+                            $aRunPercent = $aRunTotal > 0 ? round(($aRunDone / $aRunTotal) * 100) : 0;
+                        @endphp
+                        <button
+                            type="button"
+                            wire:click="$set('activeRunId', {{ $aRun->id }}); $set('activeTab', 'runs')"
+                            class="w-full text-left py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 hover:border-[var(--ui-warning)] transition-colors mb-2"
+                        >
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="text-xs text-[var(--ui-muted)]">{{ $aRun->started_at->format('d.m.Y H:i') }}</span>
+                                <span class="text-xs font-medium text-[var(--ui-secondary)]">{{ $aRunDone }}/{{ $aRunTotal }}</span>
+                            </div>
+                            <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-1.5 mb-1">
+                                <div class="h-1.5 rounded-full bg-[var(--ui-warning)]" style="width: {{ $aRunPercent }}%"></div>
+                            </div>
+                            @if($aRun->notes)
+                                <p class="text-[10px] text-[var(--ui-muted)] truncate mt-1">{{ $aRun->notes }}</p>
+                            @endif
+                        </button>
+                    @empty
+                        <p class="text-xs text-[var(--ui-muted)] mb-2">Keine aktiven Durchläufe</p>
+                    @endforelse
+                    <button
+                        type="button"
+                        wire:click="createRun"
+                        class="w-full py-2 px-4 border-2 border-dashed border-[var(--ui-border)]/60 rounded-lg text-xs text-[var(--ui-muted)] hover:border-[var(--ui-warning)] hover:text-[var(--ui-secondary)] transition-colors flex items-center justify-center gap-1"
+                    >
+                        @svg('heroicon-o-play', 'w-3.5 h-3.5')
+                        Durchlauf starten
+                    </button>
+                </div>
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Details</h3>
                     <div class="space-y-3">
@@ -1485,6 +1528,225 @@
             @endif
         @endif
 
+        {{-- ── Tab: Durchläufe ────────────────────────────────── --}}
+        @if($activeTab === 'runs')
+            <div class="flex justify-end mb-4">
+                <x-ui-button variant="primary" size="sm" wire:click="createRun">
+                    @svg('heroicon-o-play', 'w-4 h-4')
+                    <span>Durchlauf starten</span>
+                </x-ui-button>
+            </div>
+
+            {{-- Expanded Run --}}
+            @if($activeRunId)
+                @php $expandedRun = $this->allRuns->firstWhere('id', $activeRunId); @endphp
+                @if($expandedRun)
+                    <div class="bg-white rounded-lg border border-[var(--ui-border)] mb-6">
+                        <div class="flex items-center justify-between px-5 py-3 border-b border-[var(--ui-border)]/40">
+                            <div class="flex items-center gap-3">
+                                <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $expandedRun->started_at->format('d.m.Y H:i') }}</span>
+                                <x-ui-badge variant="{{ $expandedRun->status->color() }}" size="sm">{{ $expandedRun->status->label() }}</x-ui-badge>
+                                @if($expandedRun->user)
+                                    <span class="text-xs text-[var(--ui-muted)]">{{ $expandedRun->user->name }}</span>
+                                @endif
+                            </div>
+                            <div class="flex items-center gap-2">
+                                @if($expandedRun->status === \Platform\Organization\Enums\RunStatus::ACTIVE)
+                                    <x-ui-confirm-button size="xs" variant="danger-outline" wire:click="cancelRun({{ $expandedRun->id }})" confirm-text="Durchlauf wirklich abbrechen?">
+                                        @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                        <span>Abbrechen</span>
+                                    </x-ui-confirm-button>
+                                @endif
+                                <x-ui-button size="xs" variant="secondary-outline" wire:click="setActiveRun(null)">
+                                    @svg('heroicon-o-chevron-up', 'w-4 h-4')
+                                </x-ui-button>
+                            </div>
+                        </div>
+                        @if($expandedRun->notes)
+                            <div class="px-5 py-2 border-b border-[var(--ui-border)]/40 bg-[var(--ui-muted-5)]">
+                                <p class="text-xs text-[var(--ui-muted)]">{{ $expandedRun->notes }}</p>
+                            </div>
+                        @endif
+                        <div class="p-5 space-y-2">
+                            @foreach($expandedRun->runSteps->sortBy('position') as $rs)
+                                @php
+                                    $isCompleted = $rs->status === \Platform\Organization\Enums\RunStepStatus::COMPLETED;
+                                    $isSkipped = $rs->status === \Platform\Organization\Enums\RunStepStatus::SKIPPED;
+                                    $isPending = $rs->status === \Platform\Organization\Enums\RunStepStatus::PENDING;
+                                    $isActiveRun = $expandedRun->status === \Platform\Organization\Enums\RunStatus::ACTIVE;
+                                @endphp
+                                <div
+                                    x-data="{ editing: false, activeDur: '', waitDur: '' }"
+                                    class="flex items-start gap-3 py-2 px-3 rounded-lg {{ $isCompleted ? 'bg-green-50/50' : ($isSkipped ? 'bg-[var(--ui-muted-5)]' : 'hover:bg-[var(--ui-muted-5)]') }}"
+                                >
+                                    {{-- Circle --}}
+                                    <div class="flex-shrink-0 mt-0.5">
+                                        @if($isCompleted)
+                                            <div class="w-5 h-5 rounded-full bg-[var(--ui-success)] flex items-center justify-center">
+                                                @svg('heroicon-s-check', 'w-3 h-3 text-white')
+                                            </div>
+                                        @elseif($isSkipped)
+                                            <div class="w-5 h-5 rounded-full bg-[var(--ui-muted)] flex items-center justify-center">
+                                                @svg('heroicon-s-minus', 'w-3 h-3 text-white')
+                                            </div>
+                                        @elseif($isPending && $isActiveRun)
+                                            <button
+                                                @click="editing = !editing"
+                                                class="w-5 h-5 rounded-full border-2 border-[var(--ui-border)] hover:border-[var(--ui-success)] transition-colors"
+                                            ></button>
+                                        @else
+                                            <div class="w-5 h-5 rounded-full border-2 border-[var(--ui-border)]"></div>
+                                        @endif
+                                    </div>
+
+                                    {{-- Content --}}
+                                    <div class="flex-1 min-w-0">
+                                        <div class="flex items-center gap-2">
+                                            <span class="text-xs text-[var(--ui-muted)] font-mono">{{ $rs->position }}.</span>
+                                            <span class="text-sm {{ $isCompleted ? 'line-through text-[var(--ui-muted)]' : ($isSkipped ? 'text-[var(--ui-muted)]' : 'text-[var(--ui-secondary)]') }}">
+                                                {{ $rs->processStep?->name ?? 'Step' }}
+                                            </span>
+                                            @if($rs->processStep?->duration_target_minutes)
+                                                <span class="text-[10px] text-[var(--ui-muted)]">(Soll: {{ $rs->processStep->duration_target_minutes }} Min.)</span>
+                                            @endif
+                                        </div>
+                                        @if($isCompleted || $isSkipped)
+                                            <div class="flex flex-wrap gap-3 mt-1 text-[10px] text-[var(--ui-muted)]">
+                                                @if($rs->active_duration_minutes !== null)
+                                                    <span>Aktiv: {{ $rs->active_duration_minutes }} Min.</span>
+                                                @endif
+                                                @if($rs->wait_duration_minutes !== null)
+                                                    <span>Wartezeit: {{ $rs->wait_duration_minutes }} Min.{{ $rs->wait_override ? ' (manuell)' : '' }}</span>
+                                                @endif
+                                                @if($rs->processStep?->duration_target_minutes && $rs->active_duration_minutes !== null)
+                                                    @php $delta = $rs->active_duration_minutes - $rs->processStep->duration_target_minutes; @endphp
+                                                    <span class="{{ $delta > 0 ? 'text-red-500' : 'text-green-600' }}">
+                                                        {{ $delta > 0 ? '+' : '' }}{{ $delta }} Min. vs. Soll
+                                                    </span>
+                                                @endif
+                                                @if($rs->checked_at)
+                                                    <span>{{ $rs->checked_at->format('H:i') }}</span>
+                                                @endif
+                                            </div>
+                                        @endif
+
+                                        {{-- Inline edit for pending steps --}}
+                                        @if($isPending && $isActiveRun)
+                                            <div x-show="editing" x-transition class="mt-2 flex items-end gap-2 flex-wrap">
+                                                <div>
+                                                    <label class="text-[10px] text-[var(--ui-muted)] block mb-0.5">Aktive Zeit (Min.)</label>
+                                                    <input type="number" x-model="activeDur" min="0" placeholder="0" class="w-20 text-xs px-2 py-1 rounded border border-[var(--ui-border)] focus:border-[var(--ui-info)] focus:ring-1 focus:ring-[var(--ui-info)]" />
+                                                </div>
+                                                <div>
+                                                    <label class="text-[10px] text-[var(--ui-muted)] block mb-0.5">Wartezeit (Min., opt.)</label>
+                                                    <input type="number" x-model="waitDur" min="0" placeholder="auto" class="w-20 text-xs px-2 py-1 rounded border border-[var(--ui-border)] focus:border-[var(--ui-info)] focus:ring-1 focus:ring-[var(--ui-info)]" />
+                                                </div>
+                                                <button
+                                                    type="button"
+                                                    @click="$wire.completeStep({{ $rs->id }}, activeDur ? parseInt(activeDur) : null, waitDur ? parseInt(waitDur) : null); editing = false"
+                                                    class="px-2 py-1 text-xs font-medium bg-[var(--ui-success)] text-white rounded hover:bg-[var(--ui-success)]/90 transition-colors"
+                                                >
+                                                    Erledigt
+                                                </button>
+                                                <button
+                                                    type="button"
+                                                    @click="$wire.skipStep({{ $rs->id }}); editing = false"
+                                                    class="px-2 py-1 text-xs text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] transition-colors"
+                                                >
+                                                    Skip
+                                                </button>
+                                            </div>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
+            @endif
+
+            {{-- Run-Liste --}}
+            <x-ui-table compact="true">
+                <x-ui-table-header>
+                    <x-ui-table-header-cell compact="true">Gestartet</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Fortschritt</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Aktive Zeit</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Wartezeit</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true">Erstellt von</x-ui-table-header-cell>
+                    <x-ui-table-header-cell compact="true"></x-ui-table-header-cell>
+                </x-ui-table-header>
+                <x-ui-table-body>
+                    @forelse($this->allRuns as $run)
+                        @php
+                            $runTotal = $run->runSteps->count();
+                            $runDone = $run->runSteps->whereIn('status', [\Platform\Organization\Enums\RunStepStatus::COMPLETED, \Platform\Organization\Enums\RunStepStatus::SKIPPED])->count();
+                        @endphp
+                        <x-ui-table-row compact="true" class="cursor-pointer hover:bg-[var(--ui-muted-5)]" wire:click="setActiveRun({{ $run->id }})">
+                            <x-ui-table-cell compact="true">
+                                <span class="text-sm">{{ $run->started_at->format('d.m.Y H:i') }}</span>
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                <x-ui-badge variant="{{ $run->status->color() }}" size="sm">{{ $run->status->label() }}</x-ui-badge>
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                <span class="text-sm">{{ $runDone }}/{{ $runTotal }}</span>
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                <span class="text-sm">{{ $run->runSteps->sum('active_duration_minutes') ?? 0 }} Min.</span>
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                <span class="text-sm">{{ $run->runSteps->sum('wait_duration_minutes') ?? 0 }} Min.</span>
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                <span class="text-sm">{{ $run->user?->name ?? '–' }}</span>
+                            </x-ui-table-cell>
+                            <x-ui-table-cell compact="true">
+                                <div class="flex gap-1 justify-end" @click.stop>
+                                    <x-ui-confirm-button size="xs" variant="danger-outline" wire:click="deleteRun({{ $run->id }})" confirm-text="Durchlauf wirklich löschen?">
+                                        @svg('heroicon-o-trash', 'w-4 h-4')
+                                    </x-ui-confirm-button>
+                                </div>
+                            </x-ui-table-cell>
+                        </x-ui-table-row>
+                    @empty
+                        <x-ui-table-row compact="true">
+                            <x-ui-table-cell compact="true" colspan="7">
+                                <div class="text-center text-[var(--ui-muted)] py-6">Noch keine Durchläufe</div>
+                            </x-ui-table-cell>
+                        </x-ui-table-row>
+                    @endforelse
+                </x-ui-table-body>
+            </x-ui-table>
+
+            {{-- Analytics --}}
+            @php $analytics = $this->runAnalytics; @endphp
+            @if(($analytics['total_completed'] ?? 0) >= 1)
+                <div class="mt-6 bg-white rounded-lg border border-[var(--ui-border)] p-5">
+                    <h4 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-4">Ist vs. Soll Analyse</h4>
+                    <div class="grid grid-cols-3 gap-6">
+                        <div class="text-center">
+                            <p class="text-xs text-[var(--ui-muted)] mb-1">Ø Aktive Zeit</p>
+                            <p class="text-lg font-bold text-[var(--ui-secondary)]">{{ $analytics['avg_active_minutes'] }} Min.</p>
+                            <p class="text-[10px] text-[var(--ui-muted)]">Soll: {{ $analytics['target_active_minutes'] }} Min.</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-xs text-[var(--ui-muted)] mb-1">Ø Wartezeit</p>
+                            <p class="text-lg font-bold text-[var(--ui-secondary)]">{{ $analytics['avg_wait_minutes'] }} Min.</p>
+                            <p class="text-[10px] text-[var(--ui-muted)]">Soll: {{ $analytics['target_wait_minutes'] }} Min.</p>
+                        </div>
+                        <div class="text-center">
+                            <p class="text-xs text-[var(--ui-muted)] mb-1">Abweichung</p>
+                            <p class="text-lg font-bold {{ $analytics['efficiency_delta'] > 0 ? 'text-red-500' : 'text-green-600' }}">
+                                {{ $analytics['efficiency_delta'] > 0 ? '+' : '' }}{{ $analytics['efficiency_delta'] }}%
+                            </p>
+                            <p class="text-[10px] text-[var(--ui-muted)]">{{ $analytics['total_completed'] }} abgeschlossene Durchläufe</p>
+                        </div>
+                    </div>
+                </div>
+            @endif
+        @endif
+
         {{-- ── Tab: Snapshots ────────────────────────────────── --}}
         @if($activeTab === 'snapshots')
             <div class="flex justify-end mb-4">
@@ -2332,6 +2594,30 @@
                 <x-ui-button type="button" variant="primary" wire:click="storeImprovement">
                     @svg('heroicon-o-check', 'w-4 h-4 mr-2')
                     {{ $editingImprovementId ? 'Speichern' : 'Erstellen' }}
+                </x-ui-button>
+            </div>
+        </x-slot>
+    </x-ui-modal>
+
+    {{-- ── Run Modal (Start) ─────────────────────────────────── --}}
+    <x-ui-modal wire:model="runModalShow" size="md">
+        <x-slot name="header">
+            Durchlauf starten
+        </x-slot>
+
+        <form wire:submit.prevent="startRun" class="space-y-4">
+            <p class="text-sm text-[var(--ui-secondary)]">
+                Ein neuer Durchlauf mit <strong>{{ $this->steps->where('is_active', true)->count() }}</strong> Schritten wird erstellt.
+            </p>
+            <x-ui-input-textarea name="run_notes" label="Notizen / Kontext (optional)" wire:model.live="runNotes" rows="2" placeholder="z.B. Kunde, Auftragsnummer..." />
+        </form>
+
+        <x-slot name="footer">
+            <div class="d-flex justify-end gap-2">
+                <x-ui-button type="button" variant="secondary-outline" wire:click="$set('runModalShow', false)">Abbrechen</x-ui-button>
+                <x-ui-button type="button" variant="primary" wire:click="startRun">
+                    @svg('heroicon-o-play', 'w-4 h-4 mr-2')
+                    Starten
                 </x-ui-button>
             </div>
         </x-slot>

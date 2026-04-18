@@ -134,6 +134,11 @@ class OrganizationProcess extends Model
         return $this->hasMany(OrganizationProcessImprovement::class, 'process_id');
     }
 
+    public function runs(): HasMany
+    {
+        return $this->hasMany(OrganizationProcessRun::class, 'process_id');
+    }
+
     public function chains(): BelongsToMany
     {
         return $this->belongsToMany(

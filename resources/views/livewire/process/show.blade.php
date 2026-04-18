@@ -22,7 +22,7 @@
                 </x-ui-button>
             @endif
 
-            <x-ui-button variant="primary" size="sm" wire:click="createRun">
+            <x-ui-button variant="primary" size="sm" wire:click="$set('runModalShow', true)">
                 @svg('heroicon-o-play', 'w-4 h-4')
                 <span>Durchlauf starten</span>
                 @if($this->activeRunCount > 0)
@@ -290,7 +290,7 @@
                     @endforelse
                     <button
                         type="button"
-                        wire:click="createRun"
+                        wire:click="$set('runModalShow', true)"
                         class="w-full py-2 px-4 border-2 border-dashed border-[var(--ui-border)]/60 rounded-lg text-xs text-[var(--ui-muted)] hover:border-[var(--ui-warning)] hover:text-[var(--ui-secondary)] transition-colors flex items-center justify-center gap-1"
                     >
                         @svg('heroicon-o-play', 'w-3.5 h-3.5')
@@ -1539,7 +1539,7 @@
         {{-- ── Tab: Durchläufe ────────────────────────────────── --}}
         @if($activeTab === 'runs')
             <div class="flex justify-end mb-4">
-                <x-ui-button variant="primary" size="sm" wire:click="createRun">
+                <x-ui-button variant="primary" size="sm" wire:click="$set('runModalShow', true)">
                     @svg('heroicon-o-play', 'w-4 h-4')
                     <span>Durchlauf starten</span>
                 </x-ui-button>

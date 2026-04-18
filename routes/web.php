@@ -86,3 +86,16 @@ Route::get('/processes/status/{status}', ProcessIndex::class)->name('organizatio
     ->whereIn('status', ['draft', 'under_review', 'pilot', 'active', 'deprecated']);
 Route::get('/processes/{process}', ProcessShow::class)->name('organization.processes.show');
 Route::get('/processes/{process}/certificate.pdf', ProcessCertificatePdfController::class)->name('organization.processes.certificate-pdf');
+
+// Error Tracking Test (temporär)
+Route::get('/test-error/{type?}', function (string $type = 'exception') {
+    return match ($type) {
+        '500' => abort(500, 'Organization Test: Simulated 500 Internal Server Error'),
+        '404' => abort(404, 'Organization Test: Simulated 404 Not Found'),
+        '403' => abort(403, 'Organization Test: Simulated 403 Forbidden'),
+        'runtime' => throw new \RuntimeException('Organization Test: Simulated RuntimeException'),
+        'logic' => throw new \LogicException('Organization Test: Simulated LogicException'),
+        'db' => throw new \Illuminate\Database\QueryException('mysql', 'SELECT * FROM non_existent_table', [], new \Exception('Table not found')),
+        default => throw new \Platform\Organization\Exceptions\OrganizationTestException('Organization Test: Simulated exception at ' . now()->toIso8601String()),
+    };
+})->name('organization.test-error');

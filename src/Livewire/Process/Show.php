@@ -1442,8 +1442,7 @@ class Show extends Component
 
     public function startRun(): void
     {
-        // DEBUG: Isolation test — only toast, no state changes, no DB
-        $this->dispatch('toast', message: 'startRun aufgerufen!');
+        $this->activeTab = 'snapshots';
     }
 
     public function completeStep(int $runStepId, ?int $activeDuration = null, ?int $waitOverride = null): void

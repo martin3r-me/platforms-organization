@@ -1468,7 +1468,7 @@ class Show extends Component
             ]);
         }
 
-        $this->activeTab = 'snapshots'; // DEBUG: landing page
+        $this->activeTab = 'runs'; // DEBUG: jetzt auf runs-tab
     }
 
     public function completeStep(int $runStepId, ?int $activeDuration = null, ?int $waitOverride = null): void

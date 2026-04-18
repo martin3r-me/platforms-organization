@@ -22,6 +22,14 @@
                 </x-ui-button>
             @endif
 
+            <x-ui-button variant="primary" size="sm" wire:click="createRun">
+                @svg('heroicon-o-play', 'w-4 h-4')
+                <span>Durchlauf starten</span>
+                @if($this->activeRunCount > 0)
+                    <x-ui-badge variant="warning" size="sm" class="ml-1">{{ $this->activeRunCount }}</x-ui-badge>
+                @endif
+            </x-ui-button>
+
             {{-- Ausweis Split Button --}}
             <div x-data="{ open: false }" class="relative inline-flex">
                 <x-ui-button variant="secondary-outline" size="sm" wire:click="$set('activeTab', 'certificate')" class="rounded-r-none border-r-0">

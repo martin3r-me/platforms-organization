@@ -124,7 +124,10 @@ class Index extends Component
             $q->where('is_focus', true);
         }
 
-        return $q->with(['ownerEntity', 'vsmSystem', 'steps:id,process_id,automation_level'])->orderBy('name')->get();
+        return $q->with(['ownerEntity', 'vsmSystem', 'steps:id,process_id,automation_level'])
+            ->withCount(['runs as active_runs_count' => fn ($q) => $q->where('status', 'active')])
+            ->orderBy('name')
+            ->get();
     }
 
     #[Computed]

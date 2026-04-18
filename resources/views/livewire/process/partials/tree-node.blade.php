@@ -58,6 +58,14 @@
                 @endif
             </div>
 
+            {{-- Active Runs --}}
+            @if($process->active_runs_count > 0)
+                <a href="{{ route('organization.processes.show', $process) }}?activeTab=runs" class="flex items-center gap-1 flex-shrink-0 px-1.5 py-0.5 rounded-full bg-[var(--ui-warning)]/10 text-[var(--ui-warning)] hover:bg-[var(--ui-warning)]/20 transition-colors" wire:navigate title="Aktive Durchläufe">
+                    @svg('heroicon-o-play', 'w-3 h-3')
+                    <span class="text-[10px] font-bold">{{ $process->active_runs_count }}</span>
+                </a>
+            @endif
+
             {{-- Steps count --}}
             <span class="text-xs text-[var(--ui-muted)] flex-shrink-0 w-14 text-right">{{ $process->steps_count }} Steps</span>
 

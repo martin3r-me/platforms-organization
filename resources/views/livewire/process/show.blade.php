@@ -1811,6 +1811,12 @@
                             <p class="text-[10px] text-[var(--ui-muted)]">{{ $analytics['total_completed'] }} abgeschlossene Durchläufe</p>
                         </div>
                     </div>
+                    <div class="mt-4 pt-4 border-t border-[var(--ui-border)]/40 flex justify-end">
+                        <x-ui-button size="sm" variant="secondary-outline" wire:click="applyRunAverages" wire:confirm="Soll-Zeiten der Steps mit den Durchschnittswerten aus {{ $analytics['total_completed'] }} abgeschlossenen Durchläufen überschreiben?">
+                            @svg('heroicon-o-arrow-down-on-square', 'w-4 h-4')
+                            <span>Ø in Soll-Zeiten übernehmen</span>
+                        </x-ui-button>
+                    </div>
                 </div>
             @endif
         @endif

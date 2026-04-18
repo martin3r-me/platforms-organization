@@ -1552,6 +1552,50 @@ class Show extends Component
         $this->activeRunId = $runId;
     }
 
+    public function applyRunAverages(): void
+    {
+        $completedRuns = $this->process->runs()
+            ->where('status', 'completed')
+            ->with('runSteps')
+            ->get();
+
+        if ($completedRuns->isEmpty()) {
+            $this->dispatch('toast', message: 'Keine abgeschlossenen Durchläufe vorhanden');
+            return;
+        }
+
+        $updated = 0;
+
+        foreach ($this->process->steps()->where('is_active', true)->get() as $step) {
+            $stepData = $completedRuns->flatMap(fn ($r) => $r->runSteps)
+                ->where('process_step_id', $step->id)
+                ->where('status', \Platform\Organization\Enums\RunStepStatus::COMPLETED);
+
+            if ($stepData->isEmpty()) {
+                continue;
+            }
+
+            $avgActive = (int) round($stepData->avg('active_duration_minutes'));
+            $avgWait = (int) round($stepData->avg('wait_duration_minutes'));
+
+            $changes = [];
+            if ($avgActive > 0) {
+                $changes['duration_target_minutes'] = $avgActive;
+            }
+            if ($avgWait > 0) {
+                $changes['wait_target_minutes'] = $avgWait;
+            }
+
+            if (!empty($changes)) {
+                $step->update($changes);
+                $updated++;
+            }
+        }
+
+        unset($this->steps, $this->corefitMetrics, $this->automationMetrics, $this->costMetrics, $this->improvementSimulations, $this->efficiencyMatrix);
+        $this->dispatch('toast', message: "{$updated} Steps mit Durchschnittswerten aktualisiert");
+    }
+
     private function checkRunAutoComplete(OrganizationProcessRun $run): void
     {
         $allSteps = $run->runSteps()->get();

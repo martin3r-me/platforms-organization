@@ -1440,6 +1440,7 @@ class Show extends Component
     {
         $this->runNotes = '';
         $this->runModalShow = true;
+        $this->dispatch('toast', message: 'Modal sollte jetzt offen sein (runModalShow = true)');
     }
 
     public function openActiveRun(int $runId): void

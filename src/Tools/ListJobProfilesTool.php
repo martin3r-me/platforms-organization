@@ -28,7 +28,7 @@ class ListJobProfilesTool implements ToolContract, ToolMetadataContract
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['team_id', 'status', 'level']),
+            $this->getStandardGetSchema(['team_id', 'status', 'level', 'job_family']),
             [
                 'properties' => [
                     'team_id' => [
@@ -42,6 +42,10 @@ class ListJobProfilesTool implements ToolContract, ToolMetadataContract
                     'level' => [
                         'type' => 'string',
                         'description' => 'Optional: Filter nach level (junior/mid/senior/lead/principal).',
+                    ],
+                    'job_family' => [
+                        'type' => 'string',
+                        'description' => 'Optional: Filter nach job_family (z.B. Engineering, Operations, Sales).',
                     ],
                 ],
             ]
@@ -66,10 +70,13 @@ class ListJobProfilesTool implements ToolContract, ToolMetadataContract
             if (! empty($arguments['level'])) {
                 $q->where('level', (string) $arguments['level']);
             }
+            if (! empty($arguments['job_family'])) {
+                $q->where('job_family', (string) $arguments['job_family']);
+            }
 
-            $this->applyStandardFilters($q, $arguments, ['team_id', 'status', 'level', 'created_at']);
+            $this->applyStandardFilters($q, $arguments, ['team_id', 'status', 'level', 'job_family', 'created_at']);
             $this->applyStandardSearch($q, $arguments, ['name', 'description', 'content']);
-            $this->applyStandardSort($q, $arguments, ['name', 'level', 'status', 'id', 'created_at'], 'name', 'asc');
+            $this->applyStandardSort($q, $arguments, ['name', 'level', 'status', 'job_family', 'id', 'created_at'], 'name', 'asc');
 
             $result = $this->applyStandardPaginationResult($q, $arguments);
             $items = $result['data']->map(fn (OrganizationJobProfile $jp) => [
@@ -77,10 +84,15 @@ class ListJobProfilesTool implements ToolContract, ToolMetadataContract
                 'uuid'             => $jp->uuid,
                 'name'             => $jp->name,
                 'description'      => $jp->description,
+                'purpose'          => $jp->purpose,
+                'job_family'       => $jp->job_family,
                 'level'            => $jp->level,
                 'status'           => $jp->status,
                 'skills'           => $jp->skills,
                 'responsibilities' => $jp->responsibilities,
+                'requirements'     => $jp->requirements,
+                'soft_skills'      => $jp->soft_skills,
+                'kpis'             => $jp->kpis,
                 'effective_from'   => $jp->effective_from?->toDateString(),
                 'effective_to'     => $jp->effective_to?->toDateString(),
                 'team_id'          => $jp->team_id,

@@ -42,6 +42,17 @@
                         <option value="principal">Principal</option>
                     </select>
                 </div>
+                @if(count($this->jobFamilies) > 0)
+                    <div>
+                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Job Family</h3>
+                        <select wire:model.live="jobFamilyFilter" class="w-full rounded-md border-gray-300 shadow-sm">
+                            <option value="">Alle</option>
+                            @foreach($this->jobFamilies as $family)
+                                <option value="{{ $family }}">{{ $family }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                @endif
             </div>
         </x-ui-page-sidebar>
     </x-slot>

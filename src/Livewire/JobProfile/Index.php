@@ -14,6 +14,7 @@ class Index extends Component
     public string $search = '';
     public string $statusFilter = 'active';
     public ?string $levelFilter = null;
+    public ?string $jobFamilyFilter = null;
 
     public ?int $expandedProfileId = null;
     public array $assignForm = [
@@ -42,9 +43,10 @@ class Index extends Component
     ];
 
     protected $queryString = [
-        'search'       => ['except' => ''],
-        'statusFilter' => ['except' => 'active'],
-        'levelFilter'  => ['except' => null],
+        'search'          => ['except' => ''],
+        'statusFilter'    => ['except' => 'active'],
+        'levelFilter'     => ['except' => null],
+        'jobFamilyFilter' => ['except' => null],
     ];
 
     protected function rules(): array
@@ -86,6 +88,10 @@ class Index extends Component
 
         if (! empty($this->levelFilter)) {
             $q->where('level', $this->levelFilter);
+        }
+
+        if (! empty($this->jobFamilyFilter)) {
+            $q->where('job_family', $this->jobFamilyFilter);
         }
 
         return $q->orderBy('name')->get();
@@ -164,6 +170,18 @@ class Index extends Component
         }
 
         return $nodes;
+    }
+
+    #[Computed]
+    public function jobFamilies(): array
+    {
+        return OrganizationJobProfile::where('team_id', Auth::user()->currentTeam->id)
+            ->whereNotNull('job_family')
+            ->distinct()
+            ->pluck('job_family')
+            ->sort()
+            ->values()
+            ->toArray();
     }
 
     #[Computed]

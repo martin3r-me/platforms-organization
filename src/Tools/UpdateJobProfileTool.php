@@ -33,10 +33,15 @@ class UpdateJobProfileTool implements ToolContract, ToolMetadataContract
                 'job_profile_id'   => ['type' => 'integer', 'description' => 'ID des JobProfiles (ERFORDERLICH).'],
                 'name'             => ['type' => 'string'],
                 'description'      => ['type' => 'string', 'description' => '"" zum Leeren.'],
+                'purpose'          => ['type' => 'string', 'description' => 'Rollenzweck. "" zum Leeren.'],
+                'job_family'       => ['type' => 'string', 'description' => 'Laufbahn/Kategorie. "" zum Leeren.'],
                 'content'          => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'level'            => ['type' => 'string'],
-                'skills'           => ['type' => 'array'],
-                'responsibilities' => ['type' => 'array'],
+                'skills'           => ['type' => 'array', 'description' => 'Strukturierte Skills: [{"name": "...", "level": "basic|advanced|expert", "category": "technical|methodical|domain"}]'],
+                'responsibilities' => ['type' => 'array', 'description' => 'Verantwortungen: [{"name": "...", "is_core": true}]'],
+                'requirements'     => ['type' => 'array', 'description' => 'Qualifikationen: [{"name": "...", "type": "degree|certification|experience", "required": true}]'],
+                'soft_skills'      => ['type' => 'array', 'description' => 'Soft Skills: [{"name": "...", "level": "basic|advanced|expert"}]'],
+                'kpis'             => ['type' => 'array', 'description' => 'Bewertungskriterien: [{"name": "...", "description": "..."}]'],
                 'status'           => ['type' => 'string'],
                 'effective_from'   => ['type' => 'string'],
                 'effective_to'     => ['type' => 'string'],
@@ -73,7 +78,7 @@ class UpdateJobProfileTool implements ToolContract, ToolMetadataContract
             }
 
             $update = [];
-            foreach (['name', 'level', 'status'] as $field) {
+            foreach (['name', 'level', 'status', 'job_family'] as $field) {
                 if (array_key_exists($field, $arguments)) {
                     $val = trim((string) ($arguments[$field] ?? ''));
                     if ($field === 'name' && $val === '') {
@@ -82,13 +87,13 @@ class UpdateJobProfileTool implements ToolContract, ToolMetadataContract
                     $update[$field] = $val === '' ? null : $val;
                 }
             }
-            foreach (['description', 'content'] as $field) {
+            foreach (['description', 'content', 'purpose'] as $field) {
                 if (array_key_exists($field, $arguments)) {
                     $val = (string) ($arguments[$field] ?? '');
                     $update[$field] = $val === '' ? null : $val;
                 }
             }
-            foreach (['skills', 'responsibilities'] as $field) {
+            foreach (['skills', 'responsibilities', 'requirements', 'soft_skills', 'kpis'] as $field) {
                 if (array_key_exists($field, $arguments)) {
                     $update[$field] = is_array($arguments[$field]) ? $arguments[$field] : null;
                 }

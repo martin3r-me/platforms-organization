@@ -3,9 +3,12 @@
         <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2">
                 @svg('heroicon-o-identification', 'w-3.5 h-3.5 text-[var(--ui-muted)] flex-shrink-0')
-                <span class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $item->name }}</span>
+                <a href="{{ route('organization.job-profiles.show', $item) }}" wire:navigate class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate">{{ $item->name }}</a>
                 @if($item->level)
                     <x-ui-badge variant="secondary" size="sm">{{ ucfirst($item->level) }}</x-ui-badge>
+                @endif
+                @if($item->job_family)
+                    <x-ui-badge variant="info" size="sm">{{ $item->job_family }}</x-ui-badge>
                 @endif
                 <x-ui-badge variant="{{ $item->status === 'active' ? 'success' : ($item->status === 'archived' ? 'muted' : 'info') }}" size="sm">
                     {{ ucfirst($item->status) }}

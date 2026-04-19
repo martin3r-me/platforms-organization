@@ -19,123 +19,237 @@
                 </x-ui-button>
             @endif
 
-            <x-ui-button variant="danger-outline" size="sm" wire:click="deleteRun" wire:confirm="Durchlauf wirklich löschen?">
+            <x-ui-confirm-button
+                variant="danger-outline"
+                size="sm"
+                wire:click="deleteRun"
+                confirm-text="Durchlauf wirklich löschen?"
+            >
                 @svg('heroicon-o-trash', 'w-4 h-4')
-                <span>Löschen</span>
-            </x-ui-button>
+            </x-ui-confirm-button>
 
             <a href="{{ route('organization.processes.show', $process) }}?tab=runs" wire:navigate>
                 <x-ui-button variant="secondary-outline" size="sm">
                     @svg('heroicon-o-arrow-left', 'w-4 h-4')
-                    <span>Zurück zum Prozess</span>
+                    <span>Zurück</span>
                 </x-ui-button>
             </a>
         </x-ui-page-actionbar>
     </x-slot>
 
     <x-slot name="sidebar">
-        <div class="space-y-6">
-            {{-- Status --}}
-            <div class="text-center">
-                <div class="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-[var(--ui-{{ $run->status->color() }})]/10 mb-3">
-                    @if($run->status === \Platform\Organization\Enums\RunStatus::ACTIVE)
-                        @svg('heroicon-o-play', 'w-8 h-8 text-[var(--ui-warning)]')
-                    @elseif($run->status === \Platform\Organization\Enums\RunStatus::COMPLETED)
-                        @svg('heroicon-o-check-circle', 'w-8 h-8 text-[var(--ui-success)]')
-                    @else
-                        @svg('heroicon-o-x-circle', 'w-8 h-8 text-[var(--ui-muted)]')
-                    @endif
-                </div>
-                <x-ui-badge variant="{{ $run->status->color() }}" size="lg">{{ $run->status->label() }}</x-ui-badge>
-            </div>
-
-            {{-- Progress --}}
-            @php $prog = $this->progress; @endphp
-            <div>
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-medium text-[var(--ui-muted)]">Fortschritt</span>
-                    <span class="text-sm font-bold text-[var(--ui-secondary)]">{{ $prog['percent'] }}%</span>
-                </div>
-                <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-3">
-                    <div class="h-3 rounded-full bg-[var(--ui-{{ $run->status->color() }})] transition-all" style="width: {{ $prog['percent'] }}%"></div>
-                </div>
-                <p class="text-xs text-[var(--ui-muted)] mt-1 text-center">{{ $prog['done'] }} / {{ $prog['total'] }} Schritte</p>
-            </div>
-
-            {{-- Timestamps --}}
-            <div class="space-y-3">
-                <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                    <span class="text-xs text-[var(--ui-muted)]">Gestartet am</span>
-                    <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $run->started_at->format('d.m.Y H:i') }}</div>
-                </div>
-                @if($run->completed_at)
-                    <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                        <span class="text-xs text-[var(--ui-muted)]">Abgeschlossen am</span>
-                        <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $run->completed_at->format('d.m.Y H:i') }}</div>
-                    </div>
-                @endif
-                @if($run->cancelled_at)
-                    <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                        <span class="text-xs text-[var(--ui-muted)]">Abgebrochen am</span>
-                        <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $run->cancelled_at->format('d.m.Y H:i') }}</div>
-                    </div>
-                @endif
-                @if($run->user)
-                    <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                        <span class="text-xs text-[var(--ui-muted)]">Erstellt von</span>
-                        <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $run->user->name }}</div>
-                    </div>
-                @endif
-            </div>
-
-            {{-- Time Summary --}}
-            <div>
-                <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Zeiten</h3>
-                <div class="space-y-2">
-                    <div class="flex items-center justify-between py-2 px-3 bg-[var(--ui-muted-5)] rounded-lg">
-                        <span class="text-xs text-[var(--ui-muted)]">Aktive Zeit</span>
-                        <div class="text-right">
-                            <span class="text-sm font-bold text-[var(--ui-secondary)]">{{ $this->totalActive }} Min.</span>
-                            @if($this->targetActive > 0)
-                                <span class="text-[10px] text-[var(--ui-muted)] block">Soll: {{ $this->targetActive }} Min.</span>
-                            @endif
-                        </div>
-                    </div>
-                    <div class="flex items-center justify-between py-2 px-3 bg-[var(--ui-muted-5)] rounded-lg">
-                        <span class="text-xs text-[var(--ui-muted)]">Wartezeit</span>
-                        <div class="text-right">
-                            <span class="text-sm font-bold text-[var(--ui-secondary)]">{{ $this->totalWait }} Min.</span>
-                            @if($this->targetWait > 0)
-                                <span class="text-[10px] text-[var(--ui-muted)] block">Soll: {{ $this->targetWait }} Min.</span>
-                            @endif
-                        </div>
-                    </div>
-                    @if($this->targetActive > 0)
-                        @php
-                            $activeDelta = $this->totalActive - $this->targetActive;
-                            $waitDelta = $this->totalWait - $this->targetWait;
-                        @endphp
-                        <div class="flex items-center justify-between py-2 px-3 bg-[var(--ui-muted-5)] rounded-lg">
-                            <span class="text-xs text-[var(--ui-muted)]">Abweichung (aktiv)</span>
-                            <span class="text-sm font-bold {{ $activeDelta > 0 ? 'text-red-500' : 'text-green-600' }}">
-                                {{ $activeDelta > 0 ? '+' : '' }}{{ $activeDelta }} Min.
-                            </span>
-                        </div>
-                    @endif
-                </div>
-            </div>
-
-            {{-- Notes --}}
-            @if($run->notes)
+        <x-ui-page-sidebar title="Informationen" width="w-80" :defaultOpen="true" side="left">
+            <div class="p-6 space-y-6">
+                {{-- Status --}}
                 <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-2">Notizen</h3>
-                    <p class="text-sm text-[var(--ui-muted)]">{{ $run->notes }}</p>
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Status</h3>
+                    <div class="space-y-2">
+                        <x-ui-badge variant="{{ $run->status->color() }}" size="sm">{{ $run->status->label() }}</x-ui-badge>
+                    </div>
+                </div>
+
+                {{-- Fortschritt --}}
+                @php $prog = $this->progress; @endphp
+                <div>
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Fortschritt</h3>
+                    <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                        <div class="flex items-center justify-between mb-2">
+                            <span class="text-xs text-[var(--ui-muted)]">{{ $prog['done'] }} von {{ $prog['total'] }} Schritte</span>
+                            <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ $prog['percent'] }}%</span>
+                        </div>
+                        <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2">
+                            <div class="h-2 rounded-full bg-[var(--ui-{{ $run->status->color() }})] transition-all" style="width: {{ $prog['percent'] }}%"></div>
+                        </div>
+                    </div>
+                </div>
+
+                {{-- Zeiten --}}
+                <div>
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Zeiten</h3>
+                    <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 space-y-2">
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-[var(--ui-muted)]">Aktive Zeit</span>
+                            <span class="text-sm text-[var(--ui-secondary)]">{{ $this->totalActive }} Min.</span>
+                        </div>
+                        @if($this->targetActive > 0)
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-[var(--ui-muted)]">Soll (aktiv)</span>
+                                <span class="text-sm text-[var(--ui-muted)]">{{ $this->targetActive }} Min.</span>
+                            </div>
+                        @endif
+                        <div class="flex items-center justify-between">
+                            <span class="text-xs text-[var(--ui-muted)]">Wartezeit</span>
+                            <span class="text-sm text-[var(--ui-secondary)]">{{ $this->totalWait }} Min.</span>
+                        </div>
+                        @if($this->targetWait > 0)
+                            <div class="flex items-center justify-between">
+                                <span class="text-xs text-[var(--ui-muted)]">Soll (warten)</span>
+                                <span class="text-sm text-[var(--ui-muted)]">{{ $this->targetWait }} Min.</span>
+                            </div>
+                        @endif
+                        @if($this->targetActive > 0)
+                            @php $activeDelta = $this->totalActive - $this->targetActive; @endphp
+                            <div class="pt-1 border-t border-[var(--ui-border)]/30">
+                                <div class="flex items-center justify-between">
+                                    <span class="text-xs text-[var(--ui-muted)]">Abweichung</span>
+                                    <span class="text-sm font-bold {{ $activeDelta > 0 ? 'text-red-500' : ($activeDelta < 0 ? 'text-green-600' : 'text-[var(--ui-secondary)]') }}">
+                                        {{ $activeDelta > 0 ? '+' : '' }}{{ $activeDelta }} Min.
+                                    </span>
+                                </div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Details --}}
+                <div>
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Details</h3>
+                    <div class="space-y-3">
+                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                            <span class="text-xs text-[var(--ui-muted)]">Prozess</span>
+                            <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $process->name }}</div>
+                            @if($process->code)
+                                <div class="text-xs text-[var(--ui-muted)]">{{ $process->code }}</div>
+                            @endif
+                        </div>
+                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                            <span class="text-xs text-[var(--ui-muted)]">Gestartet am</span>
+                            <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $run->started_at->format('d.m.Y H:i') }}</div>
+                        </div>
+                        @if($run->completed_at)
+                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                                <span class="text-xs text-[var(--ui-muted)]">Abgeschlossen am</span>
+                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $run->completed_at->format('d.m.Y H:i') }}</div>
+                            </div>
+                        @endif
+                        @if($run->cancelled_at)
+                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                                <span class="text-xs text-[var(--ui-muted)]">Abgebrochen am</span>
+                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $run->cancelled_at->format('d.m.Y H:i') }}</div>
+                            </div>
+                        @endif
+                        @if($run->user)
+                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                                <span class="text-xs text-[var(--ui-muted)]">Erstellt von</span>
+                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $run->user->name }}</div>
+                            </div>
+                        @endif
+                    </div>
+                </div>
+
+                {{-- Notizen --}}
+                @if($run->notes)
+                    <div>
+                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Notizen</h3>
+                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                            <p class="text-sm text-[var(--ui-muted)]">{{ $run->notes }}</p>
+                        </div>
+                    </div>
+                @endif
+            </div>
+        </x-ui-page-sidebar>
+    </x-slot>
+
+    @php
+        $prog = $this->progress;
+        $leadTime = $this->totalActive + $this->totalWait;
+        $targetLead = $this->targetActive + $this->targetWait;
+        $leadDelta = $targetLead > 0 ? round((($leadTime - $targetLead) / $targetLead) * 100, 1) : 0;
+        $completedSteps = $this->runSteps->where('status', \Platform\Organization\Enums\RunStepStatus::COMPLETED)->count();
+        $skippedSteps = $this->runSteps->where('status', \Platform\Organization\Enums\RunStepStatus::SKIPPED)->count();
+        $pendingSteps = $this->runSteps->where('status', \Platform\Organization\Enums\RunStepStatus::PENDING)->count();
+    @endphp
+
+    {{-- Mini-Dashboard --}}
+    <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mb-6">
+        <div class="flex items-start justify-between mb-5">
+            <div>
+                <h1 class="text-xl font-bold text-[var(--ui-secondary)]">{{ $process->name }}</h1>
+                <div class="flex items-center gap-3 mt-1.5">
+                    <x-ui-badge variant="{{ $run->status->color() }}" size="sm">{{ $run->status->label() }}</x-ui-badge>
+                    <span class="text-xs text-[var(--ui-muted)]">{{ $run->started_at->format('d.m.Y H:i') }}</span>
+                    @if($run->user)
+                        <span class="text-xs text-[var(--ui-muted)]">von {{ $run->user->name }}</span>
+                    @endif
+                </div>
+            </div>
+            @if($this->isActive && $prog['percent'] > 0)
+                <div class="text-right">
+                    <span class="text-3xl font-bold text-[var(--ui-{{ $run->status->color() }})]">{{ $prog['percent'] }}%</span>
                 </div>
             @endif
         </div>
-    </x-slot>
 
-    {{-- Main content: Step Checklist --}}
+        {{-- Progress Bar --}}
+        <div class="mb-5">
+            <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2.5">
+                <div class="h-2.5 rounded-full bg-[var(--ui-{{ $run->status->color() }})] transition-all" style="width: {{ $prog['percent'] }}%"></div>
+            </div>
+        </div>
+
+        {{-- Stats Grid --}}
+        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                <div class="flex items-center gap-2 mb-1">
+                    @svg('heroicon-o-check-circle', 'w-4 h-4 text-[var(--ui-success)]')
+                    <span class="text-xs text-[var(--ui-muted)]">Erledigt</span>
+                </div>
+                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ $completedSteps }}</span>
+                <span class="text-xs text-[var(--ui-muted)]"> / {{ $prog['total'] }}</span>
+            </div>
+            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                <div class="flex items-center gap-2 mb-1">
+                    @svg('heroicon-o-clock', 'w-4 h-4 text-[var(--ui-info)]')
+                    <span class="text-xs text-[var(--ui-muted)]">Aktive Zeit</span>
+                </div>
+                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ $this->totalActive }} Min.</span>
+                @if($this->targetActive > 0)
+                    <span class="text-[10px] text-[var(--ui-muted)] block">Soll: {{ $this->targetActive }} Min.</span>
+                @endif
+            </div>
+            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                <div class="flex items-center gap-2 mb-1">
+                    @svg('heroicon-o-pause', 'w-4 h-4 text-[var(--ui-warning)]')
+                    <span class="text-xs text-[var(--ui-muted)]">Wartezeit</span>
+                </div>
+                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ $this->totalWait }} Min.</span>
+                @if($this->targetWait > 0)
+                    <span class="text-[10px] text-[var(--ui-muted)] block">Soll: {{ $this->targetWait }} Min.</span>
+                @endif
+            </div>
+            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
+                <div class="flex items-center gap-2 mb-1">
+                    @svg('heroicon-o-arrow-trending-up', 'w-4 h-4 text-[var(--ui-muted)]')
+                    <span class="text-xs text-[var(--ui-muted)]">Durchlaufzeit</span>
+                </div>
+                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ $leadTime }} Min.</span>
+                @if($targetLead > 0)
+                    <span class="text-[10px] {{ $leadDelta > 0 ? 'text-red-500' : ($leadDelta < 0 ? 'text-green-600' : 'text-[var(--ui-muted)]') }} block">
+                        {{ $leadDelta > 0 ? '+' : '' }}{{ $leadDelta }}% vs. Soll
+                    </span>
+                @endif
+            </div>
+        </div>
+
+        @if($skippedSteps > 0 || $pendingSteps > 0)
+            <div class="flex items-center gap-4 mt-3 pt-3 border-t border-[var(--ui-border)]/30">
+                @if($skippedSteps > 0)
+                    <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1">
+                        @svg('heroicon-o-minus-circle', 'w-3.5 h-3.5')
+                        {{ $skippedSteps }} übersprungen
+                    </span>
+                @endif
+                @if($pendingSteps > 0)
+                    <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1">
+                        @svg('heroicon-o-ellipsis-horizontal-circle', 'w-3.5 h-3.5')
+                        {{ $pendingSteps }} offen
+                    </span>
+                @endif
+            </div>
+        @endif
+    </div>
+
+    {{-- Step Checklist --}}
     <div class="space-y-3">
         @foreach($this->runSteps as $rs)
             @php
@@ -198,7 +312,7 @@
 
                         {{-- Completed/skipped details --}}
                         @if($isCompleted || $isSkipped)
-                            <div class="flex flex-wrap gap-4 mt-2.5">
+                            <div class="flex flex-wrap gap-3 mt-2.5">
                                 @if($rs->active_duration_minutes !== null)
                                     <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1.5 py-1 px-2.5 bg-[var(--ui-muted-5)] rounded-md">
                                         @svg('heroicon-o-clock', 'w-3.5 h-3.5')

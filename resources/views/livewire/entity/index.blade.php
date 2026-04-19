@@ -71,6 +71,7 @@
             <x-ui-table-header-cell compact="true">Übergeordnet</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Relationen</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
+            <x-ui-table-header-cell compact="true">Bewegung</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Erstellt</x-ui-table-header-cell>
         </x-ui-table-header>
         
@@ -78,10 +79,10 @@
             {{-- Root Entities (ohne Parent) --}}
             @if($this->entities['root']->count() > 0)
                 @foreach($this->entities['root'] as $entity)
-                    @include('organization::livewire.entity.partials.table-row', ['entity' => $entity])
+                    @include('organization::livewire.entity.partials.table-row', ['entity' => $entity, 'entityMovements' => $this->entityMovements])
                 @endforeach
             @endif
-            
+
             {{-- Child Entities gruppiert nach Entity-Typ --}}
             @foreach($this->entities['byType'] as $entityTypeId => $entities)
                 @php
@@ -89,7 +90,7 @@
                     $entityType = $firstEntity->type;
                 @endphp
                 <x-ui-table-row compact="true" class="bg-[var(--ui-muted-5)]/30">
-                    <x-ui-table-cell compact="true" colspan="8">
+                    <x-ui-table-cell compact="true" colspan="9">
                         <div class="flex items-center gap-2 py-2">
                             @if($entityType->icon)
                                 @php
@@ -113,7 +114,7 @@
                     </x-ui-table-cell>
                 </x-ui-table-row>
                 @foreach($entities as $entity)
-                    @include('organization::livewire.entity.partials.table-row', ['entity' => $entity])
+                    @include('organization::livewire.entity.partials.table-row', ['entity' => $entity, 'entityMovements' => $this->entityMovements])
                 @endforeach
             @endforeach
         </x-ui-table-body>

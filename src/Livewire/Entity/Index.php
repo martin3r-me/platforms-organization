@@ -8,6 +8,7 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntityTypeGroup;
 use Platform\Organization\Models\OrganizationVsmSystem;
+use Platform\Organization\Services\SnapshotMovementService;
 
 class Index extends Component
 {
@@ -147,6 +148,18 @@ class Index extends Component
             ->with('type')
             ->orderBy('name')
             ->get();
+    }
+
+    #[Computed]
+    public function entityMovements(): array
+    {
+        $teamId = auth()->user()->currentTeam->id;
+        $entityIds = OrganizationEntity::forTeam($teamId)->pluck('id')->toArray();
+        if (empty($entityIds)) {
+            return [];
+        }
+
+        return resolve(SnapshotMovementService::class)->forEntitiesBatch($entityIds, 7);
     }
 
     #[Computed]

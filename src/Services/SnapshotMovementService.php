@@ -171,6 +171,84 @@ class SnapshotMovementService
     }
 
     /**
+     * Batch: per entity a compact activity score + top delta.
+     * Uses only 2 DB queries for all entities.
+     *
+     * @return array<int, array{score: int, delta_count: int, positive: int, negative: int, top_delta: ?string}>
+     */
+    public function forEntitiesBatch(array $entityIds, int $days = 7): array
+    {
+        if (empty($entityIds)) {
+            return [];
+        }
+
+        $currentSnapshots = $this->getLatestSnapshotsForEntities($entityIds);
+        $previousSnapshots = $this->getSnapshotsNearDate($entityIds, now()->subDays($days));
+
+        $allDefinitions = $this->registry->allMetricDefinitions();
+        $result = [];
+
+        foreach ($entityIds as $entityId) {
+            $currentMetrics = isset($currentSnapshots[$entityId]) ? $currentSnapshots[$entityId]->metrics : [];
+            $previousMetrics = isset($previousSnapshots[$entityId]) ? $previousSnapshots[$entityId]->metrics : [];
+
+            $positiveCount = 0;
+            $negativeCount = 0;
+            $deltaCount = 0;
+            $topAbsDelta = 0;
+            $topDeltaLabel = null;
+
+            // Merge keys from both snapshots
+            $allKeys = array_unique(array_merge(array_keys($currentMetrics), array_keys($previousMetrics)));
+
+            foreach ($allKeys as $key) {
+                $cur = $currentMetrics[$key] ?? 0;
+                $prev = $previousMetrics[$key] ?? 0;
+                $delta = $cur - $prev;
+
+                if ($delta == 0) {
+                    continue;
+                }
+
+                $deltaCount++;
+                $def = $allDefinitions[$key] ?? null;
+                $direction = $def['direction'] ?? 'neutral';
+                $sentiment = $this->deriveSentiment($delta, $direction);
+
+                if ($sentiment === 'positive') {
+                    $positiveCount++;
+                } elseif ($sentiment === 'negative') {
+                    $negativeCount++;
+                }
+
+                $absDelta = abs($delta);
+                if ($absDelta > $topAbsDelta) {
+                    $topAbsDelta = $absDelta;
+                    $label = $def['label'] ?? ucfirst(str_replace('_', ' ', $key));
+                    $sign = $delta > 0 ? '+' : '';
+                    $unit = $def['unit'] ?? 'count';
+                    $formatted = match ($unit) {
+                        'minutes' => $sign . round($delta / 60, 1) . 'h',
+                        'percentage' => $sign . $delta . '%',
+                        default => $sign . $delta,
+                    };
+                    $topDeltaLabel = $formatted . ' ' . $label;
+                }
+            }
+
+            $result[$entityId] = [
+                'score' => $positiveCount - $negativeCount,
+                'delta_count' => $deltaCount,
+                'positive' => $positiveCount,
+                'negative' => $negativeCount,
+                'top_delta' => $topDeltaLabel,
+            ];
+        }
+
+        return $result;
+    }
+
+    /**
      * Get the latest snapshot for each entity.
      *
      * @return array<int, OrganizationEntitySnapshot>

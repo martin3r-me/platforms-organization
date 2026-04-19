@@ -117,6 +117,23 @@
         @endif
     </x-ui-table-cell>
     <x-ui-table-cell compact="true">
+        @php $mv = ($entityMovements[$entity->id] ?? null); @endphp
+        @if($mv && $mv['delta_count'] > 0)
+            <div class="flex items-center gap-1.5">
+                <span class="w-2 h-2 rounded-full flex-shrink-0
+                    {{ $mv['positive'] > $mv['negative'] ? 'bg-green-500' : '' }}
+                    {{ $mv['negative'] > $mv['positive'] ? 'bg-red-500' : '' }}
+                    {{ $mv['positive'] === $mv['negative'] && $mv['delta_count'] > 0 ? 'bg-amber-400' : '' }}
+                "></span>
+                <span class="text-[10px] text-[var(--ui-muted)] truncate max-w-[120px]" title="{{ $mv['top_delta'] }}">
+                    {{ $mv['top_delta'] }}
+                </span>
+            </div>
+        @else
+            <span class="w-2 h-2 rounded-full bg-gray-200 inline-block" title="Keine Bewegung"></span>
+        @endif
+    </x-ui-table-cell>
+    <x-ui-table-cell compact="true">
         <span class="text-xs text-[var(--ui-muted)]">{{ $entity->created_at->format('d.m.Y') }}</span>
     </x-ui-table-cell>
 </x-ui-table-row>

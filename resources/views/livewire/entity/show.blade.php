@@ -173,6 +173,28 @@
                     </div>
                 </div>
 
+                {{-- Movement Summary (7d, kompakt) --}}
+                @php $mv = $this->movement; @endphp
+                @if(!empty($mv['metrics']))
+                    @php
+                        $nonZero = collect($mv['metrics'])->filter(fn($m) => $m['delta'] != 0)->take(5);
+                    @endphp
+                    @if($nonZero->isNotEmpty())
+                        <div class="mt-3 flex items-center gap-2 flex-wrap">
+                            <span class="text-[10px] text-[var(--ui-muted)] font-medium">7d:</span>
+                            @foreach($nonZero as $m)
+                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium
+                                    {{ $m['sentiment'] === 'positive' ? 'bg-green-50 text-green-700 border border-green-200' : '' }}
+                                    {{ $m['sentiment'] === 'negative' ? 'bg-red-50 text-red-700 border border-red-200' : '' }}
+                                    {{ $m['sentiment'] === 'neutral' ? 'bg-gray-50 text-gray-600 border border-gray-200' : '' }}
+                                ">
+                                    {{ $m['delta_formatted'] }} {{ $m['label'] }}
+                                </span>
+                            @endforeach
+                        </div>
+                    @endif
+                @endif
+
                 {{-- Snapshot Analysis --}}
                 @php $analysis = $this->snapshotAnalysis; @endphp
                 @if(!empty($analysis))

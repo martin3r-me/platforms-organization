@@ -165,6 +165,57 @@
             @endif
         </div>
 
+        {{-- 2b. Team-Bewegung (7 Tage) --}}
+        @php $teamMovement = $this->teamMovement; @endphp
+        @if(!empty($teamMovement['metrics']))
+            <x-ui-panel title="Bewegung" subtitle="Metrik-Deltas der letzten 7 Tage" class="mb-8">
+                <div class="flex gap-1 mb-4">
+                    <button wire:click="$set('dashboardStream', null)"
+                        class="px-2 py-1 text-[10px] rounded transition-colors {{ !$dashboardStream ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]' }}">
+                        Alle
+                    </button>
+                    @foreach($teamMovement['available_groups'] as $groupKey => $groupLabel)
+                        <button wire:click="$set('dashboardStream', '{{ $groupKey }}')"
+                            class="px-2 py-1 text-[10px] rounded transition-colors {{ $dashboardStream === $groupKey ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]' }}">
+                            {{ $groupLabel }}
+                        </button>
+                    @endforeach
+                </div>
+
+                @foreach($teamMovement['metrics_by_group'] as $groupKey => $metrics)
+                    <div class="mb-3">
+                        <div class="text-[10px] font-medium text-[var(--ui-muted)] uppercase mb-1.5">
+                            {{ ucfirst($groupKey) }}
+                        </div>
+                        <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
+                            @foreach($metrics as $m)
+                                @if($m['current'] > 0 || $m['previous'] > 0)
+                                    <div class="py-2 px-2.5 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/20">
+                                        <div class="text-sm font-bold text-[var(--ui-text)]">
+                                            {{ $m['current'] }}
+                                            @if($m['delta'] != 0)
+                                                <span class="text-[10px] ml-1
+                                                    {{ $m['sentiment'] === 'positive' ? 'text-green-600' : '' }}
+                                                    {{ $m['sentiment'] === 'negative' ? 'text-red-600' : '' }}
+                                                    {{ $m['sentiment'] === 'neutral' ? 'text-[var(--ui-muted)]' : '' }}
+                                                ">{{ $m['delta_formatted'] }}</span>
+                                            @endif
+                                        </div>
+                                        <div class="text-[10px] text-[var(--ui-muted)]">{{ $m['label'] }}</div>
+                                        @if($m['ratio'])
+                                            <div class="mt-1 h-1 bg-[var(--ui-border)]/30 rounded-full overflow-hidden">
+                                                <div class="h-full bg-blue-500 rounded-full" style="width: {{ min($m['ratio'], 100) }}%"></div>
+                                            </div>
+                                        @endif
+                                    </div>
+                                @endif
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
+            </x-ui-panel>
+        @endif
+
         {{-- 3. Einheiten-Gesundheit --}}
         @if(array_sum($health['counts']) > 0)
             <x-ui-panel title="Einheiten-Gesundheit" subtitle="Fortschritt-Klassifizierung" class="mb-8">

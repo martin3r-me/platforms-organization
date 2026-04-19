@@ -11,12 +11,15 @@ use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\EntityLinkRegistry;
 use Platform\Organization\Services\PersonActivityRegistry;
+use Platform\Organization\Services\SnapshotMovementService;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
 class Dashboard extends Component
 {
+    public ?string $dashboardStream = null;
+
     public function getTeamId(): ?int
     {
         $user = auth()->user();
@@ -142,6 +145,24 @@ class Dashboard extends Component
             'trend_billing' => round($billingRate - $agoBillingRate, 1),
             'has_data' => $current['items_total'] > 0 || $current['time_total_minutes'] > 0,
         ];
+    }
+
+    #[Computed]
+    public function teamMovement(): array
+    {
+        $teamId = $this->getTeamId();
+        if (!$teamId) {
+            return [];
+        }
+
+        $entityIds = OrganizationEntity::forTeam($teamId)->pluck('id')->toArray();
+        if (empty($entityIds)) {
+            return [];
+        }
+
+        $service = resolve(SnapshotMovementService::class);
+
+        return $service->forEntities($entityIds, 7, $this->dashboardStream)->toArray();
     }
 
     #[Computed]
@@ -603,6 +624,14 @@ class Dashboard extends Component
             } else {
                 $text .= ".";
                 $statements[] = ['text' => $text, 'type' => 'info'];
+            }
+        }
+
+        // Movement insights (domain-specific)
+        $movement = $this->teamMovement;
+        if (!empty($movement['summary'])) {
+            foreach ($movement['summary'] as $insight) {
+                $statements[] = $insight;
             }
         }
 

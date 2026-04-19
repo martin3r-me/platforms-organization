@@ -371,6 +371,10 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\UpdateProcessRunTool());
             $registry->register(new \Platform\Organization\Tools\CompleteProcessRunStepTool());
 
+            // Movement & Metric Definition Tools
+            $registry->register(new \Platform\Organization\Tools\EntityMovementTool());
+            $registry->register(new \Platform\Organization\Tools\MetricDefinitionsTool());
+
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

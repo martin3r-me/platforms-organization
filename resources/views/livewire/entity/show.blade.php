@@ -253,6 +253,60 @@
                     </div>
                 @endif
 
+                {{-- Bewegung (7 Tage) --}}
+                @php $movement = $this->movement; @endphp
+                @if(!empty($movement['metrics']))
+                    <div class="mt-6 pt-6 border-t border-[var(--ui-border)]/40">
+                        <div class="flex items-center justify-between mb-4">
+                            <span class="text-xs font-medium text-[var(--ui-muted)]">Bewegung (7 Tage)</span>
+                            <div class="flex gap-1">
+                                <button wire:click="$set('movementStream', null)"
+                                    class="px-2 py-1 text-[10px] rounded transition-colors {{ !$movementStream ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]' }}">
+                                    Alle
+                                </button>
+                                @foreach($this->availableStreams as $stream)
+                                    <button wire:click="$set('movementStream', '{{ $stream }}')"
+                                        class="px-2 py-1 text-[10px] rounded transition-colors {{ $movementStream === $stream ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]' }}">
+                                        {{ ucfirst($stream) }}
+                                    </button>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        @foreach($movement['metrics_by_group'] as $groupKey => $metrics)
+                            <div class="mb-3">
+                                <div class="text-[10px] font-medium text-[var(--ui-muted)] uppercase mb-1.5">
+                                    {{ ucfirst($groupKey) }}
+                                </div>
+                                <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                    @foreach($metrics as $m)
+                                        @if($m['current'] > 0 || $m['previous'] > 0)
+                                            <div class="py-2 px-2.5 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/20">
+                                                <div class="text-sm font-bold text-[var(--ui-text)]">
+                                                    {{ $m['current'] }}
+                                                    @if($m['delta'] != 0)
+                                                        <span class="text-[10px] ml-1
+                                                            {{ $m['sentiment'] === 'positive' ? 'text-green-600' : '' }}
+                                                            {{ $m['sentiment'] === 'negative' ? 'text-red-600' : '' }}
+                                                            {{ $m['sentiment'] === 'neutral' ? 'text-[var(--ui-muted)]' : '' }}
+                                                        ">{{ $m['delta_formatted'] }}</span>
+                                                    @endif
+                                                </div>
+                                                <div class="text-[10px] text-[var(--ui-muted)]">{{ $m['label'] }}</div>
+                                                @if($m['ratio'])
+                                                    <div class="mt-1 h-1 bg-[var(--ui-border)]/30 rounded-full overflow-hidden">
+                                                        <div class="h-full bg-blue-500 rounded-full" style="width: {{ min($m['ratio'], 100) }}%"></div>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        @endif
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
                 {{-- Snapshot Trend (14 Tage) --}}
                 @php $trend = $this->snapshotTrend; @endphp
                 @if(!empty($trend) && count($trend['snapshots'] ?? []) >= 1)

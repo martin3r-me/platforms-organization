@@ -3,6 +3,7 @@
 namespace Platform\Organization\Services;
 
 use Platform\Organization\Contracts\EntityLinkProvider;
+use Platform\Organization\Contracts\HasMetricDefinitions;
 
 class EntityLinkRegistry
 {
@@ -15,6 +16,7 @@ class EntityLinkRegistry
     protected ?array $cachedLinkTypeConfig = null;
     protected ?array $cachedDisplayRules = null;
     protected ?array $cachedTimeTrackableCascades = null;
+    protected ?array $cachedMetricDefinitions = null;
 
     public function register(EntityLinkProvider $provider): void
     {
@@ -28,6 +30,7 @@ class EntityLinkRegistry
         $this->cachedLinkTypeConfig = null;
         $this->cachedDisplayRules = null;
         $this->cachedTimeTrackableCascades = null;
+        $this->cachedMetricDefinitions = null;
     }
 
     public function getProvider(string $morphAlias): ?EntityLinkProvider
@@ -153,6 +156,96 @@ class EntityLinkRegistry
         }
 
         return $labels;
+    }
+
+    /**
+     * All metric definitions from providers + built-in.
+     *
+     * @return array<string, array{label: string, group: string, direction: string, unit: string, pair?: string}>
+     */
+    public function allMetricDefinitions(): array
+    {
+        if ($this->cachedMetricDefinitions !== null) {
+            return $this->cachedMetricDefinitions;
+        }
+
+        $defs = $this->builtInMetricDefinitions();
+
+        foreach ($this->providers as $provider) {
+            if ($provider instanceof HasMetricDefinitions) {
+                foreach ($provider->metricDefinitions() as $key => $def) {
+                    $defs[$key] = $def;
+                }
+            }
+        }
+
+        return $this->cachedMetricDefinitions = $defs;
+    }
+
+    /**
+     * Metric definitions filtered by group.
+     */
+    public function metricDefinitionsForGroup(string $group): array
+    {
+        return array_filter(
+            $this->allMetricDefinitions(),
+            fn (array $def) => $def['group'] === $group
+        );
+    }
+
+    /**
+     * All available metric groups with labels.
+     *
+     * @return array<string, string>
+     */
+    public function allMetricGroups(): array
+    {
+        $labels = [
+            'core' => 'Basis',
+            'work' => 'Arbeitspakete',
+            'dev' => 'Development',
+            'okr' => 'OKR',
+            'recruiting' => 'Recruiting',
+            'crm' => 'CRM',
+            'hcm' => 'HCM',
+            'canvas' => 'Canvas',
+        ];
+
+        $groups = [];
+        foreach ($this->allMetricDefinitions() as $def) {
+            $group = $def['group'];
+            $groups[$group] = $labels[$group] ?? ucfirst($group);
+        }
+
+        return $groups;
+    }
+
+    /**
+     * Built-in metric definitions for core snapshot keys.
+     */
+    protected function builtInMetricDefinitions(): array
+    {
+        return [
+            'links_count' => [
+                'label' => 'Verknuepfungen',
+                'group' => 'core',
+                'direction' => 'neutral',
+                'unit' => 'count',
+            ],
+            'time_total_minutes' => [
+                'label' => 'Zeiterfassung (gesamt)',
+                'group' => 'core',
+                'direction' => 'neutral',
+                'unit' => 'minutes',
+            ],
+            'time_billed_minutes' => [
+                'label' => 'Zeiterfassung (abgerechnet)',
+                'group' => 'core',
+                'direction' => 'up',
+                'unit' => 'minutes',
+                'pair' => 'time_total_minutes',
+            ],
+        ];
     }
 
     /**

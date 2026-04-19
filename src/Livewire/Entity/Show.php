@@ -21,6 +21,7 @@ use Platform\Core\Enums\TeamRole;
 use Platform\Organization\Services\EntityTimeResolver;
 use Platform\Organization\Services\EntityLinkRegistry;
 use Platform\Organization\Services\EntityHierarchyService;
+use Platform\Organization\Services\SnapshotMovementService;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -35,6 +36,8 @@ class Show extends Component
         'name' => '',
         'parent_team_id' => null,
     ];
+
+    public ?string $movementStream = null;
 
     // Relation CRUD
     public bool $relationFormShow = false;
@@ -518,6 +521,24 @@ class Show extends Component
                 'max_minutes' => 0,
             ];
         }
+    }
+
+    #[Computed]
+    public function movement(): array
+    {
+        $service = resolve(SnapshotMovementService::class);
+        $result = $service->forEntity($this->entity->id, 7, $this->movementStream);
+
+        return $result->toArray();
+    }
+
+    #[Computed]
+    public function availableStreams(): array
+    {
+        $service = resolve(SnapshotMovementService::class);
+        $all = $service->forEntity($this->entity->id, 7);
+
+        return array_keys(array_filter($all->byGroup(), fn ($deltas) => collect($deltas)->contains(fn ($d) => $d->current > 0 || $d->previous > 0)));
     }
 
     #[Computed]

@@ -269,10 +269,10 @@
                             $aRunDone = $aRun->runSteps->whereIn('status', [\Platform\Organization\Enums\RunStepStatus::COMPLETED, \Platform\Organization\Enums\RunStepStatus::SKIPPED])->count();
                             $aRunPercent = $aRunTotal > 0 ? round(($aRunDone / $aRunTotal) * 100) : 0;
                         @endphp
-                        <button
-                            type="button"
-                            wire:click="openActiveRun({{ $aRun->id }})"
-                            class="w-full text-left py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 hover:border-[var(--ui-warning)] transition-colors mb-2"
+                        <a
+                            href="{{ route('organization.processes.runs.show', [$process, $aRun]) }}"
+                            wire:navigate
+                            class="block w-full text-left py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 hover:border-[var(--ui-warning)] transition-colors mb-2"
                         >
                             <div class="flex items-center justify-between mb-1">
                                 <span class="text-xs text-[var(--ui-muted)]">{{ $aRun->started_at->format('d.m.Y H:i') }}</span>
@@ -284,7 +284,7 @@
                             @if($aRun->notes)
                                 <p class="text-[10px] text-[var(--ui-muted)] truncate mt-1">{{ $aRun->notes }}</p>
                             @endif
-                        </button>
+                        </a>
                     @empty
                         <p class="text-xs text-[var(--ui-muted)] mb-2">Keine aktiven Durchläufe</p>
                     @endforelse
@@ -1545,189 +1545,6 @@
                 </x-ui-button>
             </div>
 
-            {{-- Expanded Run --}}
-            @if($activeRunId)
-                @php $expandedRun = $this->allRuns->firstWhere('id', $activeRunId); @endphp
-                @if($expandedRun)
-                    @php
-                        $exRunSteps = $expandedRun->runSteps->sortBy('position');
-                        $exTotal = $exRunSteps->count();
-                        $exDone = $exRunSteps->filter(fn ($s) => in_array($s->status, [\Platform\Organization\Enums\RunStepStatus::COMPLETED, \Platform\Organization\Enums\RunStepStatus::SKIPPED]))->count();
-                        $exPercent = $exTotal > 0 ? round(($exDone / $exTotal) * 100) : 0;
-                        $exIsActive = $expandedRun->status === \Platform\Organization\Enums\RunStatus::ACTIVE;
-                    @endphp
-                    <div class="bg-white rounded-xl border border-[var(--ui-border)] mb-6 shadow-sm">
-                        {{-- Header --}}
-                        <div class="flex items-center justify-between px-6 py-4 border-b border-[var(--ui-border)]/40">
-                            <div class="flex items-center gap-4">
-                                <div class="w-10 h-10 rounded-lg bg-[var(--ui-{{ $expandedRun->status->color() }})]/10 flex items-center justify-center">
-                                    @if($exIsActive)
-                                        @svg('heroicon-o-play', 'w-5 h-5 text-[var(--ui-warning)]')
-                                    @elseif($expandedRun->status === \Platform\Organization\Enums\RunStatus::COMPLETED)
-                                        @svg('heroicon-o-check-circle', 'w-5 h-5 text-[var(--ui-success)]')
-                                    @else
-                                        @svg('heroicon-o-x-circle', 'w-5 h-5 text-[var(--ui-muted)]')
-                                    @endif
-                                </div>
-                                <div>
-                                    <div class="flex items-center gap-2">
-                                        <span class="text-sm font-semibold text-[var(--ui-secondary)]">Durchlauf {{ $expandedRun->started_at->format('d.m.Y H:i') }}</span>
-                                        <x-ui-badge variant="{{ $expandedRun->status->color() }}" size="sm">{{ $expandedRun->status->label() }}</x-ui-badge>
-                                    </div>
-                                    <div class="flex items-center gap-3 mt-0.5">
-                                        @if($expandedRun->user)
-                                            <span class="text-xs text-[var(--ui-muted)]">{{ $expandedRun->user->name }}</span>
-                                        @endif
-                                        <span class="text-xs text-[var(--ui-muted)]">{{ $exDone }}/{{ $exTotal }} Schritte</span>
-                                    </div>
-                                </div>
-                            </div>
-                            <div class="flex items-center gap-2">
-                                @if($exIsActive)
-                                    <x-ui-button size="sm" variant="danger-outline" wire:click="cancelRun({{ $expandedRun->id }})" wire:confirm="Durchlauf wirklich abbrechen?">
-                                        @svg('heroicon-o-x-mark', 'w-4 h-4')
-                                        <span>Abbrechen</span>
-                                    </x-ui-button>
-                                @endif
-                                <x-ui-button size="sm" variant="secondary-outline" wire:click="setActiveRun(null)">
-                                    @svg('heroicon-o-chevron-up', 'w-4 h-4')
-                                    <span>Zuklappen</span>
-                                </x-ui-button>
-                            </div>
-                        </div>
-
-                        {{-- Progress bar --}}
-                        <div class="px-6 py-3 border-b border-[var(--ui-border)]/40 bg-[var(--ui-muted-5)]/50">
-                            <div class="flex items-center gap-3">
-                                <div class="flex-1 bg-[var(--ui-muted-20)] rounded-full h-2">
-                                    <div class="h-2 rounded-full bg-[var(--ui-{{ $expandedRun->status->color() }})] transition-all" style="width: {{ $exPercent }}%"></div>
-                                </div>
-                                <span class="text-xs font-medium text-[var(--ui-secondary)] w-10 text-right">{{ $exPercent }}%</span>
-                            </div>
-                        </div>
-
-                        @if($expandedRun->notes)
-                            <div class="px-6 py-3 border-b border-[var(--ui-border)]/40 bg-[var(--ui-muted-5)]/50">
-                                <p class="text-xs text-[var(--ui-muted)]">{{ $expandedRun->notes }}</p>
-                            </div>
-                        @endif
-
-                        {{-- Step checklist --}}
-                        <div class="divide-y divide-[var(--ui-border)]/30">
-                            @foreach($exRunSteps as $rs)
-                                @php
-                                    $isCompleted = $rs->status === \Platform\Organization\Enums\RunStepStatus::COMPLETED;
-                                    $isSkipped = $rs->status === \Platform\Organization\Enums\RunStepStatus::SKIPPED;
-                                    $isPending = $rs->status === \Platform\Organization\Enums\RunStepStatus::PENDING;
-                                @endphp
-                                <div
-                                    x-data="{ editing: false, activeDur: '', waitDur: '' }"
-                                    class="flex items-start gap-4 px-6 py-4 {{ $isCompleted ? 'bg-green-50/30' : ($isSkipped ? 'bg-[var(--ui-muted-5)]/50' : '') }} {{ $isPending && $exIsActive ? 'hover:bg-[var(--ui-muted-5)]/50 cursor-pointer' : '' }} transition-colors"
-                                    @if($isPending && $exIsActive) @click="editing = !editing" @endif
-                                >
-                                    {{-- Status indicator --}}
-                                    <div class="flex-shrink-0 mt-0.5">
-                                        @if($isCompleted)
-                                            <div class="w-7 h-7 rounded-full bg-[var(--ui-success)] flex items-center justify-center">
-                                                @svg('heroicon-s-check', 'w-4 h-4 text-white')
-                                            </div>
-                                        @elseif($isSkipped)
-                                            <div class="w-7 h-7 rounded-full bg-[var(--ui-muted)]/60 flex items-center justify-center">
-                                                @svg('heroicon-s-minus', 'w-4 h-4 text-white')
-                                            </div>
-                                        @elseif($isPending && $exIsActive)
-                                            <div class="w-7 h-7 rounded-full border-2 border-[var(--ui-border)] hover:border-[var(--ui-success)] transition-colors flex items-center justify-center">
-                                                <span class="text-[10px] font-bold text-[var(--ui-muted)]">{{ $rs->position }}</span>
-                                            </div>
-                                        @else
-                                            <div class="w-7 h-7 rounded-full border-2 border-[var(--ui-border)]/50 flex items-center justify-center">
-                                                <span class="text-[10px] text-[var(--ui-muted)]/50">{{ $rs->position }}</span>
-                                            </div>
-                                        @endif
-                                    </div>
-
-                                    {{-- Content --}}
-                                    <div class="flex-1 min-w-0">
-                                        <div class="flex items-center justify-between">
-                                            <div class="flex items-center gap-2">
-                                                <span class="text-sm font-medium {{ $isCompleted ? 'line-through text-[var(--ui-muted)]' : ($isSkipped ? 'text-[var(--ui-muted)]' : 'text-[var(--ui-secondary)]') }}">
-                                                    {{ $rs->processStep?->name ?? 'Step' }}
-                                                </span>
-                                                @if($isSkipped)
-                                                    <span class="text-[10px] text-[var(--ui-muted)] italic">Übersprungen</span>
-                                                @endif
-                                            </div>
-                                            @if($rs->processStep?->duration_target_minutes)
-                                                <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0 ml-2">Soll: {{ $rs->processStep->duration_target_minutes }} Min.</span>
-                                            @endif
-                                        </div>
-
-                                        {{-- Completed/skipped details --}}
-                                        @if($isCompleted || $isSkipped)
-                                            <div class="flex flex-wrap gap-4 mt-1.5">
-                                                @if($rs->active_duration_minutes !== null)
-                                                    <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1">
-                                                        @svg('heroicon-o-clock', 'w-3 h-3')
-                                                        Aktiv: {{ $rs->active_duration_minutes }} Min.
-                                                    </span>
-                                                @endif
-                                                @if($rs->wait_duration_minutes !== null)
-                                                    <span class="text-xs text-[var(--ui-muted)] flex items-center gap-1">
-                                                        @svg('heroicon-o-pause', 'w-3 h-3')
-                                                        Wartezeit: {{ $rs->wait_duration_minutes }} Min.{{ $rs->wait_override ? ' (manuell)' : '' }}
-                                                    </span>
-                                                @endif
-                                                @if($rs->processStep?->duration_target_minutes && $rs->active_duration_minutes !== null)
-                                                    @php $delta = $rs->active_duration_minutes - $rs->processStep->duration_target_minutes; @endphp
-                                                    <span class="text-xs flex items-center gap-1 {{ $delta > 0 ? 'text-red-500' : 'text-green-600' }}">
-                                                        @svg($delta > 0 ? 'heroicon-o-arrow-trending-up' : 'heroicon-o-arrow-trending-down', 'w-3 h-3')
-                                                        {{ $delta > 0 ? '+' : '' }}{{ $delta }} Min.
-                                                    </span>
-                                                @endif
-                                                @if($rs->checked_at)
-                                                    <span class="text-xs text-[var(--ui-muted)]">{{ $rs->checked_at->format('H:i') }}</span>
-                                                @endif
-                                            </div>
-                                        @endif
-
-                                        {{-- Inline edit for pending steps --}}
-                                        @if($isPending && $exIsActive)
-                                            <div x-show="editing" x-transition @click.stop class="mt-3 p-3 bg-white rounded-lg border border-[var(--ui-border)]/60 shadow-sm">
-                                                <div class="flex items-end gap-3 flex-wrap">
-                                                    <div>
-                                                        <label class="text-[10px] font-medium text-[var(--ui-muted)] block mb-1">Aktive Zeit (Min.)</label>
-                                                        <input type="number" x-model="activeDur" min="0" placeholder="0" class="w-24 text-sm px-3 py-1.5 rounded-lg border border-[var(--ui-border)] focus:border-[var(--ui-info)] focus:ring-1 focus:ring-[var(--ui-info)] bg-white" />
-                                                    </div>
-                                                    <div>
-                                                        <label class="text-[10px] font-medium text-[var(--ui-muted)] block mb-1">Wartezeit (Min., opt.)</label>
-                                                        <input type="number" x-model="waitDur" min="0" placeholder="auto" class="w-24 text-sm px-3 py-1.5 rounded-lg border border-[var(--ui-border)] focus:border-[var(--ui-info)] focus:ring-1 focus:ring-[var(--ui-info)] bg-white" />
-                                                    </div>
-                                                    <button
-                                                        type="button"
-                                                        @click="$wire.completeStep({{ $rs->id }}, activeDur ? parseInt(activeDur) : null, waitDur ? parseInt(waitDur) : null); editing = false"
-                                                        class="px-4 py-1.5 text-sm font-medium bg-[var(--ui-success)] text-white rounded-lg hover:bg-[var(--ui-success)]/90 transition-colors flex items-center gap-1.5"
-                                                    >
-                                                        @svg('heroicon-o-check', 'w-4 h-4')
-                                                        Erledigt
-                                                    </button>
-                                                    <button
-                                                        type="button"
-                                                        @click="$wire.skipStep({{ $rs->id }}); editing = false"
-                                                        class="px-3 py-1.5 text-sm text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] transition-colors"
-                                                    >
-                                                        Skip
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        @endif
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
-            @endif
-
             {{-- Run-Liste --}}
             <x-ui-table compact="true">
                 <x-ui-table-header>
@@ -1745,9 +1562,9 @@
                             $runTotal = $run->runSteps->count();
                             $runDone = $run->runSteps->whereIn('status', [\Platform\Organization\Enums\RunStepStatus::COMPLETED, \Platform\Organization\Enums\RunStepStatus::SKIPPED])->count();
                         @endphp
-                        <x-ui-table-row compact="true" class="cursor-pointer hover:bg-[var(--ui-muted-5)]" wire:click="setActiveRun({{ $run->id }})">
+                        <x-ui-table-row compact="true" class="cursor-pointer hover:bg-[var(--ui-muted-5)]" onclick="window.Livewire.navigate('{{ route('organization.processes.runs.show', [$process, $run]) }}')">
                             <x-ui-table-cell compact="true">
-                                <span class="text-sm">{{ $run->started_at->format('d.m.Y H:i') }}</span>
+                                <a href="{{ route('organization.processes.runs.show', [$process, $run]) }}" wire:navigate class="text-sm hover:underline">{{ $run->started_at->format('d.m.Y H:i') }}</a>
                             </x-ui-table-cell>
                             <x-ui-table-cell compact="true">
                                 <x-ui-badge variant="{{ $run->status->color() }}" size="sm">{{ $run->status->label() }}</x-ui-badge>

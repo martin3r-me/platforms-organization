@@ -28,6 +28,7 @@ use Platform\Organization\Livewire\JobProfile\Index as JobProfileIndex;
 use Platform\Organization\Livewire\Role\Index as RoleIndex;
 use Platform\Organization\Livewire\Process\Index as ProcessIndex;
 use Platform\Organization\Livewire\Process\Show as ProcessShow;
+use Platform\Organization\Livewire\Run\Show as RunShow;
 use Platform\Organization\Http\Controllers\ProcessCertificatePdfController;
 
 Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organization.dashboard');
@@ -85,6 +86,7 @@ Route::get('/processes', ProcessIndex::class)->name('organization.processes.inde
 Route::get('/processes/status/{status}', ProcessIndex::class)->name('organization.processes.status')
     ->whereIn('status', ['draft', 'under_review', 'pilot', 'active', 'deprecated']);
 Route::get('/processes/{process}', ProcessShow::class)->name('organization.processes.show');
+Route::get('/processes/{process}/runs/{run}', RunShow::class)->name('organization.processes.runs.show');
 Route::get('/processes/{process}/certificate.pdf', ProcessCertificatePdfController::class)->name('organization.processes.certificate-pdf');
 
 // Error Tracking Test (temporär)

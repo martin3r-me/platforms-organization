@@ -4,6 +4,7 @@ namespace Platform\Organization\Livewire\Process;
 
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\Url;
 use Livewire\Component;
 use Platform\Organization\Enums\AutomationLevel;
 use Platform\Organization\Enums\CorefitClassification;
@@ -20,7 +21,6 @@ use Platform\Organization\Models\OrganizationProcessOutput;
 use Platform\Organization\Models\OrganizationProcessSnapshot;
 use Platform\Organization\Models\OrganizationProcessImprovement;
 use Platform\Organization\Models\OrganizationProcessRun;
-use Platform\Organization\Models\OrganizationProcessRunStep;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationVsmSystem;
@@ -33,6 +33,7 @@ class Show extends Component
 {
     public OrganizationProcess $process;
     public array $form = [];
+    #[Url(as: 'tab')]
     public string $activeTab = 'details';
 
     // Step CRUD
@@ -92,9 +93,6 @@ class Show extends Component
     // Snapshot
     public bool $snapshotModalShow = false;
     public string $snapshotLabel = '';
-
-    // Run
-    public ?int $activeRunId = null;
 
     // Improvement CRUD
     public bool $improvementModalShow = false;
@@ -1434,13 +1432,7 @@ class Show extends Component
 
     // ── Run CRUD ─────────────────────────────────────────────
 
-    public function openActiveRun(int $runId): void
-    {
-        $this->activeRunId = $runId;
-        $this->activeTab = 'runs';
-    }
-
-    public function startRun(): void
+    public function startRun()
     {
         $activeSteps = $this->process->steps()
             ->where('is_active', true)
@@ -1468,59 +1460,9 @@ class Show extends Component
             ]);
         }
 
-        $this->activeRunId = $run->id;
-        $this->activeTab = 'runs';
         $this->invalidateRunCaches();
-        $this->dispatch('toast', message: 'Durchlauf gestartet');
-    }
 
-    public function completeStep(int $runStepId, ?int $activeDuration = null, ?int $waitOverride = null): void
-    {
-        $runStep = OrganizationProcessRunStep::with('run')->find($runStepId);
-        if (! $runStep || $runStep->run->process_id !== $this->process->id) return;
-        if ($runStep->status !== RunStepStatus::PENDING) return;
-
-        $updates = [
-            'status'     => 'completed',
-            'checked_at' => now(),
-            'active_duration_minutes' => $activeDuration,
-        ];
-
-        if ($waitOverride !== null) {
-            $updates['wait_duration_minutes'] = $waitOverride;
-            $updates['wait_override'] = true;
-        } else {
-            $previousStep = $runStep->run->runSteps()
-                ->where('position', '<', $runStep->position)
-                ->whereNotNull('checked_at')
-                ->orderByDesc('position')
-                ->first();
-
-            if ($previousStep && $previousStep->checked_at) {
-                $totalMinutesSince = (int) $previousStep->checked_at->diffInMinutes(now());
-                $waitMinutes = max(0, $totalMinutesSince - ($activeDuration ?? 0));
-                $updates['wait_duration_minutes'] = $waitMinutes;
-            }
-        }
-
-        $runStep->update($updates);
-        $this->checkRunAutoComplete($runStep->run);
-        $this->invalidateRunCaches();
-    }
-
-    public function skipStep(int $runStepId): void
-    {
-        $runStep = OrganizationProcessRunStep::with('run')->find($runStepId);
-        if (! $runStep || $runStep->run->process_id !== $this->process->id) return;
-        if ($runStep->status !== RunStepStatus::PENDING) return;
-
-        $runStep->update([
-            'status'     => 'skipped',
-            'checked_at' => now(),
-        ]);
-
-        $this->checkRunAutoComplete($runStep->run);
-        $this->invalidateRunCaches();
+        return redirect()->route('organization.processes.runs.show', [$this->process, $run]);
     }
 
     public function cancelRun(int $runId): void
@@ -1540,16 +1482,8 @@ class Show extends Component
     public function deleteRun(int $runId): void
     {
         $this->process->runs()->where('id', $runId)->delete();
-        if ($this->activeRunId === $runId) {
-            $this->activeRunId = null;
-        }
         $this->invalidateRunCaches();
         $this->dispatch('toast', message: 'Durchlauf gelöscht');
-    }
-
-    public function setActiveRun(?int $runId): void
-    {
-        $this->activeRunId = $runId;
     }
 
     public function applyRunAverages(): void
@@ -1601,20 +1535,6 @@ class Show extends Component
         $this->storeSnapshot();
 
         $this->dispatch('toast', message: "{$updated} Steps aktualisiert + Snapshot erstellt");
-    }
-
-    private function checkRunAutoComplete(OrganizationProcessRun $run): void
-    {
-        $allSteps = $run->runSteps()->get();
-        $allDone = $allSteps->every(fn ($s) => in_array($s->status->value, ['completed', 'skipped']));
-
-        if ($allDone) {
-            $run->update([
-                'status'       => 'completed',
-                'completed_at' => now(),
-            ]);
-            $this->dispatch('toast', message: 'Durchlauf abgeschlossen');
-        }
     }
 
     private function invalidateRunCaches(): void

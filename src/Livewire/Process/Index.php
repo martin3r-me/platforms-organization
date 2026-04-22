@@ -258,7 +258,7 @@ class Index extends Component
             'name'             => (string) $process->name,
             'code'             => (string) ($process->code ?? ''),
             'description'      => (string) ($process->description ?? ''),
-            'status'           => (string) ($process->status ?? 'draft'),
+            'status'           => $process->status?->value ?? 'draft',
             'process_category' => (string) ($process->process_category?->value ?? ''),
             'is_focus'         => (bool) $process->is_focus,
             'focus_reason'     => (string) ($process->focus_reason ?? ''),

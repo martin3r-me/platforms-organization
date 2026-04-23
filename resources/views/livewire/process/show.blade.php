@@ -566,19 +566,19 @@
                                     <span class="text-xs font-mono text-[var(--ui-muted)] w-5 text-right">{{ $step->position }}</span>
                                     <span class="text-sm text-[var(--ui-secondary)] flex-1 truncate">{{ $step->name }}</span>
                                     {{-- CoreFit Badge --}}
-                                    @if($step->corefit_classification === 'core')
+                                    @if($step->corefit_classification?->value === 'core')
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">Core</span>
-                                    @elseif($step->corefit_classification === 'context')
+                                    @elseif($step->corefit_classification?->value === 'context')
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">Ctx</span>
                                     @else
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-red-50 text-red-700 border border-red-200">NF</span>
                                     @endif
                                     {{-- Automation Badge --}}
-                                    @if($step->automation_level === 'llm_autonomous')
+                                    @if($step->automation_level?->value === 'llm_autonomous')
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-green-50 text-green-700 border border-green-200">LLM</span>
-                                    @elseif($step->automation_level === 'llm_assisted')
+                                    @elseif($step->automation_level?->value === 'llm_assisted')
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-blue-50 text-blue-700 border border-blue-200">Asst</span>
-                                    @elseif($step->automation_level === 'hybrid')
+                                    @elseif($step->automation_level?->value === 'hybrid')
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">Hyb</span>
                                     @else
                                         <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-gray-50 text-gray-600 border border-gray-200">H</span>
@@ -1171,20 +1171,20 @@
                                 @endif
                             </x-ui-table-cell>
                             <x-ui-table-cell compact="true">
-                                @if($step->corefit_classification === 'core')
+                                @if($step->corefit_classification?->value === 'core')
                                     <x-ui-badge variant="success" size="sm">Core</x-ui-badge>
-                                @elseif($step->corefit_classification === 'context')
+                                @elseif($step->corefit_classification?->value === 'context')
                                     <x-ui-badge variant="warning" size="sm">Context</x-ui-badge>
                                 @else
                                     <x-ui-badge variant="danger" size="sm">No Fit</x-ui-badge>
                                 @endif
                             </x-ui-table-cell>
                             <x-ui-table-cell compact="true">
-                                @if($step->automation_level === 'llm_autonomous')
+                                @if($step->automation_level?->value === 'llm_autonomous')
                                     <x-ui-badge variant="success" size="sm">LLM-Autonomous</x-ui-badge>
-                                @elseif($step->automation_level === 'llm_assisted')
+                                @elseif($step->automation_level?->value === 'llm_assisted')
                                     <x-ui-badge variant="info" size="sm">LLM-Assisted</x-ui-badge>
-                                @elseif($step->automation_level === 'hybrid')
+                                @elseif($step->automation_level?->value === 'hybrid')
                                     <x-ui-badge variant="warning" size="sm">Hybrid</x-ui-badge>
                                 @else
                                     <x-ui-badge variant="muted" size="sm">Human</x-ui-badge>
@@ -1726,7 +1726,7 @@
 
                 {{-- Efficiency Scale --}}
                 <div class="mb-5">
-                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-800 mb-2">Effizienzklasse</h3>
+                    <h3 class="text-xs font-bold uppercase tracking-wider text-gray-800 mb-2">Prozess-Score</h3>
                     @php
                         $scaleClasses = [
                             ['class' => 'A+', 'color' => '#16a34a'],
@@ -1751,24 +1751,50 @@
                     <div class="inline-flex items-center gap-3 px-3 py-2 rounded-md border-2" style="background: {{ $certData['efficiency_class']['color'] }}15; border-color: {{ $certData['efficiency_class']['color'] }};">
                         <span class="text-3xl font-bold" style="color: {{ $certData['efficiency_class']['color'] }};">{{ $certData['efficiency_class']['class'] }}</span>
                         <span class="text-sm font-medium" style="color: {{ $certData['efficiency_class']['color'] }};">{{ $certData['efficiency_class']['label'] }}</span>
-                        <span class="text-sm text-gray-500">({{ $certData['efficiency_percent'] }}%)</span>
+                        <span class="text-sm text-gray-500">({{ $certData['process_score'] }}%)</span>
                     </div>
+                    @if($certData['has_run_data'] ?? false)
+                        <div class="text-[10px] text-gray-400 mt-1">Basiert auf {{ $certData['run_count'] }} {{ $certData['run_count'] === 1 ? 'Durchlauf' : 'Durchläufen' }}</div>
+                    @endif
                 </div>
+
+                {{-- Score Dimensions --}}
+                @if(!empty($certData['score_dimensions']))
+                    <div class="mb-5">
+                        <h3 class="text-xs font-bold uppercase tracking-wider text-gray-800 mb-2 pb-1 border-b border-gray-200">Score-Dimensionen</h3>
+                        @php
+                            $dimColors = [
+                                'design'     => '#8b5cf6',
+                                'automation' => '#3b82f6',
+                                'time'       => '#f59e0b',
+                                'maturity'   => '#10b981',
+                                'flow'       => '#06b6d4',
+                            ];
+                        @endphp
+                        @foreach($certData['score_dimensions'] as $dimKey => $dim)
+                            <div class="mb-2">
+                                <div class="flex justify-between text-xs text-gray-600 mb-0.5">
+                                    <span>{{ $dim['label'] }} <span class="text-gray-400">({{ $dim['weight'] }}%)</span></span>
+                                    <span class="font-medium">{{ $dim['score'] }}</span>
+                                </div>
+                                <div class="w-full h-2.5 bg-gray-100 rounded-sm overflow-hidden">
+                                    <div class="h-2.5 rounded-sm transition-all" style="width: {{ max(1, $dim['score']) }}%; background: {{ $dimColors[$dimKey] ?? '#94a3b8' }};"></div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
 
                 {{-- KPI Grid --}}
                 @php
-                    $certAutoScore = $certData['automation_score'] ?? null;
                     $certKpis = [
                         ['label' => 'Steps', 'value' => $certData['kpis']['total_steps'], 'detail' => 'Prozessschritte', 'color' => 'text-gray-800'],
                         ['label' => 'Durchlaufzeit', 'value' => $certData['kpis']['lead_time'], 'detail' => 'Min. (' . $certData['kpis']['total_duration'] . ' Arbeit + ' . $certData['kpis']['total_wait'] . ' Warten)', 'color' => 'text-gray-800'],
-                        ['label' => 'Effizienz', 'value' => $certData['efficiency_percent'] . '%', 'detail' => 'Anteil aktiver Arbeit', 'color' => ''],
+                        ['label' => 'Prozess-Score', 'value' => $certData['process_score'] . '%', 'detail' => ($certData['has_run_data'] ?? false) ? $certData['run_count'] . ' Durchläufe' : 'Ohne Durchlaufdaten', 'color' => ''],
                         ['label' => 'LLM-Quote', 'value' => $certData['kpis']['llm_quote'] . '%', 'detail' => $certData['kpis']['llm_count'] . ' von ' . $certData['kpis']['total_steps'] . ' Steps', 'color' => ''],
                     ];
-                    if ($certAutoScore) {
-                        $certKpis[] = ['label' => 'Automation-Score', 'value' => $certAutoScore['score'] . '/100', 'detail' => 'Note: ' . $certAutoScore['grade'], 'color' => 'text-gray-800'];
-                    }
                 @endphp
-                <div class="grid grid-cols-{{ count($certKpis) <= 4 ? '4' : '5' }} gap-0 mb-5">
+                <div class="grid grid-cols-4 gap-0 mb-5">
                     @foreach($certKpis as $kpi)
                         <div class="p-3 border border-gray-200 text-center">
                             <div class="text-[10px] uppercase tracking-wider text-gray-400 font-bold">{{ $kpi['label'] }}</div>

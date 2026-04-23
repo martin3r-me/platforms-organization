@@ -122,7 +122,7 @@
 
     {{-- Efficiency Scale --}}
     <div class="efficiency-section">
-        <div class="efficiency-title">Effizienzklasse</div>
+        <div class="efficiency-title">Prozess-Score</div>
 
         @php
             $scaleClasses = [
@@ -151,8 +151,36 @@
         <div class="efficiency-result" style="background: {{ $data['efficiency_class']['color'] }}20; border: 2px solid {{ $data['efficiency_class']['color'] }};">
             <span class="efficiency-result-class" style="color: {{ $data['efficiency_class']['color'] }};">{{ $data['efficiency_class']['class'] }}</span>
             <span class="efficiency-result-label" style="color: {{ $data['efficiency_class']['color'] }};">{{ $data['efficiency_class']['label'] }}</span>
-            <span class="efficiency-result-percent">({{ $data['efficiency_percent'] }}%)</span>
+            <span class="efficiency-result-percent">({{ $data['process_score'] }}%)</span>
         </div>
+        @if($data['has_run_data'] ?? false)
+            <div style="font-size: 9px; color: #94a3b8; margin-top: 4px;">Basiert auf {{ $data['run_count'] }} {{ $data['run_count'] === 1 ? 'Durchlauf' : 'Durchläufen' }}</div>
+        @endif
+
+        {{-- Score Dimensions --}}
+        @if(!empty($data['score_dimensions']))
+            @php
+                $dimColors = [
+                    'design'     => '#8b5cf6',
+                    'automation' => '#3b82f6',
+                    'time'       => '#f59e0b',
+                    'maturity'   => '#10b981',
+                    'flow'       => '#06b6d4',
+                ];
+            @endphp
+            <div style="margin-top: 12px;">
+                @foreach($data['score_dimensions'] as $dimKey => $dim)
+                    <div style="margin-bottom: 6px;">
+                        <div style="font-size: 9px; color: #475569; margin-bottom: 2px;">
+                            {{ $dim['label'] }} ({{ $dim['weight'] }}%) — <strong>{{ $dim['score'] }}</strong>
+                        </div>
+                        <div style="width: 100%; height: 10px; background: #f1f5f9; border-radius: 2px; overflow: hidden;">
+                            <div style="height: 10px; border-radius: 2px; width: {{ max(1, $dim['score']) }}%; background: {{ $dimColors[$dimKey] ?? '#94a3b8' }};"></div>
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        @endif
     </div>
 
     {{-- KPI Grid --}}
@@ -168,9 +196,15 @@
             <div class="kpi-detail">Min. ({{ $data['kpis']['total_duration'] }} Arbeit + {{ $data['kpis']['total_wait'] }} Warten)</div>
         </div>
         <div class="kpi-cell">
-            <div class="kpi-label">Effizienz</div>
-            <div class="kpi-value" style="color: {{ $data['efficiency_class']['color'] }};">{{ $data['efficiency_percent'] }}%</div>
-            <div class="kpi-detail">Anteil aktiver Arbeit</div>
+            <div class="kpi-label">Prozess-Score</div>
+            <div class="kpi-value" style="color: {{ $data['efficiency_class']['color'] }};">{{ $data['process_score'] }}%</div>
+            <div class="kpi-detail">
+                @if($data['has_run_data'] ?? false)
+                    {{ $data['run_count'] }} {{ $data['run_count'] === 1 ? 'Durchlauf' : 'Durchläufe' }}
+                @else
+                    Ohne Durchlaufdaten
+                @endif
+            </div>
         </div>
         <div class="kpi-cell">
             <div class="kpi-label">LLM-Quote</div>

@@ -1,3 +1,4 @@
+<div>
 <x-ui-page>
     <x-slot name="navbar">
         <x-ui-page-navbar title="" />
@@ -1311,3 +1312,4 @@
         </x-slot>
     </x-ui-modal>
 </x-ui-page>
+</div>

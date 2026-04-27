@@ -1,4 +1,3 @@
-<div>
 <x-ui-page>
     <x-slot name="navbar">
         <x-ui-page-navbar title="" />
@@ -926,11 +925,60 @@
                 @endif
             </div>
         </div>
+    <!-- Create Team Modal -->
+    <x-ui-modal
+        wire:model="showCreateTeamModal"
+        size="md"
+    >
+        <x-slot name="header">
+            Team aus Entität erstellen
+        </x-slot>
+
+        <div class="space-y-4">
+            <div class="space-y-4">
+                <x-ui-input-text
+                    name="team_name"
+                    label="Team-Name"
+                    wire:model.live="newTeam.name"
+                    required
+                    placeholder="Name des Teams"
+                />
+
+                <x-ui-input-select
+                    name="parent_team_id"
+                    label="Eltern-Team (optional)"
+                    :options="$this->availableTeams"
+                    optionValue="id"
+                    optionLabel="name"
+                    :nullable="true"
+                    nullLabel="Kein Eltern-Team"
+                    wire:model.live="newTeam.parent_team_id"
+                />
+            </div>
+        </div>
+
+        <x-slot name="footer">
+            <div class="d-flex justify-end gap-2">
+                <x-ui-button
+                    type="button"
+                    variant="secondary-outline"
+                    wire:click="closeCreateTeamModal"
+                >
+                    Abbrechen
+                </x-ui-button>
+                <x-ui-button type="button" variant="primary" wire:click="createTeam">
+                    @svg('heroicon-o-user-group', 'w-4 h-4 mr-2')
+                    Team erstellen
+                </x-ui-button>
+            </div>
+        </x-slot>
+    </x-ui-modal>
+
     </x-ui-page-container>
 
     {{-- Alpine treeNode component for recursive tree rendering --}}
+    @script
     <script>
-    document.addEventListener('alpine:init', () => {
         // Store linkConfig and linkIconSvgs globally for tree nodes
         Alpine.store('treeConfig', {
             linkConfig: @js(collect($this->linkTypeConfig)->map(fn($c) => ['label' => $c['label'], 'icon' => $c['icon']])),
@@ -1260,56 +1308,6 @@
                 return window._treeRenderLinkGroups(n, cfg.linkConfig, cfg.linkIconSvgs);
             },
         }));
-    });
     </script>
-
-    <!-- Create Team Modal -->
-    <x-ui-modal
-        wire:model="showCreateTeamModal"
-        size="md"
-    >
-        <x-slot name="header">
-            Team aus Entität erstellen
-        </x-slot>
-
-        <div class="space-y-4">
-            <div class="space-y-4">
-                <x-ui-input-text
-                    name="team_name"
-                    label="Team-Name"
-                    wire:model.live="newTeam.name"
-                    required
-                    placeholder="Name des Teams"
-                />
-
-                <x-ui-input-select
-                    name="parent_team_id"
-                    label="Eltern-Team (optional)"
-                    :options="$this->availableTeams"
-                    optionValue="id"
-                    optionLabel="name"
-                    :nullable="true"
-                    nullLabel="Kein Eltern-Team"
-                    wire:model.live="newTeam.parent_team_id"
-                />
-            </div>
-        </div>
-
-        <x-slot name="footer">
-            <div class="d-flex justify-end gap-2">
-                <x-ui-button
-                    type="button"
-                    variant="secondary-outline"
-                    wire:click="closeCreateTeamModal"
-                >
-                    Abbrechen
-                </x-ui-button>
-                <x-ui-button type="button" variant="primary" wire:click="createTeam">
-                    @svg('heroicon-o-user-group', 'w-4 h-4 mr-2')
-                    Team erstellen
-                </x-ui-button>
-            </div>
-        </x-slot>
-    </x-ui-modal>
+    @endscript
 </x-ui-page>
-</div>

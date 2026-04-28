@@ -78,7 +78,7 @@ class OrganizationTimeEntry extends Model
 
     public function context(): MorphTo
     {
-        return $this->morphTo();
+        return $this->morphTo()->withTrashed();
     }
 
     public function scopeForContextKey($query, string $type, int $id)

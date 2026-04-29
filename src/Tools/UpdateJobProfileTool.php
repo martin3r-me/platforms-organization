@@ -41,8 +41,11 @@ class UpdateJobProfileTool implements ToolContract, ToolMetadataContract
                 'responsibilities' => ['type' => 'array', 'description' => 'Verantwortungen: [{"name": "...", "is_core": true}]'],
                 'requirements'     => ['type' => 'array', 'description' => 'Qualifikationen: [{"name": "...", "type": "degree|certification|experience", "required": true}]'],
                 'soft_skills'      => ['type' => 'array', 'description' => 'Soft Skills: [{"name": "...", "level": "basic|advanced|expert"}]'],
-                'kpis'             => ['type' => 'array', 'description' => 'Bewertungskriterien: [{"name": "...", "description": "..."}]'],
-                'status'           => ['type' => 'string'],
+                'kpis'               => ['type' => 'array', 'description' => 'Bewertungskriterien: [{"name": "...", "description": "..."}]'],
+                'exclusion_criteria' => ['type' => 'array', 'description' => 'Ausschlusskriterien: ["Keine Influencerin", ...]'],
+                'work_model'         => ['type' => 'object', 'description' => 'Arbeitsmodell: {"type": "remote|hybrid|onsite|travel", "travel_required": bool, "self_organized": bool, "location_notes": "..."}'],
+                'reporting'          => ['type' => 'object', 'description' => 'Reporting: {"reports_to": "...", "autonomy_level": "full|guided|supervised"}'],
+                'status'             => ['type' => 'string'],
                 'effective_from'   => ['type' => 'string'],
                 'effective_to'     => ['type' => 'string'],
             ],
@@ -93,7 +96,7 @@ class UpdateJobProfileTool implements ToolContract, ToolMetadataContract
                     $update[$field] = $val === '' ? null : $val;
                 }
             }
-            foreach (['skills', 'responsibilities', 'requirements', 'soft_skills', 'kpis'] as $field) {
+            foreach (['skills', 'responsibilities', 'requirements', 'soft_skills', 'kpis', 'exclusion_criteria', 'work_model', 'reporting'] as $field) {
                 if (array_key_exists($field, $arguments)) {
                     $update[$field] = is_array($arguments[$field]) ? $arguments[$field] : null;
                 }

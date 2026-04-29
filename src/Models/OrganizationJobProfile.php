@@ -35,6 +35,9 @@ class OrganizationJobProfile extends Model
         'requirements',
         'soft_skills',
         'kpis',
+        'exclusion_criteria',
+        'work_model',
+        'reporting',
         'status',
         'owner_entity_id',
         'effective_from',
@@ -46,8 +49,11 @@ class OrganizationJobProfile extends Model
         'responsibilities' => 'array',
         'requirements'     => 'array',
         'soft_skills'      => 'array',
-        'kpis'             => 'array',
-        'effective_from'   => 'date',
+        'kpis'               => 'array',
+        'exclusion_criteria' => 'array',
+        'work_model'         => 'array',
+        'reporting'          => 'array',
+        'effective_from'     => 'date',
         'effective_to'     => 'date',
     ];
 

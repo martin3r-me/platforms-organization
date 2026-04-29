@@ -340,6 +340,79 @@
                 @endif
             </div>
 
+            {{-- Ausschlusskriterien --}}
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Ausschlusskriterien</h2>
+                    <x-ui-button size="xs" variant="secondary-outline" wire:click="addExclusionCriterion">
+                        @svg('heroicon-o-plus', 'w-3.5 h-3.5') Hinzufügen
+                    </x-ui-button>
+                </div>
+                @if(!empty($form['exclusion_criteria']))
+                    <div class="space-y-2">
+                        @foreach($form['exclusion_criteria'] as $i => $criterion)
+                            <div class="flex items-center gap-2" wire:key="excl-{{ $i }}">
+                                <div class="flex-1">
+                                    <input type="text" wire:model.live="form.exclusion_criteria.{{ $i }}" placeholder="z.B. Keine Influencerin" class="w-full rounded-md border-gray-300 shadow-sm text-sm" />
+                                </div>
+                                <button type="button" wire:click="removeExclusionCriterion({{ $i }})" class="text-red-500 hover:text-red-700 p-1">
+                                    @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                </button>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <p class="text-sm text-[var(--ui-muted)]">Keine Ausschlusskriterien definiert.</p>
+                @endif
+            </div>
+
+            {{-- Arbeitsmodell --}}
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Arbeitsmodell</h2>
+                <div class="space-y-4">
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 mb-2">Arbeitsmodell-Typ</label>
+                            <select wire:model.live="form.work_model.type" class="w-full rounded-md border-gray-300 shadow-sm text-sm">
+                                <option value="">—</option>
+                                <option value="remote">Remote</option>
+                                <option value="hybrid">Hybrid</option>
+                                <option value="onsite">Vor Ort</option>
+                                <option value="travel">Reisend</option>
+                            </select>
+                        </div>
+                        <x-ui-input-text name="work_model_location_notes" label="Standort-Hinweise" wire:model.live="form.work_model.location_notes" placeholder="z.B. Köln, flexibel, weltweit" />
+                    </div>
+                    <div class="flex items-center gap-6">
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" wire:model.live="form.work_model.travel_required" id="wm_travel" class="rounded border-gray-300">
+                            <label for="wm_travel" class="text-sm text-[var(--ui-secondary)]">Reisebereitschaft erforderlich</label>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            <input type="checkbox" wire:model.live="form.work_model.self_organized" id="wm_self" class="rounded border-gray-300">
+                            <label for="wm_self" class="text-sm text-[var(--ui-secondary)]">Selbstorganisiert</label>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            {{-- Reporting-Linie / Autonomie --}}
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Reporting & Autonomie</h2>
+                <div class="grid grid-cols-2 gap-4">
+                    <x-ui-input-text name="reporting_reports_to" label="Berichtet an" wire:model.live="form.reporting.reports_to" placeholder="z.B. CTO, Geschäftsführung, niemand" />
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 mb-2">Autonomie-Level</label>
+                        <select wire:model.live="form.reporting.autonomy_level" class="w-full rounded-md border-gray-300 shadow-sm text-sm">
+                            <option value="">—</option>
+                            <option value="full">Full (volle Autonomie)</option>
+                            <option value="guided">Guided (begleitet)</option>
+                            <option value="supervised">Supervised (angeleitet)</option>
+                        </select>
+                    </div>
+                </div>
+            </div>
+
             {{-- Ausführliches Profil (Content / Markdown) --}}
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                 <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Ausführliches Profil</h2>

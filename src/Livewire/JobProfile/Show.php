@@ -49,8 +49,15 @@ class Show extends Component
             'responsibilities' => $jp->responsibilities ?? [],
             'requirements'     => $jp->requirements ?? [],
             'soft_skills'      => $jp->soft_skills ?? [],
-            'kpis'             => $jp->kpis ?? [],
-            'status'           => (string) ($jp->status ?? 'active'),
+            'kpis'               => $jp->kpis ?? [],
+            'exclusion_criteria' => $jp->exclusion_criteria ?? [],
+            'work_model'         => $jp->work_model ?? [
+                'type' => '', 'travel_required' => false, 'self_organized' => false, 'location_notes' => '',
+            ],
+            'reporting'          => $jp->reporting ?? [
+                'reports_to' => '', 'autonomy_level' => '',
+            ],
+            'status'             => (string) ($jp->status ?? 'active'),
             'owner_entity_id'  => (string) ($jp->owner_entity_id ?? ''),
             'effective_from'   => $jp->effective_from?->toDateString(),
             'effective_to'     => $jp->effective_to?->toDateString(),
@@ -83,8 +90,11 @@ class Show extends Component
             'responsibilities' => ! empty($this->form['responsibilities']) ? $this->form['responsibilities'] : null,
             'requirements'     => ! empty($this->form['requirements']) ? $this->form['requirements'] : null,
             'soft_skills'      => ! empty($this->form['soft_skills']) ? $this->form['soft_skills'] : null,
-            'kpis'             => ! empty($this->form['kpis']) ? $this->form['kpis'] : null,
-            'status'           => $this->form['status'],
+            'kpis'               => ! empty($this->form['kpis']) ? $this->form['kpis'] : null,
+            'exclusion_criteria' => ! empty($this->form['exclusion_criteria']) ? $this->form['exclusion_criteria'] : null,
+            'work_model'         => $this->hasWorkModelData() ? $this->form['work_model'] : null,
+            'reporting'          => $this->hasReportingData() ? $this->form['reporting'] : null,
+            'status'             => $this->form['status'],
             'owner_entity_id'  => $this->form['owner_entity_id'] !== '' ? (int) $this->form['owner_entity_id'] : null,
             'effective_from'   => $this->form['effective_from'] ?: null,
             'effective_to'     => $this->form['effective_to'] ?: null,
@@ -166,6 +176,39 @@ class Show extends Component
     {
         unset($this->form['kpis'][$index]);
         $this->form['kpis'] = array_values($this->form['kpis']);
+    }
+
+    // --- Exclusion Criteria ---
+
+    public function addExclusionCriterion(): void
+    {
+        $this->form['exclusion_criteria'][] = '';
+    }
+
+    public function removeExclusionCriterion(int $index): void
+    {
+        unset($this->form['exclusion_criteria'][$index]);
+        $this->form['exclusion_criteria'] = array_values($this->form['exclusion_criteria']);
+    }
+
+    // --- Work Model / Reporting helpers ---
+
+    private function hasWorkModelData(): bool
+    {
+        $wm = $this->form['work_model'] ?? [];
+
+        return ($wm['type'] ?? '') !== ''
+            || ! empty($wm['travel_required'])
+            || ! empty($wm['self_organized'])
+            || ($wm['location_notes'] ?? '') !== '';
+    }
+
+    private function hasReportingData(): bool
+    {
+        $r = $this->form['reporting'] ?? [];
+
+        return ($r['reports_to'] ?? '') !== ''
+            || ($r['autonomy_level'] ?? '') !== '';
     }
 
     // --- Assignments ---
@@ -274,7 +317,10 @@ class Show extends Component
             || $this->form['responsibilities'] !== ($jp->responsibilities ?? [])
             || $this->form['requirements'] !== ($jp->requirements ?? [])
             || $this->form['soft_skills'] !== ($jp->soft_skills ?? [])
-            || $this->form['kpis'] !== ($jp->kpis ?? []);
+            || $this->form['kpis'] !== ($jp->kpis ?? [])
+            || $this->form['exclusion_criteria'] !== ($jp->exclusion_criteria ?? [])
+            || $this->form['work_model'] !== ($jp->work_model ?? ['type' => '', 'travel_required' => false, 'self_organized' => false, 'location_notes' => ''])
+            || $this->form['reporting'] !== ($jp->reporting ?? ['reports_to' => '', 'autonomy_level' => '']);
     }
 
     public function render()

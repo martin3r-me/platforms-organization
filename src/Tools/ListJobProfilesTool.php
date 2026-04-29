@@ -92,8 +92,11 @@ class ListJobProfilesTool implements ToolContract, ToolMetadataContract
                 'responsibilities' => $jp->responsibilities,
                 'requirements'     => $jp->requirements,
                 'soft_skills'      => $jp->soft_skills,
-                'kpis'             => $jp->kpis,
-                'effective_from'   => $jp->effective_from?->toDateString(),
+                'kpis'               => $jp->kpis,
+                'exclusion_criteria' => $jp->exclusion_criteria,
+                'work_model'         => $jp->work_model,
+                'reporting'          => $jp->reporting,
+                'effective_from'     => $jp->effective_from?->toDateString(),
                 'effective_to'     => $jp->effective_to?->toDateString(),
                 'team_id'          => $jp->team_id,
             ])->values()->toArray();

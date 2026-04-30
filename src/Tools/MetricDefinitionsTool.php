@@ -17,7 +17,7 @@ class MetricDefinitionsTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/metric-definitions - Listet alle bekannten Metrik-Definitionen mit Label, Group, Direction, Unit. Filterbar nach Group.';
+        return 'GET /organization/metric-definitions - Listet alle bekannten Metrik-Definitionen mit Label, Group, Direction, Unit, Dimension (7½), Type (stock/flow/modulator). Filterbar nach Group oder Dimension.';
     }
 
     public function getSchema(): array
@@ -27,7 +27,12 @@ class MetricDefinitionsTool implements ToolContract, ToolMetadataContract
             'properties' => [
                 'group' => [
                     'type' => 'string',
-                    'description' => 'Optional: Filter nach Domain/Stream (z.B. "dev", "planner", "core").',
+                    'description' => 'Optional: Filter nach fachlicher Gruppe (z.B. "work", "core", "crm", "okr").',
+                ],
+                'dimension' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Filter nach 7½-Dimension (complexity, energy, throughput, org_capital, costs, revenue, potential, quality).',
+                    'enum' => ['complexity', 'energy', 'throughput', 'org_capital', 'costs', 'revenue', 'potential', 'quality'],
                 ],
             ],
         ];
@@ -38,18 +43,26 @@ class MetricDefinitionsTool implements ToolContract, ToolMetadataContract
         try {
             $registry = resolve(EntityLinkRegistry::class);
             $group = $arguments['group'] ?? null;
+            $dimension = $arguments['dimension'] ?? null;
 
-            $definitions = $group
-                ? $registry->metricDefinitionsForGroup($group)
-                : $registry->allMetricDefinitions();
+            if ($dimension) {
+                $definitions = $registry->metricDefinitionsForDimension($dimension);
+            } elseif ($group) {
+                $definitions = $registry->metricDefinitionsForGroup($group);
+            } else {
+                $definitions = $registry->allMetricDefinitions();
+            }
 
             $groups = $registry->allMetricGroups();
+            $dimensions = EntityLinkRegistry::allDimensions();
 
             return ToolResult::success([
                 'definitions' => $definitions,
                 'groups' => $groups,
+                'dimensions' => $dimensions,
                 'total' => count($definitions),
                 'filter_group' => $group,
+                'filter_dimension' => $dimension,
             ]);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler: ' . $e->getMessage());

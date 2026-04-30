@@ -7,6 +7,21 @@ use Platform\Organization\Contracts\HasMetricDefinitions;
 
 class EntityLinkRegistry
 {
+    // 7½ Dimensionen
+    public const DIMENSION_COMPLEXITY  = 'complexity';
+    public const DIMENSION_ENERGY      = 'energy';
+    public const DIMENSION_THROUGHPUT  = 'throughput';
+    public const DIMENSION_ORG_CAPITAL = 'org_capital';
+    public const DIMENSION_COSTS       = 'costs';
+    public const DIMENSION_REVENUE     = 'revenue';
+    public const DIMENSION_POTENTIAL   = 'potential';
+    public const DIMENSION_QUALITY     = 'quality';
+
+    // Metrik-Typen
+    public const TYPE_STOCK     = 'stock';
+    public const TYPE_FLOW      = 'flow';
+    public const TYPE_MODULATOR = 'modulator';
+
     /** @var EntityLinkProvider[] */
     protected array $providers = [];
 
@@ -179,6 +194,17 @@ class EntityLinkRegistry
             }
         }
 
+        // Apply defaults for dimension/type if not set by provider
+        foreach ($defs as $key => &$def) {
+            if (!isset($def['dimension'])) {
+                $def['dimension'] = null;
+            }
+            if (!isset($def['type'])) {
+                $def['type'] = self::TYPE_STOCK;
+            }
+        }
+        unset($def);
+
         return $this->cachedMetricDefinitions = $defs;
     }
 
@@ -191,6 +217,36 @@ class EntityLinkRegistry
             $this->allMetricDefinitions(),
             fn (array $def) => $def['group'] === $group
         );
+    }
+
+    /**
+     * Metric definitions filtered by dimension (7½ Dimensionen).
+     */
+    public function metricDefinitionsForDimension(string $dimension): array
+    {
+        return array_filter(
+            $this->allMetricDefinitions(),
+            fn (array $def) => ($def['dimension'] ?? null) === $dimension
+        );
+    }
+
+    /**
+     * All 7½ dimensions with labels.
+     *
+     * @return array<string, array{label: string, type: string}>
+     */
+    public static function allDimensions(): array
+    {
+        return [
+            self::DIMENSION_COMPLEXITY  => ['label' => 'Komplexitaet',  'type' => self::TYPE_STOCK],
+            self::DIMENSION_ENERGY      => ['label' => 'Energie',       'type' => self::TYPE_FLOW],
+            self::DIMENSION_THROUGHPUT  => ['label' => 'Durchsatz',     'type' => self::TYPE_FLOW],
+            self::DIMENSION_ORG_CAPITAL => ['label' => 'Org-Kapital',   'type' => self::TYPE_STOCK],
+            self::DIMENSION_COSTS       => ['label' => 'Kosten',        'type' => self::TYPE_FLOW],
+            self::DIMENSION_REVENUE     => ['label' => 'Umsatz',        'type' => self::TYPE_FLOW],
+            self::DIMENSION_POTENTIAL   => ['label' => 'Potenziale',    'type' => self::TYPE_STOCK],
+            self::DIMENSION_QUALITY     => ['label' => 'Qualitaet',     'type' => self::TYPE_MODULATOR],
+        ];
     }
 
     /**
@@ -209,6 +265,7 @@ class EntityLinkRegistry
             'crm' => 'CRM',
             'hcm' => 'HCM',
             'canvas' => 'Canvas',
+            'finance' => 'Finanzen',
         ];
 
         $groups = [];
@@ -231,12 +288,16 @@ class EntityLinkRegistry
                 'group' => 'core',
                 'direction' => 'neutral',
                 'unit' => 'count',
+                'dimension' => self::DIMENSION_ORG_CAPITAL,
+                'type' => self::TYPE_STOCK,
             ],
             'time_total_minutes' => [
                 'label' => 'Zeiterfassung (gesamt)',
                 'group' => 'core',
                 'direction' => 'neutral',
                 'unit' => 'minutes',
+                'dimension' => self::DIMENSION_ENERGY,
+                'type' => self::TYPE_FLOW,
             ],
             'time_billed_minutes' => [
                 'label' => 'Zeiterfassung (abgerechnet)',
@@ -244,6 +305,8 @@ class EntityLinkRegistry
                 'direction' => 'up',
                 'unit' => 'minutes',
                 'pair' => 'time_total_minutes',
+                'dimension' => self::DIMENSION_ENERGY,
+                'type' => self::TYPE_FLOW,
             ],
         ];
     }

@@ -40,6 +40,8 @@ class UpdateProcessTool implements ToolContract, ToolMetadataContract
                 'version'         => ['type' => 'integer'],
                 'is_active'       => ['type' => 'boolean'],
                 'metadata'              => ['type' => 'object'],
+                'process_landscape'     => ['type' => 'string', 'description' => 'Prozesslandkarte: Einordnung in die Gesamtlandschaft. "" zum Leeren.'],
+                'corefit_classification_notes' => ['type' => 'string', 'description' => 'COREFIT Klassifizierung: Begründung der Einstufung. "" zum Leeren.'],
                 'target_description'    => ['type' => 'string', 'description' => 'Zielbild. "" zum Leeren.'],
                 'value_proposition'     => ['type' => 'string', 'description' => 'Kundennutzen & Wertbeitrag. "" zum Leeren.'],
                 'cost_analysis'         => ['type' => 'string', 'description' => 'Kosten & Break-Even. "" zum Leeren.'],
@@ -112,7 +114,7 @@ class UpdateProcessTool implements ToolContract, ToolMetadataContract
             if (array_key_exists('metadata', $arguments)) {
                 $update['metadata'] = $arguments['metadata'];
             }
-            foreach (['target_description', 'value_proposition', 'cost_analysis', 'risk_assessment', 'improvement_levers', 'action_plan', 'standardization_notes'] as $field) {
+            foreach (['process_landscape', 'corefit_classification_notes', 'target_description', 'value_proposition', 'cost_analysis', 'risk_assessment', 'improvement_levers', 'action_plan', 'standardization_notes'] as $field) {
                 if (array_key_exists($field, $arguments)) {
                     $val = (string) ($arguments[$field] ?? '');
                     $update[$field] = $val === '' ? null : $val;

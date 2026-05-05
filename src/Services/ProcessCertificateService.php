@@ -124,6 +124,8 @@ class ProcessCertificateService
                 'owner' => $process->ownerEntity?->name,
                 'vsm_system' => $process->vsmSystem?->name,
                 'team' => $process->team?->name,
+                'process_landscape' => $process->process_landscape,
+                'corefit_classification_notes' => $process->corefit_classification_notes,
                 'target_description' => $process->target_description,
                 'value_proposition' => $process->value_proposition,
                 'cost_analysis' => $process->cost_analysis,
@@ -370,7 +372,7 @@ class ProcessCertificateService
         }
 
         // COREFIT analysis fields filled
-        $analysisFields = ['value_proposition', 'cost_analysis', 'risk_assessment', 'improvement_levers', 'action_plan', 'standardization_notes'];
+        $analysisFields = ['process_landscape', 'corefit_classification_notes', 'value_proposition', 'cost_analysis', 'risk_assessment', 'improvement_levers', 'action_plan', 'standardization_notes'];
         $filledFields = 0;
         foreach ($analysisFields as $field) {
             if (! empty($process->$field)) {

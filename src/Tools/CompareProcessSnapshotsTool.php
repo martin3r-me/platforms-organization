@@ -110,7 +110,7 @@ class CompareProcessSnapshotsTool implements ToolContract, ToolMetadataContract
             $processChanges = [];
             $processA = $dataA['process'] ?? [];
             $processB = $dataB['process'] ?? [];
-            foreach (['name', 'code', 'description', 'status', 'version', 'target_description', 'value_proposition', 'cost_analysis', 'risk_assessment', 'improvement_levers', 'action_plan', 'standardization_notes'] as $field) {
+            foreach (['name', 'code', 'description', 'status', 'version', 'process_landscape', 'corefit_classification_notes', 'target_description', 'value_proposition', 'cost_analysis', 'risk_assessment', 'improvement_levers', 'action_plan', 'standardization_notes'] as $field) {
                 if (($processA[$field] ?? null) !== ($processB[$field] ?? null)) {
                     $processChanges[$field] = [
                         'before' => $processA[$field] ?? null,

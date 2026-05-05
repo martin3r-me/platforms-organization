@@ -41,6 +41,8 @@ class OrganizationProcess extends Model
         'improvement_levers',
         'action_plan',
         'standardization_notes',
+        'process_landscape',
+        'corefit_classification_notes',
         'hourly_rate',
         'frequency',
         'public_token',

@@ -145,6 +145,8 @@ class Show extends Component
             'improvement_levers'    => $this->process->improvement_levers ?? '',
             'action_plan'           => $this->process->action_plan ?? '',
             'standardization_notes' => $this->process->standardization_notes ?? '',
+            'process_landscape' => $this->process->process_landscape ?? '',
+            'corefit_classification_notes' => $this->process->corefit_classification_notes ?? '',
         ];
     }
 
@@ -171,7 +173,9 @@ class Show extends Component
                $this->form['risk_assessment'] !== ($this->process->risk_assessment ?? '') ||
                $this->form['improvement_levers'] !== ($this->process->improvement_levers ?? '') ||
                $this->form['action_plan'] !== ($this->process->action_plan ?? '') ||
-               $this->form['standardization_notes'] !== ($this->process->standardization_notes ?? '');
+               $this->form['standardization_notes'] !== ($this->process->standardization_notes ?? '') ||
+               $this->form['process_landscape'] !== ($this->process->process_landscape ?? '') ||
+               $this->form['corefit_classification_notes'] !== ($this->process->corefit_classification_notes ?? '');
     }
 
     #[Computed]
@@ -818,6 +822,8 @@ class Show extends Component
             'form.improvement_levers'    => 'nullable|string',
             'form.action_plan'           => 'nullable|string',
             'form.standardization_notes' => 'nullable|string',
+            'form.process_landscape' => 'nullable|string',
+            'form.corefit_classification_notes' => 'nullable|string',
         ]);
 
         $this->process->update([
@@ -842,6 +848,8 @@ class Show extends Component
             'improvement_levers'    => $this->form['improvement_levers'] !== '' ? $this->form['improvement_levers'] : null,
             'action_plan'           => $this->form['action_plan'] !== '' ? $this->form['action_plan'] : null,
             'standardization_notes' => $this->form['standardization_notes'] !== '' ? $this->form['standardization_notes'] : null,
+            'process_landscape' => $this->form['process_landscape'] !== '' ? $this->form['process_landscape'] : null,
+            'corefit_classification_notes' => $this->form['corefit_classification_notes'] !== '' ? $this->form['corefit_classification_notes'] : null,
         ]);
 
         $this->process->refresh();
@@ -1237,6 +1245,7 @@ class Show extends Component
                 'owner_entity_id', 'vsm_system_id', 'metadata',
                 'target_description', 'value_proposition', 'cost_analysis',
                 'risk_assessment', 'improvement_levers', 'action_plan', 'standardization_notes',
+                'process_landscape', 'corefit_classification_notes',
                 'hourly_rate',
             ]),
             'steps'    => $process->steps->map(fn ($s) => $s->only([

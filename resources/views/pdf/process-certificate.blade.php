@@ -219,7 +219,7 @@
             <div class="section-title">COREFIT-Verteilung</div>
             @php
                 $corefitColors = ['core' => '#22c55e', 'context' => '#eab308', 'no_fit' => '#ef4444'];
-                $corefitLabels = ['core' => 'Core', 'context' => 'Context', 'no_fit' => 'No Fit'];
+                $corefitLabels = ['core' => 'Core', 'context' => 'Context', 'no_fit' => 'not Fit'];
             @endphp
             @foreach(['core', 'context', 'no_fit'] as $cf)
                 <div class="bar-row">

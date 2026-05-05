@@ -13,7 +13,7 @@ enum CorefitClassification: string
         return match ($this) {
             self::CORE => 'Core',
             self::CONTEXT => 'Context',
-            self::NO_FIT => 'No Fit',
+            self::NO_FIT => 'not Fit',
         };
     }
 

@@ -515,7 +515,7 @@
                             </div>
                             <div>
                                 <div class="flex justify-between text-sm mb-1">
-                                    <span class="text-[var(--ui-secondary)]">No Fit <span class="text-[var(--ui-muted)] font-normal">({{ $metrics['no_fit']['count'] }})</span></span>
+                                    <span class="text-[var(--ui-secondary)]">not Fit <span class="text-[var(--ui-muted)] font-normal">({{ $metrics['no_fit']['count'] }})</span></span>
                                     <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['no_fit']['percent'] }}%</span>
                                 </div>
                                 <div class="w-full bg-[var(--ui-muted-20)] rounded-full h-2">
@@ -894,7 +894,7 @@
                 $corefitLabels = [
                     'core' => 'Core',
                     'context' => 'Context',
-                    'no_fit' => 'No Fit',
+                    'no_fit' => 'not Fit',
                 ];
                 // Recommendation map: corefit => automation => [label, color-class]
                 $recommendations = [
@@ -1835,7 +1835,7 @@
                         <h3 class="text-xs font-bold uppercase tracking-wider text-gray-800 mb-2 pb-1 border-b border-gray-200">COREFIT-Verteilung</h3>
                         @php
                             $cfColors = ['core' => '#22c55e', 'context' => '#eab308', 'no_fit' => '#ef4444'];
-                            $cfLabels = ['core' => 'Core', 'context' => 'Context', 'no_fit' => 'No Fit'];
+                            $cfLabels = ['core' => 'Core', 'context' => 'Context', 'no_fit' => 'not Fit'];
                         @endphp
                         @foreach(['core', 'context', 'no_fit'] as $cf)
                             <div class="mb-2">
@@ -2071,7 +2071,7 @@
                         :options="[
                             ['value' => 'core', 'label' => 'Core'],
                             ['value' => 'context', 'label' => 'Context'],
-                            ['value' => 'no_fit', 'label' => 'No Fit'],
+                            ['value' => 'no_fit', 'label' => 'not Fit'],
                         ]"
                         wire:model.live="stepForm.corefit_classification"
                     />

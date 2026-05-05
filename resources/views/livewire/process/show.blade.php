@@ -1050,10 +1050,10 @@
             @php
                 $impByCategory = $this->improvementsByCategory;
                 $canvasCards = [
+                    ['field' => 'target_description', 'label' => 'Prozess & Zielbild', 'description' => 'Beschreibung des optimalen Soll-Zustands dieses Prozesses.', 'placeholder' => 'Wie soll der Prozess idealerweise aussehen?', 'category' => null],
+                    ['field' => 'value_proposition', 'label' => 'Kundennutzen & Wertbeitrag', 'description' => 'Welchen konkreten Mehrwert liefert dieser Prozess an interne/externe Kunden?', 'placeholder' => 'Welchen Wert liefert der Prozess?', 'category' => 'quality'],
                     ['field' => 'process_landscape', 'label' => 'Prozesslandkarte', 'description' => 'Einordnung des Prozesses in die Gesamtlandschaft: Vor-/Nachprozesse, Schnittstellen und Abhängigkeiten zu anderen Prozessen.', 'placeholder' => 'Wo steht dieser Prozess in der Gesamtlandschaft? Welche Prozesse liefern Inputs, welche empfangen Outputs?', 'category' => null],
                     ['field' => 'corefit_classification_notes', 'label' => 'COREFIT Klassifizierung', 'description' => 'Begründung und Bewertung der COREFIT-Einstufung: Warum sind Steps Core, Context oder No Fit? Was ist die strategische Einordnung?', 'placeholder' => 'Wie wurde die COREFIT-Klassifizierung vorgenommen? Welche Kriterien wurden angelegt?', 'category' => null],
-                    ['field' => 'target_description', 'label' => 'Zielbild', 'description' => 'Beschreibung des optimalen Soll-Zustands dieses Prozesses.', 'placeholder' => 'Wie soll der Prozess idealerweise aussehen?', 'category' => null],
-                    ['field' => 'value_proposition', 'label' => 'Kundennutzen & Wertbeitrag', 'description' => 'Welchen konkreten Mehrwert liefert dieser Prozess an interne/externe Kunden?', 'placeholder' => 'Welchen Wert liefert der Prozess?', 'category' => 'quality'],
                     ['field' => 'cost_analysis', 'label' => 'Kosten & Break-Even', 'description' => 'Analyse der laufenden Kosten, Investitionen und ab wann sich Verbesserungen rechnen.', 'placeholder' => 'Kosten, Aufwand, Break-Even-Analyse', 'category' => 'cost'],
                     ['field' => 'risk_assessment', 'label' => 'Risiko & Resilienz', 'description' => 'Wo liegen Ausfallrisiken, Single Points of Failure und Schwachstellen?', 'placeholder' => 'Risiken, Single Points of Failure, Resilienz', 'category' => 'risk'],
                     ['field' => 'improvement_levers', 'label' => 'Hebel & Lösungsdesign', 'description' => 'Die wirksamsten Stellschrauben zur Verbesserung von Durchlaufzeit und Effizienz.', 'placeholder' => 'Wo liegen die größten Verbesserungshebel?', 'category' => 'speed'],
@@ -1907,10 +1907,10 @@
                 {{-- COREFIT Analysis Texts --}}
                 @php
                     $analysisBlocks = [
+                        ['key' => 'target_description',    'label' => 'Prozess & Zielbild'],
+                        ['key' => 'value_proposition',     'label' => 'Wertbeitrag'],
                         ['key' => 'process_landscape',     'label' => 'Prozesslandkarte'],
                         ['key' => 'corefit_classification_notes', 'label' => 'COREFIT Klassifizierung'],
-                        ['key' => 'target_description',    'label' => 'Zielbeschreibung'],
-                        ['key' => 'value_proposition',     'label' => 'Wertbeitrag'],
                         ['key' => 'cost_analysis',         'label' => 'Kostenanalyse'],
                         ['key' => 'risk_assessment',       'label' => 'Risikobewertung'],
                         ['key' => 'improvement_levers',    'label' => 'Verbesserungshebel'],

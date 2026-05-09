@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
 use Platform\Organization\Enums\ImprovementStatus;
+use Platform\Organization\Enums\SavingsType;
 use Symfony\Component\Uid\UuidV7;
 
 class OrganizationProcessImprovement extends Model
@@ -38,6 +39,8 @@ class OrganizationProcessImprovement extends Model
         'projected_automation_level',
         'projected_complexity',
         'projected_hourly_rate',
+        'savings_type',
+        'projected_external_cost_per_run',
     ];
 
     protected $casts = [
@@ -46,6 +49,8 @@ class OrganizationProcessImprovement extends Model
         'status'                           => ImprovementStatus::class,
         'projected_duration_target_minutes' => 'integer',
         'projected_hourly_rate'             => 'decimal:2',
+        'savings_type'                      => SavingsType::class,
+        'projected_external_cost_per_run'   => 'decimal:2',
     ];
 
     protected static function booted(): void

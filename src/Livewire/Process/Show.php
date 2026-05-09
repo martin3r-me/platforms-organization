@@ -12,6 +12,7 @@ use Platform\Organization\Enums\ImprovementStatus;
 use Platform\Organization\Enums\ProcessCategory;
 use Platform\Organization\Enums\ProcessFrequency;
 use Platform\Organization\Enums\ProcessStatus;
+use Platform\Organization\Enums\SavingsType;
 use Platform\Organization\Enums\StepComplexity;
 use Platform\Organization\Models\OrganizationProcess;
 use Platform\Organization\Models\OrganizationProcessStep;
@@ -27,14 +28,24 @@ use Platform\Organization\Models\OrganizationVsmSystem;
 use Platform\Organization\Enums\RunStatus;
 use Platform\Organization\Enums\RunStepStatus;
 use Platform\Organization\Services\ProcessCertificateService;
+use Platform\Canvas\Models\Canvas;
+use Platform\Canvas\Models\CanvasType;
+use Platform\Canvas\Services\CanvasService;
 use Illuminate\Support\Str;
+use Livewire\WithFileUploads;
 
 class Show extends Component
 {
+    use WithFileUploads;
+
     public OrganizationProcess $process;
     public array $form = [];
     #[Url(as: 'tab')]
     public string $activeTab = 'details';
+
+    // COREFIT Workshop
+    public string $corefitViewMode = 'list'; // 'list' | 'workshop'
+    public $workshopFile; // for file uploads in workshop
 
     // Step CRUD
     public bool $stepModalShow = false;
@@ -46,6 +57,7 @@ class Show extends Component
         'step_type' => 'task',
         'duration_target_minutes' => '',
         'wait_target_minutes' => '',
+        'external_cost_per_run' => '',
         'corefit_classification' => 'core',
         'automation_level' => 'human',
         'complexity' => '',
@@ -107,6 +119,8 @@ class Show extends Component
         'projected_automation_level' => '',
         'projected_complexity' => '',
         'projected_hourly_rate' => '',
+        'savings_type' => '',
+        'projected_external_cost_per_run' => '',
     ];
 
     public function mount(OrganizationProcess $process)
@@ -389,7 +403,7 @@ class Show extends Component
         $steps = $this->steps;
         $totalSteps = $steps->count();
 
-        $empty = ['count' => 0, 'minutes' => 0, 'wait' => 0, 'percent' => 0, 'cost' => 0];
+        $empty = ['count' => 0, 'minutes' => 0, 'wait' => 0, 'percent' => 0, 'labor_cost' => 0, 'external_cost' => 0, 'cost' => 0];
         if ($totalSteps === 0) {
             return [
                 'total_steps' => 0,
@@ -428,7 +442,9 @@ class Show extends Component
             $minutes = $group->sum('duration_target_minutes') ?? 0;
             $wait = $group->sum('wait_target_minutes') ?? 0;
             $percent = $totalSteps > 0 ? round(($count / $totalSteps) * 100, 1) : 0;
-            $cost = round($minutes * $minuteRate, 2);
+            $laborCost = round($minutes * $minuteRate, 2);
+            $externalCost = round($group->sum(fn ($s) => (float) ($s->external_cost_per_run ?? 0)), 2);
+            $cost = round($laborCost + $externalCost, 2);
             $totalCost += $cost;
 
             $result[$classification] = [
@@ -436,6 +452,8 @@ class Show extends Component
                 'minutes' => $minutes,
                 'wait' => $wait,
                 'percent' => $percent,
+                'labor_cost' => $laborCost,
+                'external_cost' => $externalCost,
                 'cost' => $cost,
             ];
         }
@@ -599,13 +617,19 @@ class Show extends Component
     {
         $steps = $this->steps;
         $totalDuration = $steps->sum('duration_target_minutes') ?? 0;
+        $totalExternalCost = round($steps->sum(fn ($s) => (float) ($s->external_cost_per_run ?? 0)), 2);
         $hourlyRate = (float) ($this->form['hourly_rate'] ?? 0);
         $frequencyValue = $this->form['frequency'] ?? '';
         $frequency = $frequencyValue !== '' ? ProcessFrequency::tryFrom($frequencyValue) : null;
 
-        if ($hourlyRate <= 0 || $totalDuration <= 0 || ! $frequency) {
+        $laborCostPerRun = ($hourlyRate > 0 && $totalDuration > 0) ? round(($totalDuration / 60) * $hourlyRate, 2) : 0;
+        $costPerRun = round($laborCostPerRun + $totalExternalCost, 2);
+
+        if ($costPerRun <= 0 || ! $frequency) {
             return [
-                'cost_per_run' => 0,
+                'labor_cost_per_run' => $laborCostPerRun,
+                'external_cost_per_run' => $totalExternalCost,
+                'cost_per_run' => $costPerRun,
                 'cost_per_month' => 0,
                 'cost_per_year' => 0,
                 'frequency_label' => $frequency?->label() ?? null,
@@ -613,11 +637,12 @@ class Show extends Component
             ];
         }
 
-        $costPerRun = round(($totalDuration / 60) * $hourlyRate, 2);
         $costPerMonth = round($costPerRun * $frequency->monthlyFactor(), 2);
         $costPerYear = round($costPerMonth * 12, 2);
 
         return [
+            'labor_cost_per_run' => $laborCostPerRun,
+            'external_cost_per_run' => $totalExternalCost,
             'cost_per_run' => $costPerRun,
             'cost_per_month' => $costPerMonth,
             'cost_per_year' => $costPerYear,
@@ -641,6 +666,11 @@ class Show extends Component
 
         foreach ($improvements as $imp) {
             if (! $imp->target_step_id) {
+                continue;
+            }
+
+            $targetStep = $steps->firstWhere('id', $imp->target_step_id);
+            if (! $targetStep) {
                 continue;
             }
 
@@ -687,37 +717,72 @@ class Show extends Component
             $projectedScore = $weightSum > 0 ? (int) round($weightedSum / $weightSum) : 0;
             $scoreDelta = $projectedScore - ($currentScore['score'] ?? 0);
 
-            // Cost delta — use projected hourly rate if set, otherwise process rate
+            // Labor saving — use projected hourly rate if set, otherwise process rate
             $effectiveRate = $imp->projected_hourly_rate !== null ? (float) $imp->projected_hourly_rate : $hourlyRate;
             $originalDuration = $steps->sum('duration_target_minutes') ?? 0;
             $simulatedDuration = $simulatedSteps->sum('duration_target_minutes') ?? 0;
             $durationDelta = $originalDuration - $simulatedDuration;
 
-            // Cost saving = time saved at effective rate + rate difference on remaining time
             $timeSaving = $effectiveRate > 0 ? round(($durationDelta / 60) * $effectiveRate, 2) : 0;
             $rateSaving = ($imp->projected_hourly_rate !== null && $hourlyRate > 0)
                 ? round((($hourlyRate - $effectiveRate) / 60) * $simulatedDuration, 2)
                 : 0;
-            $costSavingPerRun = $timeSaving + $rateSaving;
-            $costSavingPerMonth = round($costSavingPerRun * $monthlyFactor, 2);
+            $laborSavingPerRun = $timeSaving + $rateSaving;
+
+            // External cost saving
+            $originalExternalCost = (float) ($targetStep->external_cost_per_run ?? 0);
+            $projectedExternalCost = $imp->projected_external_cost_per_run !== null
+                ? (float) $imp->projected_external_cost_per_run
+                : $originalExternalCost;
+            $externalSavingPerRun = round($originalExternalCost - $projectedExternalCost, 2);
+
+            // Split by savings_type
+            $savingsType = $imp->savings_type?->value ?? 'both';
+            $costReductionPerRun = 0;
+            $productivityGainPerRun = 0;
+
+            if ($savingsType === 'cost_reduction') {
+                $costReductionPerRun = $externalSavingPerRun;
+                $productivityGainPerRun = $laborSavingPerRun;
+            } elseif ($savingsType === 'productivity_gain') {
+                $costReductionPerRun = 0;
+                $productivityGainPerRun = $laborSavingPerRun + $externalSavingPerRun;
+            } else { // both
+                $costReductionPerRun = $externalSavingPerRun;
+                $productivityGainPerRun = $laborSavingPerRun;
+            }
+
+            $totalSavingPerRun = $laborSavingPerRun + $externalSavingPerRun;
+            $totalSavingPerMonth = round($totalSavingPerRun * $monthlyFactor, 2);
 
             $simulations[$imp->id] = [
                 'score_delta' => $scoreDelta,
                 'projected_score' => $projectedScore,
-                'cost_saving_per_run' => $costSavingPerRun,
-                'cost_saving_per_month' => $costSavingPerMonth,
+                'cost_saving_per_run' => $totalSavingPerRun,
+                'cost_saving_per_month' => $totalSavingPerMonth,
                 'duration_delta' => $durationDelta,
+                'labor_saving_per_run' => $laborSavingPerRun,
+                'external_saving_per_run' => $externalSavingPerRun,
+                'cost_reduction_per_run' => $costReductionPerRun,
+                'productivity_gain_per_run' => $productivityGainPerRun,
+                'cost_reduction_per_month' => round($costReductionPerRun * $monthlyFactor, 2),
+                'productivity_gain_per_month' => round($productivityGainPerRun * $monthlyFactor, 2),
+                'savings_type' => $savingsType,
             ];
         }
 
         // Totals: aggregate all simulations (theoretical maximum if all applied)
         $totalCostSavingsPerMonth = collect($simulations)->sum('cost_saving_per_month');
         $totalCostSavingsPerYear = round($totalCostSavingsPerMonth * 12, 2);
+        $totalCostReductionPerMonth = collect($simulations)->sum('cost_reduction_per_month');
+        $totalProductivityGainPerMonth = collect($simulations)->sum('productivity_gain_per_month');
 
         return [
             'simulations' => $simulations,
             'total_cost_savings_per_month' => $totalCostSavingsPerMonth,
             'total_cost_savings_per_year' => $totalCostSavingsPerYear,
+            'total_cost_reduction_per_month' => $totalCostReductionPerMonth,
+            'total_productivity_gain_per_month' => $totalProductivityGainPerMonth,
         ];
     }
 
@@ -739,10 +804,11 @@ class Show extends Component
                 $minutes = $group->sum('duration_target_minutes') ?? 0;
                 $cost = round($minutes * $minuteRate, 2);
 
+                $externalCost = round($group->sum(fn ($s) => (float) ($s->external_cost_per_run ?? 0)), 2);
                 $matrix[$corefit][$auto] = [
                     'count' => $count,
                     'minutes' => $minutes,
-                    'cost' => $cost,
+                    'cost' => round($cost + $externalCost, 2),
                 ];
             }
         }
@@ -879,6 +945,7 @@ class Show extends Component
             'step_type' => 'task',
             'duration_target_minutes' => '',
             'wait_target_minutes' => '',
+            'external_cost_per_run' => '',
             'corefit_classification' => 'core',
             'automation_level' => 'human',
             'complexity' => '',
@@ -902,6 +969,7 @@ class Show extends Component
             'step_type'               => $step->step_type ?? 'task',
             'duration_target_minutes' => (string) ($step->duration_target_minutes ?? ''),
             'wait_target_minutes'     => (string) ($step->wait_target_minutes ?? ''),
+            'external_cost_per_run'   => (string) ($step->external_cost_per_run ?? ''),
             'corefit_classification'  => $step->corefit_classification?->value ?? 'core',
             'automation_level'        => $step->automation_level?->value ?? 'human',
             'complexity'              => $step->complexity?->value ?? '',
@@ -920,6 +988,7 @@ class Show extends Component
             'stepForm.step_type'               => 'required|in:task,decision,event,subprocess',
             'stepForm.duration_target_minutes' => 'nullable|integer|min:0',
             'stepForm.wait_target_minutes'     => 'nullable|integer|min:0',
+            'stepForm.external_cost_per_run'   => 'nullable|numeric|min:0',
             'stepForm.corefit_classification'  => 'required|in:' . implode(',', CorefitClassification::values()),
             'stepForm.automation_level'        => 'required|in:' . implode(',', AutomationLevel::values()),
             'stepForm.complexity'              => 'nullable|in:' . implode(',', StepComplexity::values()),
@@ -937,6 +1006,7 @@ class Show extends Component
             'step_type'               => $this->stepForm['step_type'],
             'duration_target_minutes' => $this->stepForm['duration_target_minutes'] !== '' ? (int) $this->stepForm['duration_target_minutes'] : null,
             'wait_target_minutes'     => $this->stepForm['wait_target_minutes'] !== '' ? (int) $this->stepForm['wait_target_minutes'] : null,
+            'external_cost_per_run'   => $this->stepForm['external_cost_per_run'] !== '' ? (float) $this->stepForm['external_cost_per_run'] : null,
             'corefit_classification'  => $this->stepForm['corefit_classification'],
             'automation_level'        => $this->stepForm['automation_level'],
             'complexity'              => $this->stepForm['complexity'] !== '' ? $this->stepForm['complexity'] : null,
@@ -1250,7 +1320,7 @@ class Show extends Component
             ]),
             'steps'    => $process->steps->map(fn ($s) => $s->only([
                 'id', 'name', 'description', 'position', 'step_type',
-                'duration_target_minutes', 'wait_target_minutes',
+                'duration_target_minutes', 'wait_target_minutes', 'external_cost_per_run',
                 'corefit_classification', 'automation_level', 'complexity', 'is_active',
             ]))->values()->toArray(),
             'flows'    => $process->flows->map(fn ($f) => $f->only([
@@ -1350,6 +1420,7 @@ class Show extends Component
             'target_step_id' => '', 'projected_duration_target_minutes' => '',
             'projected_automation_level' => '', 'projected_complexity' => '',
             'projected_hourly_rate' => '',
+            'savings_type' => '', 'projected_external_cost_per_run' => '',
         ];
         $this->improvementModalShow = true;
     }
@@ -1371,6 +1442,8 @@ class Show extends Component
             'projected_automation_level'        => (string) ($imp->projected_automation_level ?? ''),
             'projected_complexity'              => (string) ($imp->projected_complexity ?? ''),
             'projected_hourly_rate'             => (string) ($imp->projected_hourly_rate ?? ''),
+            'savings_type'                      => $imp->savings_type?->value ?? '',
+            'projected_external_cost_per_run'   => (string) ($imp->projected_external_cost_per_run ?? ''),
         ];
         $this->improvementModalShow = true;
     }
@@ -1387,6 +1460,8 @@ class Show extends Component
             'improvementForm.projected_automation_level'        => 'nullable|in:' . implode(',', AutomationLevel::values()),
             'improvementForm.projected_complexity'              => 'nullable|in:' . implode(',', StepComplexity::values()),
             'improvementForm.projected_hourly_rate'             => 'nullable|numeric|min:0',
+            'improvementForm.savings_type'                      => 'nullable|in:' . implode(',', SavingsType::values()),
+            'improvementForm.projected_external_cost_per_run'   => 'nullable|numeric|min:0',
         ]);
 
         $payload = [
@@ -1399,6 +1474,8 @@ class Show extends Component
             'projected_automation_level'        => $this->improvementForm['projected_automation_level'] !== '' ? $this->improvementForm['projected_automation_level'] : null,
             'projected_complexity'              => $this->improvementForm['projected_complexity'] !== '' ? $this->improvementForm['projected_complexity'] : null,
             'projected_hourly_rate'             => $this->improvementForm['projected_hourly_rate'] !== '' ? (float) $this->improvementForm['projected_hourly_rate'] : null,
+            'savings_type'                      => $this->improvementForm['savings_type'] !== '' ? $this->improvementForm['savings_type'] : null,
+            'projected_external_cost_per_run'   => $this->improvementForm['projected_external_cost_per_run'] !== '' ? (float) $this->improvementForm['projected_external_cost_per_run'] : null,
         ];
 
         // States that imply the improvement has been implemented (completion timestamp set)
@@ -1549,6 +1626,166 @@ class Show extends Component
     private function invalidateRunCaches(): void
     {
         unset($this->activeRuns, $this->allRuns, $this->activeRunCount, $this->runAnalytics);
+    }
+
+    // ── COREFIT Workshop ────────────────────────────────────────
+
+    public function openCorefitWorkshop(): void
+    {
+        $this->corefitViewMode = 'workshop';
+        // Ensure canvas exists (lazy creation)
+        $this->getOrCreateCorefitCanvas();
+        unset($this->corefitCanvas, $this->workshopData);
+    }
+
+    public function closeCorefitWorkshop(): void
+    {
+        $this->corefitViewMode = 'list';
+    }
+
+    #[Computed]
+    public function corefitCanvas(): ?Canvas
+    {
+        return $this->getOrCreateCorefitCanvas();
+    }
+
+    private function getOrCreateCorefitCanvas(): ?Canvas
+    {
+        $canvas = $this->process->corefitCanvas;
+
+        if ($canvas) {
+            return $canvas;
+        }
+
+        $canvasType = CanvasType::where('key', 'corefit-process')->first();
+        if (! $canvasType) {
+            return null;
+        }
+
+        $canvas = (new CanvasService())->createCanvas([
+            'team_id' => $this->process->team_id,
+            'canvas_type_id' => $canvasType->id,
+            'name' => 'COREFIT Workshop: ' . $this->process->name,
+            'status' => 'open',
+            'contextable_type' => OrganizationProcess::class,
+            'contextable_id' => $this->process->id,
+            'created_by_user_id' => Auth::id(),
+        ]);
+
+        // Clear cached relationship
+        $this->process->unsetRelation('corefitCanvas');
+
+        return $canvas;
+    }
+
+    #[Computed]
+    public function workshopData(): array
+    {
+        $canvas = $this->corefitCanvas;
+        if (! $canvas) {
+            return ['notes' => [], 'blockDefs' => [], 'layout' => [], 'blocksById' => collect(), 'canvasData' => ['blocks' => []]];
+        }
+
+        $canvas->loadMissing(['canvasType', 'buildingBlocks.entries', 'workshopNotes']);
+
+        $blockDefs = $canvas->canvasType->block_definitions ?? [];
+        $layout = $canvas->canvasType->layout ?? ['type' => 'grid', 'columns' => 3, 'rows' => 3];
+        $blocksById = $canvas->buildingBlocks->keyBy('block_key');
+        $canvasData = $canvas->toCanvasArray();
+
+        $workshopNotes = $canvas->workshopNotes()
+            ->orderBy('created_at')
+            ->get()
+            ->map(fn ($n) => [
+                'id' => $n->id,
+                'type' => $n->type,
+                'content' => $n->content,
+                'color' => $n->color,
+                'x' => $n->x,
+                'y' => $n->y,
+                'width' => $n->width,
+                'height' => $n->height,
+                'block_id' => $n->building_block_id,
+                'metadata' => $n->metadata,
+                'locked' => (bool) $n->is_locked,
+            ])
+            ->values()
+            ->toArray();
+
+        return [
+            'notes' => $workshopNotes,
+            'blockDefs' => $blockDefs,
+            'layout' => $layout,
+            'blocksById' => $blocksById,
+            'canvasData' => $canvasData,
+        ];
+    }
+
+    // Workshop note CRUD (delegating to canvas)
+
+    public function addWorkshopNote(string $type, ?int $blockId, array $data): void
+    {
+        $canvas = $this->corefitCanvas;
+        if (! $canvas) return;
+
+        $canvas->workshopNotes()->create([
+            'type' => $type,
+            'content' => $data['content'] ?? '',
+            'color' => $data['color'] ?? 'yellow',
+            'x' => $data['x'] ?? 100,
+            'y' => $data['y'] ?? 100,
+            'width' => $data['width'] ?? null,
+            'height' => $data['height'] ?? null,
+            'building_block_id' => $blockId,
+            'metadata' => $data['metadata'] ?? null,
+            'created_by_user_id' => Auth::id(),
+        ]);
+
+        unset($this->workshopData);
+    }
+
+    public function updateWorkshopNote(int $noteId, array $data): void
+    {
+        $canvas = $this->corefitCanvas;
+        if (! $canvas) return;
+
+        $note = $canvas->workshopNotes()->find($noteId);
+        if (! $note) return;
+
+        $allowed = ['content', 'color', 'x', 'y', 'width', 'height', 'metadata', 'is_locked', 'building_block_id'];
+        $note->update(array_intersect_key($data, array_flip($allowed)));
+    }
+
+    public function deleteWorkshopNote(int $noteId): void
+    {
+        $canvas = $this->corefitCanvas;
+        if (! $canvas) return;
+
+        $note = $canvas->workshopNotes()->find($noteId);
+        if (! $note) return;
+
+        // Delete connectors referencing this note
+        if ($note->type !== 'connector') {
+            $canvas->workshopNotes()
+                ->where('type', 'connector')
+                ->get()
+                ->filter(fn ($c) => ($c->metadata['from_id'] ?? null) === $noteId || ($c->metadata['to_id'] ?? null) === $noteId)
+                ->each->delete();
+        }
+
+        $note->delete();
+        unset($this->workshopData);
+    }
+
+    public function updateWorkshopSettings(array $settings): void
+    {
+        $canvas = $this->corefitCanvas;
+        if (! $canvas) return;
+
+        $allowed = ['gridWidth', 'gridHeight'];
+        $current = $canvas->workshop_settings ?? [];
+        $merged = array_merge($current, array_intersect_key($settings, array_flip($allowed)));
+        $canvas->update(['workshop_settings' => $merged]);
     }
 
     public function render()

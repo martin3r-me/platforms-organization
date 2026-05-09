@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Team;
@@ -156,6 +157,12 @@ class OrganizationProcess extends Model
     public function chainMemberships(): HasMany
     {
         return $this->hasMany(OrganizationProcessChainMember::class, 'process_id');
+    }
+
+    public function corefitCanvas(): MorphOne
+    {
+        return $this->morphOne(\Platform\Canvas\Models\Canvas::class, 'contextable')
+            ->whereHas('canvasType', fn ($q) => $q->where('key', 'corefit-process'));
     }
 
     public function scopeActive($query)

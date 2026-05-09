@@ -241,6 +241,16 @@
                                 <span class="text-xs text-[var(--ui-muted)]">Pro Durchlauf</span>
                                 <span class="text-sm text-[var(--ui-secondary)]">{{ number_format($sidebarCosts['cost_per_run'], 2, ',', '.') }} &euro;</span>
                             </div>
+                            @if($sidebarCosts['external_cost_per_run'] > 0)
+                                <div class="flex items-center justify-between text-[10px]">
+                                    <span class="text-[var(--ui-muted)]">&nbsp;&nbsp;davon Arbeitszeit</span>
+                                    <span class="text-[var(--ui-muted)]">{{ number_format($sidebarCosts['labor_cost_per_run'], 2, ',', '.') }} &euro;</span>
+                                </div>
+                                <div class="flex items-center justify-between text-[10px]">
+                                    <span class="text-[var(--ui-muted)]">&nbsp;&nbsp;davon extern</span>
+                                    <span class="text-[var(--ui-muted)]">{{ number_format($sidebarCosts['external_cost_per_run'], 2, ',', '.') }} &euro;</span>
+                                </div>
+                            @endif
                             <div class="flex items-center justify-between">
                                 <span class="text-xs text-[var(--ui-muted)]">Pro Monat</span>
                                 <span class="text-sm font-bold text-[var(--ui-secondary)]">{{ number_format($sidebarCosts['cost_per_month'], 2, ',', '.') }} &euro;</span>
@@ -634,6 +644,178 @@
 
         {{-- ── Tab: COREFIT ────────────────────────────────── --}}
         @if($activeTab === 'corefit')
+            {{-- View Mode Toggle --}}
+            <div class="flex items-center justify-between mb-4">
+                <div class="flex items-center gap-2">
+                    <button
+                        wire:click="closeCorefitWorkshop"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors {{ $corefitViewMode === 'list' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-muted-10)] text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-20)]' }}"
+                    >
+                        @svg('heroicon-o-list-bullet', 'w-3.5 h-3.5')
+                        Liste
+                    </button>
+                    <button
+                        wire:click="openCorefitWorkshop"
+                        class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md transition-colors {{ $corefitViewMode === 'workshop' ? 'bg-[var(--ui-primary)] text-white' : 'bg-[var(--ui-muted-10)] text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-20)]' }}"
+                    >
+                        @svg('heroicon-o-squares-2x2', 'w-3.5 h-3.5')
+                        Workshop
+                    </button>
+                </div>
+            </div>
+
+            @if($corefitViewMode === 'workshop')
+                {{-- ═══ COREFIT WORKSHOP VIEW ═══ --}}
+                @php
+                    $wsData = $this->workshopData;
+                    $wsNotes = $wsData['notes'];
+                    $wsBlockDefs = $wsData['blockDefs'];
+                    $wsLayout = $wsData['layout'];
+                    $wsBlocksById = $wsData['blocksById'];
+                    $wsCanvasData = $wsData['canvasData'];
+
+                    $wGridCols = $wsLayout['columns'] ?? 3;
+                    $wGridRows = $wsLayout['rows'] ?? 3;
+                    $wAreasRaw = $wsLayout['areas'] ?? null;
+                    $wAreaMap = is_array($wsLayout['area_map'] ?? null) ? $wsLayout['area_map'] : [];
+
+                    $ws = $this->corefitCanvas?->workshop_settings ?? [];
+                    $wGridW = (int) ($ws['gridWidth'] ?? max(1200, $wGridCols * 280));
+                    $wGridH = (int) ($ws['gridHeight'] ?? max(800, $wGridRows * 280));
+                    $wBoardW = 5000;
+                    $wBoardH = 3000;
+                    $wGridLeft = intval(($wBoardW - $wGridW) / 2);
+                    $wGridTop = intval(($wBoardH - $wGridH) / 2);
+
+                    // Parse layout areas into placement
+                    $wBlockPlacement = [];
+                    if (is_string($wAreasRaw) && !empty($wAreasRaw) && !empty($wAreaMap)) {
+                        $reverseMap = array_flip($wAreaMap);
+                        $rows = explode('/', $wAreasRaw);
+                        $grid = [];
+                        foreach ($rows as $ri => $row) {
+                            $cols = preg_split('/\s+/', trim($row));
+                            $grid[$ri] = $cols;
+                        }
+                        $seen = [];
+                        foreach ($grid as $ri => $cols) {
+                            foreach ($cols as $ci => $cell) {
+                                $blockKey = $reverseMap[$cell] ?? null;
+                                if (! $blockKey || isset($seen[$blockKey])) continue;
+                                $seen[$blockKey] = true;
+                                $colspan = 1;
+                                while (($ci + $colspan) < count($cols) && $cols[$ci + $colspan] === $cell) $colspan++;
+                                $rowspan = 1;
+                                while (($ri + $rowspan) < count($grid) && ($grid[$ri + $rowspan][$ci] ?? null) === $cell) $rowspan++;
+                                $wBlockPlacement[$blockKey] = ['col' => $ci + 1, 'row' => $ri + 1, 'colspan' => $colspan, 'rowspan' => $rowspan];
+                            }
+                        }
+                    }
+                @endphp
+
+                @if(empty($wsBlockDefs))
+                    <div class="text-center py-12 text-[var(--ui-muted)]">
+                        <p>COREFIT Workshop-Canvas konnte nicht erstellt werden.</p>
+                        <p class="text-xs mt-1">Bitte den Canvas-Type-Seeder ausführen.</p>
+                    </div>
+                @else
+                    <div wire:key="corefit-workshop"
+                         wire:ignore
+                         x-data="workshopBoard({
+                            notes: {{ Js::from($wsNotes) }},
+                            canvasBlocks: {{ Js::from(collect($wsBlockDefs)->map(fn($d) => ['key' => $d['key'], 'label' => $d['label'] ?? $d['key'], 'id' => $wsBlocksById[$d['key']]?->id ?? null])->values()) }},
+                            gridLayout: {{ Js::from($wsLayout) }}
+                         })"
+                         class="relative overflow-hidden h-[calc(100vh-220px)]"
+                         style="background: #eef0f4; border-radius: 8px;"
+                    >
+                        {{-- Zoom Controls --}}
+                        <div class="workshop-zoom-controls">
+                            <button x-on:click="zoomIn()" title="Zoom In">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" /></svg>
+                            </button>
+                            <div class="zoom-level" x-text="Math.round(scale * 100) + '%'"></div>
+                            <button x-on:click="zoomOut()" title="Zoom Out">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M4 10a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H4.75A.75.75 0 014 10z" clip-rule="evenodd" /></svg>
+                            </button>
+                            <button x-on:click="resetZoom()" title="Reset Zoom" class="text-[10px] font-bold">1:1</button>
+                            <button x-on:click="fitToScreen()" title="An Bildschirm anpassen">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M4.25 2A2.25 2.25 0 002 4.25v2.5a.75.75 0 001.5 0v-2.5a.75.75 0 01.75-.75h2.5a.75.75 0 000-1.5h-2.5zM13.25 2a.75.75 0 000 1.5h2.5a.75.75 0 01.75.75v2.5a.75.75 0 001.5 0v-2.5A2.25 2.25 0 0015.75 2h-2.5zM3.5 13.25a.75.75 0 00-1.5 0v2.5A2.25 2.25 0 004.25 18h2.5a.75.75 0 000-1.5h-2.5a.75.75 0 01-.75-.75v-2.5zM18 13.25a.75.75 0 00-1.5 0v2.5a.75.75 0 01-.75.75h-2.5a.75.75 0 000 1.5h2.5A2.25 2.25 0 0018 15.75v-2.5z" clip-rule="evenodd" /></svg>
+                            </button>
+                            <button x-on:click="toggleFullscreen()" title="Vollbild">
+                                <template x-if="!isFullscreen">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M3.28 2.22a.75.75 0 00-1.06 1.06L5.44 6.5H2.75a.75.75 0 000 1.5h4.5A.75.75 0 008 7.25v-4.5a.75.75 0 00-1.5 0v2.69L3.28 2.22zM16.72 2.22a.75.75 0 010 1.06L13.56 6.5h2.69a.75.75 0 010 1.5h-4.5A.75.75 0 0111 7.25v-4.5a.75.75 0 011.5 0v2.69l3.22-3.22a.75.75 0 011.06 0zM3.28 17.78a.75.75 0 001.06 0L7.56 14.5h-2.69a.75.75 0 010-1.5h4.5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-2.69l-3.22 3.22a.75.75 0 01-1.06-1.06zM16.72 17.78a.75.75 0 01-1.06 0L12.44 14.5h2.69a.75.75 0 000-1.5h-4.5a.75.75 0 00-.75.75v4.5a.75.75 0 001.5 0v-2.69l3.22 3.22a.75.75 0 001.06-1.06z" /></svg>
+                                </template>
+                                <template x-if="isFullscreen">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M3.28 2.22a.75.75 0 00-1.06 1.06L5.44 6.5H2.75a.75.75 0 000 1.5h4.5A.75.75 0 008 7.25v-4.5a.75.75 0 00-1.5 0v2.69L3.28 2.22z" /></svg>
+                                </template>
+                            </button>
+                        </div>
+
+                        {{-- Element Toolbar --}}
+                        <div class="workshop-toolbar">
+                            <button class="workshop-toolbar-btn" x-on:click="addElement('note')" title="Sticky Note">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4z"/></svg>
+                                <span>Notiz</span>
+                            </button>
+                            <button class="workshop-toolbar-btn" x-on:click="addElement('text')" title="Textlabel">
+                                <span style="font-weight:800;font-size:14px;line-height:1;">T</span>
+                                <span>Text</span>
+                            </button>
+                            <button class="workshop-toolbar-btn" x-on:click="addElement('section')" title="Section / Frame">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4"><rect x="3" y="3" width="14" height="14" rx="2" stroke-dasharray="3 2"/></svg>
+                                <span>Section</span>
+                            </button>
+                            <button class="workshop-toolbar-btn" x-on:click="addElement('shape')" title="Form">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><circle cx="10" cy="10" r="7"/></svg>
+                                <span>Form</span>
+                            </button>
+                            <button class="workshop-toolbar-btn"
+                                    x-on:click="startConnectorMode()"
+                                    :class="{ 'active': _connectorMode }"
+                                    title="Verbindung">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.69l-4.72-4.72a.75.75 0 011.06-1.06l6 6a.75.75 0 010 1.06l-6 6a.75.75 0 11-1.06-1.06l4.72-4.72H2.75A.75.75 0 012 10z" clip-rule="evenodd"/></svg>
+                                <span>Pfeil</span>
+                            </button>
+                            <button class="workshop-toolbar-btn" x-on:click="addElement('kanban')" title="Kanban Board">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M2 4.5A2.5 2.5 0 014.5 2h2A2.5 2.5 0 019 4.5v11A2.5 2.5 0 016.5 18h-2A2.5 2.5 0 012 15.5v-11zM11 4.5A2.5 2.5 0 0113.5 2h2A2.5 2.5 0 0118 4.5v6a2.5 2.5 0 01-2.5 2.5h-2A2.5 2.5 0 0111 10.5v-6z"/></svg>
+                                <span>Kanban</span>
+                            </button>
+                        </div>
+
+                        {{-- Board: JS owns this DOM entirely --}}
+                        <div x-ref="board" class="workshop-board" style="width: {{ $wBoardW }}px; height: {{ $wBoardH }}px;">
+                            {{-- Canvas Grid (read-only background) --}}
+                            <div class="workshop-canvas-background" style="
+                                position: absolute;
+                                top: {{ $wGridTop }}px;
+                                left: {{ $wGridLeft }}px;
+                                width: {{ $wGridW }}px;
+                                min-height: {{ $wGridH }}px;
+                                display: grid;
+                                grid-template-columns: repeat({{ $wGridCols }}, 1fr);
+                                grid-template-rows: repeat({{ $wGridRows }}, minmax(180px, auto));
+                                gap: 1.5px;
+                                background: #2d2d2d;
+                                border: 1.5px solid #2d2d2d;
+                                border-radius: 4px;
+                                overflow: hidden;
+                            ">
+                                @foreach($wsBlockDefs as $def)
+                                    @include('canvas::livewire.canvas._workshop-grid-block', [
+                                        'blockKey' => $def['key'],
+                                        'blockDef' => $def,
+                                        'block' => $wsBlocksById[$def['key']] ?? null,
+                                        'canvasData' => $wsCanvasData,
+                                        'placement' => $wBlockPlacement[$def['key']] ?? null,
+                                    ])
+                                @endforeach
+                            </div>
+                        </div>
+                    </div>
+                @endif
+            @else
+            {{-- ═══ COREFIT LIST VIEW (original) ═══ --}}
             @php $metrics = $this->corefitMetrics; @endphp
 
             {{-- Einführung --}}
@@ -702,66 +884,42 @@
                 <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1">Zeitanalyse pro Klassifikation</h3>
                 <p class="text-xs text-[var(--ui-muted)] mb-4">Bearbeitungszeit und Wartezeit aufgeschlüsselt nach Core, Context und No Fit.</p>
                 <div class="grid grid-cols-3 gap-4">
+                    @foreach([
+                        'core' => ['label' => 'Core', 'color' => 'success'],
+                        'context' => ['label' => 'Context', 'color' => 'warning'],
+                        'no_fit' => ['label' => 'No Fit', 'color' => 'danger'],
+                    ] as $cfKey => $cfMeta)
                     <div class="border border-[var(--ui-border)]/40 rounded-lg p-4">
                         <div class="flex items-center gap-2 mb-2">
-                            <span class="inline-block w-2 h-2 rounded-full bg-[var(--ui-success)]"></span>
-                            <h4 class="text-sm font-medium text-[var(--ui-secondary)]">Core</h4>
+                            <span class="inline-block w-2 h-2 rounded-full bg-[var(--ui-{{ $cfMeta['color'] }})]"></span>
+                            <h4 class="text-sm font-medium text-[var(--ui-secondary)]">{{ $cfMeta['label'] }}</h4>
                         </div>
                         <div class="space-y-1 text-sm">
                             <div class="flex justify-between">
                                 <span class="text-[var(--ui-muted)]">Bearbeitung</span>
-                                <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['core']['minutes'] }} Min.</span>
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics[$cfKey]['minutes'] }} Min.</span>
                             </div>
                             <div class="flex justify-between">
                                 <span class="text-[var(--ui-muted)]">Wartezeit</span>
-                                <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['core']['wait'] }} Min.</span>
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics[$cfKey]['wait'] }} Min.</span>
                             </div>
                             <div class="flex justify-between border-t border-[var(--ui-border)]/40 pt-1">
                                 <span class="text-[var(--ui-muted)]">Kosten</span>
-                                <span class="font-medium text-[var(--ui-success)]">{{ number_format($metrics['core']['cost'], 2, ',', '.') }} EUR</span>
+                                <span class="font-medium text-[var(--ui-{{ $cfMeta['color'] }})]">{{ number_format($metrics[$cfKey]['cost'], 2, ',', '.') }} EUR</span>
                             </div>
+                            @if($metrics[$cfKey]['external_cost'] > 0)
+                                <div class="flex justify-between text-[10px]">
+                                    <span class="text-[var(--ui-muted)]">&nbsp;&nbsp;Arbeitszeit</span>
+                                    <span class="text-[var(--ui-muted)]">{{ number_format($metrics[$cfKey]['labor_cost'], 2, ',', '.') }} EUR</span>
+                                </div>
+                                <div class="flex justify-between text-[10px]">
+                                    <span class="text-[var(--ui-muted)]">&nbsp;&nbsp;Extern</span>
+                                    <span class="text-[var(--ui-muted)]">{{ number_format($metrics[$cfKey]['external_cost'], 2, ',', '.') }} EUR</span>
+                                </div>
+                            @endif
                         </div>
                     </div>
-                    <div class="border border-[var(--ui-border)]/40 rounded-lg p-4">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="inline-block w-2 h-2 rounded-full bg-[var(--ui-warning)]"></span>
-                            <h4 class="text-sm font-medium text-[var(--ui-secondary)]">Context</h4>
-                        </div>
-                        <div class="space-y-1 text-sm">
-                            <div class="flex justify-between">
-                                <span class="text-[var(--ui-muted)]">Bearbeitung</span>
-                                <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['context']['minutes'] }} Min.</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-[var(--ui-muted)]">Wartezeit</span>
-                                <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['context']['wait'] }} Min.</span>
-                            </div>
-                            <div class="flex justify-between border-t border-[var(--ui-border)]/40 pt-1">
-                                <span class="text-[var(--ui-muted)]">Kosten</span>
-                                <span class="font-medium text-[var(--ui-warning)]">{{ number_format($metrics['context']['cost'], 2, ',', '.') }} EUR</span>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="border border-[var(--ui-border)]/40 rounded-lg p-4">
-                        <div class="flex items-center gap-2 mb-2">
-                            <span class="inline-block w-2 h-2 rounded-full bg-[var(--ui-danger)]"></span>
-                            <h4 class="text-sm font-medium text-[var(--ui-secondary)]">No Fit</h4>
-                        </div>
-                        <div class="space-y-1 text-sm">
-                            <div class="flex justify-between">
-                                <span class="text-[var(--ui-muted)]">Bearbeitung</span>
-                                <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['no_fit']['minutes'] }} Min.</span>
-                            </div>
-                            <div class="flex justify-between">
-                                <span class="text-[var(--ui-muted)]">Wartezeit</span>
-                                <span class="font-medium text-[var(--ui-secondary)]">{{ $metrics['no_fit']['wait'] }} Min.</span>
-                            </div>
-                            <div class="flex justify-between border-t border-[var(--ui-border)]/40 pt-1">
-                                <span class="text-[var(--ui-muted)]">Kosten</span>
-                                <span class="font-medium text-[var(--ui-danger)]">{{ number_format($metrics['no_fit']['cost'], 2, ',', '.') }} EUR</span>
-                            </div>
-                        </div>
-                    </div>
+                    @endforeach
                 </div>
             </div>
 
@@ -1112,6 +1270,7 @@
                     </div>
                 @endforeach
             </div>
+            @endif {{-- end corefitViewMode else (list) --}}
         @endif
 
         {{-- ── Tab: Steps ──────────────────────────────────── --}}
@@ -1489,9 +1648,14 @@
                                                 Score {{ $sim['score_delta'] > 0 ? '+' : '' }}{{ $sim['score_delta'] }}
                                             </x-ui-badge>
                                         @endif
-                                        @if($sim['cost_saving_per_month'] > 0)
+                                        @if($sim['cost_reduction_per_month'] > 0)
                                             <x-ui-badge variant="success" size="sm">
-                                                -{{ number_format($sim['cost_saving_per_month'], 0, ',', '.') }} &euro;/Mo
+                                                -{{ number_format($sim['cost_reduction_per_month'], 0, ',', '.') }} &euro;/Mo
+                                            </x-ui-badge>
+                                        @endif
+                                        @if($sim['productivity_gain_per_month'] > 0)
+                                            <x-ui-badge variant="info" size="sm">
+                                                +{{ number_format($sim['productivity_gain_per_month'], 0, ',', '.') }} &euro;/Mo Prod.
                                             </x-ui-badge>
                                         @endif
                                     </div>
@@ -1526,13 +1690,25 @@
                     <h4 class="text-sm font-semibold text-green-800 mb-2">Gesamtpotenzial (wenn alle Projektionen umgesetzt)</h4>
                     <div class="flex gap-6">
                         <div>
-                            <span class="text-xs text-green-600">Ersparnis/Monat</span>
+                            <span class="text-xs text-green-600">Gesamt/Monat</span>
                             <div class="text-lg font-bold text-green-700">{{ number_format($impSimulations['total_cost_savings_per_month'], 2, ',', '.') }} &euro;</div>
                         </div>
                         <div>
-                            <span class="text-xs text-green-600">Ersparnis/Jahr</span>
+                            <span class="text-xs text-green-600">Gesamt/Jahr</span>
                             <div class="text-lg font-bold text-green-700">{{ number_format($impSimulations['total_cost_savings_per_year'], 2, ',', '.') }} &euro;</div>
                         </div>
+                        @if($impSimulations['total_cost_reduction_per_month'] > 0)
+                            <div class="border-l border-green-300 pl-4">
+                                <span class="text-xs text-green-600">Echte Einsparung/Mo</span>
+                                <div class="text-sm font-semibold text-green-700">{{ number_format($impSimulations['total_cost_reduction_per_month'], 2, ',', '.') }} &euro;</div>
+                            </div>
+                        @endif
+                        @if($impSimulations['total_productivity_gain_per_month'] > 0)
+                            <div class="border-l border-blue-300 pl-4">
+                                <span class="text-xs text-blue-600">Produktivitätsgewinn/Mo</span>
+                                <div class="text-sm font-semibold text-blue-700">{{ number_format($impSimulations['total_productivity_gain_per_month'], 2, ',', '.') }} &euro;</div>
+                            </div>
+                        @endif
                     </div>
                 </div>
             @endif
@@ -2148,9 +2324,10 @@
                 </div>
             @endif
 
-            <div class="grid grid-cols-2 gap-4">
+            <div class="grid grid-cols-3 gap-4">
                 <x-ui-input-text name="duration_target_minutes" label="Dauer (Min.)" type="number" wire:model.live="stepForm.duration_target_minutes" min="0" placeholder="Aktive Bearbeitungszeit" />
                 <x-ui-input-text name="wait_target_minutes" label="Wartezeit (Min.)" type="number" wire:model.live="stepForm.wait_target_minutes" min="0" placeholder="Liegezeit bis zum nächsten Schritt" />
+                <x-ui-input-text name="external_cost_per_run" label="Externe Kosten/Lauf (&euro;)" type="number" wire:model.live="stepForm.external_cost_per_run" min="0" step="0.01" placeholder="Lizenzen, Material, Outsourcing" />
             </div>
 
             <div class="flex items-center">
@@ -2427,7 +2604,7 @@
                 @if($targetStep)
                     <div class="p-3 rounded-lg bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
                         <p class="text-xs font-medium text-[var(--ui-muted)] mb-2 uppercase tracking-wider">Aktuell: {{ $targetStep->name }}</p>
-                        <div class="grid grid-cols-3 gap-3 text-sm">
+                        <div class="grid grid-cols-4 gap-3 text-sm">
                             <div>
                                 <span class="text-[var(--ui-muted)]">Dauer:</span>
                                 <span class="font-medium text-[var(--ui-secondary)]">{{ $targetStep->duration_target_minutes ?? '–' }} Min.</span>
@@ -2440,6 +2617,10 @@
                                 <span class="text-[var(--ui-muted)]">Komplexität:</span>
                                 <span class="font-medium text-[var(--ui-secondary)]">{{ $targetStep->complexity ? strtoupper($targetStep->complexity->value) : '–' }}</span>
                             </div>
+                            <div>
+                                <span class="text-[var(--ui-muted)]">Ext. Kosten:</span>
+                                <span class="font-medium text-[var(--ui-secondary)]">{{ $targetStep->external_cost_per_run ? number_format((float) $targetStep->external_cost_per_run, 2, ',', '.') . ' €' : '–' }}</span>
+                            </div>
                         </div>
                     </div>
                 @endif
@@ -2448,7 +2629,21 @@
             {{-- Projektion: Was ändert sich? (immer sichtbar) --}}
             <div class="grid grid-cols-2 gap-3">
                 <x-ui-input-text name="proj_duration" label="Neue Dauer (Min.)" type="number" wire:model.live="improvementForm.projected_duration_target_minutes" min="0" placeholder="{{ $improvementForm['target_step_id'] !== '' ? ($this->steps->firstWhere('id', (int) $improvementForm['target_step_id'])?->duration_target_minutes ?? 'Unverändert') : 'Unverändert' }}" />
-                <x-ui-input-text name="proj_hourly_rate" label="Neuer Stundensatz (€)" type="number" wire:model.live="improvementForm.projected_hourly_rate" min="0" step="0.01" placeholder="{{ $this->form['hourly_rate'] !== '' ? $this->form['hourly_rate'] . ' (aktuell)' : 'Unverändert' }}" />
+                <x-ui-input-text name="proj_hourly_rate" label="Neuer Stundensatz (&euro;)" type="number" wire:model.live="improvementForm.projected_hourly_rate" min="0" step="0.01" placeholder="{{ $this->form['hourly_rate'] !== '' ? $this->form['hourly_rate'] . ' (aktuell)' : 'Unverändert' }}" />
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <x-ui-input-select
+                    name="savings_type"
+                    label="Art der Einsparung"
+                    :options="[
+                        ['value' => '', 'label' => '– Nicht definiert –'],
+                        ['value' => 'cost_reduction', 'label' => 'Echte Kosteneinsparung'],
+                        ['value' => 'productivity_gain', 'label' => 'Produktivitätsgewinn'],
+                        ['value' => 'both', 'label' => 'Beides'],
+                    ]"
+                    wire:model.live="improvementForm.savings_type"
+                />
+                <x-ui-input-text name="proj_external_cost" label="Neue externe Kosten/Lauf (&euro;)" type="number" wire:model.live="improvementForm.projected_external_cost_per_run" min="0" step="0.01" placeholder="{{ $improvementForm['target_step_id'] !== '' ? ($this->steps->firstWhere('id', (int) $improvementForm['target_step_id'])?->external_cost_per_run ?? '0.00') . ' (aktuell)' : 'Unverändert' }}" />
             </div>
             <div class="grid grid-cols-2 gap-3">
                 <x-ui-input-select

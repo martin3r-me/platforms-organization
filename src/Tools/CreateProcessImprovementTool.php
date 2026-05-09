@@ -44,6 +44,8 @@ class CreateProcessImprovementTool implements ToolContract, ToolMetadataContract
                 'projected_automation_level'        => ['type' => 'string', 'description' => 'Optional: human | llm_assisted | llm_autonomous | hybrid.'],
                 'projected_complexity'              => ['type' => 'string', 'description' => 'Optional: xs | s | m | l | xl | xxl.'],
                 'projected_hourly_rate'             => ['type' => 'number', 'description' => 'Optional: Projizierter Stundensatz in EUR.'],
+                'savings_type'                      => ['type' => 'string', 'description' => 'Optional: cost_reduction | productivity_gain | both. Art der Einsparung.'],
+                'projected_external_cost_per_run'   => ['type' => 'number', 'description' => 'Optional: Projizierte externe Kosten pro Durchlauf in EUR.'],
                 'metadata'                          => ['type' => 'object'],
             ],
             'required' => ['process_id', 'title', 'category'],
@@ -103,6 +105,8 @@ class CreateProcessImprovementTool implements ToolContract, ToolMetadataContract
                 'projected_automation_level'        => ! empty($arguments['projected_automation_level']) ? $arguments['projected_automation_level'] : null,
                 'projected_complexity'              => ! empty($arguments['projected_complexity']) ? $arguments['projected_complexity'] : null,
                 'projected_hourly_rate'             => isset($arguments['projected_hourly_rate']) ? (float) $arguments['projected_hourly_rate'] : null,
+                'savings_type'                      => ! empty($arguments['savings_type']) ? $arguments['savings_type'] : null,
+                'projected_external_cost_per_run'   => isset($arguments['projected_external_cost_per_run']) ? (float) $arguments['projected_external_cost_per_run'] : null,
                 'metadata'                          => $arguments['metadata'] ?? null,
             ]);
 

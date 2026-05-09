@@ -42,6 +42,7 @@ class UpdateProcessStepTool implements ToolContract, ToolMetadataContract
                 'event_type'              => ['type' => 'string', 'description' => 'start | end | intermediate_throw | intermediate_catch | timer | message | error | escalation. "" zum Leeren.'],
                 'duration_target_minutes' => ['type' => 'integer', 'description' => '0 oder null zum Leeren.'],
                 'wait_target_minutes'     => ['type' => 'integer', 'description' => '0 oder null zum Leeren.'],
+                'external_cost_per_run'   => ['type' => 'number', 'description' => 'Externe Kosten pro Durchlauf in EUR. 0 oder null zum Leeren.'],
                 'corefit_classification'  => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'automation_level'        => ['type' => 'string', 'description' => 'human | llm_assisted | llm_autonomous | hybrid. "" zum Leeren.'],
                 'complexity'              => ['type' => 'string', 'description' => 'T-Shirt-Größe: xs | s | m | l | xl | xxl. "" zum Leeren.'],
@@ -120,6 +121,11 @@ class UpdateProcessStepTool implements ToolContract, ToolMetadataContract
                 : ($step->gateway_type instanceof \BackedEnum ? $step->gateway_type->value : $step->gateway_type);
             if ($effectiveStepType === 'gateway' && ! $effectiveGatewayType) {
                 return ToolResult::error('VALIDATION_ERROR', 'gateway_type ist bei step_type=gateway erforderlich.');
+            }
+
+            if (array_key_exists('external_cost_per_run', $arguments)) {
+                $val = $arguments['external_cost_per_run'];
+                $update['external_cost_per_run'] = ($val === null || $val === '' || (float) $val === 0.0) ? null : (float) $val;
             }
 
             foreach (['duration_target_minutes', 'wait_target_minutes'] as $field) {

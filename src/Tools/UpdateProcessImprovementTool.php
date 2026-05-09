@@ -45,6 +45,8 @@ class UpdateProcessImprovementTool implements ToolContract, ToolMetadataContract
                 'projected_automation_level'        => ['type' => 'string', 'description' => 'human | llm_assisted | llm_autonomous | hybrid. "" zum Leeren.'],
                 'projected_complexity'              => ['type' => 'string', 'description' => 'xs | s | m | l | xl | xxl. "" zum Leeren.'],
                 'projected_hourly_rate'             => ['type' => 'number', 'description' => 'Projizierter Stundensatz in EUR. 0 oder null zum Leeren.'],
+                'savings_type'                      => ['type' => 'string', 'description' => 'cost_reduction | productivity_gain | both. "" zum Leeren.'],
+                'projected_external_cost_per_run'   => ['type' => 'number', 'description' => 'Projizierte externe Kosten pro Durchlauf in EUR. 0 oder null zum Leeren.'],
                 'metadata'                          => ['type' => 'object'],
             ],
             'required' => ['improvement_id'],
@@ -149,6 +151,16 @@ class UpdateProcessImprovementTool implements ToolContract, ToolMetadataContract
             if (array_key_exists('projected_hourly_rate', $arguments)) {
                 $val = $arguments['projected_hourly_rate'];
                 $update['projected_hourly_rate'] = (! empty($val) && (float) $val > 0) ? (float) $val : null;
+            }
+
+            if (array_key_exists('savings_type', $arguments)) {
+                $val = (string) ($arguments['savings_type'] ?? '');
+                $update['savings_type'] = $val !== '' ? $val : null;
+            }
+
+            if (array_key_exists('projected_external_cost_per_run', $arguments)) {
+                $val = $arguments['projected_external_cost_per_run'];
+                $update['projected_external_cost_per_run'] = (! empty($val) && (float) $val > 0) ? (float) $val : null;
             }
 
             if (array_key_exists('after_snapshot_id', $arguments)) {

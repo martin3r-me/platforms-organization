@@ -73,7 +73,7 @@ class CreateProcessSnapshotTool implements ToolContract, ToolMetadataContract
                 'steps'    => $process->steps->map(fn ($s) => $s->only([
                     'id', 'name', 'description', 'position', 'step_type',
                     'gateway_type', 'event_type',
-                    'duration_target_minutes', 'wait_target_minutes',
+                    'duration_target_minutes', 'wait_target_minutes', 'external_cost_per_run',
                     'corefit_classification', 'automation_level', 'complexity', 'llm_tools',
                     'sub_process_id', 'is_active',
                 ]))->values()->toArray(),

@@ -28,16 +28,10 @@ use Platform\Organization\Models\OrganizationVsmSystem;
 use Platform\Organization\Enums\RunStatus;
 use Platform\Organization\Enums\RunStepStatus;
 use Platform\Organization\Services\ProcessCertificateService;
-use Platform\Canvas\Models\Canvas;
-use Platform\Canvas\Models\CanvasType;
-use Platform\Canvas\Services\CanvasService;
 use Illuminate\Support\Str;
-use Livewire\WithFileUploads;
 
 class Show extends Component
 {
-    use WithFileUploads;
-
     public OrganizationProcess $process;
     public array $form = [];
     #[Url(as: 'tab')]
@@ -45,7 +39,6 @@ class Show extends Component
 
     // COREFIT Workshop
     public string $corefitViewMode = 'list'; // 'list' | 'workshop'
-    public $workshopFile; // for file uploads in workshop
 
     // Step CRUD
     public bool $stepModalShow = false;
@@ -1630,12 +1623,21 @@ class Show extends Component
 
     // ── COREFIT Workshop ────────────────────────────────────────
 
+    private const COREFIT_BLOCK_DEFS = [
+        ['key' => 'target_description', 'label' => 'Zielbeschreibung', 'description' => 'Was ist das Ziel dieses Prozesses?', 'position' => 1, 'guiding_questions' => ['Was ist das gewünschte Ergebnis?', 'Welchen Beitrag leistet der Prozess?', 'Wie sieht der Soll-Zustand aus?']],
+        ['key' => 'value_proposition', 'label' => 'Wertversprechen', 'description' => 'Welchen Wert liefert der Prozess?', 'position' => 2, 'guiding_questions' => ['Welches Problem löst der Prozess?', 'Was ist der konkrete Nutzen?', 'Warum ist dieser Prozess wichtig?']],
+        ['key' => 'cost_analysis', 'label' => 'Kostenanalyse', 'description' => 'Welche Kosten verursacht der Prozess?', 'position' => 3, 'guiding_questions' => ['Was sind die größten Kostentreiber?', 'Welche Kosten sind fix, welche variabel?', 'Wo gibt es Einsparpotenzial?']],
+        ['key' => 'risk_assessment', 'label' => 'Risikobewertung', 'description' => 'Welche Risiken bestehen?', 'position' => 4, 'guiding_questions' => ['Was sind die größten Risiken?', 'Was passiert bei Ausfall?', 'Welche Abhängigkeiten existieren?']],
+        ['key' => 'improvement_levers', 'label' => 'Verbesserungshebel', 'description' => 'Welche Hebel können angesetzt werden?', 'position' => 5, 'guiding_questions' => ['Wo sind die größten Potenziale?', 'Welche Quick Wins gibt es?', 'Welche Automatisierungsmöglichkeiten bestehen?']],
+        ['key' => 'action_plan', 'label' => 'Maßnahmenplan', 'description' => 'Welche Maßnahmen werden ergriffen?', 'position' => 6, 'guiding_questions' => ['Welche Maßnahmen sind priorisiert?', 'Wer ist verantwortlich?', 'Bis wann umgesetzt?']],
+        ['key' => 'standardization_notes', 'label' => 'Standardisierung', 'description' => 'Wie standardisiert ist der Prozess?', 'position' => 7, 'guiding_questions' => ['Was ist bereits standardisiert?', 'Wo gibt es Abweichungen?', 'Welche Dokumentation existiert?']],
+        ['key' => 'process_landscape', 'label' => 'Prozesslandkarte', 'description' => 'Einordnung in die Gesamtlandschaft.', 'position' => 8, 'guiding_questions' => ['Welche vor-/nachgelagerten Prozesse gibt es?', 'Welche Schnittstellen existieren?', 'Wo gibt es Medienbrüche?']],
+        ['key' => 'corefit_classification_notes', 'label' => 'COREFIT Klassifizierung', 'description' => 'Begründung der Einstufung.', 'position' => 9, 'guiding_questions' => ['Welche Kriterien wurden angelegt?', 'Was gehört zum Kern?', 'Was kann eliminiert werden?']],
+    ];
+
     public function openCorefitWorkshop(): void
     {
         $this->corefitViewMode = 'workshop';
-        // Ensure canvas exists (lazy creation)
-        $this->getOrCreateCorefitCanvas();
-        unset($this->corefitCanvas, $this->workshopData);
     }
 
     public function closeCorefitWorkshop(): void
@@ -1644,178 +1646,116 @@ class Show extends Component
     }
 
     #[Computed]
-    public function corefitCanvas(): ?Canvas
+    public function workshopNotes(): array
     {
-        return $this->getOrCreateCorefitCanvas();
-    }
-
-    private function getOrCreateCorefitCanvas(): ?Canvas
-    {
-        $canvas = $this->process->corefitCanvas;
-
-        if ($canvas) {
-            return $canvas;
-        }
-
-        $canvasType = CanvasType::where('key', 'corefit-process')->first();
-        if (! $canvasType) {
-            $canvasType = $this->ensureCorefitCanvasType();
-        }
-
-        $canvas = (new CanvasService())->createCanvas([
-            'team_id' => $this->process->team_id,
-            'canvas_type_id' => $canvasType->id,
-            'name' => 'COREFIT Workshop: ' . $this->process->name,
-            'status' => 'open',
-            'contextable_type' => OrganizationProcess::class,
-            'contextable_id' => $this->process->id,
-            'created_by_user_id' => Auth::id(),
-        ]);
-
-        // Clear cached relationship
-        $this->process->unsetRelation('corefitCanvas');
-
-        return $canvas;
-    }
-
-    private function ensureCorefitCanvasType(): CanvasType
-    {
-        return CanvasType::updateOrCreate(
-            ['key' => 'corefit-process', 'team_id' => null],
-            [
-                'name' => 'COREFIT Prozess-Workshop',
-                'description' => 'Workshop-Canvas für die COREFIT-Analyse eines Prozesses.',
-                'purpose' => 'COREFIT workshop on a process with 9 structured dimensions.',
-                'methodology' => 'COREFIT Framework',
-                'icon' => 'heroicon-o-adjustments-horizontal',
-                'origin' => 'system',
-                'is_active' => true,
-                'entry_types' => ['text'],
-                'block_definitions' => [
-                    ['key' => 'target_description', 'label' => 'Zielbeschreibung', 'description' => 'Was ist das Ziel dieses Prozesses?', 'position' => 1, 'guiding_questions' => ['Was ist das gewünschte Ergebnis?', 'Welchen Beitrag leistet der Prozess?', 'Wie sieht der Soll-Zustand aus?']],
-                    ['key' => 'value_proposition', 'label' => 'Wertversprechen', 'description' => 'Welchen Wert liefert der Prozess?', 'position' => 2, 'guiding_questions' => ['Welches Problem löst der Prozess?', 'Was ist der konkrete Nutzen?', 'Warum ist dieser Prozess wichtig?']],
-                    ['key' => 'cost_analysis', 'label' => 'Kostenanalyse', 'description' => 'Welche Kosten verursacht der Prozess?', 'position' => 3, 'guiding_questions' => ['Was sind die größten Kostentreiber?', 'Welche Kosten sind fix, welche variabel?', 'Wo gibt es Einsparpotenzial?']],
-                    ['key' => 'risk_assessment', 'label' => 'Risikobewertung', 'description' => 'Welche Risiken bestehen?', 'position' => 4, 'guiding_questions' => ['Was sind die größten Risiken?', 'Was passiert bei Ausfall?', 'Welche Abhängigkeiten existieren?']],
-                    ['key' => 'improvement_levers', 'label' => 'Verbesserungshebel', 'description' => 'Welche Hebel können angesetzt werden?', 'position' => 5, 'guiding_questions' => ['Wo sind die größten Potenziale?', 'Welche Quick Wins gibt es?', 'Welche Automatisierungsmöglichkeiten bestehen?']],
-                    ['key' => 'action_plan', 'label' => 'Maßnahmenplan', 'description' => 'Welche Maßnahmen werden ergriffen?', 'position' => 6, 'guiding_questions' => ['Welche Maßnahmen sind priorisiert?', 'Wer ist verantwortlich?', 'Bis wann umgesetzt?']],
-                    ['key' => 'standardization_notes', 'label' => 'Standardisierung', 'description' => 'Wie standardisiert ist der Prozess?', 'position' => 7, 'guiding_questions' => ['Was ist bereits standardisiert?', 'Wo gibt es Abweichungen?', 'Welche Dokumentation existiert?']],
-                    ['key' => 'process_landscape', 'label' => 'Prozesslandkarte', 'description' => 'Einordnung in die Gesamtlandschaft.', 'position' => 8, 'guiding_questions' => ['Welche vor-/nachgelagerten Prozesse gibt es?', 'Welche Schnittstellen existieren?', 'Wo gibt es Medienbrüche?']],
-                    ['key' => 'corefit_classification_notes', 'label' => 'COREFIT Klassifizierung', 'description' => 'Begründung der Einstufung.', 'position' => 9, 'guiding_questions' => ['Welche Kriterien wurden angelegt?', 'Was gehört zum Kern?', 'Was kann eliminiert werden?']],
-                ],
-                'layout' => ['type' => 'grid', 'columns' => 3, 'rows' => 3],
-                'analysis_config' => ['strategy' => 'completeness', 'thresholds' => ['good' => 80, 'partial' => 50, 'minimal' => 1]],
-            ]
-        );
+        return $this->process->workshop_notes ?? [];
     }
 
     #[Computed]
-    public function workshopData(): array
+    public function workshopBlockDefs(): array
     {
-        $canvas = $this->corefitCanvas;
-        if (! $canvas) {
-            return ['notes' => [], 'blockDefs' => [], 'layout' => [], 'blocksById' => collect(), 'canvasData' => ['blocks' => []]];
-        }
-
-        $canvas->loadMissing(['canvasType', 'buildingBlocks.entries', 'workshopNotes']);
-
-        $blockDefs = $canvas->canvasType->block_definitions ?? [];
-        $layout = $canvas->canvasType->layout ?? ['type' => 'grid', 'columns' => 3, 'rows' => 3];
-        $blocksById = $canvas->buildingBlocks->keyBy('block_key');
-        $canvasData = $canvas->toCanvasArray();
-
-        $workshopNotes = $canvas->workshopNotes()
-            ->orderBy('created_at')
-            ->get()
-            ->map(fn ($n) => [
-                'id' => $n->id,
-                'type' => $n->type,
-                'content' => $n->content,
-                'color' => $n->color,
-                'x' => $n->x,
-                'y' => $n->y,
-                'width' => $n->width,
-                'height' => $n->height,
-                'block_id' => $n->building_block_id,
-                'metadata' => $n->metadata,
-                'locked' => (bool) $n->is_locked,
-            ])
-            ->values()
-            ->toArray();
-
-        return [
-            'notes' => $workshopNotes,
-            'blockDefs' => $blockDefs,
-            'layout' => $layout,
-            'blocksById' => $blocksById,
-            'canvasData' => $canvasData,
-        ];
+        return self::COREFIT_BLOCK_DEFS;
     }
 
-    // Workshop note CRUD (delegating to canvas)
-
-    public function addWorkshopNote(string $type, ?int $blockId, array $data): void
+    public function addWorkshopNote(string $type, ?string $blockKey = null, ?string $content = null, ?string $color = null, ?int $x = null, ?int $y = null): void
     {
-        $canvas = $this->corefitCanvas;
-        if (! $canvas) return;
+        $notes = $this->process->workshop_notes ?? [];
 
-        $canvas->workshopNotes()->create([
+        $notes[] = [
+            'id' => count($notes) > 0 ? max(array_column($notes, 'id')) + 1 : 1,
             'type' => $type,
-            'content' => $data['content'] ?? '',
-            'color' => $data['color'] ?? 'yellow',
-            'x' => $data['x'] ?? 100,
-            'y' => $data['y'] ?? 100,
-            'width' => $data['width'] ?? null,
-            'height' => $data['height'] ?? null,
-            'building_block_id' => $blockId,
-            'metadata' => $data['metadata'] ?? null,
-            'created_by_user_id' => Auth::id(),
-        ]);
+            'block_key' => $blockKey,
+            'content' => $content ?? '',
+            'color' => $color ?? 'yellow',
+            'x' => $x ?? 100,
+            'y' => $y ?? 100,
+            'width' => null,
+            'height' => null,
+            'metadata' => null,
+            'locked' => false,
+        ];
 
-        unset($this->workshopData);
+        $this->process->update(['workshop_notes' => $notes]);
+        unset($this->workshopNotes);
     }
 
-    public function updateWorkshopNote(int $noteId, array $data): void
+    public function updateWorkshopNote(int $noteId, ?string $content = null, ?string $color = null, ?int $x = null, ?int $y = null, ?int $width = null, ?int $height = null, ?bool $locked = null): void
     {
-        $canvas = $this->corefitCanvas;
-        if (! $canvas) return;
+        $notes = $this->process->workshop_notes ?? [];
 
-        $note = $canvas->workshopNotes()->find($noteId);
-        if (! $note) return;
+        foreach ($notes as &$note) {
+            if (($note['id'] ?? null) === $noteId) {
+                if ($content !== null) $note['content'] = $content;
+                if ($color !== null) $note['color'] = $color;
+                if ($x !== null) $note['x'] = $x;
+                if ($y !== null) $note['y'] = $y;
+                if ($width !== null) $note['width'] = $width;
+                if ($height !== null) $note['height'] = $height;
+                if ($locked !== null) $note['locked'] = $locked;
+                break;
+            }
+        }
+        unset($note);
 
-        $allowed = ['content', 'color', 'x', 'y', 'width', 'height', 'metadata', 'is_locked', 'building_block_id'];
-        $note->update(array_intersect_key($data, array_flip($allowed)));
+        $this->process->update(['workshop_notes' => $notes]);
+        unset($this->workshopNotes);
+    }
+
+    public function moveWorkshopNote(int $noteId, int $x, int $y): void
+    {
+        $notes = $this->process->workshop_notes ?? [];
+
+        foreach ($notes as &$note) {
+            if (($note['id'] ?? null) === $noteId) {
+                $note['x'] = $x;
+                $note['y'] = $y;
+                break;
+            }
+        }
+        unset($note);
+
+        $this->process->update(['workshop_notes' => $notes]);
+        unset($this->workshopNotes);
     }
 
     public function deleteWorkshopNote(int $noteId): void
     {
-        $canvas = $this->corefitCanvas;
-        if (! $canvas) return;
+        $notes = $this->process->workshop_notes ?? [];
 
-        $note = $canvas->workshopNotes()->find($noteId);
-        if (! $note) return;
+        // Also remove connectors referencing this note
+        $notes = array_values(array_filter($notes, function ($note) use ($noteId) {
+            if (($note['id'] ?? null) === $noteId) return false;
+            if (($note['type'] ?? '') === 'connector') {
+                $meta = $note['metadata'] ?? [];
+                if (($meta['from_id'] ?? null) === $noteId || ($meta['to_id'] ?? null) === $noteId) return false;
+            }
+            return true;
+        }));
 
-        // Delete connectors referencing this note
-        if ($note->type !== 'connector') {
-            $canvas->workshopNotes()
-                ->where('type', 'connector')
-                ->get()
-                ->filter(fn ($c) => ($c->metadata['from_id'] ?? null) === $noteId || ($c->metadata['to_id'] ?? null) === $noteId)
-                ->each->delete();
-        }
-
-        $note->delete();
-        unset($this->workshopData);
+        $this->process->update(['workshop_notes' => $notes]);
+        unset($this->workshopNotes);
     }
 
-    public function updateWorkshopSettings(array $settings): void
+    public function addWorkshopConnector(int $fromId, int $toId): void
     {
-        $canvas = $this->corefitCanvas;
-        if (! $canvas) return;
+        $notes = $this->process->workshop_notes ?? [];
 
-        $allowed = ['gridWidth', 'gridHeight'];
-        $current = $canvas->workshop_settings ?? [];
-        $merged = array_merge($current, array_intersect_key($settings, array_flip($allowed)));
-        $canvas->update(['workshop_settings' => $merged]);
+        $notes[] = [
+            'id' => count($notes) > 0 ? max(array_column($notes, 'id')) + 1 : 1,
+            'type' => 'connector',
+            'block_key' => null,
+            'content' => '',
+            'color' => 'gray',
+            'x' => 0,
+            'y' => 0,
+            'width' => null,
+            'height' => null,
+            'metadata' => ['from_id' => $fromId, 'to_id' => $toId],
+            'locked' => false,
+        ];
+
+        $this->process->update(['workshop_notes' => $notes]);
+        unset($this->workshopNotes);
     }
 
     public function render()

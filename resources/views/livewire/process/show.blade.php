@@ -667,153 +667,258 @@
             @if($corefitViewMode === 'workshop')
                 {{-- ═══ COREFIT WORKSHOP VIEW ═══ --}}
                 @php
-                    $wsData = $this->workshopData;
-                    $wsNotes = $wsData['notes'];
-                    $wsBlockDefs = $wsData['blockDefs'];
-                    $wsLayout = $wsData['layout'];
-                    $wsBlocksById = $wsData['blocksById'];
-                    $wsCanvasData = $wsData['canvasData'];
-
-                    $wGridCols = $wsLayout['columns'] ?? 3;
-                    $wGridRows = $wsLayout['rows'] ?? 3;
-                    $wAreasRaw = $wsLayout['areas'] ?? null;
-                    $wAreaMap = is_array($wsLayout['area_map'] ?? null) ? $wsLayout['area_map'] : [];
-
-                    $ws = $this->corefitCanvas?->workshop_settings ?? [];
-                    $wGridW = (int) ($ws['gridWidth'] ?? max(1200, $wGridCols * 280));
-                    $wGridH = (int) ($ws['gridHeight'] ?? max(800, $wGridRows * 280));
+                    $wsBlockDefs = $this->workshopBlockDefs;
+                    $wsNotes = $this->workshopNotes;
+                    $wGridCols = 3;
+                    $wGridRows = 3;
+                    $wGridW = 840;
+                    $wGridH = 840;
                     $wBoardW = 5000;
                     $wBoardH = 3000;
                     $wGridLeft = intval(($wBoardW - $wGridW) / 2);
                     $wGridTop = intval(($wBoardH - $wGridH) / 2);
 
-                    // Parse layout areas into placement
-                    $wBlockPlacement = [];
-                    if (is_string($wAreasRaw) && !empty($wAreasRaw) && !empty($wAreaMap)) {
-                        $reverseMap = array_flip($wAreaMap);
-                        $rows = explode('/', $wAreasRaw);
-                        $grid = [];
-                        foreach ($rows as $ri => $row) {
-                            $cols = preg_split('/\s+/', trim($row));
-                            $grid[$ri] = $cols;
-                        }
-                        $seen = [];
-                        foreach ($grid as $ri => $cols) {
-                            foreach ($cols as $ci => $cell) {
-                                $blockKey = $reverseMap[$cell] ?? null;
-                                if (! $blockKey || isset($seen[$blockKey])) continue;
-                                $seen[$blockKey] = true;
-                                $colspan = 1;
-                                while (($ci + $colspan) < count($cols) && $cols[$ci + $colspan] === $cell) $colspan++;
-                                $rowspan = 1;
-                                while (($ri + $rowspan) < count($grid) && ($grid[$ri + $rowspan][$ci] ?? null) === $cell) $rowspan++;
-                                $wBlockPlacement[$blockKey] = ['col' => $ci + 1, 'row' => $ri + 1, 'colspan' => $colspan, 'rowspan' => $rowspan];
-                            }
-                        }
-                    }
+                    $wsIconMap = [
+                        'target_description' => 'heroicon-o-flag',
+                        'value_proposition' => 'heroicon-o-gift',
+                        'cost_analysis' => 'heroicon-o-calculator',
+                        'risk_assessment' => 'heroicon-o-shield-exclamation',
+                        'improvement_levers' => 'heroicon-o-wrench-screwdriver',
+                        'action_plan' => 'heroicon-o-clipboard-document-check',
+                        'standardization_notes' => 'heroicon-o-document-check',
+                        'process_landscape' => 'heroicon-o-map',
+                        'corefit_classification_notes' => 'heroicon-o-adjustments-horizontal',
+                    ];
                 @endphp
 
-                @if(empty($wsBlockDefs))
-                    <div class="text-center py-12 text-[var(--ui-muted)]">
-                        <p>COREFIT Workshop-Canvas konnte nicht erstellt werden.</p>
-                        <p class="text-xs mt-1">Bitte den Canvas-Type-Seeder ausführen.</p>
+                <div wire:key="corefit-workshop"
+                     x-data="{
+                        notes: {{ Js::from($wsNotes) }},
+                        scale: 0.6,
+                        panX: 0,
+                        panY: 0,
+                        isPanning: false,
+                        panStartX: 0,
+                        panStartY: 0,
+                        isFullscreen: false,
+                        draggingNote: null,
+                        dragOffsetX: 0,
+                        dragOffsetY: 0,
+                        editingNote: null,
+                        selectedColor: 'yellow',
+                        colorMap: {
+                            yellow: { bg: '#fef9c3', border: '#fde047', text: '#713f12' },
+                            blue: { bg: '#dbeafe', border: '#93c5fd', text: '#1e3a5f' },
+                            green: { bg: '#dcfce7', border: '#86efac', text: '#14532d' },
+                            pink: { bg: '#fce7f3', border: '#f9a8d4', text: '#831843' },
+                            orange: { bg: '#ffedd5', border: '#fdba74', text: '#7c2d12' },
+                        },
+                        init() {
+                            // Center the grid in view
+                            const container = this.$el;
+                            const cw = container.clientWidth;
+                            const ch = container.clientHeight;
+                            this.panX = (cw / 2) - ({{ $wBoardW }} * this.scale / 2);
+                            this.panY = (ch / 2) - ({{ $wBoardH }} * this.scale / 2);
+                        },
+                        zoomIn() { this.scale = Math.min(2, this.scale + 0.1); },
+                        zoomOut() { this.scale = Math.max(0.1, this.scale - 0.1); },
+                        resetZoom() { this.scale = 1; },
+                        fitToScreen() {
+                            const cw = this.$el.clientWidth;
+                            const ch = this.$el.clientHeight;
+                            this.scale = Math.min(cw / {{ $wGridW + 200 }}, ch / {{ $wGridH + 200 }});
+                            this.panX = (cw / 2) - ({{ $wBoardW }} * this.scale / 2);
+                            this.panY = (ch / 2) - ({{ $wBoardH }} * this.scale / 2);
+                        },
+                        toggleFullscreen() {
+                            this.isFullscreen = !this.isFullscreen;
+                            if (this.isFullscreen) {
+                                this.$el.style.position = 'fixed';
+                                this.$el.style.inset = '0';
+                                this.$el.style.zIndex = '9999';
+                                this.$el.style.height = '100vh';
+                                this.$el.style.borderRadius = '0';
+                            } else {
+                                this.$el.style.position = '';
+                                this.$el.style.inset = '';
+                                this.$el.style.zIndex = '';
+                                this.$el.style.height = '';
+                                this.$el.style.borderRadius = '';
+                            }
+                        },
+                        startPan(e) {
+                            if (e.target.closest('.ws-note') || e.target.closest('.ws-toolbar-inner') || e.target.closest('.ws-zoom-controls')) return;
+                            this.isPanning = true;
+                            this.panStartX = e.clientX - this.panX;
+                            this.panStartY = e.clientY - this.panY;
+                        },
+                        doPan(e) {
+                            if (this.isPanning) {
+                                this.panX = e.clientX - this.panStartX;
+                                this.panY = e.clientY - this.panStartY;
+                            }
+                            if (this.draggingNote !== null) {
+                                const rect = this.$refs.board.getBoundingClientRect();
+                                const x = Math.round((e.clientX - rect.left) / this.scale - this.dragOffsetX);
+                                const y = Math.round((e.clientY - rect.top) / this.scale - this.dragOffsetY);
+                                const n = this.notes.find(n => n.id === this.draggingNote);
+                                if (n) { n.x = x; n.y = y; }
+                            }
+                        },
+                        stopPan() {
+                            this.isPanning = false;
+                            if (this.draggingNote !== null) {
+                                const n = this.notes.find(n => n.id === this.draggingNote);
+                                if (n) {
+                                    $wire.moveWorkshopNote(n.id, n.x, n.y);
+                                }
+                                this.draggingNote = null;
+                            }
+                        },
+                        handleWheel(e) {
+                            e.preventDefault();
+                            const delta = e.deltaY > 0 ? -0.05 : 0.05;
+                            this.scale = Math.min(2, Math.max(0.1, this.scale + delta));
+                        },
+                        startDrag(e, noteId) {
+                            const n = this.notes.find(n => n.id === noteId);
+                            if (!n || n.locked) return;
+                            const rect = this.$refs.board.getBoundingClientRect();
+                            this.draggingNote = noteId;
+                            this.dragOffsetX = (e.clientX - rect.left) / this.scale - n.x;
+                            this.dragOffsetY = (e.clientY - rect.top) / this.scale - n.y;
+                        },
+                        addNote(type, blockKey) {
+                            $wire.addWorkshopNote(type, blockKey, null, this.selectedColor);
+                        },
+                        updateNote(noteId, content) {
+                            $wire.updateWorkshopNote(noteId, content);
+                        },
+                        deleteNote(noteId) {
+                            this.notes = this.notes.filter(n => n.id !== noteId);
+                            $wire.deleteWorkshopNote(noteId);
+                        },
+                        getNoteStyle(note) {
+                            const c = this.colorMap[note.color] || this.colorMap.yellow;
+                            return `position:absolute;left:${note.x}px;top:${note.y}px;width:${note.width || 160}px;min-height:${note.height || 120}px;background:${c.bg};border:2px solid ${c.border};color:${c.text};border-radius:4px;padding:8px;cursor:${note.locked ? 'default' : 'grab'};font-size:12px;box-shadow:0 2px 4px rgba(0,0,0,0.1);user-select:none;`;
+                        }
+                     }"
+                     class="relative overflow-hidden h-[calc(100vh-220px)]"
+                     style="background: #eef0f4; border-radius: 8px;"
+                     @mousedown="startPan($event)"
+                     @mousemove="doPan($event)"
+                     @mouseup="stopPan()"
+                     @mouseleave="stopPan()"
+                     @wheel.prevent="handleWheel($event)"
+                >
+                    {{-- Zoom Controls --}}
+                    <div class="ws-zoom-controls" style="position:absolute;top:12px;right:12px;z-index:20;display:flex;gap:4px;background:white;border-radius:6px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,0.15);">
+                        <button @click="zoomIn()" title="Zoom In" style="padding:4px;border:none;background:none;cursor:pointer;border-radius:4px;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='none'">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:16px;height:16px;"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" /></svg>
+                        </button>
+                        <span style="font-size:11px;padding:4px 6px;color:#666;" x-text="Math.round(scale * 100) + '%'"></span>
+                        <button @click="zoomOut()" title="Zoom Out" style="padding:4px;border:none;background:none;cursor:pointer;border-radius:4px;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='none'">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:16px;height:16px;"><path fill-rule="evenodd" d="M4 10a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H4.75A.75.75 0 014 10z" clip-rule="evenodd" /></svg>
+                        </button>
+                        <button @click="fitToScreen()" title="Einpassen" style="padding:4px;border:none;background:none;cursor:pointer;border-radius:4px;font-size:10px;font-weight:bold;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='none'">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:16px;height:16px;"><path fill-rule="evenodd" d="M4.25 2A2.25 2.25 0 002 4.25v2.5a.75.75 0 001.5 0v-2.5a.75.75 0 01.75-.75h2.5a.75.75 0 000-1.5h-2.5zM13.25 2a.75.75 0 000 1.5h2.5a.75.75 0 01.75.75v2.5a.75.75 0 001.5 0v-2.5A2.25 2.25 0 0015.75 2h-2.5zM3.5 13.25a.75.75 0 00-1.5 0v2.5A2.25 2.25 0 004.25 18h2.5a.75.75 0 000-1.5h-2.5a.75.75 0 01-.75-.75v-2.5zM18 13.25a.75.75 0 00-1.5 0v2.5a.75.75 0 01-.75.75h-2.5a.75.75 0 000 1.5h2.5A2.25 2.25 0 0018 15.75v-2.5z" clip-rule="evenodd" /></svg>
+                        </button>
+                        <button @click="toggleFullscreen()" title="Vollbild" style="padding:4px;border:none;background:none;cursor:pointer;border-radius:4px;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='none'">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:16px;height:16px;">
+                                <template x-if="!isFullscreen"><path d="M3.28 2.22a.75.75 0 00-1.06 1.06L5.44 6.5H2.75a.75.75 0 000 1.5h4.5A.75.75 0 008 7.25v-4.5a.75.75 0 00-1.5 0v2.69L3.28 2.22zM16.72 2.22a.75.75 0 010 1.06L13.56 6.5h2.69a.75.75 0 010 1.5h-4.5A.75.75 0 0111 7.25v-4.5a.75.75 0 011.5 0v2.69l3.22-3.22a.75.75 0 011.06 0zM3.28 17.78a.75.75 0 001.06 0L7.56 14.5h-2.69a.75.75 0 010-1.5h4.5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-2.69l-3.22 3.22a.75.75 0 01-1.06-1.06zM16.72 17.78a.75.75 0 01-1.06 0L12.44 14.5h2.69a.75.75 0 000-1.5h-4.5a.75.75 0 00-.75.75v4.5a.75.75 0 001.5 0v-2.69l3.22 3.22a.75.75 0 001.06-1.06z" /></template>
+                                <template x-if="isFullscreen"><path d="M6.22 3.22a.75.75 0 011.06 0L10 5.94l2.72-2.72a.75.75 0 111.06 1.06L11.06 7h2.19a.75.75 0 010 1.5h-4.5A.75.75 0 018 7.75v-4.5a.75.75 0 01.75-.75h.007L6.22 4.28a.75.75 0 010-1.06z" /></template>
+                            </svg>
+                        </button>
                     </div>
-                @else
-                    <div wire:key="corefit-workshop"
-                         wire:ignore
-                         x-data="workshopBoard({
-                            notes: {{ Js::from($wsNotes) }},
-                            canvasBlocks: {{ Js::from(collect($wsBlockDefs)->map(fn($d) => ['key' => $d['key'], 'label' => $d['label'] ?? $d['key'], 'id' => $wsBlocksById[$d['key']]?->id ?? null])->values()) }},
-                            gridLayout: {{ Js::from($wsLayout) }}
-                         })"
-                         class="relative overflow-hidden h-[calc(100vh-220px)]"
-                         style="background: #eef0f4; border-radius: 8px;"
+
+                    {{-- Toolbar --}}
+                    <div class="ws-toolbar-inner" style="position:absolute;top:12px;left:12px;z-index:20;display:flex;gap:4px;background:white;border-radius:6px;padding:4px;box-shadow:0 1px 3px rgba(0,0,0,0.15);">
+                        <button @click="addNote('note', null)" title="Notiz hinzufügen" style="display:flex;align-items:center;gap:4px;padding:4px 8px;border:none;background:none;cursor:pointer;border-radius:4px;font-size:11px;color:#555;" onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='none'">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" style="width:14px;height:14px;"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4z"/></svg>
+                            Notiz
+                        </button>
+                        {{-- Color Picker --}}
+                        <template x-for="(c, name) in colorMap" :key="name">
+                            <button
+                                @click="selectedColor = name"
+                                :style="`width:20px;height:20px;border-radius:50%;border:2px solid ${selectedColor === name ? '#333' : c.border};background:${c.bg};cursor:pointer;`"
+                                :title="name"
+                            ></button>
+                        </template>
+                    </div>
+
+                    {{-- Board --}}
+                    <div x-ref="board"
+                         :style="`transform:translate(${panX}px,${panY}px) scale(${scale});transform-origin:0 0;position:relative;width:{{ $wBoardW }}px;height:{{ $wBoardH }}px;`"
                     >
-                        {{-- Zoom Controls --}}
-                        <div class="workshop-zoom-controls">
-                            <button x-on:click="zoomIn()" title="Zoom In">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M10.75 4.75a.75.75 0 00-1.5 0v4.5h-4.5a.75.75 0 000 1.5h4.5v4.5a.75.75 0 001.5 0v-4.5h4.5a.75.75 0 000-1.5h-4.5v-4.5z" /></svg>
-                            </button>
-                            <div class="zoom-level" x-text="Math.round(scale * 100) + '%'"></div>
-                            <button x-on:click="zoomOut()" title="Zoom Out">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M4 10a.75.75 0 01.75-.75h10.5a.75.75 0 010 1.5H4.75A.75.75 0 014 10z" clip-rule="evenodd" /></svg>
-                            </button>
-                            <button x-on:click="resetZoom()" title="Reset Zoom" class="text-[10px] font-bold">1:1</button>
-                            <button x-on:click="fitToScreen()" title="An Bildschirm anpassen">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M4.25 2A2.25 2.25 0 002 4.25v2.5a.75.75 0 001.5 0v-2.5a.75.75 0 01.75-.75h2.5a.75.75 0 000-1.5h-2.5zM13.25 2a.75.75 0 000 1.5h2.5a.75.75 0 01.75.75v2.5a.75.75 0 001.5 0v-2.5A2.25 2.25 0 0015.75 2h-2.5zM3.5 13.25a.75.75 0 00-1.5 0v2.5A2.25 2.25 0 004.25 18h2.5a.75.75 0 000-1.5h-2.5a.75.75 0 01-.75-.75v-2.5zM18 13.25a.75.75 0 00-1.5 0v2.5a.75.75 0 01-.75.75h-2.5a.75.75 0 000 1.5h2.5A2.25 2.25 0 0018 15.75v-2.5z" clip-rule="evenodd" /></svg>
-                            </button>
-                            <button x-on:click="toggleFullscreen()" title="Vollbild">
-                                <template x-if="!isFullscreen">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M3.28 2.22a.75.75 0 00-1.06 1.06L5.44 6.5H2.75a.75.75 0 000 1.5h4.5A.75.75 0 008 7.25v-4.5a.75.75 0 00-1.5 0v2.69L3.28 2.22zM16.72 2.22a.75.75 0 010 1.06L13.56 6.5h2.69a.75.75 0 010 1.5h-4.5A.75.75 0 0111 7.25v-4.5a.75.75 0 011.5 0v2.69l3.22-3.22a.75.75 0 011.06 0zM3.28 17.78a.75.75 0 001.06 0L7.56 14.5h-2.69a.75.75 0 010-1.5h4.5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-2.69l-3.22 3.22a.75.75 0 01-1.06-1.06zM16.72 17.78a.75.75 0 01-1.06 0L12.44 14.5h2.69a.75.75 0 000-1.5h-4.5a.75.75 0 00-.75.75v4.5a.75.75 0 001.5 0v-2.69l3.22 3.22a.75.75 0 001.06-1.06z" /></svg>
-                                </template>
-                                <template x-if="isFullscreen">
-                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M3.28 2.22a.75.75 0 00-1.06 1.06L5.44 6.5H2.75a.75.75 0 000 1.5h4.5A.75.75 0 008 7.25v-4.5a.75.75 0 00-1.5 0v2.69L3.28 2.22z" /></svg>
-                                </template>
-                            </button>
+                        {{-- COREFIT Grid (read-only background) --}}
+                        <div style="
+                            position: absolute;
+                            top: {{ $wGridTop }}px;
+                            left: {{ $wGridLeft }}px;
+                            width: {{ $wGridW }}px;
+                            min-height: {{ $wGridH }}px;
+                            display: grid;
+                            grid-template-columns: repeat({{ $wGridCols }}, 1fr);
+                            grid-template-rows: repeat({{ $wGridRows }}, minmax(180px, auto));
+                            gap: 1.5px;
+                            background: #2d2d2d;
+                            border: 1.5px solid #2d2d2d;
+                            border-radius: 4px;
+                            overflow: hidden;
+                        ">
+                            @foreach($wsBlockDefs as $def)
+                                <div class="workshop-grid-block" style="background:#f8f9fa;padding:12px;">
+                                    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+                                        <h4 style="font-size:12px;font-weight:600;color:#374151;margin:0;">{{ $def['label'] }}</h4>
+                                        @svg($wsIconMap[$def['key']] ?? 'heroicon-o-square-3-stack-3d', 'w-4 h-4 text-gray-300')
+                                    </div>
+                                    @if(!empty($def['guiding_questions']))
+                                        <div style="display:flex;flex-direction:column;gap:2px;">
+                                            @foreach($def['guiding_questions'] as $q)
+                                                <span style="font-size:10px;color:#9ca3af;line-height:1.3;">{{ $q }}</span>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                            @endforeach
                         </div>
 
-                        {{-- Element Toolbar --}}
-                        <div class="workshop-toolbar">
-                            <button class="workshop-toolbar-btn" x-on:click="addElement('note')" title="Sticky Note">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M3 4a1 1 0 011-1h12a1 1 0 011 1v12a1 1 0 01-1 1H4a1 1 0 01-1-1V4z"/></svg>
-                                <span>Notiz</span>
-                            </button>
-                            <button class="workshop-toolbar-btn" x-on:click="addElement('text')" title="Textlabel">
-                                <span style="font-weight:800;font-size:14px;line-height:1;">T</span>
-                                <span>Text</span>
-                            </button>
-                            <button class="workshop-toolbar-btn" x-on:click="addElement('section')" title="Section / Frame">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="1.5" class="w-4 h-4"><rect x="3" y="3" width="14" height="14" rx="2" stroke-dasharray="3 2"/></svg>
-                                <span>Section</span>
-                            </button>
-                            <button class="workshop-toolbar-btn" x-on:click="addElement('shape')" title="Form">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><circle cx="10" cy="10" r="7"/></svg>
-                                <span>Form</span>
-                            </button>
-                            <button class="workshop-toolbar-btn"
-                                    x-on:click="startConnectorMode()"
-                                    :class="{ 'active': _connectorMode }"
-                                    title="Verbindung">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.69l-4.72-4.72a.75.75 0 011.06-1.06l6 6a.75.75 0 010 1.06l-6 6a.75.75 0 11-1.06-1.06l4.72-4.72H2.75A.75.75 0 012 10z" clip-rule="evenodd"/></svg>
-                                <span>Pfeil</span>
-                            </button>
-                            <button class="workshop-toolbar-btn" x-on:click="addElement('kanban')" title="Kanban Board">
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4"><path d="M2 4.5A2.5 2.5 0 014.5 2h2A2.5 2.5 0 019 4.5v11A2.5 2.5 0 016.5 18h-2A2.5 2.5 0 012 15.5v-11zM11 4.5A2.5 2.5 0 0113.5 2h2A2.5 2.5 0 0118 4.5v6a2.5 2.5 0 01-2.5 2.5h-2A2.5 2.5 0 0111 10.5v-6z"/></svg>
-                                <span>Kanban</span>
-                            </button>
-                        </div>
-
-                        {{-- Board: JS owns this DOM entirely --}}
-                        <div x-ref="board" class="workshop-board" style="width: {{ $wBoardW }}px; height: {{ $wBoardH }}px;">
-                            {{-- Canvas Grid (read-only background) --}}
-                            <div class="workshop-canvas-background" style="
-                                position: absolute;
-                                top: {{ $wGridTop }}px;
-                                left: {{ $wGridLeft }}px;
-                                width: {{ $wGridW }}px;
-                                min-height: {{ $wGridH }}px;
-                                display: grid;
-                                grid-template-columns: repeat({{ $wGridCols }}, 1fr);
-                                grid-template-rows: repeat({{ $wGridRows }}, minmax(180px, auto));
-                                gap: 1.5px;
-                                background: #2d2d2d;
-                                border: 1.5px solid #2d2d2d;
-                                border-radius: 4px;
-                                overflow: hidden;
-                            ">
-                                @foreach($wsBlockDefs as $def)
-                                    @include('canvas::livewire.canvas._workshop-grid-block', [
-                                        'blockKey' => $def['key'],
-                                        'blockDef' => $def,
-                                        'block' => $wsBlocksById[$def['key']] ?? null,
-                                        'canvasData' => $wsCanvasData,
-                                        'placement' => $wBlockPlacement[$def['key']] ?? null,
-                                    ])
-                                @endforeach
+                        {{-- Workshop Notes (Alpine-managed) --}}
+                        <template x-for="note in notes.filter(n => n.type !== 'connector')" :key="note.id">
+                            <div class="ws-note"
+                                 :style="getNoteStyle(note)"
+                                 @mousedown.stop="startDrag($event, note.id)"
+                            >
+                                <div style="display:flex;justify-content:space-between;align-items:start;margin-bottom:4px;">
+                                    <div
+                                        x-show="editingNote !== note.id"
+                                        @dblclick="editingNote = note.id"
+                                        style="flex:1;min-height:60px;white-space:pre-wrap;word-break:break-word;font-size:12px;cursor:text;"
+                                        x-text="note.content || 'Doppelklick zum Bearbeiten...'"
+                                    ></div>
+                                    <textarea
+                                        x-show="editingNote === note.id"
+                                        x-ref="noteInput"
+                                        :value="note.content"
+                                        @blur="note.content = $el.value; editingNote = null; updateNote(note.id, $el.value)"
+                                        @keydown.escape="editingNote = null"
+                                        @mousedown.stop
+                                        style="flex:1;min-height:60px;background:transparent;border:none;outline:none;resize:none;font-size:12px;font-family:inherit;"
+                                    ></textarea>
+                                    <button
+                                        @click.stop="deleteNote(note.id)"
+                                        style="background:none;border:none;cursor:pointer;padding:2px;opacity:0.4;font-size:14px;line-height:1;"
+                                        onmouseover="this.style.opacity='1'"
+                                        onmouseout="this.style.opacity='0.4'"
+                                        title="Löschen"
+                                    >&times;</button>
+                                </div>
                             </div>
-                        </div>
+                        </template>
                     </div>
-                @endif
+                </div>
             @else
             {{-- ═══ COREFIT LIST VIEW (original) ═══ --}}
             @php $metrics = $this->corefitMetrics; @endphp

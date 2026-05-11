@@ -29,9 +29,12 @@ use Platform\Organization\Enums\RunStatus;
 use Platform\Organization\Enums\RunStepStatus;
 use Platform\Organization\Services\ProcessCertificateService;
 use Illuminate\Support\Str;
+use Livewire\WithFileUploads;
 
 class Show extends Component
 {
+    use WithFileUploads;
+
     public OrganizationProcess $process;
     public array $form = [];
     #[Url(as: 'tab')]
@@ -39,6 +42,7 @@ class Show extends Component
 
     // COREFIT Workshop
     public string $corefitViewMode = 'list'; // 'list' | 'workshop'
+    public $workshopFile; // for file uploads in workshop
 
     // Step CRUD
     public bool $stepModalShow = false;
@@ -1646,83 +1650,134 @@ class Show extends Component
     }
 
     #[Computed]
-    public function workshopNotes(): array
-    {
-        return $this->process->workshop_notes ?? [];
-    }
-
-    #[Computed]
     public function workshopBlockDefs(): array
     {
         return self::COREFIT_BLOCK_DEFS;
     }
 
-    public function addWorkshopNote(string $type, ?string $blockKey = null, ?string $content = null, ?string $color = null, ?int $x = null, ?int $y = null): void
+    // ── Workshop API (matches workshopBoard JS from core) ────────
+
+    /**
+     * Called by JS: $wire.call('getWorkshopNotes')
+     * Returns all notes for the board.
+     */
+    public function getWorkshopNotes(): array
+    {
+        return $this->process->workshop_notes ?? [];
+    }
+
+    /**
+     * Called by JS: $wire.call('addWorkshopNote', {x, y}, type)
+     * Creates a new note and returns its data (with server-assigned ID).
+     */
+    public function addWorkshopNote(array $position, string $type = 'note'): array
     {
         $notes = $this->process->workshop_notes ?? [];
+        $nextId = count($notes) > 0 ? max(array_column($notes, 'id')) + 1 : 1;
 
-        $notes[] = [
-            'id' => count($notes) > 0 ? max(array_column($notes, 'id')) + 1 : 1,
+        $note = [
+            'id' => $nextId,
             'type' => $type,
-            'block_key' => $blockKey,
-            'content' => $content ?? '',
-            'color' => $color ?? 'yellow',
-            'x' => $x ?? 100,
-            'y' => $y ?? 100,
+            'title' => '',
+            'content' => '',
+            'x' => (int) ($position['x'] ?? 100),
+            'y' => (int) ($position['y'] ?? 100),
             'width' => null,
             'height' => null,
+            'color' => 'yellow',
             'metadata' => null,
-            'locked' => false,
         ];
 
+        $notes[] = $note;
         $this->process->update(['workshop_notes' => $notes]);
-        unset($this->workshopNotes);
+
+        return $note;
     }
 
-    public function updateWorkshopNote(int $noteId, ?string $content = null, ?string $color = null, ?int $x = null, ?int $y = null, ?int $width = null, ?int $height = null, ?bool $locked = null): void
+    /**
+     * Called by JS: $wire.call('updateNoteText', noteId, title, content)
+     */
+    public function updateNoteText(int $noteId, string $title, string $content): void
     {
         $notes = $this->process->workshop_notes ?? [];
 
         foreach ($notes as &$note) {
             if (($note['id'] ?? null) === $noteId) {
-                if ($content !== null) $note['content'] = $content;
-                if ($color !== null) $note['color'] = $color;
-                if ($x !== null) $note['x'] = $x;
-                if ($y !== null) $note['y'] = $y;
-                if ($width !== null) $note['width'] = $width;
-                if ($height !== null) $note['height'] = $height;
-                if ($locked !== null) $note['locked'] = $locked;
+                $note['title'] = $title;
+                $note['content'] = $content;
                 break;
             }
         }
         unset($note);
 
         $this->process->update(['workshop_notes' => $notes]);
-        unset($this->workshopNotes);
     }
 
-    public function moveWorkshopNote(int $noteId, int $x, int $y): void
+    /**
+     * Called by JS: $wire.call('updateNoteMetadata', noteId, metadata)
+     */
+    public function updateNoteMetadata(int $noteId, array $metadata): void
     {
         $notes = $this->process->workshop_notes ?? [];
 
         foreach ($notes as &$note) {
             if (($note['id'] ?? null) === $noteId) {
-                $note['x'] = $x;
-                $note['y'] = $y;
+                $note['metadata'] = $metadata;
                 break;
             }
         }
         unset($note);
 
         $this->process->update(['workshop_notes' => $notes]);
-        unset($this->workshopNotes);
     }
 
+    /**
+     * Called by JS: $wire.call('updateNotePosition', noteId, {x, y, width, height, blockId})
+     */
+    public function updateNotePosition(int $noteId, array $data): void
+    {
+        $notes = $this->process->workshop_notes ?? [];
+
+        foreach ($notes as &$note) {
+            if (($note['id'] ?? null) === $noteId) {
+                if (isset($data['x'])) $note['x'] = (int) $data['x'];
+                if (isset($data['y'])) $note['y'] = (int) $data['y'];
+                if (isset($data['width'])) $note['width'] = (int) $data['width'];
+                if (isset($data['height'])) $note['height'] = (int) $data['height'];
+                break;
+            }
+        }
+        unset($note);
+
+        $this->process->update(['workshop_notes' => $notes]);
+    }
+
+    /**
+     * Called by JS: $wire.call('updateNoteColor', noteId, color)
+     */
+    public function updateNoteColor(int $noteId, string $color): void
+    {
+        $notes = $this->process->workshop_notes ?? [];
+
+        foreach ($notes as &$note) {
+            if (($note['id'] ?? null) === $noteId) {
+                $note['color'] = $color;
+                break;
+            }
+        }
+        unset($note);
+
+        $this->process->update(['workshop_notes' => $notes]);
+    }
+
+    /**
+     * Called by JS: $wire.call('deleteWorkshopNote', noteId)
+     */
     public function deleteWorkshopNote(int $noteId): void
     {
         $notes = $this->process->workshop_notes ?? [];
 
-        // Also remove connectors referencing this note
+        // Remove note and any connectors referencing it
         $notes = array_values(array_filter($notes, function ($note) use ($noteId) {
             if (($note['id'] ?? null) === $noteId) return false;
             if (($note['type'] ?? '') === 'connector') {
@@ -1733,29 +1788,69 @@ class Show extends Component
         }));
 
         $this->process->update(['workshop_notes' => $notes]);
-        unset($this->workshopNotes);
     }
 
-    public function addWorkshopConnector(int $fromId, int $toId): void
+    /**
+     * Called by JS: $wire.call('addConnector', fromNoteId, toNoteId)
+     */
+    public function addConnector(int $fromNoteId, int $toNoteId): array
     {
         $notes = $this->process->workshop_notes ?? [];
+        $nextId = count($notes) > 0 ? max(array_column($notes, 'id')) + 1 : 1;
 
-        $notes[] = [
-            'id' => count($notes) > 0 ? max(array_column($notes, 'id')) + 1 : 1,
+        $connector = [
+            'id' => $nextId,
             'type' => 'connector',
-            'block_key' => null,
+            'title' => '',
             'content' => '',
-            'color' => 'gray',
             'x' => 0,
             'y' => 0,
             'width' => null,
             'height' => null,
-            'metadata' => ['from_id' => $fromId, 'to_id' => $toId],
-            'locked' => false,
+            'color' => 'blue',
+            'metadata' => ['from_id' => $fromNoteId, 'to_id' => $toNoteId],
         ];
 
+        $notes[] = $connector;
         $this->process->update(['workshop_notes' => $notes]);
-        unset($this->workshopNotes);
+
+        return $connector;
+    }
+
+    /**
+     * Called by JS: $wire.call('updateWorkshopSettings', {gridWidth, gridHeight})
+     */
+    public function updateWorkshopSettings(array $settings): void
+    {
+        $meta = $this->process->metadata ?? [];
+        $meta['workshop_settings'] = array_merge($meta['workshop_settings'] ?? [], $settings);
+        $this->process->update(['metadata' => $meta]);
+    }
+
+    /**
+     * File upload event handler for workshopFile.
+     * After JS calls $wire.upload('workshopFile', ...), Livewire triggers this.
+     */
+    public function updatedWorkshopFile(): void
+    {
+        if (! $this->workshopFile) return;
+
+        $path = $this->workshopFile->store('workshop-media', 'public');
+        $url = asset('storage/' . $path);
+
+        // Get image dimensions if applicable
+        $width = null;
+        $height = null;
+        if (str_starts_with($this->workshopFile->getMimeType(), 'image/')) {
+            [$width, $height] = getimagesize($this->workshopFile->getRealPath());
+        }
+
+        $this->dispatch('workshop-file-uploaded', [
+            'url' => $url,
+            'contextFileId' => null,
+            'width' => $width,
+            'height' => $height,
+        ]);
     }
 
     public function render()

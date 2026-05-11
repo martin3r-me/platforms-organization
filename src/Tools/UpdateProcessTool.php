@@ -50,6 +50,7 @@ class UpdateProcessTool implements ToolContract, ToolMetadataContract
                 'action_plan'           => ['type' => 'string', 'description' => 'Maßnahmenplan. "" zum Leeren.'],
                 'standardization_notes' => ['type' => 'string', 'description' => 'Standardisierung & Kontrolle. "" zum Leeren.'],
                 'hourly_rate'           => ['type' => 'number', 'description' => 'Stundensatz in EUR. 0 oder null zum Leeren.'],
+                'workshop_notes'        => ['type' => 'array', 'description' => 'Workshop-Notizen als JSON-Array. Jede Note: {id, type, title, content, x, y, width, height, color, metadata}. null oder [] zum Leeren.'],
             ],
             'required' => ['process_id'],
         ]);
@@ -119,6 +120,10 @@ class UpdateProcessTool implements ToolContract, ToolMetadataContract
                     $val = (string) ($arguments[$field] ?? '');
                     $update[$field] = $val === '' ? null : $val;
                 }
+            }
+            if (array_key_exists('workshop_notes', $arguments)) {
+                $val = $arguments['workshop_notes'];
+                $update['workshop_notes'] = is_array($val) && !empty($val) ? $val : null;
             }
             if (array_key_exists('hourly_rate', $arguments)) {
                 $val = $arguments['hourly_rate'];

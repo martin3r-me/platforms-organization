@@ -123,7 +123,18 @@ class UpdateProcessTool implements ToolContract, ToolMetadataContract
             }
             if (array_key_exists('workshop_notes', $arguments)) {
                 $val = $arguments['workshop_notes'];
-                $update['workshop_notes'] = is_array($val) && !empty($val) ? $val : null;
+                if (is_array($val) && !empty($val)) {
+                    // Auto-compute block_key for each note based on position
+                    foreach ($val as &$note) {
+                        if (!isset($note['block_key']) && isset($note['x'], $note['y'])) {
+                            $note['block_key'] = self::resolveBlockKey((int) $note['x'], (int) $note['y']);
+                        }
+                    }
+                    unset($note);
+                    $update['workshop_notes'] = $val;
+                } else {
+                    $update['workshop_notes'] = null;
+                }
             }
             if (array_key_exists('hourly_rate', $arguments)) {
                 $val = $arguments['hourly_rate'];
@@ -161,5 +172,38 @@ class UpdateProcessTool implements ToolContract, ToolMetadataContract
             'risk_level'    => 'write',
             'idempotent'    => true,
         ];
+    }
+
+    /**
+     * Resolve block_key from absolute board coordinates (fixed 3×3 grid).
+     */
+    private static function resolveBlockKey(int $x, int $y): ?string
+    {
+        $gridW = 1200;
+        $gridH = 840;
+        $boardW = 5000;
+        $boardH = 3000;
+        $cols = 3;
+        $rows = 3;
+
+        $gridLeft = ($boardW - $gridW) / 2;
+        $gridTop = ($boardH - $gridH) / 2;
+        $cellW = $gridW / $cols;
+        $cellH = $gridH / $rows;
+
+        $col = (int) floor(($x - $gridLeft) / $cellW);
+        $row = (int) floor(($y - $gridTop) / $cellH);
+
+        $grid = [
+            ['target_description', 'value_proposition', 'process_landscape'],
+            ['corefit_classification_notes', 'cost_analysis', 'risk_assessment'],
+            ['improvement_levers', 'action_plan', 'standardization_notes'],
+        ];
+
+        if ($col >= 0 && $col < $cols && $row >= 0 && $row < $rows) {
+            return $grid[$row][$col];
+        }
+
+        return null;
     }
 }

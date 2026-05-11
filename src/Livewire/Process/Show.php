@@ -1655,6 +1655,47 @@ class Show extends Component
         return self::COREFIT_BLOCK_DEFS;
     }
 
+    // ── Workshop Grid Constants (fixed 3×3 grid) ───────────────────
+    private const BOARD_W = 5000;
+    private const BOARD_H = 3000;
+    private const GRID_W = 1200;
+    private const GRID_H = 840;
+    private const GRID_COLS = 3;
+    private const GRID_ROWS = 3;
+
+    /**
+     * Block-key grid map: [row][col] => block_key
+     * Row 0: target_description | value_proposition | process_landscape
+     * Row 1: corefit_classification_notes | cost_analysis | risk_assessment
+     * Row 2: improvement_levers | action_plan | standardization_notes
+     */
+    private const BLOCK_GRID = [
+        ['target_description', 'value_proposition', 'process_landscape'],
+        ['corefit_classification_notes', 'cost_analysis', 'risk_assessment'],
+        ['improvement_levers', 'action_plan', 'standardization_notes'],
+    ];
+
+    /**
+     * Resolve block_key from absolute board coordinates.
+     * Returns null if the position is outside the grid.
+     */
+    private function resolveBlockKey(int $x, int $y): ?string
+    {
+        $gridLeft = (self::BOARD_W - self::GRID_W) / 2; // 1900
+        $gridTop = (self::BOARD_H - self::GRID_H) / 2;  // 1080
+        $cellW = self::GRID_W / self::GRID_COLS;         // 400
+        $cellH = self::GRID_H / self::GRID_ROWS;         // 280
+
+        $col = (int) floor(($x - $gridLeft) / $cellW);
+        $row = (int) floor(($y - $gridTop) / $cellH);
+
+        if ($col >= 0 && $col < self::GRID_COLS && $row >= 0 && $row < self::GRID_ROWS) {
+            return self::BLOCK_GRID[$row][$col];
+        }
+
+        return null;
+    }
+
     // ── Workshop API (matches workshopBoard JS from core) ────────
 
     /**
@@ -1675,17 +1716,21 @@ class Show extends Component
         $notes = $this->process->workshop_notes ?? [];
         $nextId = count($notes) > 0 ? max(array_column($notes, 'id')) + 1 : 1;
 
+        $x = (int) ($position['x'] ?? 100);
+        $y = (int) ($position['y'] ?? 100);
+
         $note = [
             'id' => $nextId,
             'type' => $type,
             'title' => '',
             'content' => '',
-            'x' => (int) ($position['x'] ?? 100),
-            'y' => (int) ($position['y'] ?? 100),
+            'x' => $x,
+            'y' => $y,
             'width' => null,
             'height' => null,
             'color' => 'yellow',
             'metadata' => null,
+            'block_key' => $this->resolveBlockKey($x, $y),
         ];
 
         $notes[] = $note;
@@ -1744,6 +1789,12 @@ class Show extends Component
                 if (isset($data['y'])) $note['y'] = (int) $data['y'];
                 if (isset($data['width'])) $note['width'] = (int) $data['width'];
                 if (isset($data['height'])) $note['height'] = (int) $data['height'];
+
+                // Re-compute block assignment based on new position
+                $note['block_key'] = $this->resolveBlockKey(
+                    (int) ($note['x'] ?? 0),
+                    (int) ($note['y'] ?? 0)
+                );
                 break;
             }
         }

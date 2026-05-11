@@ -1659,7 +1659,7 @@ class Show extends Component
 
         $canvasType = CanvasType::where('key', 'corefit-process')->first();
         if (! $canvasType) {
-            return null;
+            $canvasType = $this->ensureCorefitCanvasType();
         }
 
         $canvas = (new CanvasService())->createCanvas([
@@ -1676,6 +1676,36 @@ class Show extends Component
         $this->process->unsetRelation('corefitCanvas');
 
         return $canvas;
+    }
+
+    private function ensureCorefitCanvasType(): CanvasType
+    {
+        return CanvasType::updateOrCreate(
+            ['key' => 'corefit-process', 'team_id' => null],
+            [
+                'name' => 'COREFIT Prozess-Workshop',
+                'description' => 'Workshop-Canvas für die COREFIT-Analyse eines Prozesses.',
+                'purpose' => 'COREFIT workshop on a process with 9 structured dimensions.',
+                'methodology' => 'COREFIT Framework',
+                'icon' => 'heroicon-o-adjustments-horizontal',
+                'origin' => 'system',
+                'is_active' => true,
+                'entry_types' => ['text'],
+                'block_definitions' => [
+                    ['key' => 'target_description', 'label' => 'Zielbeschreibung', 'description' => 'Was ist das Ziel dieses Prozesses?', 'position' => 1, 'guiding_questions' => ['Was ist das gewünschte Ergebnis?', 'Welchen Beitrag leistet der Prozess?', 'Wie sieht der Soll-Zustand aus?']],
+                    ['key' => 'value_proposition', 'label' => 'Wertversprechen', 'description' => 'Welchen Wert liefert der Prozess?', 'position' => 2, 'guiding_questions' => ['Welches Problem löst der Prozess?', 'Was ist der konkrete Nutzen?', 'Warum ist dieser Prozess wichtig?']],
+                    ['key' => 'cost_analysis', 'label' => 'Kostenanalyse', 'description' => 'Welche Kosten verursacht der Prozess?', 'position' => 3, 'guiding_questions' => ['Was sind die größten Kostentreiber?', 'Welche Kosten sind fix, welche variabel?', 'Wo gibt es Einsparpotenzial?']],
+                    ['key' => 'risk_assessment', 'label' => 'Risikobewertung', 'description' => 'Welche Risiken bestehen?', 'position' => 4, 'guiding_questions' => ['Was sind die größten Risiken?', 'Was passiert bei Ausfall?', 'Welche Abhängigkeiten existieren?']],
+                    ['key' => 'improvement_levers', 'label' => 'Verbesserungshebel', 'description' => 'Welche Hebel können angesetzt werden?', 'position' => 5, 'guiding_questions' => ['Wo sind die größten Potenziale?', 'Welche Quick Wins gibt es?', 'Welche Automatisierungsmöglichkeiten bestehen?']],
+                    ['key' => 'action_plan', 'label' => 'Maßnahmenplan', 'description' => 'Welche Maßnahmen werden ergriffen?', 'position' => 6, 'guiding_questions' => ['Welche Maßnahmen sind priorisiert?', 'Wer ist verantwortlich?', 'Bis wann umgesetzt?']],
+                    ['key' => 'standardization_notes', 'label' => 'Standardisierung', 'description' => 'Wie standardisiert ist der Prozess?', 'position' => 7, 'guiding_questions' => ['Was ist bereits standardisiert?', 'Wo gibt es Abweichungen?', 'Welche Dokumentation existiert?']],
+                    ['key' => 'process_landscape', 'label' => 'Prozesslandkarte', 'description' => 'Einordnung in die Gesamtlandschaft.', 'position' => 8, 'guiding_questions' => ['Welche vor-/nachgelagerten Prozesse gibt es?', 'Welche Schnittstellen existieren?', 'Wo gibt es Medienbrüche?']],
+                    ['key' => 'corefit_classification_notes', 'label' => 'COREFIT Klassifizierung', 'description' => 'Begründung der Einstufung.', 'position' => 9, 'guiding_questions' => ['Welche Kriterien wurden angelegt?', 'Was gehört zum Kern?', 'Was kann eliminiert werden?']],
+                ],
+                'layout' => ['type' => 'grid', 'columns' => 3, 'rows' => 3],
+                'analysis_config' => ['strategy' => 'completeness', 'thresholds' => ['good' => 80, 'partial' => 50, 'minimal' => 1]],
+            ]
+        );
     }
 
     #[Computed]

@@ -375,6 +375,10 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\EntityMovementTool());
             $registry->register(new \Platform\Organization\Tools\MetricDefinitionsTool());
 
+            // Perspective Tools (Perspektiven-Layer)
+            $registry->register(new \Platform\Organization\Tools\ListPerspectivesTool());
+            $registry->register(new \Platform\Organization\Tools\SwitchPerspectiveTool());
+
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

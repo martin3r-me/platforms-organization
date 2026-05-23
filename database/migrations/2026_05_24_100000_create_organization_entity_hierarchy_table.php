@@ -30,9 +30,9 @@ return new class extends Migration
                 ->cascadeOnDelete();
             $table->timestamps();
 
-            $table->unique(['perspective_id', 'entity_id']);
-            $table->index(['perspective_id', 'parent_entity_id']);
-            $table->index(['team_id', 'perspective_id']);
+            $table->unique(['perspective_id', 'entity_id'], 'org_hierarchy_perspective_entity_unique');
+            $table->index(['perspective_id', 'parent_entity_id'], 'org_hierarchy_perspective_parent_idx');
+            $table->index(['team_id', 'perspective_id'], 'org_hierarchy_team_perspective_idx');
         });
     }
 

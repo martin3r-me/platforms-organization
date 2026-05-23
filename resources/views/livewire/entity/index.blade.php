@@ -61,16 +61,6 @@
     </x-slot>
 
     <x-ui-page-container>
-        @php
-            $activePerspective = \Platform\Organization\Services\PerspectiveService::getActive(auth()->user()->currentTeam->id, auth()->id());
-        @endphp
-        @if(!$activePerspective->is_default)
-            <div class="mb-4 px-4 py-3 bg-blue-50 border border-blue-200 rounded-lg flex items-center gap-2 text-sm text-blue-800">
-                @svg('heroicon-o-eye', 'w-4 h-4 flex-shrink-0')
-                <span>Perspektive <strong>{{ $activePerspective->name }}</strong> ist aktiv — nur verknüpfte Entities werden angezeigt.</span>
-            </div>
-        @endif
-
         <x-ui-table compact="true">
         <x-ui-table-header>
             <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>

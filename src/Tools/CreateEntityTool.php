@@ -44,10 +44,6 @@ class CreateEntityTool implements ToolContract, ToolMetadataContract
                     'type' => 'integer',
                     'description' => 'Optional: Entity Type ID. Nutze organization.entity_types.GET.',
                 ],
-                'cost_center_id' => [
-                    'type' => 'integer',
-                    'description' => 'Optional: Direkte Kostenstellen-ID (Standard-KST der Entity).',
-                ],
                 'parent_entity_id' => [
                     'type' => 'integer',
                     'description' => 'Optional: Parent Entity ID für Hierarchie.',
@@ -106,7 +102,6 @@ class CreateEntityTool implements ToolContract, ToolMetadataContract
                 'name' => $name,
                 'code' => $code,
                 'entity_type_id' => isset($arguments['entity_type_id']) ? (int) $arguments['entity_type_id'] : null,
-                'cost_center_id' => isset($arguments['cost_center_id']) ? (int) $arguments['cost_center_id'] : null,
                 'parent_entity_id' => isset($arguments['parent_entity_id']) ? (int) $arguments['parent_entity_id'] : null,
                 'description' => ($arguments['description'] ?? null) ?: null,
                 'is_active' => (bool) ($arguments['is_active'] ?? true),
@@ -119,7 +114,6 @@ class CreateEntityTool implements ToolContract, ToolMetadataContract
                 'name' => $entity->name,
                 'team_id' => $entity->team_id,
                 'entity_type_id' => $entity->entity_type_id,
-                'cost_center_id' => $entity->cost_center_id,
                 'parent_entity_id' => $entity->parent_entity_id,
                 'is_active' => (bool) $entity->is_active,
                 'message' => 'Entity erfolgreich erstellt.',

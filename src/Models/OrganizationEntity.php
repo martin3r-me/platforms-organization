@@ -23,7 +23,6 @@ class OrganizationEntity extends Model
         'linked_user_id',
         'description',
         'entity_type_id',
-        'cost_center_id',
         'parent_entity_id',
         'is_active',
         'metadata',
@@ -80,14 +79,6 @@ class OrganizationEntity extends Model
     public function type()
     {
         return $this->belongsTo(OrganizationEntityType::class, 'entity_type_id');
-    }
-
-    /**
-     * Beziehung zu Cost Center
-     */
-    public function costCenter()
-    {
-        return $this->belongsTo(OrganizationCostCenter::class, 'cost_center_id');
     }
 
     /**

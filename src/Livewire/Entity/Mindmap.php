@@ -293,7 +293,6 @@ class Mindmap extends Component
             ->active()
             ->with([
                 'type.group',
-                'costCenter:id,code,name',
             ])
             ->get();
 
@@ -344,10 +343,6 @@ class Mindmap extends Component
                 'val'      => $baseVal,
                 'depth'    => $depth,
                 'isSun'    => $depth === 0 && $parentIds->has($e->id),
-                'cost_center' => $e->costCenter ? [
-                    'name'  => $e->costCenter->name,
-                    'color' => $this->colorFor('cc:' . $e->costCenter->name),
-                ] : null,
                 'metrics'  => [
                     'items_total'   => $metrics['items_total'] ?? 0,
                     'items_done'    => $metrics['items_done'] ?? 0,

@@ -62,12 +62,6 @@
                             <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity->type->name }}</div>
                             <div class="text-xs text-[var(--ui-muted)]">{{ $entity->type->group->name }}</div>
                         </div>
-                        @if($entity->costCenter)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Kostenstelle</span>
-                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity->costCenter->name }}</div>
-                            </div>
-                        @endif
                         @if($entity->parent)
                             <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                                 <span class="text-xs text-[var(--ui-muted)]">Übergeordnet</span>
@@ -701,16 +695,6 @@
                                     :nullable="false"
                                     wire:model.live="form.entity_type_id"
                                     required
-                                />
-                                <x-ui-input-select
-                                    name="cost_center_id"
-                                    label="Kostenstelle (optional)"
-                                    :options="$this->costCenters"
-                                    optionValue="id"
-                                    optionLabel="name"
-                                    :nullable="true"
-                                    nullLabel="Keine Kostenstelle"
-                                    wire:model.live="form.cost_center_id"
                                 />
                                 <x-ui-input-select
                                     name="parent_entity_id"

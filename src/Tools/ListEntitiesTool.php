@@ -50,7 +50,7 @@ class ListEntitiesTool implements ToolContract, ToolMetadataContract
                     ],
                     'include_relations' => [
                         'type' => 'boolean',
-                        'description' => 'Optional: Typ, Kostenstelle und Parent mitladen. Default: false.',
+                        'description' => 'Optional: Typ und Parent mitladen. Default: false.',
                     ],
                 ],
             ]
@@ -88,7 +88,7 @@ class ListEntitiesTool implements ToolContract, ToolMetadataContract
             }
 
             if (!empty($arguments['include_relations'])) {
-                $q->with(['type', 'costCenter', 'parent']);
+                $q->with(['type', 'parent']);
             }
 
             $this->applyStandardFilters($q, $arguments, ['team_id', 'is_active', 'entity_type_id', 'parent_entity_id', 'created_at']);
@@ -104,14 +104,12 @@ class ListEntitiesTool implements ToolContract, ToolMetadataContract
                     'code' => $e->code,
                     'name' => $e->name,
                     'entity_type_id' => $e->entity_type_id,
-                    'cost_center_id' => $e->cost_center_id,
                     'parent_entity_id' => $e->parent_entity_id,
                     'is_active' => (bool) $e->is_active,
                 ];
 
                 if ($includeRelations) {
                     $item['type_name'] = $e->type?->name;
-                    $item['cost_center_name'] = $e->costCenter?->name;
                     $item['parent_name'] = $e->parent?->name;
                 }
 

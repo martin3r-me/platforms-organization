@@ -36,7 +36,6 @@ class SnapshotEntitiesCommand extends Command
         $entities = OrganizationEntity::active()
             ->with([
                 'type.group',
-                'costCenter:id,code,name',
             ])
             ->get();
 
@@ -181,8 +180,6 @@ class SnapshotEntitiesCommand extends Command
                 'group_name' => $e->type?->group?->name,
                 'is_active' => $e->is_active,
                 'linked_user_id' => $e->linked_user_id,
-                'cost_center_id' => $e->cost_center_id,
-                'cost_center_name' => $e->costCenter?->name,
             ])->values()->all();
 
             // Relationships

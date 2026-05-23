@@ -154,14 +154,6 @@ class OrganizationCostCenter extends Model
     }
 
     /**
-     * Organisationseinheiten, die dieser Kostenstelle zugeordnet sind
-     */
-    public function entities()
-    {
-        return $this->hasMany(OrganizationEntity::class, 'cost_center_id');
-    }
-
-    /**
      * Alle Links zu dieser Cost Center (polymorph zu verschiedenen Modellen)
      * Über diese können dann alle verlinkten Objekte abgefragt werden
      */

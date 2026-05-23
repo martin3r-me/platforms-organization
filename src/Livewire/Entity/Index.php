@@ -58,7 +58,6 @@ class Index extends Component
         $query = OrganizationEntity::query()
             ->with([
                 'type.group',
-                'costCenter', 
                 'parent', 
                 'team', 
                 'user', 

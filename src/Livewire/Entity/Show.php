@@ -8,7 +8,6 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationEntityType;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Platform\Organization\Models\OrganizationCostCenter;
 use Platform\Organization\Models\OrganizationVsmFunction;
 use Platform\Organization\Models\OrganizationContext;
 use Platform\Organization\Models\OrganizationEntityRelationship;
@@ -64,7 +63,6 @@ class Show extends Component
     {
         $this->entity = $entity->load([
             'type.group',
-            'costCenter',
             'parent',
             'children.type',
             'children.children',
@@ -87,7 +85,6 @@ class Show extends Component
             'code' => $this->entity->code,
             'description' => $this->entity->description,
             'entity_type_id' => $this->entity->entity_type_id,
-            'cost_center_id' => $this->entity->cost_center_id,
             'parent_entity_id' => $this->entity->parent_entity_id,
             'linked_user_id' => $this->entity->linked_user_id,
             'is_active' => $this->entity->is_active,
@@ -101,7 +98,6 @@ class Show extends Component
             'form.code' => 'nullable|string|max:255',
             'form.description' => 'nullable|string',
             'form.entity_type_id' => 'required|exists:organization_entity_types,id',
-            'form.cost_center_id' => 'nullable|exists:organization_cost_centers,id',
             'form.parent_entity_id' => 'nullable|exists:organization_entities,id',
             'form.linked_user_id' => 'nullable|exists:users,id',
             'form.is_active' => 'boolean',
@@ -124,7 +120,6 @@ class Show extends Component
                $this->form['code'] !== $this->entity->code ||
                $this->form['description'] !== $this->entity->description ||
                $this->form['entity_type_id'] != $this->entity->entity_type_id ||
-               $this->form['cost_center_id'] != $this->entity->cost_center_id ||
                $this->form['parent_entity_id'] != $this->entity->parent_entity_id ||
                $this->form['linked_user_id'] != $this->entity->linked_user_id ||
                $this->form['is_active'] !== $this->entity->is_active;
@@ -137,14 +132,6 @@ class Show extends Component
             ->with('group')
             ->get()
             ->groupBy('group.name');
-    }
-
-    public function getCostCentersProperty()
-    {
-        return OrganizationCostCenter::active()
-            ->where('team_id', auth()->user()->currentTeam->id)
-            ->orderBy('name')
-            ->get();
     }
 
     public function getAvailableVsmFunctionsProperty()

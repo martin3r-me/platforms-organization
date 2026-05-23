@@ -49,10 +49,6 @@ class UpdateEntityTool implements ToolContract, ToolMetadataContract
                     'type' => 'integer',
                     'description' => 'Optional: Neue Entity Type ID (0/null zum Leeren).',
                 ],
-                'cost_center_id' => [
-                    'type' => 'integer',
-                    'description' => 'Optional: Neue Kostenstellen-ID (0/null zum Leeren).',
-                ],
                 'parent_entity_id' => [
                     'type' => 'integer',
                     'description' => 'Optional: Neue Parent Entity ID (0/null zum Leeren).',
@@ -129,7 +125,7 @@ class UpdateEntityTool implements ToolContract, ToolMetadataContract
                 $update['description'] = $d === '' ? null : $d;
             }
 
-            foreach (['entity_type_id', 'cost_center_id', 'parent_entity_id'] as $fkField) {
+            foreach (['entity_type_id', 'parent_entity_id'] as $fkField) {
                 if (array_key_exists($fkField, $arguments)) {
                     $val = $arguments[$fkField];
                     if ($val === null || $val === '' || $val === 'null' || $val === 0 || $val === '0') {
@@ -162,7 +158,6 @@ class UpdateEntityTool implements ToolContract, ToolMetadataContract
                 'name' => $entity->name,
                 'team_id' => $entity->team_id,
                 'entity_type_id' => $entity->entity_type_id,
-                'cost_center_id' => $entity->cost_center_id,
                 'parent_entity_id' => $entity->parent_entity_id,
                 'is_active' => (bool) $entity->is_active,
                 'message' => 'Entity erfolgreich aktualisiert.',

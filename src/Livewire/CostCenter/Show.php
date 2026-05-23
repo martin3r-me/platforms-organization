@@ -16,7 +16,7 @@ class Show extends Component
 
     public function mount(OrganizationCostCenter $costCenter)
     {
-        $this->costCenter = $costCenter->load('entities.type');
+        $this->costCenter = $costCenter;
         $this->loadForm();
     }
 

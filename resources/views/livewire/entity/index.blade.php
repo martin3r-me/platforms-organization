@@ -65,7 +65,6 @@
         <x-ui-table-header>
             <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
-            <x-ui-table-header-cell compact="true">Kostenstelle</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Übergeordnet</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Relationen</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>

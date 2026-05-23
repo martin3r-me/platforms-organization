@@ -40,7 +40,7 @@ return new class extends Migration
             $table->index(['linkable_type', 'linkable_id'], 'dim_link_linkable');
             $table->index(['dimension_value_id']);
             $table->index(['perspective_id']);
-            $table->index(['team_id', 'dimension_definition_id']);
+            $table->index(['team_id', 'dimension_definition_id'], 'dim_link_team_def');
         });
     }
 

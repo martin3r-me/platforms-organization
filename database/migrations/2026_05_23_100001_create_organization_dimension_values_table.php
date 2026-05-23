@@ -24,8 +24,8 @@ return new class extends Migration
             $table->timestamps();
             $table->softDeletes();
 
-            $table->index(['dimension_definition_id', 'is_active']);
-            $table->index(['team_id', 'dimension_definition_id']);
+            $table->index(['dimension_definition_id', 'is_active'], 'dim_val_def_active');
+            $table->index(['team_id', 'dimension_definition_id'], 'dim_val_team_def');
             $table->index('code');
         });
     }

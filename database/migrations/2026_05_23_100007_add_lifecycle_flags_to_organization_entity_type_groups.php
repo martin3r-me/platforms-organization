@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('organization_entity_type_groups', 'allow_soft_delete')) return;
         Schema::table('organization_entity_type_groups', function (Blueprint $table) {
             $table->boolean('allow_soft_delete')->default(true)->after('is_active');
             $table->boolean('allow_rename')->default(true)->after('allow_soft_delete');

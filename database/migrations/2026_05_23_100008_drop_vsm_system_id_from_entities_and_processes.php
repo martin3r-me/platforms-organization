@@ -9,18 +9,22 @@ return new class extends Migration
     public function up(): void
     {
         // Drop from organization_entities
-        Schema::table('organization_entities', function (Blueprint $table) {
-            $table->dropForeign(['vsm_system_id']);
-            $table->dropIndex(['vsm_system_id', 'is_active']);
-            $table->dropColumn('vsm_system_id');
-        });
+        if (Schema::hasColumn('organization_entities', 'vsm_system_id')) {
+            Schema::table('organization_entities', function (Blueprint $table) {
+                $table->dropForeign(['vsm_system_id']);
+                $table->dropIndex(['vsm_system_id', 'is_active']);
+                $table->dropColumn('vsm_system_id');
+            });
+        }
 
         // Drop from organization_processes
-        Schema::table('organization_processes', function (Blueprint $table) {
-            $table->dropForeign(['vsm_system_id']);
-            $table->dropIndex(['vsm_system_id']);
-            $table->dropColumn('vsm_system_id');
-        });
+        if (Schema::hasColumn('organization_processes', 'vsm_system_id')) {
+            Schema::table('organization_processes', function (Blueprint $table) {
+                $table->dropForeign(['vsm_system_id']);
+                $table->dropIndex(['vsm_system_id']);
+                $table->dropColumn('vsm_system_id');
+            });
+        }
     }
 
     public function down(): void

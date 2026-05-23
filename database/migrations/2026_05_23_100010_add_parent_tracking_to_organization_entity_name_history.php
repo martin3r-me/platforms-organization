@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasColumn('organization_entity_name_history', 'change_type')) return;
         Schema::table('organization_entity_name_history', function (Blueprint $table) {
             $table->foreignId('old_parent_entity_id')
                 ->nullable()

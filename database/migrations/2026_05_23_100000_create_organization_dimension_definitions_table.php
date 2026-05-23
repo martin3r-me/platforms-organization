@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (Schema::hasTable('organization_dimension_definitions')) return;
         Schema::create('organization_dimension_definitions', function (Blueprint $table) {
             $table->id();
             $table->string('key')->unique();

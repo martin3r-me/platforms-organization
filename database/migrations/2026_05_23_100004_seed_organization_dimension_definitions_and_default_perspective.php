@@ -7,6 +7,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Skip if already seeded
+        if (DB::table('organization_dimension_definitions')->where('key', 'vsm-system')->exists()) {
+            return;
+        }
+
         $now = now();
 
         // 1. Seed dimension definitions

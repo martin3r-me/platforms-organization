@@ -8,6 +8,7 @@ return new class extends Migration
 {
     public function up(): void
     {
+        if (!Schema::hasColumn('organization_entities', 'cost_center_id')) return;
         Schema::table('organization_entities', function (Blueprint $table) {
             $table->dropForeign(['cost_center_id']);
             $table->dropColumn('cost_center_id');

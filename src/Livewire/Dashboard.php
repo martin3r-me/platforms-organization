@@ -71,7 +71,7 @@ class Dashboard extends Component
             return collect();
         }
         return OrganizationEntity::forTeam($teamId)
-            ->with(['type', 'vsmSystem'])
+            ->with(['type'])
             ->orderBy('created_at', 'desc')
             ->limit(5)
             ->get();

@@ -11,7 +11,7 @@ class ProcessCertificateService
 {
     public static function compute(OrganizationProcess $process): array
     {
-        $process->loadMissing(['ownerEntity', 'vsmSystem', 'steps', 'improvements', 'team', 'runs.runSteps']);
+        $process->loadMissing(['ownerEntity', 'steps', 'improvements', 'team', 'runs.runSteps']);
 
         $steps = $process->steps->sortBy('position');
         $totalSteps = $steps->count();
@@ -122,7 +122,6 @@ class ProcessCertificateService
                 'status' => $process->status?->value ?? 'draft',
                 'description' => $process->description,
                 'owner' => $process->ownerEntity?->name,
-                'vsm_system' => $process->vsmSystem?->name,
                 'team' => $process->team?->name,
                 'process_landscape' => $process->process_landscape,
                 'corefit_classification_notes' => $process->corefit_classification_notes,

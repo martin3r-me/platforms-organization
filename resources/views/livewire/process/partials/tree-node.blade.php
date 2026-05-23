@@ -49,9 +49,6 @@
                             {{ $process->process_category->label() }}
                         </x-ui-badge>
                     @endif
-                    @if($process->vsmSystem)
-                        <x-ui-badge variant="{{ $process->vsmSystem->color() }}" size="sm">{{ $process->vsmSystem->name }}</x-ui-badge>
-                    @endif
                 </div>
                 @if($process->description)
                     <div class="text-xs text-[var(--ui-muted)] ml-5.5 truncate">{{ \Illuminate\Support\Str::limit($process->description, 80) }}</div>

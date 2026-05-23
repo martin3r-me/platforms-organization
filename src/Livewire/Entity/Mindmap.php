@@ -293,7 +293,6 @@ class Mindmap extends Component
             ->active()
             ->with([
                 'type.group',
-                'vsmSystem:id,code,name,sort_order',
                 'costCenter:id,code,name',
             ])
             ->get();
@@ -345,11 +344,6 @@ class Mindmap extends Component
                 'val'      => $baseVal,
                 'depth'    => $depth,
                 'isSun'    => $depth === 0 && $parentIds->has($e->id),
-                'vsm'      => $e->vsmSystem ? [
-                    'code' => $e->vsmSystem->code,
-                    'name' => $e->vsmSystem->name,
-                    'sort' => (int) $e->vsmSystem->sort_order,
-                ] : null,
                 'cost_center' => $e->costCenter ? [
                     'name'  => $e->costCenter->name,
                     'color' => $this->colorFor('cc:' . $e->costCenter->name),

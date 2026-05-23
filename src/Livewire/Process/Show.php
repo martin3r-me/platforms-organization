@@ -24,7 +24,6 @@ use Platform\Organization\Models\OrganizationProcessImprovement;
 use Platform\Organization\Models\OrganizationProcessRun;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
-use Platform\Organization\Models\OrganizationVsmSystem;
 use Platform\Organization\Enums\RunStatus;
 use Platform\Organization\Enums\RunStepStatus;
 use Platform\Organization\Services\ProcessCertificateService;
@@ -122,7 +121,7 @@ class Show extends Component
 
     public function mount(OrganizationProcess $process)
     {
-        $this->process = $process->load(['ownerEntity', 'vsmSystem', 'user']);
+        $this->process = $process->load(['ownerEntity', 'user']);
 
         // Backward-compat: alter zusammengeführter Tab (chaining) → triggers
         if ($this->activeTab === 'chaining') {
@@ -144,7 +143,6 @@ class Show extends Component
             'focus_reason'          => (string) ($this->process->focus_reason ?? ''),
             'focus_until'           => $this->process->focus_until?->format('Y-m-d'),
             'owner_entity_id'       => (string) ($this->process->owner_entity_id ?? ''),
-            'vsm_system_id'         => (string) ($this->process->vsm_system_id ?? ''),
             'version'               => (string) ($this->process->version ?? '1'),
             'is_active'             => $this->process->is_active,
             'hourly_rate'           => (string) ($this->process->hourly_rate ?? ''),
@@ -173,7 +171,6 @@ class Show extends Component
                $this->form['focus_reason'] !== (string) ($this->process->focus_reason ?? '') ||
                $this->form['focus_until'] !== $this->process->focus_until?->format('Y-m-d') ||
                $this->form['owner_entity_id'] != ($this->process->owner_entity_id ?? '') ||
-               $this->form['vsm_system_id'] != ($this->process->vsm_system_id ?? '') ||
                (int) $this->form['version'] !== ($this->process->version ?? 1) ||
                $this->form['is_active'] !== $this->process->is_active ||
                $this->form['hourly_rate'] !== (string) ($this->process->hourly_rate ?? '') ||
@@ -303,12 +300,6 @@ class Show extends Component
     public function availableEntityTypes()
     {
         return OrganizationEntityType::active()->ordered()->get();
-    }
-
-    #[Computed]
-    public function availableVsmSystems()
-    {
-        return OrganizationVsmSystem::orderBy('name')->get();
     }
 
     #[Computed]
@@ -873,7 +864,6 @@ class Show extends Component
             'form.focus_reason'          => 'nullable|string',
             'form.focus_until'           => 'nullable|date',
             'form.owner_entity_id'       => 'nullable|integer|exists:organization_entities,id',
-            'form.vsm_system_id'         => 'nullable|integer|exists:organization_vsm_systems,id',
             'form.version'               => 'required|integer|min:1',
             'form.is_active'             => 'boolean',
             'form.hourly_rate'           => 'nullable|numeric|min:0',
@@ -899,7 +889,6 @@ class Show extends Component
             'focus_reason'          => $this->form['is_focus'] && $this->form['focus_reason'] !== '' ? $this->form['focus_reason'] : null,
             'focus_until'           => $this->form['is_focus'] && $this->form['focus_until'] ? $this->form['focus_until'] : null,
             'owner_entity_id'       => $this->form['owner_entity_id'] !== '' ? (int) $this->form['owner_entity_id'] : null,
-            'vsm_system_id'         => $this->form['vsm_system_id'] !== '' ? (int) $this->form['vsm_system_id'] : null,
             'version'               => (int) $this->form['version'],
             'is_active'             => $this->form['is_active'],
             'hourly_rate'           => $this->form['hourly_rate'] !== '' ? (float) $this->form['hourly_rate'] : null,
@@ -1309,7 +1298,7 @@ class Show extends Component
         $snapshotData = [
             'process' => $process->only([
                 'name', 'code', 'description', 'status', 'version', 'is_active',
-                'owner_entity_id', 'vsm_system_id', 'metadata',
+                'owner_entity_id', 'metadata',
                 'target_description', 'value_proposition', 'cost_analysis',
                 'risk_assessment', 'improvement_levers', 'action_plan', 'standardization_notes',
                 'process_landscape', 'corefit_classification_notes',

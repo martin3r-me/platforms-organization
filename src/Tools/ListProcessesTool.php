@@ -22,20 +22,19 @@ class ListProcessesTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/processes - Listet Prozess-Definitionen. Filter: status, is_active, owner_entity_id, vsm_system_id.';
+        return 'GET /organization/processes - Listet Prozess-Definitionen. Filter: status, is_active, owner_entity_id.';
     }
 
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['team_id', 'status', 'is_active', 'owner_entity_id', 'vsm_system_id']),
+            $this->getStandardGetSchema(['team_id', 'status', 'is_active', 'owner_entity_id']),
             [
                 'properties' => [
                     'team_id'         => ['type' => 'integer'],
                     'status'          => ['type' => 'string', 'description' => 'Optional: draft | under_review | pilot | active | deprecated.'],
                     'is_active'       => ['type' => 'boolean', 'description' => 'Optional: Default true.'],
                     'owner_entity_id' => ['type' => 'integer', 'description' => 'Optional: Filter nach Owner-Entity.'],
-                    'vsm_system_id'   => ['type' => 'integer', 'description' => 'Optional: Filter nach VSM-System.'],
                 ],
             ]
         );
@@ -61,10 +60,7 @@ class ListProcessesTool implements ToolContract, ToolMetadataContract
             if (! empty($arguments['owner_entity_id'])) {
                 $q->where('owner_entity_id', (int) $arguments['owner_entity_id']);
             }
-            if (! empty($arguments['vsm_system_id'])) {
-                $q->where('vsm_system_id', (int) $arguments['vsm_system_id']);
-            }
-            $this->applyStandardFilters($q, $arguments, ['team_id', 'status', 'is_active', 'owner_entity_id', 'vsm_system_id', 'created_at']);
+            $this->applyStandardFilters($q, $arguments, ['team_id', 'status', 'is_active', 'owner_entity_id', 'created_at']);
             $this->applyStandardSearch($q, $arguments, ['name', 'code', 'description']);
             $this->applyStandardSort($q, $arguments, ['name', 'code', 'status', 'version', 'id', 'created_at'], 'name', 'asc');
 
@@ -76,7 +72,6 @@ class ListProcessesTool implements ToolContract, ToolMetadataContract
                 'code'            => $p->code,
                 'description'     => $p->description,
                 'owner_entity_id' => $p->owner_entity_id,
-                'vsm_system_id'   => $p->vsm_system_id,
                 'status'          => $p->status,
                 'version'         => $p->version,
                 'is_active'       => $p->is_active,

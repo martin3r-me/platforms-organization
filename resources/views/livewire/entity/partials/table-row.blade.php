@@ -35,13 +35,6 @@
         <div class="text-xs text-[var(--ui-muted)]">{{ $entity->type->group->name }}</div>
     </x-ui-table-cell>
     <x-ui-table-cell compact="true">
-        @if($entity->vsmSystem)
-            <x-ui-badge variant="secondary" size="sm">{{ $entity->vsmSystem->name }}</x-ui-badge>
-        @else
-            <span class="text-xs text-[var(--ui-muted)]">–</span>
-        @endif
-    </x-ui-table-cell>
-    <x-ui-table-cell compact="true">
         @if($entity->costCenter)
             <x-ui-badge variant="primary" size="sm" title="{{ $entity->costCenter->name }}">{{ $entity->costCenter->code }}</x-ui-badge>
         @else

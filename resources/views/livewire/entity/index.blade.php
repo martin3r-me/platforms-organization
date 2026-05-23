@@ -27,7 +27,6 @@
                     <div class="space-y-3">
                         <x-ui-input-select name="selectedGroup" label="Gruppe" :options="$this->entityTypeGroups" optionValue="id" optionLabel="name" :nullable="true" nullLabel="– Alle Gruppen –" size="sm" />
                         <x-ui-input-select name="selectedType" label="Typ" :options="$this->entityTypes->flatten()" optionValue="id" optionLabel="name" :nullable="true" nullLabel="– Alle Typen –" size="sm" />
-                        <x-ui-input-select name="vsmSystem" label="VSM System" :options="$this->vsmSystems" optionValue="id" optionLabel="name" :nullable="true" nullLabel="– Alle Systeme –" size="sm" />
                         <div class="flex items-center">
                             <input type="checkbox" wire:model.live="showInactive" id="showInactive" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
                             <label for="showInactive" class="ml-2 text-sm text-[var(--ui-secondary)]">Inaktive anzeigen</label>
@@ -66,7 +65,6 @@
         <x-ui-table-header>
             <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
-            <x-ui-table-header-cell compact="true">VSM System</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Kostenstelle</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Übergeordnet</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Relationen</x-ui-table-header-cell>
@@ -170,16 +168,6 @@
                             required
                         />
 
-                        <x-ui-input-select
-                            name="vsm_system_id"
-                            label="VSM System (optional)"
-                            :options="$this->vsmSystems"
-                            optionValue="id"
-                            optionLabel="name"
-                            :nullable="true"
-                            nullLabel="Kein VSM System"
-                            wire:model.live="newEntity.vsm_system_id"
-                        />
                     </div>
 
                     <div class="grid grid-cols-1 gap-4">

@@ -64,7 +64,7 @@ class CreateProcessSnapshotTool implements ToolContract, ToolMetadataContract
                 'schema_version' => 2,
                 'process' => $process->only([
                     'name', 'code', 'description', 'status', 'version', 'is_active',
-                    'owner_entity_id', 'vsm_system_id', 'metadata',
+                    'owner_entity_id', 'metadata',
                     'process_landscape', 'corefit_classification_notes',
                     'target_description', 'value_proposition', 'cost_analysis',
                     'risk_assessment', 'improvement_levers', 'action_plan', 'standardization_notes',

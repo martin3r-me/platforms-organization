@@ -35,7 +35,6 @@ class UpdateProcessTool implements ToolContract, ToolMetadataContract
                 'code'            => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'description'     => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'owner_entity_id' => ['type' => 'integer', 'description' => '0 oder null zum Leeren.'],
-                'vsm_system_id'   => ['type' => 'integer', 'description' => '0 oder null zum Leeren.'],
                 'status'          => ['type' => 'string', 'description' => 'draft | under_review | pilot | active | deprecated.'],
                 'version'         => ['type' => 'integer'],
                 'is_active'       => ['type' => 'boolean'],
@@ -97,7 +96,7 @@ class UpdateProcessTool implements ToolContract, ToolMetadataContract
                     $update[$field] = $val === '' ? null : $val;
                 }
             }
-            foreach (['owner_entity_id', 'vsm_system_id'] as $field) {
+            foreach (['owner_entity_id'] as $field) {
                 if (array_key_exists($field, $arguments)) {
                     $val = $arguments[$field];
                     $update[$field] = (! empty($val) && (int) $val > 0) ? (int) $val : null;

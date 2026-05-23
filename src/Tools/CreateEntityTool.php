@@ -44,10 +44,6 @@ class CreateEntityTool implements ToolContract, ToolMetadataContract
                     'type' => 'integer',
                     'description' => 'Optional: Entity Type ID. Nutze organization.entity_types.GET.',
                 ],
-                'vsm_system_id' => [
-                    'type' => 'integer',
-                    'description' => 'Optional: VSM System ID. Nutze organization.vsm_systems.GET.',
-                ],
                 'cost_center_id' => [
                     'type' => 'integer',
                     'description' => 'Optional: Direkte Kostenstellen-ID (Standard-KST der Entity).',
@@ -110,7 +106,6 @@ class CreateEntityTool implements ToolContract, ToolMetadataContract
                 'name' => $name,
                 'code' => $code,
                 'entity_type_id' => isset($arguments['entity_type_id']) ? (int) $arguments['entity_type_id'] : null,
-                'vsm_system_id' => isset($arguments['vsm_system_id']) ? (int) $arguments['vsm_system_id'] : null,
                 'cost_center_id' => isset($arguments['cost_center_id']) ? (int) $arguments['cost_center_id'] : null,
                 'parent_entity_id' => isset($arguments['parent_entity_id']) ? (int) $arguments['parent_entity_id'] : null,
                 'description' => ($arguments['description'] ?? null) ?: null,
@@ -124,7 +119,6 @@ class CreateEntityTool implements ToolContract, ToolMetadataContract
                 'name' => $entity->name,
                 'team_id' => $entity->team_id,
                 'entity_type_id' => $entity->entity_type_id,
-                'vsm_system_id' => $entity->vsm_system_id,
                 'cost_center_id' => $entity->cost_center_id,
                 'parent_entity_id' => $entity->parent_entity_id,
                 'is_active' => (bool) $entity->is_active,

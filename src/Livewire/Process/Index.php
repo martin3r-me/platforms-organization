@@ -9,14 +9,12 @@ use Platform\Organization\Enums\ProcessCategory;
 use Platform\Organization\Models\OrganizationProcess;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
-use Platform\Organization\Models\OrganizationVsmSystem;
 
 class Index extends Component
 {
     public string $search = '';
     public string $statusFilter = '';
     public string $categoryFilter = '';
-    public string $vsmFilter = '';
     public bool $focusFilter = false;
     public bool $statusFromRoute = false;
 
@@ -33,13 +31,11 @@ class Index extends Component
         'focus_reason' => '',
         'focus_until' => null,
         'owner_entity_id' => '',
-        'vsm_system_id' => '',
     ];
 
     protected $queryString = [
         'search'         => ['except' => ''],
         'categoryFilter' => ['except' => ''],
-        'vsmFilter'      => ['except' => ''],
         'focusFilter'    => ['except' => false],
     ];
 
@@ -88,7 +84,6 @@ class Index extends Component
             'form.focus_reason'     => ['nullable', 'string'],
             'form.focus_until'      => ['nullable', 'date'],
             'form.owner_entity_id'  => ['nullable', 'integer', 'exists:organization_entities,id'],
-            'form.vsm_system_id'    => ['nullable', 'integer', 'exists:organization_vsm_systems,id'],
         ];
     }
 
@@ -116,17 +111,13 @@ class Index extends Component
             $q->where('process_category', $this->categoryFilter);
         }
 
-        if ($this->vsmFilter !== '' && $this->vsmFilter !== null) {
-            $q->where('vsm_system_id', $this->vsmFilter);
-        }
-
         if ($this->focusFilter) {
             $q->where('is_focus', true);
         }
 
         $q->withCount(['runs as active_runs_count' => fn ($rq) => $rq->where('status', 'active')]);
 
-        return $q->with(['ownerEntity', 'vsmSystem', 'steps:id,process_id,automation_level'])
+        return $q->with(['ownerEntity', 'steps:id,process_id,automation_level'])
             ->orderBy('name')
             ->get();
     }
@@ -230,12 +221,6 @@ class Index extends Component
             ->get();
     }
 
-    #[Computed]
-    public function availableVsmSystems()
-    {
-        return OrganizationVsmSystem::orderBy('name')->get();
-    }
-
     public function create(): void
     {
         $this->resetValidation();
@@ -264,7 +249,6 @@ class Index extends Component
             'focus_reason'     => (string) ($process->focus_reason ?? ''),
             'focus_until'      => $process->focus_until?->format('Y-m-d'),
             'owner_entity_id'  => (string) ($process->owner_entity_id ?? ''),
-            'vsm_system_id'    => (string) ($process->vsm_system_id ?? ''),
         ];
         $this->modalShow = true;
     }
@@ -283,7 +267,6 @@ class Index extends Component
             'focus_reason'     => $data['is_focus'] && $data['focus_reason'] !== '' ? $data['focus_reason'] : null,
             'focus_until'      => $data['is_focus'] && $data['focus_until'] ? $data['focus_until'] : null,
             'owner_entity_id'  => $data['owner_entity_id'] !== '' ? (int) $data['owner_entity_id'] : null,
-            'vsm_system_id'    => $data['vsm_system_id'] !== '' ? (int) $data['vsm_system_id'] : null,
         ];
 
         if ($this->editingId) {

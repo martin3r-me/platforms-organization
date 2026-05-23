@@ -37,17 +37,6 @@
                     nullLabel="Alle Kategorien"
                     size="xs"
                 />
-                <x-ui-input-select
-                    wire:key="filter-vsm"
-                    name="vsmFilter"
-                    :options="$this->availableVsmSystems"
-                    optionValue="id"
-                    optionLabel="name"
-                    wire:model.live="vsmFilter"
-                    :nullable="true"
-                    nullLabel="Alle VSM Systeme"
-                    size="xs"
-                />
                 <button wire:key="filter-focus" wire:click="$toggle('focusFilter')" class="inline-flex items-center gap-1 text-xs px-3 py-1 rounded-lg border transition-all duration-200 {{ $focusFilter ? 'bg-[rgb(var(--ui-warning-rgb))] text-[color:var(--ui-on-warning)] border-2 border-[rgb(var(--ui-warning-rgb))] shadow-sm font-semibold ring-2 ring-[rgb(var(--ui-warning-rgb))] ring-opacity-20' : 'bg-white/50 backdrop-blur-sm text-[color:var(--ui-secondary)] border border-white/40 hover:bg-[rgba(var(--ui-warning-rgb),0.05)] hover:border-[rgb(var(--ui-warning-rgb))]' }}">
                     @svg('heroicon-o-star', 'w-3.5 h-3.5')
                     Fokus
@@ -148,17 +137,6 @@
                     wire:model.live="form.owner_entity_id"
                     :nullable="true"
                     nullLabel="– Kein Owner –"
-                    size="sm"
-                />
-                <x-ui-input-select
-                    name="form.vsm_system_id"
-                    label="VSM System"
-                    :options="$this->availableVsmSystems"
-                    optionValue="id"
-                    optionLabel="name"
-                    wire:model.live="form.vsm_system_id"
-                    :nullable="true"
-                    nullLabel="– Kein VSM System –"
                     size="sm"
                 />
             </div>

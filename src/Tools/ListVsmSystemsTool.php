@@ -17,7 +17,7 @@ class ListVsmSystemsTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/vsm-systems - Listet VSM-Systeme (Viable System Model: S1-S5). VSM-Systeme sind global (nicht team-spezifisch). Nutze dieses Tool bevor du vsm_system_id setzt.';
+        return 'GET /organization/vsm-systems - Listet VSM-Systeme (Viable System Model: S1-S5). VSM-Systeme sind global (nicht team-spezifisch). VSM-Zuweisungen laufen über das Dimensions-Framework (organization.dimension_links).';
     }
 
     public function getSchema(): array

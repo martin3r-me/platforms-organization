@@ -7,7 +7,6 @@ use Livewire\Attributes\Computed;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntityTypeGroup;
-use Platform\Organization\Models\OrganizationVsmSystem;
 use Platform\Organization\Services\SnapshotMovementService;
 
 class Index extends Component
@@ -22,7 +21,6 @@ class Index extends Component
         'code' => '',
         'description' => '',
         'entity_type_id' => '',
-        'vsm_system_id' => '',
         'parent_entity_id' => '',
         'is_active' => true,
     ];
@@ -59,8 +57,7 @@ class Index extends Component
     {
         $query = OrganizationEntity::query()
             ->with([
-                'type.group', 
-                'vsmSystem', 
+                'type.group',
                 'costCenter', 
                 'parent', 
                 'team', 
@@ -133,14 +130,6 @@ class Index extends Component
     }
 
     #[Computed]
-    public function vsmSystems()
-    {
-        return OrganizationVsmSystem::active()
-            ->ordered()
-            ->get();
-    }
-
-    #[Computed]
     public function parentEntities()
     {
         return OrganizationEntity::active()
@@ -198,7 +187,6 @@ class Index extends Component
             'newEntity.code' => 'nullable|string|max:255',
             'newEntity.description' => 'nullable|string',
             'newEntity.entity_type_id' => 'required|exists:organization_entity_types,id',
-            'newEntity.vsm_system_id' => 'nullable|exists:organization_vsm_systems,id',
             'newEntity.parent_entity_id' => 'nullable|exists:organization_entities,id',
             'newEntity.is_active' => 'boolean',
         ]);
@@ -208,7 +196,6 @@ class Index extends Component
             'code' => $this->newEntity['code'] ?: null,
             'description' => $this->newEntity['description'],
             'entity_type_id' => $this->newEntity['entity_type_id'],
-            'vsm_system_id' => $this->newEntity['vsm_system_id'] ?: null,
             'parent_entity_id' => $this->newEntity['parent_entity_id'] ?: null,
             'is_active' => $this->newEntity['is_active'],
             'team_id' => auth()->user()->currentTeam->id,

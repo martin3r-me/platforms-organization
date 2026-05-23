@@ -62,12 +62,6 @@
                             <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity->type->name }}</div>
                             <div class="text-xs text-[var(--ui-muted)]">{{ $entity->type->group->name }}</div>
                         </div>
-                        @if($entity->vsmSystem)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">VSM System</span>
-                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity->vsmSystem->name }}</div>
-                            </div>
-                        @endif
                         @if($entity->costCenter)
                             <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                                 <span class="text-xs text-[var(--ui-muted)]">Kostenstelle</span>
@@ -707,16 +701,6 @@
                                     :nullable="false"
                                     wire:model.live="form.entity_type_id"
                                     required
-                                />
-                                <x-ui-input-select
-                                    name="vsm_system_id"
-                                    label="VSM System (optional)"
-                                    :options="$this->vsmSystems"
-                                    optionValue="id"
-                                    optionLabel="name"
-                                    :nullable="true"
-                                    nullLabel="Kein VSM System"
-                                    wire:model.live="form.vsm_system_id"
                                 />
                                 <x-ui-input-select
                                     name="cost_center_id"

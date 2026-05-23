@@ -29,7 +29,6 @@ class OrganizationProcess extends Model
         'code',
         'description',
         'owner_entity_id',
-        'vsm_system_id',
         'status',
         'version',
         'is_active',
@@ -101,11 +100,6 @@ class OrganizationProcess extends Model
     public function ownerEntity(): BelongsTo
     {
         return $this->belongsTo(OrganizationEntity::class, 'owner_entity_id');
-    }
-
-    public function vsmSystem(): BelongsTo
-    {
-        return $this->belongsTo(OrganizationVsmSystem::class, 'vsm_system_id');
     }
 
     public function steps(): HasMany

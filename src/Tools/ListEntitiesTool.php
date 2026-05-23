@@ -28,7 +28,7 @@ class ListEntitiesTool implements ToolContract, ToolMetadataContract
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['team_id', 'is_active', 'entity_type_id', 'vsm_system_id', 'parent_entity_id']),
+            $this->getStandardGetSchema(['team_id', 'is_active', 'entity_type_id', 'parent_entity_id']),
             [
                 'properties' => [
                     'team_id' => [
@@ -44,17 +44,13 @@ class ListEntitiesTool implements ToolContract, ToolMetadataContract
                         'type' => 'integer',
                         'description' => 'Optional: Filter nach Entity Type ID.',
                     ],
-                    'vsm_system_id' => [
-                        'type' => 'integer',
-                        'description' => 'Optional: Filter nach VSM System ID.',
-                    ],
                     'parent_entity_id' => [
                         'type' => 'integer',
                         'description' => 'Optional: Filter nach Parent Entity ID (null = nur Root-Entities).',
                     ],
                     'include_relations' => [
                         'type' => 'boolean',
-                        'description' => 'Optional: Typ, VSM-System, Kostenstelle und Parent mitladen. Default: false.',
+                        'description' => 'Optional: Typ, Kostenstelle und Parent mitladen. Default: false.',
                     ],
                 ],
             ]
@@ -82,9 +78,6 @@ class ListEntitiesTool implements ToolContract, ToolMetadataContract
             if (array_key_exists('entity_type_id', $arguments) && $arguments['entity_type_id'] !== null) {
                 $q->where('entity_type_id', (int) $arguments['entity_type_id']);
             }
-            if (array_key_exists('vsm_system_id', $arguments) && $arguments['vsm_system_id'] !== null) {
-                $q->where('vsm_system_id', (int) $arguments['vsm_system_id']);
-            }
             if (array_key_exists('parent_entity_id', $arguments)) {
                 $pid = $arguments['parent_entity_id'];
                 if ($pid === null || $pid === '' || $pid === 'null' || $pid === 0 || $pid === '0') {
@@ -95,10 +88,10 @@ class ListEntitiesTool implements ToolContract, ToolMetadataContract
             }
 
             if (!empty($arguments['include_relations'])) {
-                $q->with(['type', 'vsmSystem', 'costCenter', 'parent']);
+                $q->with(['type', 'costCenter', 'parent']);
             }
 
-            $this->applyStandardFilters($q, $arguments, ['team_id', 'is_active', 'entity_type_id', 'vsm_system_id', 'parent_entity_id', 'created_at']);
+            $this->applyStandardFilters($q, $arguments, ['team_id', 'is_active', 'entity_type_id', 'parent_entity_id', 'created_at']);
             $this->applyStandardSearch($q, $arguments, ['name', 'code', 'description']);
             $this->applyStandardSort($q, $arguments, ['name', 'code', 'id', 'created_at'], 'name', 'asc');
 
@@ -111,7 +104,6 @@ class ListEntitiesTool implements ToolContract, ToolMetadataContract
                     'code' => $e->code,
                     'name' => $e->name,
                     'entity_type_id' => $e->entity_type_id,
-                    'vsm_system_id' => $e->vsm_system_id,
                     'cost_center_id' => $e->cost_center_id,
                     'parent_entity_id' => $e->parent_entity_id,
                     'is_active' => (bool) $e->is_active,
@@ -119,7 +111,6 @@ class ListEntitiesTool implements ToolContract, ToolMetadataContract
 
                 if ($includeRelations) {
                     $item['type_name'] = $e->type?->name;
-                    $item['vsm_system_name'] = $e->vsmSystem?->name;
                     $item['cost_center_name'] = $e->costCenter?->name;
                     $item['parent_name'] = $e->parent?->name;
                 }

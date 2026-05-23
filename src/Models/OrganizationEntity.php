@@ -23,7 +23,6 @@ class OrganizationEntity extends Model
         'linked_user_id',
         'description',
         'entity_type_id',
-        'vsm_system_id',
         'cost_center_id',
         'parent_entity_id',
         'is_active',
@@ -60,14 +59,6 @@ class OrganizationEntity extends Model
     }
 
     /**
-     * Scope für Entities nach VSM System
-     */
-    public function scopeInVsmSystem($query, $vsmSystemId)
-    {
-        return $query->where('vsm_system_id', $vsmSystemId);
-    }
-
-    /**
      * Finde Entity nach UUID
      */
     public static function findByUuid(string $uuid): ?self
@@ -80,7 +71,7 @@ class OrganizationEntity extends Model
      */
     public static function getActiveForTeam($teamId)
     {
-        return static::forTeam($teamId)->active()->with(['type', 'vsmSystem', 'parent'])->get();
+        return static::forTeam($teamId)->active()->with(['type', 'parent'])->get();
     }
 
     /**
@@ -89,14 +80,6 @@ class OrganizationEntity extends Model
     public function type()
     {
         return $this->belongsTo(OrganizationEntityType::class, 'entity_type_id');
-    }
-
-    /**
-     * Beziehung zu VSM System
-     */
-    public function vsmSystem()
-    {
-        return $this->belongsTo(OrganizationVsmSystem::class, 'vsm_system_id');
     }
 
     /**

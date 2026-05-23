@@ -13,7 +13,7 @@ class Show extends Component
 
     public function mount(OrganizationVsmSystem $vsmSystem)
     {
-        $this->vsmSystem = $vsmSystem->load('entities.type');
+        $this->vsmSystem = $vsmSystem;
         $this->loadForm();
     }
 

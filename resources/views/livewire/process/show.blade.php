@@ -326,12 +326,6 @@
                                 <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $process->ownerEntity->name }}</div>
                             </div>
                         @endif
-                        @if($process->vsmSystem)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">VSM System</span>
-                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $process->vsmSystem->name }}</div>
-                            </div>
-                        @endif
                         <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                             <span class="text-xs text-[var(--ui-muted)]">Erstellt</span>
                             <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $process->created_at->format('d.m.Y H:i') }}</div>
@@ -425,14 +419,6 @@
                                 nullable
                                 nullLabel="– Kein Owner –"
                                 wire:model.live="form.owner_entity_id"
-                            />
-                            <x-ui-input-select
-                                name="vsm_system_id"
-                                label="VSM System"
-                                :options="$this->availableVsmSystems->map(fn($v) => ['value' => (string) $v->id, 'label' => $v->name])->toArray()"
-                                nullable
-                                nullLabel="– Kein VSM System –"
-                                wire:model.live="form.vsm_system_id"
                             />
                         </div>
                         <div class="grid grid-cols-2 gap-3">
@@ -1897,7 +1883,6 @@
                 <div class="grid grid-cols-4 gap-0 mb-5">
                     @foreach([
                         ['label' => 'Owner', 'value' => $certData['process']['owner'] ?? '–'],
-                        ['label' => 'VSM System', 'value' => $certData['process']['vsm_system'] ?? '–'],
                         ['label' => 'Status', 'value' => ucfirst($certData['process']['status'])],
                         ['label' => 'Team', 'value' => $certData['process']['team'] ?? '–'],
                     ] as $meta)

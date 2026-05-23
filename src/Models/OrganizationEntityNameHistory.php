@@ -17,6 +17,9 @@ class OrganizationEntityNameHistory extends Model
         'new_name',
         'old_code',
         'new_code',
+        'old_parent_entity_id',
+        'new_parent_entity_id',
+        'change_type',
         'changed_by_user_id',
         'changed_at',
     ];
@@ -40,6 +43,16 @@ class OrganizationEntityNameHistory extends Model
     public function entity()
     {
         return $this->belongsTo(OrganizationEntity::class, 'entity_id');
+    }
+
+    public function oldParentEntity()
+    {
+        return $this->belongsTo(OrganizationEntity::class, 'old_parent_entity_id');
+    }
+
+    public function newParentEntity()
+    {
+        return $this->belongsTo(OrganizationEntity::class, 'new_parent_entity_id');
     }
 
     public function changedBy()

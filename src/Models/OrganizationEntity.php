@@ -253,6 +253,26 @@ class OrganizationEntity extends Model
     }
 
     /**
+     * Validate that setting a parent_entity_id does not create a circular hierarchy.
+     * Walks up the ancestor chain from the proposed parent; if it encounters $this->id, throws.
+     */
+    public function validateNoCircularHierarchy(int $newParentId): void
+    {
+        $visited = [$this->id];
+        $currentId = $newParentId;
+
+        while ($currentId !== null) {
+            if (in_array($currentId, $visited)) {
+                throw new \InvalidArgumentException(
+                    "Circular hierarchy detected: entity {$this->id} cannot be a child of entity {$newParentId}."
+                );
+            }
+            $visited[] = $currentId;
+            $currentId = static::where('id', $currentId)->value('parent_entity_id');
+        }
+    }
+
+    /**
      * Name/Code change history
      */
     public function nameHistory()
@@ -284,7 +304,23 @@ class OrganizationEntity extends Model
         });
 
         static::updating(function (self $model) {
-            if ($model->isDirty('name') || $model->isDirty('code')) {
+            $nameOrCodeChanged = $model->isDirty('name') || $model->isDirty('code');
+            $parentChanged = $model->isDirty('parent_entity_id');
+
+            if ($nameOrCodeChanged || $parentChanged) {
+                // Determine change_type
+                $changeType = 'rename';
+                if ($nameOrCodeChanged && $parentChanged) {
+                    $changeType = 'rename_and_move';
+                } elseif ($parentChanged) {
+                    $changeType = 'move';
+                }
+
+                // Validate hierarchy if parent changed
+                if ($parentChanged && $model->parent_entity_id !== null) {
+                    $model->validateNoCircularHierarchy($model->parent_entity_id);
+                }
+
                 OrganizationEntityNameHistory::create([
                     'team_id' => $model->team_id,
                     'entity_id' => $model->id,
@@ -292,6 +328,9 @@ class OrganizationEntity extends Model
                     'new_name' => $model->isDirty('name') ? $model->name : null,
                     'old_code' => $model->getOriginal('code'),
                     'new_code' => $model->isDirty('code') ? $model->code : null,
+                    'old_parent_entity_id' => $parentChanged ? $model->getOriginal('parent_entity_id') : null,
+                    'new_parent_entity_id' => $parentChanged ? $model->parent_entity_id : null,
+                    'change_type' => $changeType,
                     'changed_by_user_id' => auth()->id(),
                     'changed_at' => now(),
                 ]);

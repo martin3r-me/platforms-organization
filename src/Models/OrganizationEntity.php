@@ -279,7 +279,23 @@ class OrganizationEntity extends Model
     }
 
     /**
-     * Booted Event - UUID automatisch generieren
+     * Name/Code change history
+     */
+    public function nameHistory()
+    {
+        return $this->hasMany(OrganizationEntityNameHistory::class, 'entity_id');
+    }
+
+    /**
+     * Dimension links (generic dimensions framework)
+     */
+    public function dimensionLinks()
+    {
+        return $this->morphMany(OrganizationDimensionLink::class, 'linkable');
+    }
+
+    /**
+     * Booted Event - UUID automatisch generieren + Name-History tracking
      */
     protected static function booted(): void
     {
@@ -288,8 +304,23 @@ class OrganizationEntity extends Model
                 do {
                     $uuid = UuidV7::generate();
                 } while (self::where('uuid', $uuid)->exists());
-                
+
                 $model->uuid = $uuid;
+            }
+        });
+
+        static::updating(function (self $model) {
+            if ($model->isDirty('name') || $model->isDirty('code')) {
+                OrganizationEntityNameHistory::create([
+                    'team_id' => $model->team_id,
+                    'entity_id' => $model->id,
+                    'old_name' => $model->getOriginal('name'),
+                    'new_name' => $model->isDirty('name') ? $model->name : null,
+                    'old_code' => $model->getOriginal('code'),
+                    'new_code' => $model->isDirty('code') ? $model->code : null,
+                    'changed_by_user_id' => auth()->id(),
+                    'changed_at' => now(),
+                ]);
             }
         });
     }

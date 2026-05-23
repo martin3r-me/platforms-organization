@@ -16,11 +16,19 @@ class OrganizationEntityTypeGroup extends Model
         'description',
         'sort_order',
         'is_active',
+        'allow_soft_delete',
+        'allow_rename',
+        'allow_merge',
+        'allow_split',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'sort_order' => 'integer',
+        'allow_soft_delete' => 'boolean',
+        'allow_rename' => 'boolean',
+        'allow_merge' => 'boolean',
+        'allow_split' => 'boolean',
     ];
 
     /**

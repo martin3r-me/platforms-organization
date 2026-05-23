@@ -4,7 +4,9 @@ namespace Platform\Organization\Livewire\Entity;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityHierarchy;
 use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationEntityType;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -19,8 +21,11 @@ use Platform\Core\Enums\TeamRole;
 use Platform\Organization\Services\EntityTimeResolver;
 use Platform\Organization\Services\EntityLinkRegistry;
 use Platform\Organization\Services\EntityHierarchyService;
+use Platform\Organization\Services\EntityHierarchyResolver;
+use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
+use Platform\Organization\Models\OrganizationPerspective;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -36,6 +41,22 @@ class Show extends Component
     ];
 
     public ?string $movementStream = null;
+
+    #[On('perspective-switched')]
+    public function onPerspectiveSwitched(): void
+    {
+        unset(
+            $this->treeNodes,
+            $this->totalDescendantCount,
+            $this->totalLinkCount,
+        );
+    }
+
+    protected function getActivePerspective(): OrganizationPerspective
+    {
+        $user = auth()->user();
+        return PerspectiveService::getActive($user->currentTeam->id, $user->id);
+    }
 
     // Relation CRUD
     public bool $relationFormShow = false;
@@ -104,9 +125,38 @@ class Show extends Component
         ]);
 
         try {
-            $this->entity->update($this->form);
-            $this->loadForm(); // Reload form to reset dirty state
-            
+            $perspective = $this->getActivePerspective();
+            $resolver = resolve(EntityHierarchyResolver::class);
+
+            // If parent changed in a non-default perspective, update hierarchy table instead of entity column
+            $parentChanged = ($this->form['parent_entity_id'] ?? null) != $this->entity->parent_entity_id;
+            if ($parentChanged && !$resolver->isDefaultHierarchy($perspective)) {
+                $newParentId = $this->form['parent_entity_id'] ?: null;
+
+                if ($newParentId !== null) {
+                    $resolver->validateNoCircularHierarchy($this->entity->id, (int) $newParentId, $perspective);
+                }
+
+                OrganizationEntityHierarchy::updateOrCreate(
+                    [
+                        'perspective_id' => $perspective->id,
+                        'entity_id' => $this->entity->id,
+                    ],
+                    [
+                        'parent_entity_id' => $newParentId,
+                        'team_id' => $this->entity->team_id,
+                    ]
+                );
+
+                // Remove parent_entity_id from form so entity column stays unchanged
+                $formWithoutParent = $this->form;
+                unset($formWithoutParent['parent_entity_id']);
+                $this->entity->update($formWithoutParent);
+            } else {
+                $this->entity->update($this->form);
+            }
+
+            $this->loadForm();
             session()->flash('message', 'Organisationseinheit erfolgreich aktualisiert.');
         } catch (\Exception $e) {
             session()->flash('error', 'Fehler beim Speichern: ' . $e->getMessage());
@@ -417,10 +467,27 @@ class Show extends Component
     #[Computed]
     public function treeNodes(): array
     {
-        $children = $this->entity->children()
-            ->with('type')
-            ->orderBy('name')
-            ->get();
+        $perspective = $this->getActivePerspective();
+        $resolver = resolve(EntityHierarchyResolver::class);
+
+        if (!$resolver->isDefaultHierarchy($perspective)) {
+            $childMap = $resolver->getChildMap($perspective, $this->entity->team_id);
+            $childIds = $childMap[$this->entity->id] ?? [];
+
+            if (empty($childIds)) {
+                return [];
+            }
+
+            $children = OrganizationEntity::whereIn('id', $childIds)
+                ->with('type')
+                ->orderBy('name')
+                ->get();
+        } else {
+            $children = $this->entity->children()
+                ->with('type')
+                ->orderBy('name')
+                ->get();
+        }
 
         if ($children->isEmpty()) {
             return [];
@@ -593,6 +660,39 @@ class Show extends Component
         ];
     }
 
+    #[Computed]
+    public function childrenHealthSummary(): ?array
+    {
+        $children = $this->entity->children;
+        if ($children->isEmpty()) {
+            return null;
+        }
+
+        $childIds = $children->pluck('id')->toArray();
+        $service = resolve(SnapshotMovementService::class);
+        $batch = $service->forEntitiesBatch($childIds, 7);
+
+        $counts = ['progressing' => 0, 'completed' => 0, 'stalled' => 0, 'at_risk' => 0];
+        foreach ($childIds as $id) {
+            $data = $batch[$id] ?? null;
+            if (!$data) {
+                $counts['progressing']++;
+                continue;
+            }
+            if ($data['score'] > 0) {
+                $counts['progressing']++;
+            } elseif ($data['score'] == 0 && $data['delta_count'] == 0) {
+                $counts['stalled']++;
+            } elseif ($data['score'] < 0) {
+                $counts['at_risk']++;
+            } else {
+                $counts['progressing']++;
+            }
+        }
+
+        return $counts;
+    }
+
     protected function classifyHealth(int $itemsTotal, int $itemsDone, int $agoItemsTotal, int $agoItemsDone): string
     {
         if ($itemsDone >= $itemsTotal && $itemsTotal > 0) {
@@ -717,11 +817,28 @@ class Show extends Component
 
     public function loadChildNodes(int $entityId): array
     {
-        $entity = OrganizationEntity::findOrFail($entityId);
-        $children = $entity->children()
-            ->with('type')
-            ->orderBy('name')
-            ->get();
+        $perspective = $this->getActivePerspective();
+        $resolver = resolve(EntityHierarchyResolver::class);
+
+        if (!$resolver->isDefaultHierarchy($perspective)) {
+            $childMap = $resolver->getChildMap($perspective, $this->entity->team_id);
+            $childIds = $childMap[$entityId] ?? [];
+
+            if (empty($childIds)) {
+                return [];
+            }
+
+            $children = OrganizationEntity::whereIn('id', $childIds)
+                ->with('type')
+                ->orderBy('name')
+                ->get();
+        } else {
+            $entity = OrganizationEntity::findOrFail($entityId);
+            $children = $entity->children()
+                ->with('type')
+                ->orderBy('name')
+                ->get();
+        }
 
         if ($children->isEmpty()) {
             return [];
@@ -856,7 +973,8 @@ class Show extends Component
      */
     protected function getAllDescendantMap(array $rootIds): array
     {
-        return resolve(EntityHierarchyService::class)->getAllDescendantMap($rootIds);
+        $perspective = $this->getActivePerspective();
+        return resolve(EntityHierarchyService::class)->getAllDescendantMap($rootIds, $perspective);
     }
 
     protected function getEntityLinkCountsForIds(array $entityIds): array
@@ -887,6 +1005,19 @@ class Show extends Component
     {
         if (empty($entityIds)) {
             return [];
+        }
+
+        $perspective = $this->getActivePerspective();
+        $resolver = resolve(EntityHierarchyResolver::class);
+
+        if (!$resolver->isDefaultHierarchy($perspective)) {
+            return OrganizationEntityHierarchy::query()
+                ->where('perspective_id', $perspective->id)
+                ->whereIn('parent_entity_id', $entityIds)
+                ->select('parent_entity_id', DB::raw('COUNT(*) as cnt'))
+                ->groupBy('parent_entity_id')
+                ->pluck('cnt', 'parent_entity_id')
+                ->toArray();
         }
 
         return OrganizationEntity::query()
@@ -1051,8 +1182,16 @@ class Show extends Component
             ->orderBy('name')
             ->get();
 
-        // Group by parent_entity_id
-        $byParent = $allEntities->groupBy('parent_entity_id');
+        // Group by parent - perspective-aware
+        $perspective = $this->getActivePerspective();
+        $resolver = resolve(EntityHierarchyResolver::class);
+
+        if (!$resolver->isDefaultHierarchy($perspective)) {
+            $parentMap = $resolver->getParentMap($perspective, $this->entity->team_id);
+            $byParent = $allEntities->groupBy(fn ($e) => $parentMap[$e->id] ?? 'root');
+        } else {
+            $byParent = $allEntities->groupBy('parent_entity_id');
+        }
 
         // Build nodes for each parent group using batch approach
         $result = [];

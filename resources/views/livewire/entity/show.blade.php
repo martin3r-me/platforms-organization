@@ -103,7 +103,7 @@
         @endif
 
         <div class="space-y-6">
-            {{-- Hero Card --}}
+            {{-- ═══ Block A: Hero Card — Header + Stats + Health Banner ═══ --}}
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                 <div class="flex items-start justify-between mb-6">
                     <div>
@@ -161,17 +161,146 @@
                     </div>
                 </div>
 
-                {{-- Movement Summary (7d, kompakt) --}}
-                @php $mv = $this->movement; @endphp
-                @if(!empty($mv['metrics']))
+                {{-- Health Banner --}}
+                @php $analysis = $this->snapshotAnalysis; @endphp
+                @if(!empty($analysis))
                     @php
-                        $nonZero = collect($mv['metrics'])->filter(fn($m) => $m['delta'] != 0)->take(5);
+                        $healthConfig = [
+                            'progressing' => [
+                                'gradient' => 'from-green-50 to-emerald-50',
+                                'border' => 'border-green-200',
+                                'icon' => 'heroicon-o-arrow-trending-up',
+                                'label' => 'Fortschreitend',
+                                'ringColor' => 'text-green-500',
+                                'textColor' => 'text-green-700',
+                            ],
+                            'stalled' => [
+                                'gradient' => 'from-amber-50 to-yellow-50',
+                                'border' => 'border-amber-200',
+                                'icon' => 'heroicon-o-pause-circle',
+                                'label' => 'Stagnierend',
+                                'ringColor' => 'text-amber-500',
+                                'textColor' => 'text-amber-700',
+                            ],
+                            'at_risk' => [
+                                'gradient' => 'from-red-50 to-rose-50',
+                                'border' => 'border-red-200',
+                                'icon' => 'heroicon-o-exclamation-triangle',
+                                'label' => 'Gefährdet',
+                                'ringColor' => 'text-red-500',
+                                'textColor' => 'text-red-700',
+                            ],
+                            'completed' => [
+                                'gradient' => 'from-blue-50 to-indigo-50',
+                                'border' => 'border-blue-200',
+                                'icon' => 'heroicon-o-check-circle',
+                                'label' => 'Abgeschlossen',
+                                'ringColor' => 'text-blue-500',
+                                'textColor' => 'text-blue-700',
+                            ],
+                        ];
+                        $hc = $healthConfig[$analysis['health_status']] ?? $healthConfig['progressing'];
+                        $pct = (int) $analysis['completion_rate'];
+                    @endphp
+                    <div class="mt-6 rounded-lg bg-gradient-to-r {{ $hc['gradient'] }} border {{ $hc['border'] }} p-4">
+                        <div class="flex items-center gap-4">
+                            {{-- Completion Ring --}}
+                            <div class="flex-shrink-0">
+                                <svg viewBox="0 0 36 36" class="w-14 h-14">
+                                    <path stroke="currentColor" class="text-gray-200" stroke-width="3" fill="none"
+                                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                    <path stroke="currentColor" class="{{ $hc['ringColor'] }}" stroke-width="3" fill="none"
+                                        stroke-dasharray="{{ $pct }}, 100" stroke-linecap="round"
+                                        d="M18 2.0845 a 15.9155 15.9155 0 0 1 0 31.831 a 15.9155 15.9155 0 0 1 0 -31.831"/>
+                                    <text x="18" y="20.5" text-anchor="middle" class="fill-current {{ $hc['textColor'] }}"
+                                        style="font-size: 8px; font-weight: 700;">{{ $pct }}%</text>
+                                </svg>
+                            </div>
+
+                            {{-- Status + KPIs --}}
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-1">
+                                    @svg($hc['icon'], 'w-4 h-4 ' . $hc['textColor'])
+                                    <span class="text-sm font-semibold {{ $hc['textColor'] }}">{{ $hc['label'] }}</span>
+                                </div>
+                                <div class="flex items-center gap-4 text-xs text-[var(--ui-muted)] flex-wrap">
+                                    <span>{{ $analysis['items_done'] }}/{{ $analysis['items_total'] }} Items</span>
+                                    <span>Velocity {{ $analysis['velocity_daily_avg'] }}/Tag</span>
+                                    @if($analysis['estimated_days_remaining'] !== null)
+                                        <span>~{{ $analysis['estimated_days_remaining'] }}d Restlaufzeit</span>
+                                    @endif
+                                    @if($analysis['billing_rate'] > 0)
+                                        <span>{{ $analysis['billing_rate'] }}% abgerechnet</span>
+                                    @endif
+                                </div>
+
+                                {{-- Insight Statements (compact) --}}
+                                @if(!empty($analysis['insights']))
+                                    <div class="mt-2 flex items-center gap-3 text-[11px] flex-wrap">
+                                        @foreach($analysis['insights'] as $insight)
+                                            <span class="@if($insight['type'] === 'success') text-green-700 @elseif($insight['type'] === 'warning') text-amber-700 @else text-[var(--ui-muted)] @endif">
+                                                @if($insight['type'] === 'success')
+                                                    @svg('heroicon-o-arrow-trending-up', 'w-3 h-3 inline-block -mt-0.5 mr-0.5')
+                                                @elseif($insight['type'] === 'warning')
+                                                    @svg('heroicon-o-exclamation-triangle', 'w-3 h-3 inline-block -mt-0.5 mr-0.5')
+                                                @else
+                                                    @svg('heroicon-o-information-circle', 'w-3 h-3 inline-block -mt-0.5 mr-0.5')
+                                                @endif
+                                                {{ $insight['text'] }}
+                                            </span>
+                                        @endforeach
+                                    </div>
+                                @endif
+
+                                {{-- Children Health Summary --}}
+                                @php $childrenHealth = $this->childrenHealthSummary; @endphp
+                                @if($childrenHealth)
+                                    @php
+                                        $totalChildren = array_sum($childrenHealth);
+                                        $parts = [];
+                                        if ($childrenHealth['progressing'] > 0) $parts[] = $childrenHealth['progressing'] . ' fortschreitend';
+                                        if ($childrenHealth['completed'] > 0) $parts[] = $childrenHealth['completed'] . ' abgeschlossen';
+                                        if ($childrenHealth['stalled'] > 0) $parts[] = $childrenHealth['stalled'] . ' stagnierend';
+                                        if ($childrenHealth['at_risk'] > 0) $parts[] = $childrenHealth['at_risk'] . ' gefährdet';
+                                    @endphp
+                                    <div class="mt-1.5 text-[11px] text-[var(--ui-muted)]">
+                                        <span class="mr-0.5">&darr;</span> {{ $totalChildren }} Untereinheit{{ $totalChildren !== 1 ? 'en' : '' }}: {{ implode(' · ', $parts) }}
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
+            </div>
+
+            {{-- ═══ Block B: Bewegung (7 Tage) ═══ --}}
+            @php $movement = $this->movement; @endphp
+            @if(!empty($movement['metrics']))
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-sm font-semibold text-[var(--ui-secondary)]">Bewegung (7 Tage)</h2>
+                        <div class="flex gap-1">
+                            <button wire:click="$set('movementStream', null)"
+                                class="px-2 py-1 text-[10px] rounded transition-colors {{ !$movementStream ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]' }}">
+                                Alle
+                            </button>
+                            @foreach($this->availableStreams as $stream)
+                                <button wire:click="$set('movementStream', '{{ $stream }}')"
+                                    class="px-2 py-1 text-[10px] rounded transition-colors {{ $movementStream === $stream ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]' }}">
+                                    {{ ucfirst($stream) }}
+                                </button>
+                            @endforeach
+                        </div>
+                    </div>
+
+                    {{-- Compact Delta Badges (top 5 non-zero) --}}
+                    @php
+                        $nonZero = collect($movement['metrics'])->filter(fn($m) => $m['delta'] != 0)->take(5);
                     @endphp
                     @if($nonZero->isNotEmpty())
-                        <div class="mt-3 flex items-center gap-2 flex-wrap">
-                            <span class="text-[10px] text-[var(--ui-muted)] font-medium">7d:</span>
+                        <div class="flex items-center gap-2 flex-wrap mb-4">
                             @foreach($nonZero as $m)
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[10px] font-medium
+                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
                                     {{ $m['sentiment'] === 'positive' ? 'bg-green-50 text-green-700 border border-green-200' : '' }}
                                     {{ $m['sentiment'] === 'negative' ? 'bg-red-50 text-red-700 border border-red-200' : '' }}
                                     {{ $m['sentiment'] === 'neutral' ? 'bg-gray-50 text-gray-600 border border-gray-200' : '' }}
@@ -181,108 +310,12 @@
                             @endforeach
                         </div>
                     @endif
-                @endif
 
-                {{-- Snapshot Analysis --}}
-                @php $analysis = $this->snapshotAnalysis; @endphp
-                @if(!empty($analysis))
-                    {{-- Health Status Badge + Snapshot KPIs --}}
-                    <div class="mt-6 pt-6 border-t border-[var(--ui-border)]/40">
-                        <div class="flex items-center justify-between mb-4">
-                            <span class="text-xs font-medium text-[var(--ui-muted)]">Snapshot-Analyse</span>
-                            @php
-                                $healthLabels = [
-                                    'progressing' => ['Fortschreitend', 'success'],
-                                    'completed' => ['Abgeschlossen', 'info'],
-                                    'stalled' => ['Stagnierend', 'warning'],
-                                    'at_risk' => ['Gefährdet', 'danger'],
-                                ];
-                                [$healthLabel, $healthVariant] = $healthLabels[$analysis['health_status']] ?? ['—', 'secondary'];
-                            @endphp
-                            <x-ui-badge :variant="$healthVariant" size="sm">{{ $healthLabel }}</x-ui-badge>
-                        </div>
-
-                        {{-- Snapshot KPI Grid --}}
-                        <div class="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
-                            <div class="py-2.5 px-3 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 text-center">
-                                <div class="text-lg font-bold text-[var(--ui-secondary)]">
-                                    {{ $analysis['completion_rate'] }}%
-                                    @if($analysis['trend_completion'] > 0)
-                                        <span class="text-xs text-green-600 font-medium ml-1">+{{ $analysis['trend_completion'] }}%</span>
-                                    @elseif($analysis['trend_completion'] < 0)
-                                        <span class="text-xs text-red-600 font-medium ml-1">{{ $analysis['trend_completion'] }}%</span>
-                                    @endif
-                                </div>
-                                <div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Fortschritt</div>
-                            </div>
-                            <div class="py-2.5 px-3 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 text-center">
-                                <div class="text-lg font-bold text-[var(--ui-secondary)]">{{ $analysis['items_completed_7d'] }}</div>
-                                <div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Items erledigt (7d)</div>
-                            </div>
-                            <div class="py-2.5 px-3 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 text-center">
-                                <div class="text-lg font-bold text-[var(--ui-secondary)]">
-                                    {{ $analysis['estimated_days_remaining'] !== null ? $analysis['estimated_days_remaining'] . ' Tage' : '—' }}
-                                </div>
-                                <div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Geschätzte Restlaufzeit</div>
-                            </div>
-                            <div class="py-2.5 px-3 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 text-center">
-                                <div class="text-lg font-bold text-[var(--ui-secondary)]">
-                                    {{ $analysis['billing_rate'] }}%
-                                    @if($analysis['trend_billing'] > 0)
-                                        <span class="text-xs text-green-600 font-medium ml-1">+{{ $analysis['trend_billing'] }}%</span>
-                                    @elseif($analysis['trend_billing'] < 0)
-                                        <span class="text-xs text-red-600 font-medium ml-1">{{ $analysis['trend_billing'] }}%</span>
-                                    @endif
-                                </div>
-                                <div class="text-[10px] text-[var(--ui-muted)] mt-0.5">Abrechnungsquote</div>
-                            </div>
-                        </div>
-
-                        {{-- Insight Statements --}}
-                        @if(!empty($analysis['insights']))
-                            <div class="space-y-1 mb-4">
-                                @foreach($analysis['insights'] as $insight)
-                                    <p class="text-xs
-                                        @if($insight['type'] === 'success') text-green-700
-                                        @elseif($insight['type'] === 'warning') text-amber-700
-                                        @else text-[var(--ui-muted)]
-                                        @endif
-                                    ">
-                                        @if($insight['type'] === 'success')
-                                            @svg('heroicon-o-arrow-trending-up', 'w-3.5 h-3.5 inline-block -mt-0.5 mr-0.5')
-                                        @elseif($insight['type'] === 'warning')
-                                            @svg('heroicon-o-exclamation-triangle', 'w-3.5 h-3.5 inline-block -mt-0.5 mr-0.5')
-                                        @else
-                                            @svg('heroicon-o-information-circle', 'w-3.5 h-3.5 inline-block -mt-0.5 mr-0.5')
-                                        @endif
-                                        {{ $insight['text'] }}
-                                    </p>
-                                @endforeach
-                            </div>
-                        @endif
-                    </div>
-                @endif
-
-                {{-- Bewegung (7 Tage) --}}
-                @php $movement = $this->movement; @endphp
-                @if(!empty($movement['metrics']))
-                    <div class="mt-6 pt-6 border-t border-[var(--ui-border)]/40">
-                        <div class="flex items-center justify-between mb-4">
-                            <span class="text-xs font-medium text-[var(--ui-muted)]">Bewegung (7 Tage)</span>
-                            <div class="flex gap-1">
-                                <button wire:click="$set('movementStream', null)"
-                                    class="px-2 py-1 text-[10px] rounded transition-colors {{ !$movementStream ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]' }}">
-                                    Alle
-                                </button>
-                                @foreach($this->availableStreams as $stream)
-                                    <button wire:click="$set('movementStream', '{{ $stream }}')"
-                                        class="px-2 py-1 text-[10px] rounded transition-colors {{ $movementStream === $stream ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]' }}">
-                                        {{ ucfirst($stream) }}
-                                    </button>
-                                @endforeach
-                            </div>
-                        </div>
-
+                    {{-- Full Metric Grid (shown when stream filter active or many metrics) --}}
+                    @php
+                        $totalMetrics = collect($movement['metrics'])->filter(fn($m) => $m['current'] > 0 || $m['previous'] > 0)->count();
+                    @endphp
+                    @if($movementStream || $totalMetrics > 5)
                         @foreach($movement['metrics_by_group'] as $groupKey => $metrics)
                             <div class="mb-3">
                                 <div class="text-[10px] font-medium text-[var(--ui-muted)] uppercase mb-1.5">
@@ -314,16 +347,44 @@
                                 </div>
                             </div>
                         @endforeach
-                    </div>
-                @endif
+                    @endif
+                </div>
+            @endif
 
-                {{-- Snapshot Trend (14 Tage) --}}
-                @php $trend = $this->snapshotTrend; @endphp
-                @if(!empty($trend) && count($trend['snapshots'] ?? []) >= 1)
-                    <div class="mt-6 pt-6 border-t border-[var(--ui-border)]/40">
-                        <div class="flex items-center justify-between mb-4">
-                            <span class="text-xs font-medium text-[var(--ui-muted)]">Trend (14 Tage)</span>
-                            <div class="flex items-center gap-3">
+            {{-- ═══ Block C: Trends (14d + 12 Monate) ═══ --}}
+            @php
+                $trend = $this->snapshotTrend;
+                $monthlyData = $this->monthlyTimeData;
+                $chartMonths = $monthlyData['months'] ?? [];
+                $monthlyMax = $monthlyData['max_minutes'] ?? 0;
+                $hasTrend = !empty($trend) && count($trend['snapshots'] ?? []) >= 1;
+                $hasMonthly = $monthlyMax > 0;
+            @endphp
+            @if($hasTrend || $hasMonthly)
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6"
+                     x-data="{ trendTab: '{{ $hasTrend ? '14d' : '12m' }}' }">
+                    {{-- Tab Header --}}
+                    <div class="flex items-center gap-4 mb-4 border-b border-[var(--ui-border)]/40 -mx-6 px-6 pb-3">
+                        @if($hasTrend)
+                            <button @click="trendTab = '14d'"
+                                class="text-sm font-medium transition-colors pb-1"
+                                :class="trendTab === '14d' ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]'">
+                                14 Tage
+                            </button>
+                        @endif
+                        @if($hasMonthly)
+                            <button @click="trendTab = '12m'"
+                                class="text-sm font-medium transition-colors pb-1"
+                                :class="trendTab === '12m' ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]'">
+                                12 Monate
+                            </button>
+                        @endif
+                    </div>
+
+                    {{-- Tab: 14 Tage --}}
+                    @if($hasTrend)
+                        <div x-show="trendTab === '14d'" x-cloak>
+                            <div class="flex items-center justify-end gap-3 mb-3">
                                 <div class="flex items-center gap-1.5">
                                     <span class="w-2 h-2 rounded-full bg-blue-500"></span>
                                     <span class="text-[10px] text-[var(--ui-muted)]">Items erledigt</span>
@@ -337,70 +398,57 @@
                                     <span class="text-[10px] text-[var(--ui-muted)]">Stunden</span>
                                 </div>
                             </div>
-                        </div>
-                        <div class="flex items-end gap-1" style="height: 160px;" x-data="{ tooltip: null }">
-                            @foreach($trend['snapshots'] as $idx => $snap)
-                                @php
-                                    $maxItems = max($trend['max_items_total'], 1);
-                                    $maxMin = max($trend['max_minutes'], 1);
-                                    $totalH = round(($snap['items_total'] / $maxItems) * 130);
-                                    $doneH = $snap['items_total'] > 0 ? max(1, round(($snap['items_done'] / $maxItems) * 130)) : 0;
-                                    $timeH = $snap['time_total_minutes'] > 0 ? max(2, round(($snap['time_total_minutes'] / $maxMin) * 130)) : 0;
-                                @endphp
-                                <div class="flex-1 flex flex-col items-center h-full justify-end gap-px relative"
-                                     @mouseenter="tooltip = {{ $idx }}"
-                                     @mouseleave="tooltip = null">
-                                    {{-- Tooltip --}}
-                                    <div x-show="tooltip === {{ $idx }}" x-cloak
-                                         class="absolute bottom-full mb-2 px-2.5 py-1.5 rounded-lg bg-[var(--ui-secondary)] text-white text-[10px] whitespace-nowrap z-10 shadow-lg pointer-events-none"
-                                         x-transition.opacity>
-                                        {{ $snap['date'] }} {{ $snap['period'] }}: {{ $snap['items_done'] }}/{{ $snap['items_total'] }} Items,
-                                        {{ intdiv($snap['time_total_minutes'], 60) }}:{{ str_pad($snap['time_total_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h
-                                    </div>
-                                    <div class="w-full flex gap-px justify-center flex-1 items-end">
-                                        {{-- Items bar --}}
-                                        <div class="flex-1 flex flex-col justify-end">
-                                            @if($snap['items_total'] > 0)
-                                                <div class="w-full bg-blue-200 rounded-t" style="height: {{ $totalH }}px;">
-                                                    <div class="w-full bg-blue-500 rounded-t" style="height: {{ $doneH }}px;"></div>
-                                                </div>
-                                            @else
-                                                <div class="w-full bg-[var(--ui-border)]/20 rounded-t" style="height: 1px;"></div>
-                                            @endif
+                            <div class="flex items-end gap-1" style="height: 160px;" x-data="{ tooltip: null }">
+                                @foreach($trend['snapshots'] as $idx => $snap)
+                                    @php
+                                        $maxItems = max($trend['max_items_total'], 1);
+                                        $maxMin = max($trend['max_minutes'], 1);
+                                        $totalH = round(($snap['items_total'] / $maxItems) * 130);
+                                        $doneH = $snap['items_total'] > 0 ? max(1, round(($snap['items_done'] / $maxItems) * 130)) : 0;
+                                        $timeH = $snap['time_total_minutes'] > 0 ? max(2, round(($snap['time_total_minutes'] / $maxMin) * 130)) : 0;
+                                    @endphp
+                                    <div class="flex-1 flex flex-col items-center h-full justify-end gap-px relative"
+                                         @mouseenter="tooltip = {{ $idx }}"
+                                         @mouseleave="tooltip = null">
+                                        <div x-show="tooltip === {{ $idx }}" x-cloak
+                                             class="absolute bottom-full mb-2 px-2.5 py-1.5 rounded-lg bg-[var(--ui-secondary)] text-white text-[10px] whitespace-nowrap z-10 shadow-lg pointer-events-none"
+                                             x-transition.opacity>
+                                            {{ $snap['date'] }} {{ $snap['period'] }}: {{ $snap['items_done'] }}/{{ $snap['items_total'] }} Items,
+                                            {{ intdiv($snap['time_total_minutes'], 60) }}:{{ str_pad($snap['time_total_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h
                                         </div>
-                                        {{-- Time bar --}}
-                                        <div class="flex-1 flex flex-col justify-end">
-                                            @if($snap['time_total_minutes'] > 0)
-                                                <div class="w-full bg-violet-400 rounded-t" style="height: {{ $timeH }}px;"></div>
-                                            @else
-                                                <div class="w-full bg-[var(--ui-border)]/20 rounded-t" style="height: 1px;"></div>
-                                            @endif
+                                        <div class="w-full flex gap-px justify-center flex-1 items-end">
+                                            <div class="flex-1 flex flex-col justify-end">
+                                                @if($snap['items_total'] > 0)
+                                                    <div class="w-full bg-blue-200 rounded-t" style="height: {{ $totalH }}px;">
+                                                        <div class="w-full bg-blue-500 rounded-t" style="height: {{ $doneH }}px;"></div>
+                                                    </div>
+                                                @else
+                                                    <div class="w-full bg-[var(--ui-border)]/20 rounded-t" style="height: 1px;"></div>
+                                                @endif
+                                            </div>
+                                            <div class="flex-1 flex flex-col justify-end">
+                                                @if($snap['time_total_minutes'] > 0)
+                                                    <div class="w-full bg-violet-400 rounded-t" style="height: {{ $timeH }}px;"></div>
+                                                @else
+                                                    <div class="w-full bg-[var(--ui-border)]/20 rounded-t" style="height: 1px;"></div>
+                                                @endif
+                                            </div>
                                         </div>
+                                        @if($idx === 0 || $idx === count($trend['snapshots']) - 1 || $idx % 4 === 0)
+                                            <div class="text-[9px] text-[var(--ui-muted)] mt-0.5 leading-none">{{ $snap['date'] }}</div>
+                                        @else
+                                            <div class="h-[11px]"></div>
+                                        @endif
                                     </div>
-                                    @if($idx === 0 || $idx === count($trend['snapshots']) - 1 || $idx % 4 === 0)
-                                        <div class="text-[9px] text-[var(--ui-muted)] mt-0.5 leading-none">{{ $snap['date'] }}</div>
-                                    @else
-                                        <div class="h-[11px]"></div>
-                                    @endif
-                                </div>
-                            @endforeach
+                                @endforeach
+                            </div>
                         </div>
-                    </div>
-                @endif
+                    @endif
 
-                {{-- Monthly Time Chart --}}
-                @php
-                    $monthlyData = $this->monthlyTimeData;
-                    $chartMonths = $monthlyData['months'] ?? [];
-                    $maxMin = $monthlyData['max_minutes'] ?? 0;
-                @endphp
-                @if($maxMin > 0)
-                    <div class="mt-6 pt-6 border-t border-[var(--ui-border)]/40"
-                         x-data="{ tooltip: null }">
-                        {{-- Header with legend --}}
-                        <div class="flex items-center justify-between mb-4">
-                            <span class="text-xs font-medium text-[var(--ui-muted)]">Zeitverlauf (12 Monate)</span>
-                            <div class="flex items-center gap-3">
+                    {{-- Tab: 12 Monate --}}
+                    @if($hasMonthly)
+                        <div x-show="trendTab === '12m'" x-cloak x-data="{ tooltip: null }">
+                            <div class="flex items-center justify-end gap-3 mb-3">
                                 <div class="flex items-center gap-1.5">
                                     <span class="w-2 h-2 rounded-full bg-green-500"></span>
                                     <span class="text-[10px] text-[var(--ui-muted)]">abgerechnet</span>
@@ -410,60 +458,51 @@
                                     <span class="text-[10px] text-[var(--ui-muted)]">offen</span>
                                 </div>
                             </div>
-                        </div>
-
-                        {{-- Bars --}}
-                        <div class="flex items-end gap-1.5" style="height: 136px;">
-                            @foreach($chartMonths as $idx => $m)
-                                <div class="flex-1 flex flex-col items-center h-full relative"
-                                     @mouseenter="tooltip = {{ $idx }}"
-                                     @mouseleave="tooltip = null">
-                                    {{-- Tooltip --}}
-                                    <div x-show="tooltip === {{ $idx }}" x-cloak
-                                         class="absolute bottom-full mb-2 px-2.5 py-1.5 rounded-lg bg-[var(--ui-secondary)] text-white text-[10px] whitespace-nowrap z-10 shadow-lg pointer-events-none"
-                                         x-transition.opacity>
-                                        {{ $m['label'] }} {{ $m['year'] }}:
-                                        {{ intdiv($m['total_minutes'], 60) }}:{{ str_pad($m['total_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h
-                                        ({{ intdiv($m['billed_minutes'], 60) }}:{{ str_pad($m['billed_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h abgerechnet,
-                                        {{ intdiv($m['open_minutes'], 60) }}:{{ str_pad($m['open_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h offen)
+                            <div class="flex items-end gap-1.5" style="height: 136px;">
+                                @foreach($chartMonths as $idx => $m)
+                                    <div class="flex-1 flex flex-col items-center h-full relative"
+                                         @mouseenter="tooltip = {{ $idx }}"
+                                         @mouseleave="tooltip = null">
+                                        <div x-show="tooltip === {{ $idx }}" x-cloak
+                                             class="absolute bottom-full mb-2 px-2.5 py-1.5 rounded-lg bg-[var(--ui-secondary)] text-white text-[10px] whitespace-nowrap z-10 shadow-lg pointer-events-none"
+                                             x-transition.opacity>
+                                            {{ $m['label'] }} {{ $m['year'] }}:
+                                            {{ intdiv($m['total_minutes'], 60) }}:{{ str_pad($m['total_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h
+                                            ({{ intdiv($m['billed_minutes'], 60) }}:{{ str_pad($m['billed_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h abgerechnet,
+                                            {{ intdiv($m['open_minutes'], 60) }}:{{ str_pad($m['open_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h offen)
+                                        </div>
+                                        <div class="w-full flex flex-col justify-end flex-1 rounded-t overflow-hidden">
+                                            @if($m['total_minutes'] > 0)
+                                                @php
+                                                    $barHeight = round(($m['total_minutes'] / $monthlyMax) * 120);
+                                                    $billedHeight = $m['billed_minutes'] > 0 ? max(2, round(($m['billed_minutes'] / $monthlyMax) * 120)) : 0;
+                                                    $openHeight = $m['open_minutes'] > 0 ? max(2, $barHeight - $billedHeight) : 0;
+                                                    if ($billedHeight + $openHeight > $barHeight && $barHeight > 4) {
+                                                        $billedHeight = $barHeight - $openHeight;
+                                                    }
+                                                @endphp
+                                                <div class="w-full flex flex-col justify-end mt-auto">
+                                                    @if($m['open_minutes'] > 0)
+                                                        <div class="w-full bg-amber-400 rounded-t" style="height: {{ $openHeight }}px;"></div>
+                                                    @endif
+                                                    @if($m['billed_minutes'] > 0)
+                                                        <div class="w-full bg-green-500 {{ $m['open_minutes'] <= 0 ? 'rounded-t' : '' }}" style="height: {{ $billedHeight }}px;"></div>
+                                                    @endif
+                                                </div>
+                                            @else
+                                                <div class="w-full mt-auto">
+                                                    <div class="w-full bg-[var(--ui-border)]/20 rounded-t" style="height: 1px;"></div>
+                                                </div>
+                                            @endif
+                                        </div>
+                                        <div class="text-[10px] text-[var(--ui-muted)] mt-1 leading-none">{{ $m['label'] }}</div>
                                     </div>
-
-                                    {{-- Bar stack --}}
-                                    <div class="w-full flex flex-col justify-end flex-1 rounded-t overflow-hidden">
-                                        @if($m['total_minutes'] > 0)
-                                            @php
-                                                $barHeight = round(($m['total_minutes'] / $maxMin) * 120);
-                                                $billedHeight = $m['billed_minutes'] > 0 ? max(2, round(($m['billed_minutes'] / $maxMin) * 120)) : 0;
-                                                $openHeight = $m['open_minutes'] > 0 ? max(2, $barHeight - $billedHeight) : 0;
-                                                if ($billedHeight + $openHeight > $barHeight && $barHeight > 4) {
-                                                    // Adjust if min-heights pushed total over
-                                                    $billedHeight = $barHeight - $openHeight;
-                                                }
-                                            @endphp
-                                            <div class="w-full flex flex-col justify-end mt-auto">
-                                                @if($m['open_minutes'] > 0)
-                                                    <div class="w-full bg-amber-400 rounded-t" style="height: {{ $openHeight }}px;"></div>
-                                                @endif
-                                                @if($m['billed_minutes'] > 0)
-                                                    <div class="w-full bg-green-500 {{ $m['open_minutes'] <= 0 ? 'rounded-t' : '' }}" style="height: {{ $billedHeight }}px;"></div>
-                                                @endif
-                                            </div>
-                                        @else
-                                            {{-- Empty month: thin track --}}
-                                            <div class="w-full mt-auto">
-                                                <div class="w-full bg-[var(--ui-border)]/20 rounded-t" style="height: 1px;"></div>
-                                            </div>
-                                        @endif
-                                    </div>
-
-                                    {{-- Month label --}}
-                                    <div class="text-[10px] text-[var(--ui-muted)] mt-1 leading-none">{{ $m['label'] }}</div>
-                                </div>
-                            @endforeach
+                                @endforeach
+                            </div>
                         </div>
-                    </div>
-                @endif
-            </div>
+                    @endif
+                </div>
+            @endif
 
             {{-- Tab Navigation --}}
             <div x-data="{ tab: @entangle('activeTab') }">

@@ -4,9 +4,12 @@ namespace Platform\Organization\Livewire\Entity;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntityTypeGroup;
+use Platform\Organization\Services\EntityHierarchyResolver;
+use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
 
 class Index extends Component
@@ -52,9 +55,25 @@ class Index extends Component
         $this->showInactive = !$this->showInactive;
     }
 
+    #[On('perspective-switched')]
+    public function onPerspectiveSwitched(): void
+    {
+        unset($this->entities, $this->stats, $this->parentEntities, $this->entityMovements);
+    }
+
+    protected function getActivePerspective()
+    {
+        $user = auth()->user();
+        return PerspectiveService::getActive($user->currentTeam->id, $user->id);
+    }
+
     #[Computed]
     public function entities()
     {
+        $teamId = auth()->user()->currentTeam->id;
+        $perspective = $this->getActivePerspective();
+        $resolver = resolve(EntityHierarchyResolver::class);
+
         $query = OrganizationEntity::query()
             ->with([
                 'type.group',
@@ -66,7 +85,13 @@ class Index extends Component
                 'relationsTo.relationType',
                 'relationsTo.fromEntity.type'
             ])
-            ->forTeam(auth()->user()->currentTeam->id);
+            ->forTeam($teamId);
+
+        // Non-default perspective: restrict to entities in this perspective
+        if (!$resolver->isDefaultHierarchy($perspective)) {
+            $perspectiveEntityIds = $resolver->entityIdsInPerspective($perspective, $teamId);
+            $query->whereIn('id', $perspectiveEntityIds);
+        }
 
         // Suche
         if ($this->search) {
@@ -94,16 +119,29 @@ class Index extends Component
         }
 
         $entities = $query->orderBy('name')->get();
-        
-        // Gruppiere: Zuerst Root-Entities (ohne parent), dann nach Entity-Typ
-        $rootEntities = $entities->whereNull('parent_entity_id')->sortBy('name');
-        $childEntities = $entities->whereNotNull('parent_entity_id')->sortBy('name');
-        
+
+        // Determine root/child split based on perspective
+        if (!$resolver->isDefaultHierarchy($perspective)) {
+            $parentMap = $resolver->getParentMap($perspective, $teamId);
+            $entityIds = $entities->pluck('id')->toArray();
+
+            $rootEntities = $entities->filter(function ($e) use ($parentMap) {
+                return ($parentMap[$e->id] ?? null) === null;
+            })->sortBy('name');
+
+            $childEntities = $entities->filter(function ($e) use ($parentMap) {
+                return ($parentMap[$e->id] ?? null) !== null;
+            })->sortBy('name');
+        } else {
+            $rootEntities = $entities->whereNull('parent_entity_id')->sortBy('name');
+            $childEntities = $entities->whereNotNull('parent_entity_id')->sortBy('name');
+        }
+
         // Gruppiere Child-Entities nach Entity-Typ und sortiere nach Typ-Name
         $groupedByType = $childEntities->groupBy('entity_type_id')->sortBy(function ($group) {
             return $group->first()->type->name ?? '';
         });
-        
+
         return [
             'root' => $rootEntities,
             'byType' => $groupedByType,
@@ -131,11 +169,21 @@ class Index extends Component
     #[Computed]
     public function parentEntities()
     {
-        return OrganizationEntity::active()
-            ->forTeam(auth()->user()->currentTeam->id)
+        $teamId = auth()->user()->currentTeam->id;
+        $perspective = $this->getActivePerspective();
+        $resolver = resolve(EntityHierarchyResolver::class);
+
+        $query = OrganizationEntity::active()
+            ->forTeam($teamId)
             ->with('type')
-            ->orderBy('name')
-            ->get();
+            ->orderBy('name');
+
+        if (!$resolver->isDefaultHierarchy($perspective)) {
+            $ids = $resolver->entityIdsInPerspective($perspective, $teamId);
+            $query->whereIn('id', $ids);
+        }
+
+        return $query->get();
     }
 
     #[Computed]
@@ -154,15 +202,23 @@ class Index extends Component
     public function stats()
     {
         $teamId = auth()->user()->currentTeam->id;
-        
+        $perspective = $this->getActivePerspective();
+        $resolver = resolve(EntityHierarchyResolver::class);
+
+        $baseQuery = OrganizationEntity::forTeam($teamId);
+        if (!$resolver->isDefaultHierarchy($perspective)) {
+            $ids = $resolver->entityIdsInPerspective($perspective, $teamId);
+            $baseQuery->whereIn('id', $ids);
+        }
+
+        $all = (clone $baseQuery)->get();
+
         return [
-            'total' => OrganizationEntity::forTeam($teamId)->count(),
-            'active' => OrganizationEntity::forTeam($teamId)->active()->count(),
-            'inactive' => OrganizationEntity::forTeam($teamId)->where('is_active', false)->count(),
-            'by_type' => OrganizationEntity::forTeam($teamId)
-                ->active()
-                ->with('type')
-                ->get()
+            'total' => $all->count(),
+            'active' => $all->where('is_active', true)->count(),
+            'inactive' => $all->where('is_active', false)->count(),
+            'by_type' => $all->where('is_active', true)
+                ->load('type')
                 ->groupBy('type.name')
                 ->map->count(),
         ];

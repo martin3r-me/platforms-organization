@@ -4,13 +4,16 @@ namespace Platform\Organization\Livewire;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationTimeEntry;
+use Platform\Organization\Services\EntityHierarchyResolver;
 use Platform\Organization\Services\EntityLinkRegistry;
 use Platform\Organization\Services\PersonActivityRegistry;
+use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
@@ -19,6 +22,23 @@ use Carbon\Carbon;
 class Dashboard extends Component
 {
     public ?string $dashboardStream = null;
+
+    #[On('perspective-switched')]
+    public function onPerspectiveSwitched(): void
+    {
+        unset(
+            $this->teamSnapshotSummary,
+            $this->teamMovement,
+            $this->entityHealthOverview,
+            $this->teamTimeAnalytics,
+            $this->completionVelocity,
+            $this->teamSnapshotTrend,
+            $this->linkTypeDistribution,
+            $this->topEntitiesByActivity,
+            $this->personOverview,
+            $this->insightStatements,
+        );
+    }
 
     public function getTeamId(): ?int
     {
@@ -50,7 +70,12 @@ class Dashboard extends Component
         if (!$teamId) {
             return 0;
         }
-        return (int) OrganizationEntity::forTeam($teamId)->whereNull('parent_entity_id')->count();
+
+        $user = auth()->user();
+        $perspective = PerspectiveService::getActive($teamId, $user->id);
+        $resolver = resolve(EntityHierarchyResolver::class);
+
+        return count($resolver->getRootIds($perspective, $teamId));
     }
 
     public function getLeafEntitiesProperty(): int

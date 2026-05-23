@@ -4,6 +4,7 @@ namespace Platform\Organization\Livewire\Entity;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
 use Platform\Organization\Models\OrganizationEntity;
@@ -11,13 +12,22 @@ use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationTeamSnapshot;
+use Platform\Organization\Services\EntityHierarchyResolver;
 use Platform\Organization\Services\EntityLinkRegistry;
+use Platform\Organization\Services\PerspectiveService;
 
 class Mindmap extends Component
 {
     public OrganizationEntity $entity;
 
     public ?string $snapshotDate = null;
+
+    #[On('perspective-switched')]
+    public function onPerspectiveSwitched(): void
+    {
+        unset($this->graphData);
+        $this->dispatch('graph-data-updated', data: $this->graphData);
+    }
 
     public function updatedSnapshotDate(): void
     {
@@ -289,19 +299,36 @@ class Mindmap extends Component
 
     protected function graphDataLive(): array
     {
-        $entities = OrganizationEntity::forTeam($this->entity->team_id)
+        $user = auth()->user();
+        $teamId = $this->entity->team_id;
+        $perspective = PerspectiveService::getActive($teamId, $user->id);
+        $resolver = resolve(EntityHierarchyResolver::class);
+
+        $query = OrganizationEntity::forTeam($teamId)
             ->active()
-            ->with([
-                'type.group',
-            ])
-            ->get();
+            ->with(['type.group']);
+
+        // Filter entities by perspective
+        if (!$resolver->isDefaultHierarchy($perspective)) {
+            $perspectiveEntityIds = $resolver->entityIdsInPerspective($perspective, $teamId);
+            $query->whereIn('id', $perspectiveEntityIds);
+        }
+
+        $entities = $query->get();
 
         $nodes = [];
         $links = [];
 
-        // Build depth map and parent set from hierarchy
-        $depthMap = $this->buildDepthMap($entities);
-        $parentIds = $entities->pluck('parent_entity_id')->filter()->unique()->flip();
+        // Build depth map and parent set from hierarchy — perspective-aware
+        if (!$resolver->isDefaultHierarchy($perspective)) {
+            $parentMap = $resolver->getParentMap($perspective, $teamId);
+            $depthMap = $this->buildDepthMapFromParentMap($parentMap);
+            $parentIds = collect($parentMap)->filter()->unique()->flip();
+        } else {
+            $depthMap = $this->buildDepthMap($entities);
+            $parentIds = $entities->pluck('parent_entity_id')->filter()->unique()->flip();
+            $parentMap = null;
+        }
 
         // Latest snapshots
         $latestSnapshots = OrganizationEntitySnapshot::query()
@@ -319,6 +346,11 @@ class Mindmap extends Component
             $snap = $latestSnapshots[$e->id] ?? null;
             $metrics = $snap?->metrics ?? [];
             $depth = $depthMap[$e->id] ?? 0;
+
+            // Resolve parent for this entity — perspective-aware
+            $entityParentId = $parentMap !== null
+                ? ($parentMap[$e->id] ?? null)
+                : $e->parent_entity_id;
 
             // Scale val by depth: root=12, depth1=8, depth2=5, depth3+=4
             $baseVal = match(true) {
@@ -338,7 +370,7 @@ class Mindmap extends Component
                 'name'     => $e->name,
                 'group'    => $groupName,
                 'category' => 'entity',
-                'parentId' => $e->parent_entity_id ? 'e' . $e->parent_entity_id : null,
+                'parentId' => $entityParentId ? 'e' . $entityParentId : null,
                 'color'    => $color,
                 'val'      => $baseVal,
                 'depth'    => $depth,
@@ -359,9 +391,9 @@ class Mindmap extends Component
                 ],
             ];
 
-            if ($e->parent_entity_id) {
+            if ($entityParentId) {
                 $links[] = [
-                    'source' => 'e' . $e->parent_entity_id,
+                    'source' => 'e' . $entityParentId,
                     'target' => 'e' . $e->id,
                     'color'  => 'rgba(156,163,175,0.35)',
                     'width'  => 1,
@@ -510,10 +542,18 @@ class Mindmap extends Component
             $parentMap[$e->id] = $e->parent_entity_id;
         }
 
+        return $this->buildDepthMapFromParentMap($parentMap);
+    }
+
+    /**
+     * Build depth map from an arbitrary parent map (perspective-aware).
+     */
+    protected function buildDepthMapFromParentMap(array $parentMap): array
+    {
         $depths = [];
-        foreach ($entities as $e) {
+        foreach ($parentMap as $id => $parentId) {
             $depth = 0;
-            $current = $e->id;
+            $current = $id;
             $visited = [];
             while (isset($parentMap[$current]) && $parentMap[$current] !== null) {
                 if (in_array($current, $visited)) break; // cycle guard
@@ -521,7 +561,7 @@ class Mindmap extends Component
                 $current = $parentMap[$current];
                 $depth++;
             }
-            $depths[$e->id] = $depth;
+            $depths[$id] = $depth;
         }
 
         return $depths;

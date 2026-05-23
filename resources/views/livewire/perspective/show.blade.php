@@ -92,6 +92,13 @@
                     </div>
                 </div>
             </div>
+
+            @unless($perspective->is_default)
+                <div class="mt-6">
+                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Hierarchie-Editor</h2>
+                    <livewire:organization.perspective.hierarchy-editor :perspective="$perspective" />
+                </div>
+            @endunless
         </div>
     </x-ui-page-container>
 </x-ui-page>

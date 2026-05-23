@@ -20,6 +20,7 @@ class PerspectiveSwitcher extends Component
     public function mount(): void
     {
         $this->loadCurrentPerspective();
+        $this->loadPerspectives();
     }
 
     #[On('open-perspective-switcher')]

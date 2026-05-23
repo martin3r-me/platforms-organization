@@ -4,9 +4,11 @@ namespace Platform\Organization\Livewire\Entity;
 
 use Livewire\Component;
 use Livewire\Attributes\Computed;
+use Livewire\Attributes\On;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntityTypeGroup;
+use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
 
 class Index extends Component
@@ -32,6 +34,12 @@ class Index extends Component
         'showInactive' => ['except' => false],
     ];
 
+    #[On('perspective-switched')]
+    public function onPerspectiveSwitched(): void
+    {
+        unset($this->entities, $this->stats);
+    }
+
     public function updatingSearch()
     {
         // Reset search without pagination
@@ -55,18 +63,28 @@ class Index extends Component
     #[Computed]
     public function entities()
     {
+        $teamId = auth()->user()->currentTeam->id;
+
         $query = OrganizationEntity::query()
             ->with([
                 'type.group',
-                'parent', 
-                'team', 
-                'user', 
+                'parent',
+                'team',
+                'user',
                 'relationsFrom.relationType',
                 'relationsFrom.toEntity.type',
                 'relationsTo.relationType',
                 'relationsTo.fromEntity.type'
             ])
-            ->forTeam(auth()->user()->currentTeam->id);
+            ->forTeam($teamId);
+
+        // Perspektiv-Filter: Nicht-Standard-Perspektive schränkt auf verknüpfte Entities ein
+        $perspective = PerspectiveService::getActive($teamId, auth()->id());
+        if (!$perspective->is_default) {
+            $service = new PerspectiveService();
+            $entityIds = $service->entitiesInView($perspective)->pluck('id');
+            $query->whereIn('id', $entityIds);
+        }
 
         // Suche
         if ($this->search) {

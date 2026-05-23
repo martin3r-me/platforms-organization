@@ -2,7 +2,12 @@
 <div>
     {{-- Modul Header --}}
     <x-sidebar-module-header module-name="Organization" />
-    
+
+    {{-- Perspective Switcher --}}
+    <div x-show="!collapsed">
+        @livewire('organization.perspective-switcher')
+    </div>
+
     {{-- Abschnitt: Allgemein --}}
     <div>
         <h4 x-show="!collapsed" class="px-4 py-3 text-xs tracking-wide font-semibold text-[color:var(--ui-muted)] uppercase">Allgemein</h4>
@@ -180,6 +185,20 @@
             <span x-show="!collapsed" class="truncate">Kostenstellen</span>
         </a>
 
+
+        {{-- Perspektiven --}}
+        <a href="{{ route('organization.perspectives.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/perspectives')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-eye class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Perspektiven</span>
+        </a>
 
         {{-- VSM Systeme --}}
         <a href="{{ route('organization.vsm-systems.index') }}"

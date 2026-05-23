@@ -8,6 +8,8 @@ use Platform\Organization\Livewire\CostCenter\Index as CostCenterIndex;
 use Platform\Organization\Livewire\CostCenter\Show as CostCenterShow;
 use Platform\Organization\Livewire\VsmSystem\Index as VsmSystemIndex;
 use Platform\Organization\Livewire\VsmSystem\Show as VsmSystemShow;
+use Platform\Organization\Livewire\Perspective\Index as PerspectiveIndex;
+use Platform\Organization\Livewire\Perspective\Show as PerspectiveShow;
 use Platform\Organization\Livewire\Settings\EntityType\Index as EntityTypeIndex;
 use Platform\Organization\Livewire\Settings\EntityType\Show as EntityTypeShow;
 use Platform\Organization\Livewire\Settings\EntityTypeGroup\Index as EntityTypeGroupIndex;
@@ -45,6 +47,10 @@ Route::get('/cost-centers/{costCenter}', CostCenterShow::class)->name('organizat
 // Dimensionen: VSM Systeme
 Route::get('/vsm-systems', VsmSystemIndex::class)->name('organization.vsm-systems.index');
 Route::get('/vsm-systems/{vsmSystem}', VsmSystemShow::class)->name('organization.vsm-systems.show');
+
+// Dimensionen: Perspektiven
+Route::get('/perspectives', PerspectiveIndex::class)->name('organization.perspectives.index');
+Route::get('/perspectives/{perspective}', PerspectiveShow::class)->name('organization.perspectives.show');
 
 // Settings: Entity Types
 Route::get('/settings/entity-types', EntityTypeIndex::class)->name('organization.settings.entity-types.index');

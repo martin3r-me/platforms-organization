@@ -83,7 +83,7 @@ class EntityMovementTool implements ToolContract, ToolMetadataContract
                 if ($debug) {
                     $snap = OrganizationEntitySnapshot::where('entity_id', $entity->id)
                         ->orderByDesc('snapshot_date')
-                        ->orderByRaw("FIELD(snapshot_period, 'evening', 'morning') DESC")
+                        ->orderByRaw("FIELD(snapshot_period, 'morning', 'evening') DESC")
                         ->first();
                     $personKeys = array_filter(
                         array_keys($snap->metrics ?? []),

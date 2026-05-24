@@ -550,6 +550,18 @@
                                 Person
                             </button>
                         @endif
+                        @if($this->isPersonEntity)
+                            <button
+                                @click="tab = 'skills'"
+                                :class="tab === 'skills'
+                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
+                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                                class="px-4 py-2.5 text-sm transition-colors"
+                            >
+                                @svg('heroicon-o-academic-cap', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
+                                Skills
+                            </button>
+                        @endif
                     </nav>
                 </div>
 
@@ -928,6 +940,160 @@
                 @if($this->hasLinkedUser)
                     <div x-show="tab === 'person'" x-cloak>
                         <livewire:organization.entity.person-activity :entity="$entity" :key="'person-activity-'.$entity->id" />
+                    </div>
+                @endif
+
+                {{-- Tab: Skills --}}
+                @if($this->isPersonEntity)
+                    <div x-show="tab === 'skills'" x-cloak>
+                        <div class="space-y-6">
+                            {{-- Skills --}}
+                            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4 flex items-center gap-2">
+                                    @svg('heroicon-o-academic-cap', 'w-4 h-4 text-[var(--ui-primary)]')
+                                    Skills
+                                    <span class="text-xs font-normal text-[var(--ui-muted)]">({{ $this->entitySkills->count() }})</span>
+                                </h3>
+
+                                {{-- Zugeordnete Skills --}}
+                                @if($this->entitySkills->isNotEmpty())
+                                    <table class="w-full text-sm mb-4">
+                                        <thead>
+                                            <tr class="text-xs text-[var(--ui-muted)] uppercase">
+                                                <th class="text-left py-1 px-2">Name</th>
+                                                <th class="text-left py-1 px-2">Kategorie</th>
+                                                <th class="text-left py-1 px-2">Level</th>
+                                                <th class="text-left py-1 px-2">Zertifiziert am</th>
+                                                <th class="text-left py-1 px-2">Notizen</th>
+                                                <th class="py-1 px-2"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($this->entitySkills as $skill)
+                                                <tr class="border-t border-[var(--ui-border)]" wire:key="entity-skill-{{ $skill->id }}">
+                                                    <td class="py-2 px-2 font-medium text-[var(--ui-secondary)]">{{ $skill->name }}</td>
+                                                    <td class="py-2 px-2">
+                                                        <x-ui-badge variant="secondary" size="sm">{{ ucfirst($skill->category) }}</x-ui-badge>
+                                                    </td>
+                                                    <td class="py-2 px-2">
+                                                        <select
+                                                            wire:change="updatePersonSkillLevel({{ $skill->id }}, $event.target.value)"
+                                                            class="rounded-md border-gray-300 shadow-sm text-xs py-1 px-2"
+                                                        >
+                                                            <option value="basic" {{ $skill->pivot->level === 'basic' ? 'selected' : '' }}>Basic</option>
+                                                            <option value="advanced" {{ $skill->pivot->level === 'advanced' ? 'selected' : '' }}>Advanced</option>
+                                                            <option value="expert" {{ $skill->pivot->level === 'expert' ? 'selected' : '' }}>Expert</option>
+                                                        </select>
+                                                    </td>
+                                                    <td class="py-2 px-2 text-xs text-[var(--ui-muted)]">
+                                                        {{ $skill->pivot->certified_at ? \Carbon\Carbon::parse($skill->pivot->certified_at)->format('d.m.Y') : '—' }}
+                                                    </td>
+                                                    <td class="py-2 px-2 text-xs text-[var(--ui-muted)]">
+                                                        {{ $skill->pivot->notes ?? '—' }}
+                                                    </td>
+                                                    <td class="py-2 px-2 text-right">
+                                                        <button wire:click="removePersonSkill({{ $skill->id }})" wire:confirm="Skill-Zuordnung entfernen?" class="text-red-500 hover:text-red-700 p-1">
+                                                            @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                @endif
+
+                                {{-- Autocomplete --}}
+                                <div class="relative">
+                                    <input type="text" wire:model.live.debounce.300ms="personSkillSearch"
+                                        placeholder="Skill aus Katalog hinzufügen..."
+                                        class="w-full rounded-md border-gray-300 shadow-sm text-sm" />
+                                    @if($personSkillSearch && $this->availablePersonSkills->isNotEmpty())
+                                        <div class="absolute z-10 w-full mt-1 bg-white rounded-lg border border-[var(--ui-border)] shadow-lg max-h-48 overflow-y-auto">
+                                            @foreach($this->availablePersonSkills as $s)
+                                                <button type="button" wire:click="assignPersonSkill({{ $s->id }}, 'basic')"
+                                                    class="w-full text-left px-4 py-2 text-sm hover:bg-[var(--ui-muted-5)] transition-colors flex items-center gap-2">
+                                                    <span class="font-medium text-[var(--ui-secondary)]">{{ $s->name }}</span>
+                                                    <x-ui-badge variant="secondary" size="sm">{{ ucfirst($s->category) }}</x-ui-badge>
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    @elseif($personSkillSearch && $this->availablePersonSkills->isEmpty())
+                                        <div class="absolute z-10 w-full mt-1 bg-white rounded-lg border border-[var(--ui-border)] shadow-lg px-4 py-3">
+                                            <span class="text-sm text-[var(--ui-muted)]">Keine Skills gefunden.</span>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+
+                            {{-- Soft Skills --}}
+                            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4 flex items-center gap-2">
+                                    @svg('heroicon-o-heart', 'w-4 h-4 text-[var(--ui-primary)]')
+                                    Soft Skills
+                                    <span class="text-xs font-normal text-[var(--ui-muted)]">({{ $this->entitySoftSkills->count() }})</span>
+                                </h3>
+
+                                {{-- Zugeordnete Soft Skills --}}
+                                @if($this->entitySoftSkills->isNotEmpty())
+                                    <table class="w-full text-sm mb-4">
+                                        <thead>
+                                            <tr class="text-xs text-[var(--ui-muted)] uppercase">
+                                                <th class="text-left py-1 px-2">Name</th>
+                                                <th class="text-left py-1 px-2">Level</th>
+                                                <th class="text-left py-1 px-2">Notizen</th>
+                                                <th class="py-1 px-2"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            @foreach($this->entitySoftSkills as $softSkill)
+                                                <tr class="border-t border-[var(--ui-border)]" wire:key="entity-soft-skill-{{ $softSkill->id }}">
+                                                    <td class="py-2 px-2 font-medium text-[var(--ui-secondary)]">{{ $softSkill->name }}</td>
+                                                    <td class="py-2 px-2">
+                                                        <select
+                                                            wire:change="updatePersonSoftSkillLevel({{ $softSkill->id }}, $event.target.value)"
+                                                            class="rounded-md border-gray-300 shadow-sm text-xs py-1 px-2"
+                                                        >
+                                                            <option value="basic" {{ $softSkill->pivot->level === 'basic' ? 'selected' : '' }}>Basic</option>
+                                                            <option value="advanced" {{ $softSkill->pivot->level === 'advanced' ? 'selected' : '' }}>Advanced</option>
+                                                            <option value="expert" {{ $softSkill->pivot->level === 'expert' ? 'selected' : '' }}>Expert</option>
+                                                        </select>
+                                                    </td>
+                                                    <td class="py-2 px-2 text-xs text-[var(--ui-muted)]">
+                                                        {{ $softSkill->pivot->notes ?? '—' }}
+                                                    </td>
+                                                    <td class="py-2 px-2 text-right">
+                                                        <button wire:click="removePersonSoftSkill({{ $softSkill->id }})" wire:confirm="Soft-Skill-Zuordnung entfernen?" class="text-red-500 hover:text-red-700 p-1">
+                                                            @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                                        </button>
+                                                    </td>
+                                                </tr>
+                                            @endforeach
+                                        </tbody>
+                                    </table>
+                                @endif
+
+                                {{-- Autocomplete --}}
+                                <div class="relative">
+                                    <input type="text" wire:model.live.debounce.300ms="personSoftSkillSearch"
+                                        placeholder="Soft Skill aus Katalog hinzufügen..."
+                                        class="w-full rounded-md border-gray-300 shadow-sm text-sm" />
+                                    @if($personSoftSkillSearch && $this->availablePersonSoftSkills->isNotEmpty())
+                                        <div class="absolute z-10 w-full mt-1 bg-white rounded-lg border border-[var(--ui-border)] shadow-lg max-h-48 overflow-y-auto">
+                                            @foreach($this->availablePersonSoftSkills as $ss)
+                                                <button type="button" wire:click="assignPersonSoftSkill({{ $ss->id }}, 'basic')"
+                                                    class="w-full text-left px-4 py-2 text-sm hover:bg-[var(--ui-muted-5)] transition-colors flex items-center gap-2">
+                                                    <span class="font-medium text-[var(--ui-secondary)]">{{ $ss->name }}</span>
+                                                </button>
+                                            @endforeach
+                                        </div>
+                                    @elseif($personSoftSkillSearch && $this->availablePersonSoftSkills->isEmpty())
+                                        <div class="absolute z-10 w-full mt-1 bg-white rounded-lg border border-[var(--ui-border)] shadow-lg px-4 py-3">
+                                            <span class="text-sm text-[var(--ui-muted)]">Keine Soft Skills gefunden.</span>
+                                        </div>
+                                    @endif
+                                </div>
+                            </div>
+                        </div>
                     </div>
                 @endif
             </div>

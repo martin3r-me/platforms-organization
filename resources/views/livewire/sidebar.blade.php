@@ -163,6 +163,20 @@
             <x-heroicon-o-user-group class="w-6 h-6 flex-shrink-0"/>
             <span x-show="!collapsed" class="truncate">Rollen</span>
         </a>
+
+        {{-- Skills --}}
+        <a href="{{ route('organization.skills.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/skills')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-academic-cap class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Skills</span>
+        </a>
     </div>
 
     {{-- Abschnitt: Dimensionen --}}

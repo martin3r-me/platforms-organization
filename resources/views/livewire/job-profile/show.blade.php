@@ -179,10 +179,120 @@
                 <x-ui-input-textarea name="purpose" wire:model.live="form.purpose" rows="3" placeholder="Warum existiert diese Rolle? Welchen Wert schafft sie?" />
             </div>
 
-            {{-- Kompetenzen (Skills) --}}
+            {{-- Kompetenzen (Katalog) --}}
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Kompetenzen</h2>
+                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Kompetenzen (Katalog)</h2>
+                </div>
+
+                {{-- Zugeordnete Skills --}}
+                @if($this->structuredSkills->isNotEmpty())
+                    <div class="space-y-2 mb-4">
+                        @foreach($this->structuredSkills as $skill)
+                            <div class="flex items-center gap-2 py-1.5 px-3 bg-[var(--ui-muted-5)] rounded-lg" wire:key="structured-skill-{{ $skill->id }}">
+                                <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $skill->name }}</span>
+                                <x-ui-badge variant="secondary" size="sm">{{ ucfirst($skill->category) }}</x-ui-badge>
+                                <x-ui-badge variant="{{ $skill->pivot->level === 'expert' ? 'success' : ($skill->pivot->level === 'advanced' ? 'info' : 'muted') }}" size="sm">
+                                    {{ ucfirst($skill->pivot->level) }}
+                                </x-ui-badge>
+                                @if($skill->pivot->is_required)
+                                    <x-ui-badge variant="danger" size="sm">Pflicht</x-ui-badge>
+                                @endif
+                                <button type="button" wire:click="removeStructuredSkill({{ $skill->id }})" class="ml-auto text-red-500 hover:text-red-700 p-1">
+                                    @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                </button>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                {{-- Autocomplete-Suche --}}
+                <div class="relative">
+                    <input type="text" wire:model.live.debounce.300ms="skillSearch" placeholder="Skill aus Katalog suchen..."
+                        class="w-full rounded-md border-gray-300 shadow-sm text-sm" />
+                    @if($skillSearch && $this->availableSkills->isNotEmpty())
+                        <div class="absolute z-10 w-full mt-1 bg-white rounded-lg border border-[var(--ui-border)] shadow-lg max-h-48 overflow-y-auto">
+                            @foreach($this->availableSkills as $s)
+                                <button type="button" wire:click="addStructuredSkill({{ $s->id }}, 'expert', true)"
+                                    class="w-full text-left px-4 py-2 text-sm hover:bg-[var(--ui-muted-5)] transition-colors flex items-center gap-2">
+                                    <span class="font-medium text-[var(--ui-secondary)]">{{ $s->name }}</span>
+                                    <x-ui-badge variant="secondary" size="sm">{{ ucfirst($s->category) }}</x-ui-badge>
+                                    @if($s->description)
+                                        <span class="text-xs text-[var(--ui-muted)] truncate">{{ $s->description }}</span>
+                                    @endif
+                                </button>
+                            @endforeach
+                        </div>
+                    @elseif($skillSearch && $this->availableSkills->isEmpty())
+                        <div class="absolute z-10 w-full mt-1 bg-white rounded-lg border border-[var(--ui-border)] shadow-lg px-4 py-3">
+                            <span class="text-sm text-[var(--ui-muted)]">Keine Skills gefunden.</span>
+                        </div>
+                    @endif
+                </div>
+
+                @if($this->structuredSkills->isEmpty() && empty($skillSearch))
+                    <p class="text-sm text-[var(--ui-muted)] mt-2">Keine Katalog-Skills zugeordnet.</p>
+                @endif
+            </div>
+
+            {{-- Soft Skills (Katalog) --}}
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Soft Skills (Katalog)</h2>
+                </div>
+
+                {{-- Zugeordnete Soft Skills --}}
+                @if($this->structuredSoftSkills->isNotEmpty())
+                    <div class="space-y-2 mb-4">
+                        @foreach($this->structuredSoftSkills as $softSkill)
+                            <div class="flex items-center gap-2 py-1.5 px-3 bg-[var(--ui-muted-5)] rounded-lg" wire:key="structured-soft-skill-{{ $softSkill->id }}">
+                                <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $softSkill->name }}</span>
+                                <x-ui-badge variant="{{ $softSkill->pivot->level === 'expert' ? 'success' : ($softSkill->pivot->level === 'advanced' ? 'info' : 'muted') }}" size="sm">
+                                    {{ ucfirst($softSkill->pivot->level) }}
+                                </x-ui-badge>
+                                @if($softSkill->pivot->is_required)
+                                    <x-ui-badge variant="danger" size="sm">Pflicht</x-ui-badge>
+                                @endif
+                                <button type="button" wire:click="removeStructuredSoftSkill({{ $softSkill->id }})" class="ml-auto text-red-500 hover:text-red-700 p-1">
+                                    @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                </button>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+
+                {{-- Autocomplete-Suche --}}
+                <div class="relative">
+                    <input type="text" wire:model.live.debounce.300ms="softSkillSearch" placeholder="Soft Skill aus Katalog suchen..."
+                        class="w-full rounded-md border-gray-300 shadow-sm text-sm" />
+                    @if($softSkillSearch && $this->availableSoftSkills->isNotEmpty())
+                        <div class="absolute z-10 w-full mt-1 bg-white rounded-lg border border-[var(--ui-border)] shadow-lg max-h-48 overflow-y-auto">
+                            @foreach($this->availableSoftSkills as $ss)
+                                <button type="button" wire:click="addStructuredSoftSkill({{ $ss->id }}, 'expert', true)"
+                                    class="w-full text-left px-4 py-2 text-sm hover:bg-[var(--ui-muted-5)] transition-colors flex items-center gap-2">
+                                    <span class="font-medium text-[var(--ui-secondary)]">{{ $ss->name }}</span>
+                                    @if($ss->description)
+                                        <span class="text-xs text-[var(--ui-muted)] truncate">{{ $ss->description }}</span>
+                                    @endif
+                                </button>
+                            @endforeach
+                        </div>
+                    @elseif($softSkillSearch && $this->availableSoftSkills->isEmpty())
+                        <div class="absolute z-10 w-full mt-1 bg-white rounded-lg border border-[var(--ui-border)] shadow-lg px-4 py-3">
+                            <span class="text-sm text-[var(--ui-muted)]">Keine Soft Skills gefunden.</span>
+                        </div>
+                    @endif
+                </div>
+
+                @if($this->structuredSoftSkills->isEmpty() && empty($softSkillSearch))
+                    <p class="text-sm text-[var(--ui-muted)] mt-2">Keine Katalog-Soft-Skills zugeordnet.</p>
+                @endif
+            </div>
+
+            {{-- Kompetenzen (Freitext / Legacy) --}}
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Kompetenzen (Freitext)</h2>
                     <x-ui-button size="xs" variant="secondary-outline" wire:click="addSkill">
                         @svg('heroicon-o-plus', 'w-3.5 h-3.5') Hinzufügen
                     </x-ui-button>
@@ -211,14 +321,14 @@
                         @endforeach
                     </div>
                 @else
-                    <p class="text-sm text-[var(--ui-muted)]">Keine Kompetenzen definiert.</p>
+                    <p class="text-sm text-[var(--ui-muted)]">Keine Freitext-Kompetenzen definiert.</p>
                 @endif
             </div>
 
-            {{-- Soft Skills --}}
+            {{-- Soft Skills (Freitext / Legacy) --}}
             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                 <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Soft Skills</h2>
+                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Soft Skills (Freitext)</h2>
                     <x-ui-button size="xs" variant="secondary-outline" wire:click="addSoftSkill">
                         @svg('heroicon-o-plus', 'w-3.5 h-3.5') Hinzufügen
                     </x-ui-button>
@@ -242,7 +352,7 @@
                         @endforeach
                     </div>
                 @else
-                    <p class="text-sm text-[var(--ui-muted)]">Keine Soft Skills definiert.</p>
+                    <p class="text-sm text-[var(--ui-muted)]">Keine Freitext-Soft-Skills definiert.</p>
                 @endif
             </div>
 

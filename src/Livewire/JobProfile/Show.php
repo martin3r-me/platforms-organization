@@ -8,12 +8,17 @@ use Livewire\Component;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationJobProfile;
 use Platform\Organization\Models\OrganizationPersonJobProfile;
+use Platform\Organization\Models\OrganizationSkill;
+use Platform\Organization\Models\OrganizationSoftSkill;
 
 class Show extends Component
 {
     public OrganizationJobProfile $jobProfile;
 
     public array $form = [];
+
+    public string $skillSearch = '';
+    public string $softSkillSearch = '';
 
     public array $assignForm = [
         'person_entity_id' => '',
@@ -296,6 +301,100 @@ class Show extends Component
             ->where('is_active', true)
             ->orderBy('name')
             ->get();
+    }
+
+    // --- Structured Skills (Katalog) ---
+
+    #[Computed]
+    public function structuredSkills()
+    {
+        return $this->jobProfile->skillRecords()->orderBy('sort_order')->get();
+    }
+
+    #[Computed]
+    public function structuredSoftSkills()
+    {
+        return $this->jobProfile->softSkillRecords()->orderBy('sort_order')->get();
+    }
+
+    #[Computed]
+    public function availableSkills()
+    {
+        if (strlen($this->skillSearch) < 1) {
+            return collect();
+        }
+
+        $existingIds = $this->jobProfile->skillRecords()->pluck('organization_skills.id')->toArray();
+
+        return OrganizationSkill::forTeam(Auth::user()->currentTeam->id)
+            ->active()
+            ->where('name', 'like', '%' . $this->skillSearch . '%')
+            ->whereNotIn('id', $existingIds)
+            ->orderBy('name')
+            ->limit(10)
+            ->get();
+    }
+
+    #[Computed]
+    public function availableSoftSkills()
+    {
+        if (strlen($this->softSkillSearch) < 1) {
+            return collect();
+        }
+
+        $existingIds = $this->jobProfile->softSkillRecords()->pluck('organization_soft_skills.id')->toArray();
+
+        return OrganizationSoftSkill::forTeam(Auth::user()->currentTeam->id)
+            ->active()
+            ->where('name', 'like', '%' . $this->softSkillSearch . '%')
+            ->whereNotIn('id', $existingIds)
+            ->orderBy('name')
+            ->limit(10)
+            ->get();
+    }
+
+    public function addStructuredSkill(int $skillId, string $level = 'expert', bool $isRequired = true): void
+    {
+        $this->jobProfile->skillRecords()->syncWithoutDetaching([
+            $skillId => [
+                'level' => $level,
+                'is_required' => $isRequired,
+                'sort_order' => $this->jobProfile->skillRecords()->count(),
+            ],
+        ]);
+
+        $this->skillSearch = '';
+        unset($this->structuredSkills, $this->availableSkills);
+        $this->dispatch('toast', message: 'Skill hinzugefügt');
+    }
+
+    public function removeStructuredSkill(int $skillId): void
+    {
+        $this->jobProfile->skillRecords()->detach($skillId);
+        unset($this->structuredSkills);
+        $this->dispatch('toast', message: 'Skill entfernt');
+    }
+
+    public function addStructuredSoftSkill(int $softSkillId, string $level = 'expert', bool $isRequired = true): void
+    {
+        $this->jobProfile->softSkillRecords()->syncWithoutDetaching([
+            $softSkillId => [
+                'level' => $level,
+                'is_required' => $isRequired,
+                'sort_order' => $this->jobProfile->softSkillRecords()->count(),
+            ],
+        ]);
+
+        $this->softSkillSearch = '';
+        unset($this->structuredSoftSkills, $this->availableSoftSkills);
+        $this->dispatch('toast', message: 'Soft Skill hinzugefügt');
+    }
+
+    public function removeStructuredSoftSkill(int $softSkillId): void
+    {
+        $this->jobProfile->softSkillRecords()->detach($softSkillId);
+        unset($this->structuredSoftSkills);
+        $this->dispatch('toast', message: 'Soft Skill entfernt');
     }
 
     #[Computed]

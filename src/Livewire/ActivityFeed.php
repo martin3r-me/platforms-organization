@@ -7,7 +7,7 @@ use Livewire\Attributes\Computed;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Platform\ActivityLog\Models\ActivityLogActivity;
 use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationEntityLink;
+use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\EntityLinkRegistry;
 
@@ -79,8 +79,8 @@ class ActivityFeed extends Component
             // Entity-spezifisch
             $pairs[$this->getMorphKey(OrganizationEntity::class)][] = $this->entityId;
 
-            // Verknüpfte Models über entity_links (linkable_type IST bereits der Morph-Alias)
-            $links = OrganizationEntityLink::where('entity_id', $this->entityId)->get();
+            // Verknüpfte Models über dimension_links (entity dimension)
+            $links = EntityDimensionBridge::linksForEntity($this->entityId);
             foreach ($links as $link) {
                 $fqcn = $morphMap[$link->linkable_type] ?? $link->linkable_type;
                 if (class_exists($fqcn)) {
@@ -101,8 +101,8 @@ class ActivityFeed extends Component
                 $pairs[$this->getMorphKey(OrganizationEntity::class)] = $teamEntityIds;
             }
 
-            // Alle verknüpften Models über entity_links dieses Teams
-            $links = OrganizationEntityLink::whereIn('entity_id', $teamEntityIds)->get();
+            // Alle verknüpften Models über dimension_links dieses Teams
+            $links = EntityDimensionBridge::linksForEntities($teamEntityIds);
             foreach ($links as $link) {
                 $fqcn = $morphMap[$link->linkable_type] ?? $link->linkable_type;
                 if (class_exists($fqcn)) {

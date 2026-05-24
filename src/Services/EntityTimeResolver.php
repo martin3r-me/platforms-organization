@@ -4,7 +4,7 @@ namespace Platform\Organization\Services;
 
 use Illuminate\Database\Eloquent\Builder;
 use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationEntityLink;
+use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Models\OrganizationTimePlanned;
 
@@ -76,9 +76,7 @@ class EntityTimeResolver
     {
         $cascades = static::getTimeTrackableCascades();
 
-        $links = OrganizationEntityLink::query()
-            ->where('entity_id', $entity->id)
-            ->get();
+        $links = EntityDimensionBridge::linksForEntity($entity->id);
 
         foreach ($links as $link) {
             $morphAlias = $link->linkable_type;
@@ -177,9 +175,7 @@ class EntityTimeResolver
         $allEntityIds = array_values(array_unique($allEntityIds));
 
         // One query for all links
-        $links = OrganizationEntityLink::query()
-            ->whereIn('entity_id', $allEntityIds)
-            ->get();
+        $links = EntityDimensionBridge::linksForEntities($allEntityIds);
 
         // Group links by entity_id
         $linksByEntity = [];

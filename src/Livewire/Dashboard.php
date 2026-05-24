@@ -8,7 +8,7 @@ use Livewire\Attributes\On;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
-use Platform\Organization\Models\OrganizationEntityLink;
+use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\EntityHierarchyResolver;
 use Platform\Organization\Services\EntityLinkRegistry;
@@ -421,29 +421,32 @@ class Dashboard extends Component
             return [];
         }
 
-        $reverseMorphMap = array_flip(Relation::morphMap());
+        $countsByType = EntityDimensionBridge::linkCountsByEntityAndType($entityIds->toArray());
 
-        $rows = OrganizationEntityLink::whereIn('entity_id', $entityIds)
-            ->select('linkable_type', DB::raw('COUNT(*) as cnt'))
-            ->groupBy('linkable_type')
-            ->orderByDesc('cnt')
-            ->get();
+        // Flatten: aggregate across all entities
+        $typeTotals = [];
+        foreach ($countsByType as $entityCounts) {
+            foreach ($entityCounts as $type => $count) {
+                $typeTotals[$type] = ($typeTotals[$type] ?? 0) + $count;
+            }
+        }
+
+        arsort($typeTotals);
 
         $labels = resolve(EntityLinkRegistry::class)->activityTypeLabels();
         $config = resolve(EntityLinkRegistry::class)->allLinkTypeConfig();
-        $totalLinks = $rows->sum('cnt');
+        $totalLinks = array_sum($typeTotals);
 
         $result = [];
-        foreach ($rows as $row) {
-            $type = $reverseMorphMap[$row->linkable_type] ?? $row->linkable_type;
+        foreach ($typeTotals as $type => $count) {
             $typeConfig = $config[$type] ?? null;
 
             $result[] = [
                 'type' => $type,
                 'label' => $typeConfig['label'] ?? $labels[$type] ?? $type,
                 'icon' => $typeConfig['icon'] ?? 'link',
-                'count' => (int) $row->cnt,
-                'percentage' => $totalLinks > 0 ? round(($row->cnt / $totalLinks) * 100, 1) : 0,
+                'count' => $count,
+                'percentage' => $totalLinks > 0 ? round(($count / $totalLinks) * 100, 1) : 0,
             ];
         }
 

@@ -7,7 +7,7 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityHierarchy;
-use Platform\Organization\Models\OrganizationEntityLink;
+use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationEntityType;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Platform\Organization\Models\OrganizationVsmFunction;
@@ -818,7 +818,7 @@ class Show extends Component
     public function totalLinkCount(): int
     {
         $ids = array_merge([$this->entity->id], $this->getDescendantEntityIds($this->entity->id));
-        return OrganizationEntityLink::whereIn('entity_id', $ids)->count();
+        return EntityDimensionBridge::totalLinkCount($ids);
     }
 
     public function loadChildNodes(int $entityId): array
@@ -989,22 +989,7 @@ class Show extends Component
             return [];
         }
 
-        $reverseMorphMap = array_flip(Relation::morphMap());
-
-        $rows = OrganizationEntityLink::query()
-            ->whereIn('entity_id', $entityIds)
-            ->select('entity_id', 'linkable_type', DB::raw('COUNT(*) as cnt'))
-            ->groupBy('entity_id', 'linkable_type')
-            ->get();
-
-        $result = [];
-        foreach ($rows as $row) {
-            // Normalize FQCN to morph alias
-            $type = $reverseMorphMap[$row->linkable_type] ?? $row->linkable_type;
-            $result[$row->entity_id][$type] = ($result[$row->entity_id][$type] ?? 0) + $row->cnt;
-        }
-
-        return $result;
+        return EntityDimensionBridge::linkCountsByEntityAndType($entityIds);
     }
 
     protected function getChildrenCountsForIds(array $entityIds): array
@@ -1071,7 +1056,7 @@ class Show extends Component
         // Reverse map: FQCN -> morph alias (for normalizing DB entries stored as FQCN)
         $reverseMorphMap = array_flip($morphMap);
 
-        $links = OrganizationEntityLink::whereIn('entity_id', $entityIds)->get();
+        $links = EntityDimensionBridge::linksForEntities($entityIds);
 
         // Normalize linkable_type: convert FQCNs to morph aliases where possible
         $links->each(function ($link) use ($reverseMorphMap) {

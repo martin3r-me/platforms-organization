@@ -4,8 +4,10 @@ namespace Platform\Organization\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Platform\Organization\Models\OrganizationDimensionDefinition;
+use Platform\Organization\Models\OrganizationDimensionLink;
+use Platform\Organization\Models\OrganizationDimensionValue;
 use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationEntityLink;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Services\EntityLinkRegistry;
@@ -47,17 +49,44 @@ class SnapshotEntitiesCommand extends Command
 
         $entityIds = $entities->pluck('id')->toArray();
 
-        // 2. Load entity links grouped: [entityId => [morphAlias => [linkable_ids]]]
+        // 2. Load entity links via DimensionLinks for dimension 'entity'
         $reverseMorphMap = array_flip(Relation::morphMap());
 
-        $links = OrganizationEntityLink::whereIn('entity_id', $entityIds)->get();
+        $entityDef = OrganizationDimensionDefinition::where('key', 'entity')->first();
 
         $linksByEntityAndType = [];
         $linkCountsByEntity = [];
-        foreach ($links as $link) {
-            $type = $reverseMorphMap[$link->linkable_type] ?? $link->linkable_type;
-            $linksByEntityAndType[$link->entity_id][$type][] = $link->linkable_id;
-            $linkCountsByEntity[$link->entity_id] = ($linkCountsByEntity[$link->entity_id] ?? 0) + 1;
+
+        if ($entityDef) {
+            // Build map: dimValueId → source_entity_id
+            $dimValues = OrganizationDimensionValue::where('dimension_definition_id', $entityDef->id)
+                ->get();
+
+            $dimValueToEntity = [];
+            foreach ($dimValues as $dv) {
+                $meta = $dv->metadata;
+                if (isset($meta['source_entity_id'])) {
+                    $dimValueToEntity[$dv->id] = $meta['source_entity_id'];
+                }
+            }
+
+            $dimValueIds = array_keys($dimValueToEntity);
+
+            if (!empty($dimValueIds)) {
+                $dimensionLinks = OrganizationDimensionLink::where('dimension_definition_id', $entityDef->id)
+                    ->whereIn('dimension_value_id', $dimValueIds)
+                    ->get();
+
+                foreach ($dimensionLinks as $link) {
+                    $entityId = $dimValueToEntity[$link->dimension_value_id] ?? null;
+                    if (!$entityId) {
+                        continue;
+                    }
+                    $type = $reverseMorphMap[$link->linkable_type] ?? $link->linkable_type;
+                    $linksByEntityAndType[$entityId][$type][] = $link->linkable_id;
+                    $linkCountsByEntity[$entityId] = ($linkCountsByEntity[$entityId] ?? 0) + 1;
+                }
+            }
         }
 
         // 3. Compute metrics via registry
@@ -177,15 +206,27 @@ class SnapshotEntitiesCommand extends Command
         $this->info("Created/updated " . count($upsertData) . " entity snapshots.");
 
         // 8. Structure snapshots per team
-        $this->createTeamStructureSnapshots($entities, $links, $today, $period);
+        $this->createTeamStructureSnapshots($entities, $today, $period, $entityDef);
 
         return self::SUCCESS;
     }
 
-    protected function createTeamStructureSnapshots($entities, $links, $today, string $period): void
+    protected function createTeamStructureSnapshots($entities, $today, string $period, ?OrganizationDimensionDefinition $entityDef): void
     {
         $reverseMorphMap = array_flip(Relation::morphMap());
         $entitiesByTeam = $entities->groupBy('team_id');
+
+        // Build dimValueId → entityId map for structure snapshots
+        $dimValueToEntity = [];
+        if ($entityDef) {
+            $dimValues = OrganizationDimensionValue::where('dimension_definition_id', $entityDef->id)->get();
+            foreach ($dimValues as $dv) {
+                $meta = $dv->metadata;
+                if (isset($meta['source_entity_id'])) {
+                    $dimValueToEntity[$dv->id] = $meta['source_entity_id'];
+                }
+            }
+        }
 
         foreach ($entitiesByTeam as $teamId => $teamEntities) {
             $entityIds = $teamEntities->pluck('id')->toArray();
@@ -220,71 +261,88 @@ class SnapshotEntitiesCommand extends Command
                 ->values()
                 ->all();
 
-            // Entity links with resolved names
-            $teamLinks = $links->whereIn('entity_id', $entityIds);
+            // Entity links via DimensionLinks
             $entityLinksData = [];
 
-            // Normalize linkable_type → group by canonical morph alias
-            $morphMap = Relation::morphMap() ?: [];
-            $grouped = $teamLinks->groupBy(function ($link) use ($morphMap, $reverseMorphMap) {
-                $type = $link->linkable_type;
-                if (array_key_exists($type, $morphMap)) return $type;
-                if (isset($reverseMorphMap[$type])) return $reverseMorphMap[$type];
-                if (class_exists($type)) return \Illuminate\Support\Str::snake(class_basename($type));
-                return $type;
-            });
-            foreach ($grouped as $morphAlias => $typeLinks) {
-                $ids = $typeLinks->pluck('linkable_id')->unique()->values()->all();
-                // Resolve model class: alias → FQCN, or use raw type if it is already a class
-                $modelClass = Relation::getMorphedModel($morphAlias);
-                if (!$modelClass || !class_exists($modelClass)) {
-                    foreach ($typeLinks as $l) {
-                        if (class_exists($l->linkable_type)) {
-                            $modelClass = $l->linkable_type;
-                            break;
-                        }
-                    }
-                }
-                $labelMap = [];
-
-                if ($modelClass && class_exists($modelClass)) {
-                    $table = (new $modelClass)->getTable();
-                    $columns = collect(DB::getSchemaBuilder()->getColumnListing($table));
-
-                    // Build label expression — supports name/title/.../first_name+last_name/email
-                    $labelExpr = null;
-                    foreach (['name', 'title', 'subject', 'label', 'display_name'] as $col) {
-                        if ($columns->contains($col)) {
-                            $labelExpr = DB::raw("COALESCE(NULLIF({$col}, ''), CONCAT('#', id)) as label");
-                            break;
-                        }
-                    }
-                    if (!$labelExpr && $columns->contains('first_name') && $columns->contains('last_name')) {
-                        $labelExpr = DB::raw("COALESCE(NULLIF(TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))), ''), CONCAT('#', id)) as label");
-                    }
-                    if (!$labelExpr && $columns->contains('email')) {
-                        $labelExpr = DB::raw("COALESCE(NULLIF(email, ''), CONCAT('#', id)) as label");
-                    }
-                    if (!$labelExpr) {
-                        $labelExpr = DB::raw("CONCAT('#', id) as label");
-                    }
-
-                    $query = DB::table($table)->whereIn('id', $ids);
-                    if ($columns->contains('deleted_at')) {
-                        $query->whereNull('deleted_at');
-                    }
-                    foreach ($query->select('id', $labelExpr)->get() as $row) {
-                        $labelMap[$row->id] = $row->label;
+            if ($entityDef) {
+                $teamDimValueIds = [];
+                foreach ($dimValueToEntity as $dvId => $eId) {
+                    if (in_array($eId, $entityIds)) {
+                        $teamDimValueIds[] = $dvId;
                     }
                 }
 
-                foreach ($typeLinks as $link) {
-                    $entityLinksData[] = [
-                        'entity_id' => $link->entity_id,
-                        'linkable_type' => $morphAlias,
-                        'linkable_id' => $link->linkable_id,
-                        'linkable_name' => $labelMap[$link->linkable_id] ?? "#{$link->linkable_id}",
-                    ];
+                if (!empty($teamDimValueIds)) {
+                    $teamDimensionLinks = OrganizationDimensionLink::where('dimension_definition_id', $entityDef->id)
+                        ->whereIn('dimension_value_id', $teamDimValueIds)
+                        ->get();
+
+                    // Normalize linkable_type → group by canonical morph alias
+                    $morphMap = Relation::morphMap() ?: [];
+                    $grouped = $teamDimensionLinks->groupBy(function ($link) use ($morphMap, $reverseMorphMap) {
+                        $type = $link->linkable_type;
+                        if (array_key_exists($type, $morphMap)) return $type;
+                        if (isset($reverseMorphMap[$type])) return $reverseMorphMap[$type];
+                        if (class_exists($type)) return \Illuminate\Support\Str::snake(class_basename($type));
+                        return $type;
+                    });
+
+                    foreach ($grouped as $morphAlias => $typeLinks) {
+                        $ids = $typeLinks->pluck('linkable_id')->unique()->values()->all();
+                        $modelClass = Relation::getMorphedModel($morphAlias);
+                        if (!$modelClass || !class_exists($modelClass)) {
+                            foreach ($typeLinks as $l) {
+                                if (class_exists($l->linkable_type)) {
+                                    $modelClass = $l->linkable_type;
+                                    break;
+                                }
+                            }
+                        }
+                        $labelMap = [];
+
+                        if ($modelClass && class_exists($modelClass)) {
+                            $table = (new $modelClass)->getTable();
+                            $columns = collect(DB::getSchemaBuilder()->getColumnListing($table));
+
+                            $labelExpr = null;
+                            foreach (['name', 'title', 'subject', 'label', 'display_name'] as $col) {
+                                if ($columns->contains($col)) {
+                                    $labelExpr = DB::raw("COALESCE(NULLIF({$col}, ''), CONCAT('#', id)) as label");
+                                    break;
+                                }
+                            }
+                            if (!$labelExpr && $columns->contains('first_name') && $columns->contains('last_name')) {
+                                $labelExpr = DB::raw("COALESCE(NULLIF(TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))), ''), CONCAT('#', id)) as label");
+                            }
+                            if (!$labelExpr && $columns->contains('email')) {
+                                $labelExpr = DB::raw("COALESCE(NULLIF(email, ''), CONCAT('#', id)) as label");
+                            }
+                            if (!$labelExpr) {
+                                $labelExpr = DB::raw("CONCAT('#', id) as label");
+                            }
+
+                            $query = DB::table($table)->whereIn('id', $ids);
+                            if ($columns->contains('deleted_at')) {
+                                $query->whereNull('deleted_at');
+                            }
+                            foreach ($query->select('id', $labelExpr)->get() as $row) {
+                                $labelMap[$row->id] = $row->label;
+                            }
+                        }
+
+                        foreach ($typeLinks as $link) {
+                            $entityId = $dimValueToEntity[$link->dimension_value_id] ?? null;
+                            if (!$entityId) {
+                                continue;
+                            }
+                            $entityLinksData[] = [
+                                'entity_id' => $entityId,
+                                'linkable_type' => $morphAlias,
+                                'linkable_id' => $link->linkable_id,
+                                'linkable_name' => $labelMap[$link->linkable_id] ?? "#{$link->linkable_id}",
+                            ];
+                        }
+                    }
                 }
             }
 

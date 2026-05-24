@@ -171,7 +171,8 @@ class OrganizationEntity extends Model
     }
 
     /**
-     * Beziehung zu Entity Links (polymorphe Verknüpfungen zu anderen Modulen)
+     * @deprecated Use EntityDimensionBridge::linksForEntity($this->id) instead.
+     * Kept for backward compatibility during transition.
      */
     public function entityLinks()
     {

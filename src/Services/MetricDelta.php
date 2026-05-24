@@ -45,6 +45,7 @@ class MetricDelta
         return match ($this->unit) {
             'minutes' => $sign . round($this->delta / 60, 1) . 'h',
             'percentage' => $sign . $this->delta . '%',
+            'currency' => $sign . number_format(abs($this->delta), 0, ',', '.') . ' EUR',
             default => $sign . $this->delta,
         };
     }

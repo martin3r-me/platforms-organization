@@ -9,8 +9,6 @@ use Platform\Organization\Models\OrganizationCostCenterLink;
 use Platform\Organization\Models\OrganizationDimensionDefinition;
 use Platform\Organization\Models\OrganizationDimensionLink;
 use Platform\Organization\Models\OrganizationDimensionValue;
-use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationEntityLink;
 
 class DimensionLinkService
 {
@@ -28,13 +26,6 @@ class DimensionLinkService
                 'fk' => 'cost_center_id',
                 'label' => 'Kostenstellen',
                 'mode' => 'multi_percent',
-            ],
-            'entities' => [
-                'model' => OrganizationEntity::class,
-                'link_model' => OrganizationEntityLink::class,
-                'fk' => 'entity_id',
-                'label' => 'Organisationseinheiten',
-                'mode' => 'multi',
             ],
         ];
     }

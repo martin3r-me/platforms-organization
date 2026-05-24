@@ -8,7 +8,7 @@ use Livewire\Attributes\On;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
 use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationEntityLink;
+use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationTeamSnapshot;
@@ -433,10 +433,8 @@ class Mindmap extends Component
         }
 
         // EntityLinks - dynamisch, egal welcher Morph-Type kommt
-        $entityLinks = OrganizationEntityLink::query()
-            ->whereIn('entity_id', $entityIds)
-            ->where('team_id', $this->entity->team_id)
-            ->get();
+        $entityLinks = EntityDimensionBridge::linksForEntities($entityIds)
+            ->where('team_id', $this->entity->team_id);
 
         $linkedNodes = [];
         // Normalize linkable_type → group by canonical alias

@@ -7,6 +7,11 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Symfony\Component\Uid\UuidV7;
 
+/**
+ * @deprecated Use OrganizationDimensionLink with dimension 'entity' instead.
+ * See EntityDimensionBridge for the replacement API.
+ * Model kept for rollback compatibility — table will not be dropped.
+ */
 class OrganizationEntityLink extends Model
 {
     protected $table = 'organization_entity_links';

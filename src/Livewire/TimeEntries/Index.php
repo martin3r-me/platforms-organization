@@ -5,7 +5,7 @@ namespace Platform\Organization\Livewire\TimeEntries;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationEntityLink;
+use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\EntityTimeResolver;
@@ -154,11 +154,8 @@ class Index extends Component
 
         $cascades = EntityTimeResolver::getTimeTrackableCascades();
 
-        // Alle EntityLinks laden mit Entity-Relation
-        $links = OrganizationEntityLink::query()
-            ->whereIn('linkable_type', array_keys($cascades))
-            ->with('entity.type')
-            ->get();
+        // Alle EntityLinks laden via DimensionBridge
+        $links = EntityDimensionBridge::linksForLinkableTypes(array_keys($cascades));
 
         $map = [];
 

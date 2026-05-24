@@ -275,6 +275,7 @@ class SnapshotMovementService
                     $formatted = match ($unit) {
                         'minutes' => $sign . round($delta / 60, 1) . 'h',
                         'percentage' => $sign . $delta . '%',
+                        'currency' => $sign . number_format(abs($delta), 0, ',', '.') . ' EUR',
                         default => $sign . $delta,
                     };
                     $topDeltaLabel = $formatted . ' ' . $label;

@@ -23,7 +23,7 @@ class ListDimensionLinksTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/dimension-links - Zwei Modi: (1) Forward: Welche Dimensions-Einträge hängen an Objekt X? → context_type + context_id angeben. (2) Reverse: Was hängt alles an Dimensions-Element Y? → dimension_item_id angeben. Verfügbare Dimensionen: cost-centers, customers, persons.';
+        return 'GET /organization/dimension-links - Zwei Modi: (1) Forward: Welche Dimensions-Einträge hängen an Objekt X? → context_type + context_id angeben. (2) Reverse: Was hängt alles an Dimensions-Element Y? → dimension_item_id angeben. Dimensionen werden dynamisch geladen (z.B. cost-centers, entity).';
     }
 
     public function getSchema(): array
@@ -33,8 +33,7 @@ class ListDimensionLinksTool implements ToolContract, ToolMetadataContract
             'properties' => [
                 'dimension' => [
                     'type' => 'string',
-                    'enum' => ['cost-centers', 'entities'],
-                    'description' => 'ERFORDERLICH: Dimensions-Key.',
+                    'description' => 'ERFORDERLICH: Dimensions-Key (z.B. cost-centers, entity). Wird dynamisch aus verfügbaren Dimensionen validiert.',
                 ],
                 'context_type' => [
                     'type' => 'string',

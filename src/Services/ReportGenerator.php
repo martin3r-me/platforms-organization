@@ -11,7 +11,7 @@ use Platform\Core\Services\OpenAiService;
 use Platform\Core\Tools\ToolExecutor;
 use Platform\Core\Tools\ToolRegistry;
 use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationEntityLink;
+use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationReport;
 use Platform\Organization\Models\OrganizationReportType;
 
@@ -261,8 +261,7 @@ class ReportGenerator
         $allEntityNames = $this->collectEntityNames($entity);
 
         // Alle EntityLinks für diese IDs laden
-        $links = OrganizationEntityLink::whereIn('entity_id', $allEntityIds)
-            ->get();
+        $links = EntityDimensionBridge::linksForEntities($allEntityIds);
 
         // Nach linkable_type gruppiert → IDs extrahieren
         $linked = [];

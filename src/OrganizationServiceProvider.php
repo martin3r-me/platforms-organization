@@ -10,7 +10,6 @@ use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Platform\Organization\Console\Commands\DetectProcessChainsCommand;
 use Platform\Organization\Console\Commands\GenerateReportsCommand;
-use Platform\Organization\Console\Commands\NormalizeEntityLinkTypesCommand;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
 use Platform\Organization\Console\Commands\SnapshotEntitiesCommand;
 use Platform\Core\PlatformCore;
@@ -28,7 +27,6 @@ class OrganizationServiceProvider extends ServiceProvider
                 SeedOrganizationData::class,
                 GenerateReportsCommand::class,
                 SnapshotEntitiesCommand::class,
-                NormalizeEntityLinkTypesCommand::class,
                 DetectProcessChainsCommand::class,
             ]);
         }
@@ -101,6 +99,11 @@ class OrganizationServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'organization');
         $this->registerLivewireComponents();
         
+        // Observer: Entity ↔ DimensionValue sync
+        \Platform\Organization\Models\OrganizationEntity::observe(
+            \Platform\Organization\Observers\OrganizationEntityDimensionObserver::class
+        );
+
         // Entity-Komponenten manuell registrieren (für Sicherheit)
         Livewire::component('organization.entity.modal-relations', \Platform\Organization\Livewire\Entity\ModalRelations::class);
         Livewire::component('organization.entity.person-activity', \Platform\Organization\Livewire\Entity\PersonActivity::class);

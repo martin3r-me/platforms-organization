@@ -93,8 +93,10 @@ class SnapshotEntitiesCommand extends Command
         }
 
         // 5b. Compute aggregatable person metrics via HasPersonMetrics providers
+        $this->info('[v2] PersonAggregation active — ' . count($registry->personMetricsProviders()) . ' providers');
         $personAggService = new PersonAggregationService($registry);
         $computedPersonMetrics = $personAggService->computePersonMetrics($entities);
+        $this->info('[v2] Computed person metrics for ' . count($computedPersonMetrics) . ' entities');
 
         // Merge into personMetrics (coexists with vital signs keys)
         foreach ($computedPersonMetrics as $entityId => $metrics) {

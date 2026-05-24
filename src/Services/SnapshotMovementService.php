@@ -311,8 +311,11 @@ class SnapshotMovementService
         $snapshots = OrganizationEntitySnapshot::joinSub($latestDates, 'latest', function ($join) {
             $join->on('organization_entity_snapshots.entity_id', '=', 'latest.entity_id')
                  ->on('organization_entity_snapshots.snapshot_date', '=', 'latest.max_date');
-        })->get();
+        })
+            ->orderByRaw("FIELD(snapshot_period, 'morning', 'evening') ASC")
+            ->get();
 
+        // keyBy keeps last entry per key — order ensures evening wins over morning
         return $snapshots->keyBy('entity_id')->all();
     }
 
@@ -335,8 +338,11 @@ class SnapshotMovementService
         $snapshots = OrganizationEntitySnapshot::joinSub($nearDates, 'near', function ($join) {
             $join->on('organization_entity_snapshots.entity_id', '=', 'near.entity_id')
                  ->on('organization_entity_snapshots.snapshot_date', '=', 'near.max_date');
-        })->get();
+        })
+            ->orderByRaw("FIELD(snapshot_period, 'morning', 'evening') ASC")
+            ->get();
 
+        // keyBy keeps last entry per key — order ensures evening wins over morning
         return $snapshots->keyBy('entity_id')->all();
     }
 }

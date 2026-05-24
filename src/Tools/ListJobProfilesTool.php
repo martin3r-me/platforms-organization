@@ -79,6 +79,7 @@ class ListJobProfilesTool implements ToolContract, ToolMetadataContract
             $this->applyStandardSort($q, $arguments, ['name', 'level', 'status', 'job_family', 'id', 'created_at'], 'name', 'asc');
 
             $result = $this->applyStandardPaginationResult($q, $arguments);
+            $result['data']->load(['skillRecords', 'softSkillRecords']);
             $items = $result['data']->map(fn (OrganizationJobProfile $jp) => [
                 'id'               => $jp->id,
                 'uuid'             => $jp->uuid,
@@ -97,7 +98,15 @@ class ListJobProfilesTool implements ToolContract, ToolMetadataContract
                 'work_model'         => $jp->work_model,
                 'reporting'          => $jp->reporting,
                 'effective_from'     => $jp->effective_from?->toDateString(),
-                'effective_to'     => $jp->effective_to?->toDateString(),
+                'effective_to'       => $jp->effective_to?->toDateString(),
+                'skills_structured'  => $jp->skillRecords->map(fn ($s) => [
+                    'id' => $s->id, 'name' => $s->name, 'category' => $s->category,
+                    'level' => $s->pivot->level, 'is_required' => (bool) $s->pivot->is_required,
+                ])->values(),
+                'soft_skills_structured' => $jp->softSkillRecords->map(fn ($s) => [
+                    'id' => $s->id, 'name' => $s->name,
+                    'level' => $s->pivot->level, 'is_required' => (bool) $s->pivot->is_required,
+                ])->values(),
                 'team_id'          => $jp->team_id,
             ])->values()->toArray();
 

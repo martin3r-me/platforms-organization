@@ -5,6 +5,7 @@ namespace Platform\Organization\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Symfony\Component\Uid\UuidV7;
@@ -90,6 +91,18 @@ class OrganizationJobProfile extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(OrganizationPersonJobProfile::class, 'job_profile_id');
+    }
+
+    public function skillRecords(): BelongsToMany
+    {
+        return $this->belongsToMany(OrganizationSkill::class, 'organization_job_profile_skills', 'job_profile_id', 'skill_id')
+            ->withPivot('level', 'is_required', 'sort_order');
+    }
+
+    public function softSkillRecords(): BelongsToMany
+    {
+        return $this->belongsToMany(OrganizationSoftSkill::class, 'organization_job_profile_soft_skills', 'job_profile_id', 'soft_skill_id')
+            ->withPivot('level', 'is_required', 'sort_order');
     }
 
     public function scopeActive($query)

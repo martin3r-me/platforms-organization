@@ -4,6 +4,7 @@ namespace Platform\Organization\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Platform\ActivityLog\Traits\LogsActivity;
 use Symfony\Component\Uid\UuidV7;
@@ -335,6 +336,26 @@ class OrganizationEntity extends Model
             ->pluck('entity_id');
 
         return static::whereIn('id', $childIds)->orderBy('name')->get();
+    }
+
+    /**
+     * Skills (Person ↔ Skill)
+     */
+    public function skills(): BelongsToMany
+    {
+        return $this->belongsToMany(OrganizationSkill::class, 'organization_person_skills', 'person_entity_id', 'skill_id')
+            ->withPivot('level', 'certified_at', 'notes')
+            ->withTimestamps();
+    }
+
+    /**
+     * Soft Skills (Person ↔ SoftSkill)
+     */
+    public function softSkills(): BelongsToMany
+    {
+        return $this->belongsToMany(OrganizationSoftSkill::class, 'organization_person_soft_skills', 'person_entity_id', 'soft_skill_id')
+            ->withPivot('level', 'notes')
+            ->withTimestamps();
     }
 
     /**

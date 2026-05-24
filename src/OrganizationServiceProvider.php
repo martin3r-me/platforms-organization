@@ -380,6 +380,42 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\ListPerspectivesTool());
             $registry->register(new \Platform\Organization\Tools\SwitchPerspectiveTool());
 
+            // Skill-Katalog Tools
+            $registry->register(new \Platform\Organization\Tools\ListSkillsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateSkillTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateSkillTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteSkillTool());
+
+            // Soft-Skill-Katalog Tools
+            $registry->register(new \Platform\Organization\Tools\ListSoftSkillsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateSoftSkillTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateSoftSkillTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteSoftSkillTool());
+
+            // JobProfile ↔ Skill Zuordnung
+            $registry->register(new \Platform\Organization\Tools\ListJobProfileSkillsTool());
+            $registry->register(new \Platform\Organization\Tools\AssignJobProfileSkillTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateJobProfileSkillTool());
+            $registry->register(new \Platform\Organization\Tools\RemoveJobProfileSkillTool());
+
+            // JobProfile ↔ Soft-Skill Zuordnung
+            $registry->register(new \Platform\Organization\Tools\ListJobProfileSoftSkillsTool());
+            $registry->register(new \Platform\Organization\Tools\AssignJobProfileSoftSkillTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateJobProfileSoftSkillTool());
+            $registry->register(new \Platform\Organization\Tools\RemoveJobProfileSoftSkillTool());
+
+            // Person ↔ Skill Zuordnung
+            $registry->register(new \Platform\Organization\Tools\ListPersonSkillsTool());
+            $registry->register(new \Platform\Organization\Tools\AssignPersonSkillTool());
+            $registry->register(new \Platform\Organization\Tools\UpdatePersonSkillTool());
+            $registry->register(new \Platform\Organization\Tools\RemovePersonSkillTool());
+
+            // Person ↔ Soft-Skill Zuordnung
+            $registry->register(new \Platform\Organization\Tools\ListPersonSoftSkillsTool());
+            $registry->register(new \Platform\Organization\Tools\AssignPersonSoftSkillTool());
+            $registry->register(new \Platform\Organization\Tools\UpdatePersonSoftSkillTool());
+            $registry->register(new \Platform\Organization\Tools\RemovePersonSoftSkillTool());
+
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

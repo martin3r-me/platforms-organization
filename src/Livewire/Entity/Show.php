@@ -818,7 +818,14 @@ class Show extends Component
     public function totalLinkCount(): int
     {
         $ids = array_merge([$this->entity->id], $this->getDescendantEntityIds($this->entity->id));
-        return EntityDimensionBridge::totalLinkCount($ids);
+        $count = EntityDimensionBridge::totalLinkCount($ids);
+        // DEBUG-MARKER: Remove after verification
+        logger()->info('[DEPLOY-CHECK] totalLinkCount via DimensionBridge', [
+            'entity_id' => $this->entity->id,
+            'id_count' => count($ids),
+            'result' => $count,
+        ]);
+        return $count;
     }
 
     public function loadChildNodes(int $entityId): array

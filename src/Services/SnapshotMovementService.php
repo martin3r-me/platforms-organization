@@ -74,19 +74,6 @@ class SnapshotMovementService
     {
         $allDefinitions = $this->registry->allMetricDefinitions();
 
-        // Auto-discover keys from snapshots that have no definition
-        $allKeys = array_unique(array_merge(array_keys($current), array_keys($previous)));
-        foreach ($allKeys as $key) {
-            if (!isset($allDefinitions[$key]) && !str_ends_with($key, '_cascaded') && !str_starts_with($key, 'person_')) {
-                $allDefinitions[$key] = [
-                    'label' => ucfirst(str_replace('_', ' ', $key)),
-                    'group' => 'other',
-                    'direction' => 'neutral',
-                    'unit' => 'count',
-                ];
-            }
-        }
-
         // Filter by group if specified
         $definitions = $group
             ? array_filter($allDefinitions, fn (array $def) => $def['group'] === $group)
@@ -94,8 +81,17 @@ class SnapshotMovementService
 
         $deltas = [];
         foreach ($definitions as $key => $def) {
-            $cur = $current[$key] ?? 0;
-            $prev = $previous[$key] ?? 0;
+            $mode = $def['aggregation_mode'] ?? 'own';
+
+            if ($mode === 'rolled_up') {
+                $cascadedKey = $key . '_cascaded';
+                $cur = $current[$cascadedKey] ?? $current[$key] ?? 0;
+                $prev = $previous[$cascadedKey] ?? $previous[$key] ?? 0;
+            } else {
+                // 'own' and 'both' — primary entry uses own value
+                $cur = $current[$key] ?? 0;
+                $prev = $previous[$key] ?? 0;
+            }
 
             // Skip keys with no data in either snapshot
             if ($cur == 0 && $prev == 0) {
@@ -108,7 +104,14 @@ class SnapshotMovementService
             // Calculate ratio if pair defined
             $ratio = null;
             if (isset($def['pair'])) {
-                $pairValue = $current[$def['pair']] ?? 0;
+                $pairDef = $allDefinitions[$def['pair']] ?? null;
+                $pairMode = $pairDef['aggregation_mode'] ?? 'own';
+                if ($pairMode === 'rolled_up') {
+                    $pairCascaded = $def['pair'] . '_cascaded';
+                    $pairValue = $current[$pairCascaded] ?? $current[$def['pair']] ?? 0;
+                } else {
+                    $pairValue = $current[$def['pair']] ?? 0;
+                }
                 $ratio = $pairValue > 0 ? round(($cur / $pairValue) * 100, 1) : null;
             }
 
@@ -123,6 +126,32 @@ class SnapshotMovementService
                 unit: $def['unit'],
                 ratio: $ratio,
                 pairKey: $def['pair'] ?? null,
+            );
+        }
+
+        // Add cascaded entries for 'both' mode metrics
+        foreach ($definitions as $key => $def) {
+            if (($def['aggregation_mode'] ?? 'own') !== 'both') {
+                continue;
+            }
+            $cascadedKey = $key . '_cascaded';
+            $cur = $current[$cascadedKey] ?? 0;
+            $prev = $previous[$cascadedKey] ?? 0;
+            if ($cur == 0 && $prev == 0) {
+                continue;
+            }
+            $delta = $cur - $prev;
+            $deltas[$cascadedKey] = new MetricDelta(
+                key: $cascadedKey,
+                label: $def['label'] . ' (inkl. Untereinheiten)',
+                group: $def['group'],
+                current: $cur,
+                previous: $prev,
+                delta: $delta,
+                sentiment: $this->deriveSentiment($delta, $def['direction']),
+                unit: $def['unit'],
+                ratio: null,
+                pairKey: null,
             );
         }
 
@@ -202,8 +231,25 @@ class SnapshotMovementService
             $allKeys = array_unique(array_merge(array_keys($currentMetrics), array_keys($previousMetrics)));
 
             foreach ($allKeys as $key) {
-                $cur = $currentMetrics[$key] ?? 0;
-                $prev = $previousMetrics[$key] ?? 0;
+                if (str_ends_with($key, '_cascaded')) {
+                    continue;
+                }
+                if (!isset($allDefinitions[$key])) {
+                    continue;
+                }
+
+                $def = $allDefinitions[$key];
+                $mode = $def['aggregation_mode'] ?? 'own';
+
+                if ($mode === 'rolled_up') {
+                    $cascadedKey = $key . '_cascaded';
+                    $cur = $currentMetrics[$cascadedKey] ?? $currentMetrics[$key] ?? 0;
+                    $prev = $previousMetrics[$cascadedKey] ?? $previousMetrics[$key] ?? 0;
+                } else {
+                    $cur = $currentMetrics[$key] ?? 0;
+                    $prev = $previousMetrics[$key] ?? 0;
+                }
+
                 $delta = $cur - $prev;
 
                 if ($delta == 0) {
@@ -211,7 +257,6 @@ class SnapshotMovementService
                 }
 
                 $deltaCount++;
-                $def = $allDefinitions[$key] ?? null;
                 $direction = $def['direction'] ?? 'neutral';
                 $sentiment = $this->deriveSentiment($delta, $direction);
 

@@ -234,6 +234,19 @@ class OrganizationEntityRelationTypeSeeder extends Seeder
                 'is_reciprocal' => false,
             ],
 
+            // Capability-Zuordnung
+            [
+                'code' => 'is_active_in',
+                'name' => 'Ist aktiv in',
+                'description' => 'Person ist aktiv in einer Capability-Area (metadata.percentage fuer Anteil)',
+                'icon' => 'user-group',
+                'sort_order' => 21,
+                'is_active' => true,
+                'is_directional' => true,
+                'is_hierarchical' => false,
+                'is_reciprocal' => false,
+            ],
+
             // Allgemeine Beziehungen
             [
                 'code' => 'relates_to',

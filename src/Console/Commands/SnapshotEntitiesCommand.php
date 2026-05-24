@@ -12,6 +12,7 @@ use Platform\Organization\Services\EntityLinkRegistry;
 use Platform\Organization\Services\EntityTimeResolver;
 use Platform\Organization\Services\EntityHierarchyService;
 use Platform\Organization\Services\PersonActivityRegistry;
+use Platform\Organization\Services\PersonAggregationService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Relations\Relation;
 
@@ -91,6 +92,15 @@ class SnapshotEntitiesCommand extends Command
             \Log::warning('Snapshot: Person metrics failed', ['error' => $e->getMessage()]);
         }
 
+        // 5b. Compute aggregatable person metrics via HasPersonMetrics providers
+        $personAggService = new PersonAggregationService($registry);
+        $computedPersonMetrics = $personAggService->computePersonMetrics($entities);
+
+        // Merge into personMetrics (coexists with vital signs keys)
+        foreach ($computedPersonMetrics as $entityId => $metrics) {
+            $personMetrics[$entityId] = array_merge($personMetrics[$entityId] ?? [], $metrics);
+        }
+
         // 6. Cascade metrics through entity hierarchy
         $hierarchyService = new EntityHierarchyService();
         $childMap = $hierarchyService->buildChildMap($entities);
@@ -118,7 +128,18 @@ class SnapshotEntitiesCommand extends Command
             $ownMetricsMap[$entity->id] = $metrics;
         }
 
-        $cascadeKeys = array_unique(array_merge($baseKeys, array_keys($allProviderKeys)));
+        // 6b. Aggregate person metrics to org entities via is_active_in + parent_entity_id
+        $orgPersonRollups = $personAggService->aggregateToOrgEntities($computedPersonMetrics, $entities);
+        $personRollupKeys = ['active_persons_count', 'persons_workload_total', 'persons_completed_total',
+            'persons_story_points_total', 'persons_story_points_done', 'persons_time_total_minutes'];
+
+        foreach ($orgPersonRollups as $entityId => $rollups) {
+            foreach ($rollups as $key => $value) {
+                $ownMetricsMap[$entityId][$key] = $value;
+            }
+        }
+
+        $cascadeKeys = array_unique(array_merge($baseKeys, array_keys($allProviderKeys), $personRollupKeys));
         $cascadedMetrics = $hierarchyService->cascadeMetrics($ownMetricsMap, $childMap, $cascadeKeys);
 
         // 7. Upsert snapshots

@@ -4,6 +4,7 @@ namespace Platform\Organization\Services;
 
 use Platform\Organization\Contracts\EntityLinkProvider;
 use Platform\Organization\Contracts\HasMetricDefinitions;
+use Platform\Organization\Contracts\HasPersonMetrics;
 
 class EntityLinkRegistry
 {
@@ -154,6 +155,19 @@ class EntityLinkRegistry
     }
 
     /**
+     * All registered providers that implement HasPersonMetrics.
+     *
+     * @return HasPersonMetrics[]
+     */
+    public function personMetricsProviders(): array
+    {
+        return array_filter(
+            $this->providers,
+            fn ($p) => $p instanceof HasPersonMetrics
+        );
+    }
+
+    /**
      * Label-Map fuer Activity Feed: morphKey => singular Label.
      * Keys sind Morph-Aliases (wie in der DB gespeichert).
      *
@@ -194,13 +208,19 @@ class EntityLinkRegistry
             }
         }
 
-        // Apply defaults for dimension/type if not set by provider
+        // Apply defaults for dimension/type/aggregation if not set by provider
         foreach ($defs as $key => &$def) {
             if (!isset($def['dimension'])) {
                 $def['dimension'] = null;
             }
             if (!isset($def['type'])) {
                 $def['type'] = self::TYPE_STOCK;
+            }
+            if (!isset($def['aggregation_mode'])) {
+                $def['aggregation_mode'] = 'own';
+            }
+            if (!isset($def['roll_up_function'])) {
+                $def['roll_up_function'] = 'sum';
             }
         }
         unset($def);
@@ -266,6 +286,7 @@ class EntityLinkRegistry
             'hcm' => 'HCM',
             'canvas' => 'Canvas',
             'finance' => 'Finanzen',
+            'persons' => 'Personen',
         ];
 
         $groups = [];
@@ -298,6 +319,7 @@ class EntityLinkRegistry
                 'unit' => 'minutes',
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_FLOW,
+                'aggregation_mode' => 'rolled_up',
             ],
             'time_billed_minutes' => [
                 'label' => 'Zeiterfassung (abgerechnet)',
@@ -307,6 +329,107 @@ class EntityLinkRegistry
                 'pair' => 'time_total_minutes',
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_FLOW,
+                'aggregation_mode' => 'rolled_up',
+            ],
+
+            // Person-Entity Metriken
+            'person_active_items' => [
+                'label' => 'Aktive Items (Person)',
+                'group' => 'persons',
+                'direction' => 'neutral',
+                'unit' => 'count',
+                'dimension' => self::DIMENSION_ENERGY,
+                'type' => self::TYPE_STOCK,
+            ],
+            'person_completed_items' => [
+                'label' => 'Erledigte Items (Person)',
+                'group' => 'persons',
+                'direction' => 'up',
+                'unit' => 'count',
+                'dimension' => self::DIMENSION_THROUGHPUT,
+                'type' => self::TYPE_FLOW,
+            ],
+            'person_story_points_total' => [
+                'label' => 'Story Points gesamt (Person)',
+                'group' => 'persons',
+                'direction' => 'neutral',
+                'unit' => 'points',
+                'dimension' => self::DIMENSION_COMPLEXITY,
+                'type' => self::TYPE_STOCK,
+            ],
+            'person_story_points_done' => [
+                'label' => 'Story Points erledigt (Person)',
+                'group' => 'persons',
+                'direction' => 'up',
+                'unit' => 'points',
+                'pair' => 'person_story_points_total',
+                'dimension' => self::DIMENSION_THROUGHPUT,
+                'type' => self::TYPE_FLOW,
+            ],
+            'person_time_total_minutes' => [
+                'label' => 'Zeiterfassung (Person)',
+                'group' => 'persons',
+                'direction' => 'neutral',
+                'unit' => 'minutes',
+                'dimension' => self::DIMENSION_ENERGY,
+                'type' => self::TYPE_FLOW,
+            ],
+
+            // Org-Entity Person-Rollup Metriken
+            'active_persons_count' => [
+                'label' => 'Aktive Personen',
+                'group' => 'persons',
+                'direction' => 'neutral',
+                'unit' => 'count',
+                'dimension' => self::DIMENSION_ORG_CAPITAL,
+                'type' => self::TYPE_STOCK,
+                'aggregation_mode' => 'rolled_up',
+            ],
+            'persons_workload_total' => [
+                'label' => 'Workload (Personen)',
+                'group' => 'persons',
+                'direction' => 'neutral',
+                'unit' => 'count',
+                'dimension' => self::DIMENSION_ENERGY,
+                'type' => self::TYPE_STOCK,
+                'aggregation_mode' => 'rolled_up',
+            ],
+            'persons_completed_total' => [
+                'label' => 'Erledigte Items (Personen)',
+                'group' => 'persons',
+                'direction' => 'up',
+                'unit' => 'count',
+                'dimension' => self::DIMENSION_THROUGHPUT,
+                'type' => self::TYPE_FLOW,
+                'aggregation_mode' => 'rolled_up',
+            ],
+            'persons_story_points_total' => [
+                'label' => 'Story Points gesamt (Personen)',
+                'group' => 'persons',
+                'direction' => 'neutral',
+                'unit' => 'points',
+                'dimension' => self::DIMENSION_COMPLEXITY,
+                'type' => self::TYPE_STOCK,
+                'aggregation_mode' => 'rolled_up',
+            ],
+            'persons_story_points_done' => [
+                'label' => 'Story Points erledigt (Personen)',
+                'group' => 'persons',
+                'direction' => 'up',
+                'unit' => 'points',
+                'pair' => 'persons_story_points_total',
+                'dimension' => self::DIMENSION_THROUGHPUT,
+                'type' => self::TYPE_FLOW,
+                'aggregation_mode' => 'rolled_up',
+            ],
+            'persons_time_total_minutes' => [
+                'label' => 'Zeiterfassung (Personen)',
+                'group' => 'persons',
+                'direction' => 'neutral',
+                'unit' => 'minutes',
+                'dimension' => self::DIMENSION_ENERGY,
+                'type' => self::TYPE_FLOW,
+                'aggregation_mode' => 'rolled_up',
             ],
         ];
     }

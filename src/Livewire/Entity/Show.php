@@ -11,7 +11,6 @@ use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationEntityType;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Platform\Organization\Models\OrganizationVsmFunction;
-use Platform\Organization\Models\OrganizationContext;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntityRelationType;
 use Platform\Organization\Models\OrganizationEntityRelationshipInterlink;
@@ -416,18 +415,8 @@ class Show extends Component
             // Füge den User als Owner zum Team hinzu
             $user->teams()->attach($team->id, ['role' => TeamRole::OWNER->value]);
 
-            // Verlinke das Team direkt mit der Entität
-            OrganizationContext::updateOrCreate(
-                [
-                    'contextable_type' => Team::class,
-                    'contextable_id' => $team->id,
-                    'organization_entity_id' => $this->entity->id,
-                ],
-                [
-                    'team_id' => $user->currentTeamRelation?->id,
-                    'is_active' => true,
-                ]
-            );
+            // Verlinke das Team direkt mit der Entität via DimensionLink
+            EntityDimensionBridge::createLink($this->entity->id, Team::class, $team->id);
 
             $this->closeCreateTeamModal();
             $this->entity->refresh();

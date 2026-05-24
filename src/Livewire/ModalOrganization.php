@@ -7,9 +7,10 @@ use Illuminate\Support\Facades\Auth;
 use Illuminate\Validation\Rule;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use Platform\Organization\Models\OrganizationContext;
+use Platform\Organization\Contracts\HasChildContextRelations;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Models\OrganizationTimePlanned;
+use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Services\StoreTimeEntry;
 use Platform\Organization\Services\StorePlannedTime;
 use Platform\Organization\Services\TimeContextResolver;
@@ -110,20 +111,17 @@ class ModalOrganization extends Component
             ];
         }
 
-        // Entity-Verknüpfung über OrganizationContext nachschlagen
-        $orgContext = OrganizationContext::query()
-            ->where('contextable_type', $this->contextType)
-            ->where('contextable_id', $this->contextId)
-            ->where('is_active', true)
-            ->with('organizationEntity.type')
-            ->first();
+        // Entity-Verknüpfung über DimensionLink nachschlagen
+        $entityLinks = EntityDimensionBridge::linksForLinkables([$this->contextType], [$this->contextId]);
 
-        if ($orgContext && $orgContext->organizationEntity) {
-            $entity = $orgContext->organizationEntity;
-            $breadcrumb[] = [
-                'type' => $entity->type?->name ?? 'Entity',
-                'label' => $entity->name,
-            ];
+        if ($entityLinks->isNotEmpty()) {
+            $link = $entityLinks->first();
+            if ($link->entity) {
+                $breadcrumb[] = [
+                    'type' => $link->entity->type?->name ?? 'Entity',
+                    'label' => $link->entity->name,
+                ];
+            }
         }
 
         return $breadcrumb;
@@ -266,21 +264,15 @@ class ModalOrganization extends Component
     }
 
     /**
-     * Sammelt Kind-Context-Paare über OrganizationContext include_children_relations.
+     * Sammelt Kind-Context-Paare über HasChildContextRelations Interface.
      */
     protected function collectChildContextPairs(array &$pairs): void
     {
-        $orgContext = OrganizationContext::query()
-            ->where('contextable_type', $this->contextType)
-            ->where('contextable_id', $this->contextId)
-            ->where('is_active', true)
-            ->first();
-
-        if (! $orgContext || empty($orgContext->include_children_relations)) {
+        if (! class_exists($this->contextType)) {
             return;
         }
 
-        if (! class_exists($this->contextType)) {
+        if (! is_a($this->contextType, HasChildContextRelations::class, true)) {
             return;
         }
 
@@ -289,7 +281,7 @@ class ModalOrganization extends Component
             return;
         }
 
-        foreach ($orgContext->include_children_relations as $relationPath) {
+        foreach ($this->contextType::childContextRelations() as $relationPath) {
             $this->resolveRelationPathForPairs($model, $relationPath, $pairs);
         }
     }

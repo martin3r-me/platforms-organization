@@ -6,6 +6,10 @@ use Illuminate\Database\Eloquent\Relations\MorphOne;
 use Platform\Organization\Models\OrganizationContext;
 use Platform\Organization\Models\OrganizationEntity;
 
+/**
+ * @deprecated Use EntityDimensionBridge and HasChildContextRelations interface instead.
+ * Kept for rollback compatibility — do not add new callers.
+ */
 trait HasOrganizationContexts
 {
     /**

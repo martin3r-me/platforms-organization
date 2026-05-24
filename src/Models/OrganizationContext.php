@@ -9,6 +9,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Platform\Core\Models\Team;
 use Symfony\Component\Uid\UuidV7;
 
+/**
+ * @deprecated Use OrganizationDimensionLink (via EntityDimensionBridge) instead.
+ * Table retained for rollback. No new writes expected.
+ */
 class OrganizationContext extends Model
 {
     use SoftDeletes;

@@ -8,9 +8,10 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Models\Team;
-use Platform\Organization\Models\OrganizationContext;
+use Platform\Organization\Contracts\HasChildContextRelations;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\ContextTypeRegistry;
+use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Services\EntityTimeResolver;
 use Platform\Organization\Services\TimeContextResolver;
 use Platform\Organization\Tools\Concerns\ResolvesTimeEntryTeamScope;
@@ -284,7 +285,7 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
 
     /**
      * Gruppiert nach Organization Entity.
-     * Baut eine Reverse-Map: (context_type, context_id) → Entity
+     * Baut eine Reverse-Map: (context_type, context_id) → Entity via DimensionLink + HasChildContextRelations.
      */
     protected function groupByEntity($query, array $teamIds): array
     {
@@ -294,26 +295,28 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
             return [];
         }
 
-        // Sammle alle context_type/context_id Paare
-        $contextPairs = $entries->map(fn($e) => $e->context_type . ':' . $e->context_id)->unique()->values();
+        // Sammle alle einzigartigen context_types
+        $contextTypes = $entries->pluck('context_type')->unique()->values()->toArray();
 
-        // Lade alle OrganizationContexts für diese contextable Paare
-        $contexts = OrganizationContext::query()
-            ->where('is_active', true)
-            ->with('organizationEntity')
-            ->get();
+        // Lade alle DimensionLinks für diese linkable_types
+        $dimensionLinks = EntityDimensionBridge::linksForLinkableTypes($contextTypes);
 
-        // Baue Reverse-Map: "contextable_type:contextable_id" → Entity
+        // Baue Reverse-Map: "linkable_type:linkable_id" → Entity
         $contextToEntity = [];
-        foreach ($contexts as $ctx) {
-            $key = $ctx->contextable_type . ':' . $ctx->contextable_id;
-            if ($ctx->organizationEntity) {
-                $contextToEntity[$key] = $ctx->organizationEntity;
-            }
+        foreach ($dimensionLinks as $link) {
+            if ($link->entity) {
+                $key = $link->linkable_type . ':' . $link->linkable_id;
+                $contextToEntity[$key] = $link->entity;
 
-            // Auch Children-Relations berücksichtigen
-            if (!empty($ctx->include_children_relations) && $ctx->contextable_type && $ctx->contextable_id) {
-                $this->mapChildRelationsToEntity($ctx, $contextToEntity);
+                // Auch Children-Relations über HasChildContextRelations berücksichtigen
+                if (class_exists($link->linkable_type) && is_a($link->linkable_type, HasChildContextRelations::class, true)) {
+                    $model = $link->linkable_type::find($link->linkable_id);
+                    if ($model) {
+                        foreach ($link->linkable_type::childContextRelations() as $relationPath) {
+                            $this->resolveRelationPathForMapping($model, $relationPath, $link->entity, $contextToEntity);
+                        }
+                    }
+                }
             }
         }
 
@@ -366,25 +369,6 @@ class SummarizeTimeEntriesTool implements ToolContract, ToolMetadataContract
         }
 
         return $result;
-    }
-
-    /**
-     * Mappt Child-Relations eines OrganizationContext auf die Entity.
-     */
-    protected function mapChildRelationsToEntity(OrganizationContext $ctx, array &$map): void
-    {
-        if (!class_exists($ctx->contextable_type)) {
-            return;
-        }
-
-        $model = $ctx->contextable_type::find($ctx->contextable_id);
-        if (!$model || !$ctx->organizationEntity) {
-            return;
-        }
-
-        foreach ($ctx->include_children_relations as $relationPath) {
-            $this->resolveRelationPathForMapping($model, $relationPath, $ctx->organizationEntity, $map);
-        }
     }
 
     protected function resolveRelationPathForMapping($model, string $path, $entity, array &$map): void

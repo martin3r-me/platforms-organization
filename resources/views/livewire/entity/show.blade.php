@@ -1,9 +1,4 @@
 <x-ui-page>
-    {{-- DEBUG DEPLOY CHECK — REMOVE AFTER VERIFICATION --}}
-    <div class="bg-yellow-400 text-black text-center font-bold py-2 text-sm">
-        DEPLOY-CHECK: DimensionBridge aktiv | totalLinkCount = {{ $this->totalLinkCount }}
-    </div>
-
     <x-slot name="navbar">
         <x-ui-page-navbar title="" />
     </x-slot>

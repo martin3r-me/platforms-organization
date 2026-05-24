@@ -103,6 +103,7 @@ class OrganizationServiceProvider extends ServiceProvider
         
         // Entity-Komponenten manuell registrieren (für Sicherheit)
         Livewire::component('organization.entity.modal-relations', \Platform\Organization\Livewire\Entity\ModalRelations::class);
+        Livewire::component('organization.entity.person-activity', \Platform\Organization\Livewire\Entity\PersonActivity::class);
 
         // Tools registrieren (loose gekoppelt - für AI/Chat)
         $this->registerTools();

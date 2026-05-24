@@ -82,7 +82,8 @@ class EntityMovementTool implements ToolContract, ToolMetadataContract
 
                 if ($debug) {
                     $snap = OrganizationEntitySnapshot::where('entity_id', $entity->id)
-                        ->latest('snapshot_date')
+                        ->orderByDesc('snapshot_date')
+                        ->orderByRaw("FIELD(snapshot_period, 'evening', 'morning') DESC")
                         ->first();
                     $personKeys = array_filter(
                         array_keys($snap->metrics ?? []),
@@ -93,12 +94,24 @@ class EntityMovementTool implements ToolContract, ToolMetadataContract
                         $personMetrics[$k] = $snap->metrics[$k];
                     }
 
+                    // Also show all snapshots for today
+                    $allToday = OrganizationEntitySnapshot::where('entity_id', $entity->id)
+                        ->where('snapshot_date', now()->toDateString())
+                        ->get()
+                        ->map(fn ($s) => [
+                            'period' => $s->snapshot_period,
+                            'keys_count' => count($s->metrics ?? []),
+                            'has_person' => count(array_filter(array_keys($s->metrics ?? []), fn ($k) => str_starts_with($k, 'person_'))) > 0,
+                        ])->all();
+
                     return ToolResult::success([
                         'debug' => true,
                         'entity_id' => $entityId,
                         'snapshot_date' => $snap?->snapshot_date?->toDateString(),
+                        'snapshot_period' => $snap?->snapshot_period,
                         'total_metric_keys' => count($snap->metrics ?? []),
                         'person_metrics' => $personMetrics,
+                        'all_today' => $allToday,
                         'movement_service_class' => get_class($service),
                         'has_person_skip' => str_contains(
                             file_get_contents((new \ReflectionClass($service))->getFileName()),

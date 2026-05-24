@@ -75,7 +75,7 @@ class ListEntityTypeGroupsTool implements ToolContract, ToolMetadataContract
                 'description' => $group->description,
                 'sort_order' => $group->sort_order,
                 'is_active' => (bool)$group->is_active,
-                'entity_types_count' => $group->entityTypes()->count(),
+                'entity_types_count' => $group->entityTypes()->where('is_active', true)->count(),
             ])->values()->toArray();
 
             return ToolResult::success([

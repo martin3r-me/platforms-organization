@@ -28,7 +28,7 @@ class Index extends Component
     public function entityTypeGroups()
     {
         $query = OrganizationEntityTypeGroup::query()
-            ->withCount('entityTypes');
+            ->withCount(['entityTypes' => fn ($q) => $q->where('is_active', true)]);
 
         if ($this->search) {
             $query->where(function ($q) {

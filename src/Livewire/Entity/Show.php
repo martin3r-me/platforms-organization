@@ -1110,6 +1110,13 @@ class Show extends Component
 
             $metadata = $this->extractLinkMetadata($type, $linkable);
 
+            // Cost-driver links: apply percentage to amount
+            $pct = $link->percentage ? (float) $link->percentage : null;
+            if ($pct && isset($metadata['amount'])) {
+                $metadata['amount'] = round((float) $metadata['amount'] * $pct / 100, 2);
+                $metadata['percentage'] = $pct;
+            }
+
             $byEntityAndType[$link->entity_id][$type]['items'][] = array_merge([
                 'id' => $link->id,
                 'name' => $linkable->name ?? $linkable->title ?? '—',

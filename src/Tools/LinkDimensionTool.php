@@ -37,8 +37,7 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
             'properties' => [
                 'dimension' => [
                     'type' => 'string',
-                    'enum' => ['cost-centers', 'entities'],
-                    'description' => 'ERFORDERLICH: Dimensions-Key.',
+                    'description' => 'ERFORDERLICH: Dimensions-Key (z.B. "cost-centers", "entity", "vsm-system", "vsm-function", "cost-center").',
                 ],
                 'context_type' => [
                     'type' => 'string',
@@ -100,8 +99,15 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
             }
 
             // Prüfe ob das Dimensions-Element existiert
-            $dimensionModel = $cfg['model'];
-            $item = $dimensionModel::find($dimensionItemId);
+            if (isset($cfg['model'])) {
+                // Legacy dimension (cost-centers)
+                $item = $cfg['model']::find($dimensionItemId);
+            } else {
+                // Generic dimension (entity, vsm-system, etc.)
+                $item = \Platform\Organization\Models\OrganizationDimensionValue::where('id', $dimensionItemId)
+                    ->where('dimension_definition_id', $cfg['definition_id'] ?? 0)
+                    ->first();
+            }
             if (!$item) {
                 return ToolResult::error('NOT_FOUND', "Dimensions-Element mit ID {$dimensionItemId} nicht gefunden.");
             }
@@ -122,7 +128,9 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('DUPLICATE', 'Dieser Link existiert bereits.');
             }
 
-            $modeInfo = $cfg['mode'] === 'single'
+            $mode = $cfg['mode'] ?? 'multi';
+            $label = $cfg['label'] ?? ucfirst($dimension);
+            $modeInfo = $mode === 'single'
                 ? ' (single-Modus: vorheriger Link wurde ersetzt)'
                 : '';
 
@@ -132,7 +140,7 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
                 'dimension_item_name' => $item->name,
                 'context_type' => $contextType,
                 'context_id' => $contextId,
-                'message' => "{$cfg['label']}-Link erfolgreich erstellt{$modeInfo}.",
+                'message' => "{$label}-Link erfolgreich erstellt{$modeInfo}.",
             ]);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler: ' . $e->getMessage());

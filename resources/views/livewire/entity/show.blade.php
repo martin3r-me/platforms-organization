@@ -326,7 +326,7 @@
                                         @if($m['current'] > 0 || $m['previous'] > 0)
                                             <div class="py-2 px-2.5 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/20">
                                                 <div class="text-sm font-bold text-[var(--ui-text)]">
-                                                    {{ $m['current'] }}
+                                                    {{ $m['current_formatted'] }}
                                                     @if($m['delta'] != 0)
                                                         <span class="text-[10px] ml-1
                                                             {{ $m['sentiment'] === 'positive' ? 'text-green-600' : '' }}

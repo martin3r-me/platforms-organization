@@ -433,7 +433,7 @@ class Mindmap extends Component
         }
 
         // EntityLinks - dynamisch, egal welcher Morph-Type kommt
-        $entityLinks = EntityDimensionBridge::linksForEntities($entityIds)
+        $entityLinks = EntityDimensionBridge::linksForEntities($entityIds->all())
             ->where('team_id', $this->entity->team_id);
 
         $linkedNodes = [];

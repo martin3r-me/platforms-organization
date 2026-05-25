@@ -14,6 +14,13 @@ class EntityDimensionBridge
     protected static ?array $entityToDimValue = null;
     protected static ?array $dimValueToEntity = null;
 
+    /** All entity-sourced definition IDs (entity, cost-driver, etc.) */
+    protected static ?array $allEntitySourcedDefIds = null;
+    /** Maps per definition: [defId => [entityId => dimValueId]] */
+    protected static ?array $allEntityToDimValue = null;
+    /** Maps per definition: [defId => [dimValueId => entityId]] */
+    protected static ?array $allDimValueToEntity = null;
+
     /**
      * Get the dimension_definition_id for the 'entity' dimension.
      */
@@ -27,6 +34,21 @@ class EntityDimensionBridge
     }
 
     /**
+     * Get all entity-sourced dimension definition IDs (entity, cost-driver, etc.).
+     */
+    public static function allEntitySourcedDefIds(): array
+    {
+        if (static::$allEntitySourcedDefIds === null) {
+            static::$allEntitySourcedDefIds = OrganizationDimensionDefinition::where('value_source', 'entity')
+                ->where('is_active', true)
+                ->pluck('id')
+                ->toArray();
+        }
+
+        return static::$allEntitySourcedDefIds;
+    }
+
+    /**
      * Build lookup maps lazily (once per request).
      */
     protected static function ensureMaps(): void
@@ -37,20 +59,32 @@ class EntityDimensionBridge
 
         static::$entityToDimValue = [];
         static::$dimValueToEntity = [];
+        static::$allEntityToDimValue = [];
+        static::$allDimValueToEntity = [];
 
-        $defId = static::definitionId();
-        if (!$defId) {
+        $defIds = static::allEntitySourcedDefIds();
+        if (empty($defIds)) {
             return;
         }
 
-        $values = OrganizationDimensionValue::where('dimension_definition_id', $defId)->get();
+        $values = OrganizationDimensionValue::whereIn('dimension_definition_id', $defIds)->get();
+        $entityDefId = static::definitionId();
 
         foreach ($values as $v) {
             $sourceEntityId = $v->metadata['source_entity_id'] ?? null;
-            if ($sourceEntityId) {
+            if (!$sourceEntityId) {
+                continue;
+            }
+
+            // Primary entity dimension maps (backward compatible)
+            if ($v->dimension_definition_id === $entityDefId) {
                 static::$entityToDimValue[$sourceEntityId] = $v->id;
                 static::$dimValueToEntity[$v->id] = $sourceEntityId;
             }
+
+            // All entity-sourced dimension maps
+            static::$allEntityToDimValue[$v->dimension_definition_id][$sourceEntityId] = $v->id;
+            static::$allDimValueToEntity[$v->dimension_definition_id][$v->id] = $sourceEntityId;
         }
     }
 
@@ -82,6 +116,9 @@ class EntityDimensionBridge
         static::$entityDefId = null;
         static::$entityToDimValue = null;
         static::$dimValueToEntity = null;
+        static::$allEntitySourcedDefIds = null;
+        static::$allEntityToDimValue = null;
+        static::$allDimValueToEntity = null;
     }
 
     // ─── FORWARD: Entity → Linked Items ──────────────────────────
@@ -96,23 +133,27 @@ class EntityDimensionBridge
     }
 
     /**
-     * Get all dimension links for multiple entities.
+     * Get all dimension links for multiple entities across all entity-sourced dimensions.
      * Returns Collection of OrganizationDimensionLink with virtual entity_id attribute.
      */
     public static function linksForEntities(array $entityIds): Collection
     {
-        $defId = static::definitionId();
-        if (!$defId) {
+        $defIds = static::allEntitySourcedDefIds();
+        if (empty($defIds)) {
             return collect();
         }
 
         static::ensureMaps();
 
+        // Collect dimValueIds across all entity-sourced dimensions
         $dimValueIds = [];
-        foreach ($entityIds as $eid) {
-            $dvId = static::$entityToDimValue[$eid] ?? null;
-            if ($dvId) {
-                $dimValueIds[] = $dvId;
+        foreach ($defIds as $defId) {
+            $map = static::$allEntityToDimValue[$defId] ?? [];
+            foreach ($entityIds as $eid) {
+                $dvId = $map[$eid] ?? null;
+                if ($dvId) {
+                    $dimValueIds[] = $dvId;
+                }
             }
         }
 
@@ -120,13 +161,14 @@ class EntityDimensionBridge
             return collect();
         }
 
-        $links = OrganizationDimensionLink::where('dimension_definition_id', $defId)
+        $links = OrganizationDimensionLink::whereIn('dimension_definition_id', $defIds)
             ->whereIn('dimension_value_id', $dimValueIds)
             ->get();
 
-        // Attach virtual entity_id
+        // Attach virtual entity_id from whichever dimension the link belongs to
         foreach ($links as $link) {
-            $link->entity_id = static::$dimValueToEntity[$link->dimension_value_id] ?? null;
+            $reverseMap = static::$allDimValueToEntity[$link->dimension_definition_id] ?? [];
+            $link->entity_id = $reverseMap[$link->dimension_value_id] ?? null;
         }
 
         return $links;
@@ -324,22 +366,25 @@ class EntityDimensionBridge
     }
 
     /**
-     * Total link count for a set of entity IDs.
+     * Total link count for a set of entity IDs across all entity-sourced dimensions.
      */
     public static function totalLinkCount(array $entityIds): int
     {
-        $defId = static::definitionId();
-        if (!$defId) {
+        $defIds = static::allEntitySourcedDefIds();
+        if (empty($defIds)) {
             return 0;
         }
 
         static::ensureMaps();
 
         $dimValueIds = [];
-        foreach ($entityIds as $eid) {
-            $dvId = static::$entityToDimValue[$eid] ?? null;
-            if ($dvId) {
-                $dimValueIds[] = $dvId;
+        foreach ($defIds as $defId) {
+            $map = static::$allEntityToDimValue[$defId] ?? [];
+            foreach ($entityIds as $eid) {
+                $dvId = $map[$eid] ?? null;
+                if ($dvId) {
+                    $dimValueIds[] = $dvId;
+                }
             }
         }
 
@@ -347,7 +392,7 @@ class EntityDimensionBridge
             return 0;
         }
 
-        return OrganizationDimensionLink::where('dimension_definition_id', $defId)
+        return OrganizationDimensionLink::whereIn('dimension_definition_id', $defIds)
             ->whereIn('dimension_value_id', $dimValueIds)
             ->count();
     }

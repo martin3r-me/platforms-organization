@@ -205,11 +205,150 @@ class Board extends Component
             ];
         }
 
-        // 9. Variety Metrics (Dummy per band)
+        // 9. System Load (per band, from snapshot metrics)
+        $systemLoad = [];
+        foreach ($systemCodes as $code) {
+            $bandEntities = $bands[$code]['entities'];
+            $totalItems = 0;
+            $doneItems = 0;
+            $totalTimeH = 0;
+            $entityCount = count($bandEntities);
+            foreach ($bandEntities as $ent) {
+                $totalItems += $ent['metrics']['items_total'];
+                $doneItems += $ent['metrics']['items_done'];
+                $totalTimeH += $ent['metrics']['time_h'];
+            }
+            $openItems = $totalItems - $doneItems;
+            $loadPerEntity = $entityCount > 0 ? round($openItems / $entityCount, 1) : 0;
+            $congested = $loadPerEntity > 5;
+            $systemLoad[$code] = [
+                'items_total' => $totalItems,
+                'items_done' => $doneItems,
+                'open_items' => $openItems,
+                'time_h' => $totalTimeH,
+                'load_per_entity' => $loadPerEntity,
+                'congested' => $congested,
+                'entity_count' => $entityCount,
+            ];
+        }
+
+        // 10. Regulation Loop Health (per band, from relationships + movements)
+        $regulationHealth = [];
+        // Build entity-to-band map
+        $entityBandMap = [];
+        foreach ($bands as $code => $band) {
+            foreach ($band['entities'] as $ent) {
+                $entityBandMap[$ent['id']] = $code;
+            }
+        }
+        foreach ($envBand['entities'] as $ent) {
+            $entityBandMap[$ent['id']] = 'ENV';
+        }
+
+        foreach ($systemCodes as $code) {
+            $inbound = 0;
+            $outbound = 0;
+            foreach ($relationships as $rel) {
+                $fromBand = $entityBandMap[$rel->from_entity_id] ?? null;
+                $toBand = $entityBandMap[$rel->to_entity_id] ?? null;
+                if ($toBand === $code) $inbound++;
+                if ($fromBand === $code) $outbound++;
+            }
+
+            // Aggregate movement scores for entities in this band
+            $bandMovementScores = [];
+            foreach ($bands[$code]['entities'] as $ent) {
+                $mv = $movements[$ent['id']] ?? null;
+                if ($mv && $mv['delta_count'] > 0) {
+                    $bandMovementScores[] = $mv['score'];
+                }
+            }
+            $avgMovement = count($bandMovementScores) > 0
+                ? round(array_sum($bandMovementScores) / count($bandMovementScores), 1)
+                : 0;
+
+            // Classify
+            $totalConnections = $inbound + $outbound;
+            if ($totalConnections === 0) {
+                $status = 'disconnected';
+            } elseif ($avgMovement < -3 || ($inbound > 0 && $outbound === 0)) {
+                $status = 'stressed';
+            } else {
+                $status = 'healthy';
+            }
+
+            $regulationHealth[$code] = [
+                'inbound' => $inbound,
+                'outbound' => $outbound,
+                'avg_movement' => $avgMovement,
+                'status' => $status,
+            ];
+        }
+
+        // 11. Autonomy Index (S1 entities only)
+        $autonomyIndex = [];
+        foreach ($bands['S1']['entities'] as $ent) {
+            $selfRegulated = 0;
+            $s3Regulated = 0;
+            foreach ($relationships as $rel) {
+                if ($rel->to_entity_id == $ent['id']) {
+                    $fromBand = $entityBandMap[$rel->from_entity_id] ?? null;
+                    if ($fromBand === 'S3') {
+                        $s3Regulated++;
+                    } elseif ($fromBand === 'S1' || $fromBand === 'S2') {
+                        $selfRegulated++;
+                    }
+                }
+                if ($rel->from_entity_id == $ent['id']) {
+                    $toBand = $entityBandMap[$rel->to_entity_id] ?? null;
+                    if ($toBand === 'S1' || $toBand === 'S2') {
+                        $selfRegulated++;
+                    }
+                }
+            }
+            $total = $selfRegulated + $s3Regulated;
+            $autonomyPct = $total > 0 ? round(($selfRegulated / $total) * 100) : 50;
+            $autonomyIndex[$ent['id']] = [
+                'name' => $ent['name'],
+                'autonomy_pct' => $autonomyPct,
+                'self_regulated' => $selfRegulated,
+                's3_regulated' => $s3Regulated,
+            ];
+        }
+
+        // 12. Stability Indicator (entities with movement)
+        $stabilityIndicator = [];
+        foreach ($entities as $e) {
+            $mv = $movements[$e->id] ?? null;
+            if (!$mv || $mv['delta_count'] === 0) continue;
+            $pos = $mv['positive'] ?? 0;
+            $neg = $mv['negative'] ?? 0;
+            $maxVal = max($pos, $neg);
+            $minVal = min($pos, $neg);
+            $oscillation = $maxVal > 0 ? round($minVal / $maxVal, 2) : 0;
+            if ($oscillation >= 0.7) {
+                $status = 'oscillating';
+            } elseif ($oscillation >= 0.3) {
+                $status = 'mixed';
+            } else {
+                $status = 'stable';
+            }
+            $stabilityIndicator[$e->id] = [
+                'name' => $e->name,
+                'oscillation' => $oscillation,
+                'status' => $status,
+                'positive' => $pos,
+                'negative' => $neg,
+            ];
+        }
+
+        // 13. Variety Metrics (real: required based on regulation relationships targeting band)
         $varietyMetrics = [];
         foreach ($systemCodes as $code) {
             $entityCount = count($bands[$code]['entities']);
-            $required = max(2, $entityCount + rand(0, 3));
+            // Required = number of regulation relationships targeting this band (inbound connections imply variety demand)
+            $inboundCount = $regulationHealth[$code]['inbound'] ?? 0;
+            $required = max(2, $inboundCount + 1);
             $available = $entityCount;
             $gap = $available >= $required ? 'balanced' : ($required - $available <= 1 ? 'marginal' : 'deficit');
             $varietyMetrics[$code] = [
@@ -219,18 +358,32 @@ class Board extends Component
             ];
         }
 
-        // 10. Algedonic Alerts (Dummy)
-        $algedonicAlerts = [
-            [
-                'from' => 'S1',
+        // 14. Algedonic Alerts (derived from real data: congested bands + oscillating entities)
+        $algedonicAlerts = [];
+        $congestedBands = array_filter($systemLoad, fn ($l) => $l['congested']);
+        if (!empty($congestedBands)) {
+            $worstBand = array_key_first($congestedBands);
+            $algedonicAlerts[] = [
+                'from' => $worstBand,
                 'to' => 'S5',
-                'message' => 'Kritische Überlast in Operations — Eskalation an Policy',
+                'message' => 'Überlast in ' . $worstBand . ' — ' . $congestedBands[$worstBand]['open_items'] . ' offene Items',
                 'severity' => 'critical',
-                'timestamp' => now()->subMinutes(12)->format('H:i'),
-            ],
-        ];
+                'timestamp' => now()->format('H:i'),
+            ];
+        }
+        $oscillating = array_filter($stabilityIndicator, fn ($s) => $s['status'] === 'oscillating');
+        if (!empty($oscillating) && empty($algedonicAlerts)) {
+            $first = array_values($oscillating)[0];
+            $algedonicAlerts[] = [
+                'from' => 'S2',
+                'to' => 'S5',
+                'message' => 'Oszillation erkannt: ' . $first['name'],
+                'severity' => 'warning',
+                'timestamp' => now()->format('H:i'),
+            ];
+        }
 
-        // 11. Recursive entities (entities with children)
+        // 15. Recursive entities (entities with children)
         $recursiveEntityIds = OrganizationEntityRelationship::query()
             ->whereIn('from_entity_id', $entityIds)
             ->whereHas('relationType', fn ($q) => $q->whereIn('code', ['contains', 'manages']))
@@ -261,10 +414,10 @@ class Board extends Component
             }
         }
 
-        // 12. Dummy Ticker
+        // 16. Dummy Ticker
         $ticker = $this->generateDummyTicker();
 
-        // 13. Regulation Loops
+        // 17. Regulation Loops
         $regulationLoops = [
             ['from' => 'S5', 'to' => 'S3', 'label' => 'Policy → Control', 'color' => $vsmColors['S5']],
             ['from' => 'S4', 'to' => 'S3', 'label' => 'Intelligence → Control', 'color' => $vsmColors['S4']],
@@ -288,6 +441,10 @@ class Board extends Component
             'varietyMetrics' => $varietyMetrics,
             'algedonicAlerts' => $algedonicAlerts,
             'recursiveEntityIds' => $recursiveEntityIds,
+            'systemLoad' => $systemLoad,
+            'regulationHealth' => $regulationHealth,
+            'autonomyIndex' => $autonomyIndex,
+            'stabilityIndicator' => $stabilityIndicator,
         ];
     }
 

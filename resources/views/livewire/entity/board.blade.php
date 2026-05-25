@@ -18,180 +18,221 @@
     </x-slot>
 
     <div id="board-container" class="relative w-full flex-1 min-h-0 overflow-hidden" style="background:#080c18">
-        {{-- Fullscreen Button --}}
-        <button id="board-fullscreen-btn"
-                class="absolute top-3 right-3 z-30 p-2 rounded-lg bg-gray-800/80 backdrop-blur border border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-700/80 transition-all"
-                title="Fullscreen"
-                onclick="toggleBoardFullscreen()">
-            @svg('heroicon-o-arrows-pointing-out', 'w-4 h-4 fullscreen-icon-expand')
-            @svg('heroicon-o-arrows-pointing-in', 'w-4 h-4 fullscreen-icon-collapse hidden')
-        </button>
-
-        {{-- Timeline Slider (neben Fullscreen) --}}
-        <div class="absolute top-3 right-14 z-30 flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800/80 backdrop-blur border border-gray-700/50">
-            <span class="flex items-center gap-1">
-                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                <span class="text-[9px] text-emerald-400 uppercase tracking-wider font-bold">Live</span>
-            </span>
-            <input type="range" min="0" max="100" value="100" disabled
-                   class="w-20 h-1 appearance-none bg-gray-700 rounded opacity-40 cursor-not-allowed"
-                   title="Snapshot-Timeline (demnächst)">
-        </div>
-
-        {{-- Algedonic Alert Banner --}}
-        @if(!empty($this->boardData['algedonicAlerts']))
-            @php $alert = $this->boardData['algedonicAlerts'][0]; @endphp
-            <div class="absolute top-3 left-1/2 -translate-x-1/2 z-30 px-4 py-2 rounded-lg bg-red-900/80 backdrop-blur border border-red-500/50 text-red-200 text-xs flex items-center gap-2 animate-pulse shadow-lg shadow-red-500/20"
-                 style="animation-duration:2s">
-                <span class="text-base">⚡</span>
-                <span><strong>Algedonic:</strong> {{ $alert['message'] }} — {{ $alert['from'] }}→{{ $alert['to'] }} direkt</span>
-                <span class="text-[9px] text-red-400 tabular-nums ml-2">{{ $alert['timestamp'] }}</span>
-            </div>
-        @endif
-
         {{-- Canvas layer for animated flows --}}
         <canvas id="board-flows" class="absolute inset-0 w-full h-full z-0" wire:ignore></canvas>
 
         {{-- DOM layer for bands and cards --}}
-        <div id="board-bands" class="absolute inset-0 w-full h-full z-10 overflow-y-auto" wire:ignore>
+        <div id="board-bands" class="absolute inset-0 w-full h-full z-10 flex flex-col" wire:ignore>
+
+            {{-- Top Bar (replaces floating controls) --}}
+            <div class="shrink-0 h-12 flex items-center justify-between px-4 border-b border-gray-700/40 bg-gray-900/60 backdrop-blur-md">
+                {{-- Left: Algedonic Alert --}}
+                <div class="flex-1 min-w-0 max-w-md">
+                    @if(!empty($this->boardData['algedonicAlerts']))
+                        @php $alert = $this->boardData['algedonicAlerts'][0]; @endphp
+                        <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-900/60 border border-red-500/40 text-red-200 text-xs truncate animate-pulse" style="animation-duration:2s">
+                            <span class="text-sm shrink-0">&#9889;</span>
+                            <span class="truncate"><strong>Algedonic:</strong> {{ $alert['message'] }}</span>
+                            <span class="text-[9px] text-red-400 tabular-nums shrink-0 ml-1">{{ $alert['timestamp'] }}</span>
+                        </div>
+                    @else
+                        <div class="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-500">
+                            @svg('heroicon-o-check-circle', 'w-4 h-4 text-emerald-500')
+                            <span>Keine Alarme</span>
+                        </div>
+                    @endif
+                </div>
+
+                {{-- Right: Timeline + Fullscreen --}}
+                <div class="flex items-center gap-3 shrink-0">
+                    {{-- Timeline Slider --}}
+                    <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-gray-800/60 border border-gray-700/50">
+                        <span class="flex items-center gap-1">
+                            <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                            <span class="text-[9px] text-emerald-400 uppercase tracking-wider font-bold">Live</span>
+                        </span>
+                        <input type="range" min="0" max="100" value="100" disabled
+                               class="w-20 h-1 appearance-none bg-gray-700 rounded opacity-40 cursor-not-allowed"
+                               title="Snapshot-Timeline (demnächst)">
+                    </div>
+
+                    {{-- Fullscreen --}}
+                    <button id="board-fullscreen-btn"
+                            class="p-2 rounded-lg bg-gray-800/60 border border-gray-700/50 text-gray-400 hover:text-white hover:bg-gray-700/80 transition-all"
+                            title="Fullscreen"
+                            onclick="toggleBoardFullscreen()">
+                        @svg('heroicon-o-arrows-pointing-out', 'w-4 h-4 fullscreen-icon-expand')
+                        @svg('heroicon-o-arrows-pointing-in', 'w-4 h-4 fullscreen-icon-collapse hidden')
+                    </button>
+                </div>
+            </div>
+
+            {{-- Content area --}}
+            <div class="flex-1 min-h-0 overflow-y-auto">
             <div class="flex h-full">
 
-                {{-- Left Sidebar --}}
-                <div id="board-sidebar" class="w-64 shrink-0 flex flex-col gap-3 p-3 overflow-y-auto">
-                    {{-- Legend --}}
-                    <div class="bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl text-xs overflow-hidden">
-                        <div class="px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2">
-                            @svg('heroicon-o-swatch', 'w-4 h-4 text-gray-500')
-                            <span>Legende</span>
-                        </div>
-                        <div class="p-2 space-y-1">
-                            <div class="px-2 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-500">VSM Ebenen</div>
-                            @foreach(['S5' => 'Policy', 'S4' => 'Intelligence', 'S3' => 'Control', 'S2' => 'Coordination', 'S1' => 'Operations', 'ENV' => 'Environment'] as $code => $label)
-                                <div class="flex items-center gap-2 px-2 py-1">
-                                    <span class="w-3 h-3 rounded-sm shrink-0" style="background:{{ $this->boardData['vsmColors'][$code] }}"></span>
-                                    <span class="text-gray-300">{{ $code }} · {{ $label }}</span>
-                                </div>
-                            @endforeach
-                            <div class="border-t border-gray-700/50 my-1"></div>
-                            <div class="px-2 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-500">Flow-Typen</div>
-                            @foreach(['service' => 'Service', 'info' => 'Information', 'supply' => 'Supply', 'hierarchy' => 'Hierarchie', 'collaboration' => 'Kollaboration'] as $cat => $label)
-                                <div class="flex items-center gap-2 px-2 py-1">
-                                    <span class="inline-block shrink-0" style="width:16px;height:2px;background:{{ $this->boardData['flowColors'][$cat] }};box-shadow:0 0 4px {{ $this->boardData['flowColors'][$cat] }}60"></span>
-                                    <span class="text-gray-400">{{ $label }}</span>
-                                </div>
-                            @endforeach
-                        </div>
+                {{-- Left Sidebar (3-zone layout) --}}
+                <div id="board-sidebar" class="w-64 shrink-0 flex flex-col p-3">
+
+                    {{-- Zone 1: Top — System Health (always visible) --}}
+                    <div class="shrink-0 space-y-3 mb-3">
+                        @include('organization::livewire.entity.partials.board-system-health', [
+                            'systemLoad' => $this->boardData['systemLoad'],
+                            'regulationHealth' => $this->boardData['regulationHealth'],
+                            'stabilityIndicator' => $this->boardData['stabilityIndicator'],
+                        ])
                     </div>
 
-                    {{-- Balance Panel (compact in sidebar) --}}
-                    <div class="bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl text-xs overflow-hidden">
-                        <div class="px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2">
-                            @svg('heroicon-o-scale', 'w-4 h-4 text-blue-400')
-                            <span>VSM-Balance</span>
-                        </div>
-                        <div class="p-2 space-y-1">
-                            @php $maxCount = max(1, max(array_values($this->boardData['balance']))); @endphp
-                            @foreach($this->boardData['balance'] as $code => $count)
-                                @php $isEmpty = $count === 0; $pct = round(($count / $maxCount) * 100); @endphp
-                                <div class="flex items-center gap-2 px-1 py-0.5 rounded {{ $isEmpty ? 'bg-red-500/10' : '' }}">
-                                    <span class="w-8 text-[10px] font-bold {{ $isEmpty ? 'text-red-400' : 'text-gray-400' }}">{{ $code }}</span>
-                                    <div class="flex-1 h-1.5 rounded bg-gray-800 overflow-hidden">
-                                        <div class="h-full rounded {{ $isEmpty ? 'bg-red-500/50' : '' }}" style="width:{{ $pct }}%;background:{{ !$isEmpty ? ($this->boardData['vsmColors'][$code] ?? '#3b82f6') : '' }}"></div>
+                    {{-- Zone 2: Middle — Scrollable panels --}}
+                    <div class="flex-1 min-h-0 overflow-y-auto space-y-3">
+
+                        {{-- Balance Panel (collapsible, open by default) --}}
+                        <div x-data="{ open: true }" class="bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl text-xs overflow-hidden">
+                            <button @click="open = !open" class="w-full px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">
+                                @svg('heroicon-o-scale', 'w-4 h-4 text-blue-400')
+                                <span>VSM-Balance</span>
+                                <span class="ml-auto text-gray-600 text-[10px]" x-text="open ? '&#9660;' : '&#9654;'"></span>
+                            </button>
+                            <div x-show="open" x-collapse class="p-2 space-y-1">
+                                @php $maxCount = max(1, max(array_values($this->boardData['balance']))); @endphp
+                                @foreach($this->boardData['balance'] as $code => $count)
+                                    @php $isEmpty = $count === 0; $pct = round(($count / $maxCount) * 100); @endphp
+                                    <div class="flex items-center gap-2 px-1 py-0.5 rounded {{ $isEmpty ? 'bg-red-500/10' : '' }}">
+                                        <span class="w-8 text-[10px] font-bold {{ $isEmpty ? 'text-red-400' : 'text-gray-400' }}">{{ $code }}</span>
+                                        <div class="flex-1 h-1.5 rounded bg-gray-800 overflow-hidden">
+                                            <div class="h-full rounded {{ $isEmpty ? 'bg-red-500/50' : '' }}" style="width:{{ $pct }}%;background:{{ !$isEmpty ? ($this->boardData['vsmColors'][$code] ?? '#3b82f6') : '' }}"></div>
+                                        </div>
+                                        <span class="w-5 text-right tabular-nums {{ $isEmpty ? 'text-red-400' : 'text-white' }} font-bold text-[11px]">{{ $count }}</span>
                                     </div>
-                                    <span class="w-5 text-right tabular-nums {{ $isEmpty ? 'text-red-400' : 'text-white' }} font-bold text-[11px]">{{ $count }}</span>
-                                </div>
-                            @endforeach
-                            @php
-                                $diag = $this->boardData['diagnosis'];
-                                $diagType = str_contains($diag, 'fragil') || str_contains($diag, 'leere') ? 'warn' : (str_contains($diag, 'Gleichgewicht') || str_contains($diag, 'besetzt') ? 'ok' : 'warn');
-                            @endphp
-                            <div class="mt-1 px-1 text-[10px] {{ $diagType === 'ok' ? 'text-emerald-400' : 'text-amber-400' }}">
-                                {{ $diagType === 'ok' ? '&#10003;' : '&#9888;' }} {{ $diag }}
-                            </div>
-                        </div>
-                    </div>
-
-                    {{-- Variety Panel --}}
-                    <div x-data="{ open: true }" class="bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl text-xs overflow-hidden">
-                        <button @click="open = !open" class="w-full px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">
-                            @svg('heroicon-o-variable', 'w-4 h-4 text-purple-400')
-                            <span>Varietät (Ashby)</span>
-                            <span class="ml-auto text-gray-600 text-[10px]" x-text="open ? '▼' : '▶'"></span>
-                        </button>
-                        <div x-show="open" x-collapse class="p-2 space-y-1.5">
-                            @foreach($this->boardData['varietyMetrics'] as $code => $vm)
+                                @endforeach
                                 @php
-                                    $maxVar = max($vm['required'], $vm['available'], 1);
-                                    $reqPct = round(($vm['required'] / $maxVar) * 100);
-                                    $avlPct = round(($vm['available'] / $maxVar) * 100);
-                                    $gapColor = match($vm['gap']) {
-                                        'balanced' => 'text-emerald-400',
-                                        'marginal' => 'text-amber-400',
-                                        default => 'text-red-400',
-                                    };
+                                    $diag = $this->boardData['diagnosis'];
+                                    $diagType = str_contains($diag, 'fragil') || str_contains($diag, 'leere') ? 'warn' : (str_contains($diag, 'Gleichgewicht') || str_contains($diag, 'besetzt') ? 'ok' : 'warn');
                                 @endphp
-                                <div class="px-1">
-                                    <div class="flex items-center justify-between mb-0.5">
-                                        <span class="text-[10px] font-bold text-gray-400">{{ $code }}</span>
-                                        <span class="text-[9px] {{ $gapColor }}">{{ $vm['gap'] }}</span>
-                                    </div>
-                                    <div class="flex items-center gap-1">
-                                        <span class="text-[8px] text-gray-600 w-6">Req</span>
-                                        <div class="flex-1 h-1 rounded bg-gray-800 overflow-hidden">
-                                            <div class="h-full rounded bg-purple-500/60" style="width:{{ $reqPct }}%"></div>
-                                        </div>
-                                        <span class="text-[9px] text-gray-500 w-3 text-right tabular-nums">{{ $vm['required'] }}</span>
-                                    </div>
-                                    <div class="flex items-center gap-1 mt-0.5">
-                                        <span class="text-[8px] text-gray-600 w-6">Avl</span>
-                                        <div class="flex-1 h-1 rounded bg-gray-800 overflow-hidden">
-                                            <div class="h-full rounded" style="width:{{ $avlPct }}%;background:{{ $this->boardData['vsmColors'][$code] ?? '#3b82f6' }}"></div>
-                                        </div>
-                                        <span class="text-[9px] text-gray-500 w-3 text-right tabular-nums">{{ $vm['available'] }}</span>
-                                    </div>
+                                <div class="mt-1 px-1 text-[10px] {{ $diagType === 'ok' ? 'text-emerald-400' : 'text-amber-400' }}">
+                                    {{ $diagType === 'ok' ? '&#10003;' : '&#9888;' }} {{ $diag }}
                                 </div>
-                            @endforeach
-                            <div class="mt-1 px-1 text-[9px] text-gray-500 leading-snug border-t border-gray-700/30 pt-1">
-                                Ashby: Required Variety ≤ Available Variety für Steuerungsfähigkeit
+                            </div>
+                        </div>
+
+                        {{-- Variety Panel --}}
+                        <div x-data="{ open: true }" class="bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl text-xs overflow-hidden">
+                            <button @click="open = !open" class="w-full px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">
+                                @svg('heroicon-o-variable', 'w-4 h-4 text-purple-400')
+                                <span>Varietät (Ashby)</span>
+                                <span class="ml-auto text-gray-600 text-[10px]" x-text="open ? '&#9660;' : '&#9654;'"></span>
+                            </button>
+                            <div x-show="open" x-collapse class="p-2 space-y-1.5">
+                                @foreach($this->boardData['varietyMetrics'] as $code => $vm)
+                                    @php
+                                        $maxVar = max($vm['required'], $vm['available'], 1);
+                                        $reqPct = round(($vm['required'] / $maxVar) * 100);
+                                        $avlPct = round(($vm['available'] / $maxVar) * 100);
+                                        $gapColor = match($vm['gap']) {
+                                            'balanced' => 'text-emerald-400',
+                                            'marginal' => 'text-amber-400',
+                                            default => 'text-red-400',
+                                        };
+                                    @endphp
+                                    <div class="px-1">
+                                        <div class="flex items-center justify-between mb-0.5">
+                                            <span class="text-[10px] font-bold text-gray-400">{{ $code }}</span>
+                                            <span class="text-[9px] {{ $gapColor }}">{{ $vm['gap'] }}</span>
+                                        </div>
+                                        <div class="flex items-center gap-1">
+                                            <span class="text-[8px] text-gray-600 w-6">Req</span>
+                                            <div class="flex-1 h-1 rounded bg-gray-800 overflow-hidden">
+                                                <div class="h-full rounded bg-purple-500/60" style="width:{{ $reqPct }}%"></div>
+                                            </div>
+                                            <span class="text-[9px] text-gray-500 w-3 text-right tabular-nums">{{ $vm['required'] }}</span>
+                                        </div>
+                                        <div class="flex items-center gap-1 mt-0.5">
+                                            <span class="text-[8px] text-gray-600 w-6">Avl</span>
+                                            <div class="flex-1 h-1 rounded bg-gray-800 overflow-hidden">
+                                                <div class="h-full rounded" style="width:{{ $avlPct }}%;background:{{ $this->boardData['vsmColors'][$code] ?? '#3b82f6' }}"></div>
+                                            </div>
+                                            <span class="text-[9px] text-gray-500 w-3 text-right tabular-nums">{{ $vm['available'] }}</span>
+                                        </div>
+                                    </div>
+                                @endforeach
+                                <div class="mt-1 px-1 text-[9px] text-gray-500 leading-snug border-t border-gray-700/30 pt-1">
+                                    Ashby: Required Variety &le; Available Variety für Steuerungsfähigkeit
+                                </div>
+                            </div>
+                        </div>
+
+                        {{-- System Load Panel --}}
+                        @include('organization::livewire.entity.partials.board-system-load', [
+                            'systemLoad' => $this->boardData['systemLoad'],
+                            'autonomyIndex' => $this->boardData['autonomyIndex'],
+                            'stabilityIndicator' => $this->boardData['stabilityIndicator'],
+                            'boardData' => $this->boardData,
+                        ])
+
+                        {{-- Legend (collapsible, collapsed by default) --}}
+                        <div x-data="{ open: false }" class="bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl text-xs overflow-hidden">
+                            <button @click="open = !open" class="w-full px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">
+                                @svg('heroicon-o-swatch', 'w-4 h-4 text-gray-500')
+                                <span>Legende</span>
+                                <span class="ml-auto text-gray-600 text-[10px]" x-text="open ? '&#9660;' : '&#9654;'"></span>
+                            </button>
+                            <div x-show="open" x-collapse class="p-2 space-y-1">
+                                <div class="px-2 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-500">VSM Ebenen</div>
+                                @foreach(['S5' => 'Policy', 'S4' => 'Intelligence', 'S3' => 'Control', 'S2' => 'Coordination', 'S1' => 'Operations', 'ENV' => 'Environment'] as $code => $label)
+                                    <div class="flex items-center gap-2 px-2 py-1">
+                                        <span class="w-3 h-3 rounded-sm shrink-0" style="background:{{ $this->boardData['vsmColors'][$code] }}"></span>
+                                        <span class="text-gray-300">{{ $code }} · {{ $label }}</span>
+                                    </div>
+                                @endforeach
+                                <div class="border-t border-gray-700/50 my-1"></div>
+                                <div class="px-2 pt-1 pb-0.5 text-[10px] uppercase tracking-wider text-gray-500">Flow-Typen</div>
+                                @foreach(['service' => 'Service', 'info' => 'Information', 'supply' => 'Supply', 'hierarchy' => 'Hierarchie', 'collaboration' => 'Kollaboration'] as $cat => $label)
+                                    <div class="flex items-center gap-2 px-2 py-1">
+                                        <span class="inline-block shrink-0" style="width:16px;height:2px;background:{{ $this->boardData['flowColors'][$cat] }};box-shadow:0 0 4px {{ $this->boardData['flowColors'][$cat] }}60"></span>
+                                        <span class="text-gray-400">{{ $label }}</span>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+
+                        {{-- Interventions Panel --}}
+                        <div x-data="{ open: false }" class="bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl text-xs overflow-hidden">
+                            <button @click="open = !open" class="w-full px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">
+                                @svg('heroicon-o-wrench-screwdriver', 'w-4 h-4 text-amber-400')
+                                <span>Interventionen</span>
+                                <span class="ml-auto text-gray-600 text-[10px]" x-text="open ? '&#9660;' : '&#9654;'"></span>
+                            </button>
+                            <div x-show="open" x-collapse class="p-2 space-y-1.5">
+                                <button disabled class="w-full px-2 py-1.5 rounded bg-gray-800/50 text-gray-600 text-left cursor-not-allowed flex items-center gap-2">
+                                    @svg('heroicon-o-arrows-right-left', 'w-3.5 h-3.5')
+                                    <span>Ressourcen verschieben</span>
+                                </button>
+                                <button disabled class="w-full px-2 py-1.5 rounded bg-gray-800/50 text-gray-600 text-left cursor-not-allowed flex items-center gap-2">
+                                    @svg('heroicon-o-bell-alert', 'w-3.5 h-3.5')
+                                    <span>Alert auslösen</span>
+                                </button>
+                                <button disabled class="w-full px-2 py-1.5 rounded bg-gray-800/50 text-gray-600 text-left cursor-not-allowed flex items-center gap-2">
+                                    @svg('heroicon-o-document-text', 'w-3.5 h-3.5')
+                                    <span>Policy dokumentieren</span>
+                                </button>
+                                <div class="mt-1 px-1 text-[9px] text-gray-600 italic">
+                                    Aktionen in zukünftiger Version
+                                </div>
                             </div>
                         </div>
                     </div>
 
-                    {{-- Interventions Panel --}}
-                    <div x-data="{ open: false }" class="bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl text-xs overflow-hidden">
-                        <button @click="open = !open" class="w-full px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">
-                            @svg('heroicon-o-wrench-screwdriver', 'w-4 h-4 text-amber-400')
-                            <span>Interventionen</span>
-                            <span class="ml-auto text-gray-600 text-[10px]" x-text="open ? '▼' : '▶'"></span>
-                        </button>
-                        <div x-show="open" x-collapse class="p-2 space-y-1.5">
-                            <button disabled class="w-full px-2 py-1.5 rounded bg-gray-800/50 text-gray-600 text-left cursor-not-allowed flex items-center gap-2">
-                                @svg('heroicon-o-arrows-right-left', 'w-3.5 h-3.5')
-                                <span>Ressourcen verschieben</span>
-                            </button>
-                            <button disabled class="w-full px-2 py-1.5 rounded bg-gray-800/50 text-gray-600 text-left cursor-not-allowed flex items-center gap-2">
-                                @svg('heroicon-o-bell-alert', 'w-3.5 h-3.5')
-                                <span>Alert auslösen</span>
-                            </button>
-                            <button disabled class="w-full px-2 py-1.5 rounded bg-gray-800/50 text-gray-600 text-left cursor-not-allowed flex items-center gap-2">
-                                @svg('heroicon-o-document-text', 'w-3.5 h-3.5')
-                                <span>Policy dokumentieren</span>
-                            </button>
-                            <div class="mt-1 px-1 text-[9px] text-gray-600 italic">
-                                Aktionen in zukünftiger Version
+                    {{-- Zone 3: Bottom — Sticky Info Panel --}}
+                    <div class="shrink-0 mt-3">
+                        <div id="board-info-panel" class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-xl shadow-2xl text-xs hidden">
+                            <div class="p-3">
+                                <div class="flex items-center gap-2 mb-2">
+                                    <div id="board-info-dot" class="w-3 h-3 rounded-full shrink-0 ring-2 ring-white/20"></div>
+                                    <span id="board-info-name" class="font-bold text-sm text-white truncate"></span>
+                                </div>
+                                <div id="board-info-meta" class="text-gray-400 space-y-0.5"></div>
+                                <div id="board-info-actions" class="mt-2 flex gap-2"></div>
                             </div>
-                        </div>
-                    </div>
-
-                    {{-- Info Panel (hidden until card clicked) --}}
-                    <div id="board-info-panel" class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-xl shadow-2xl text-xs hidden">
-                        <div class="p-3">
-                            <div class="flex items-center gap-2 mb-2">
-                                <div id="board-info-dot" class="w-3 h-3 rounded-full shrink-0 ring-2 ring-white/20"></div>
-                                <span id="board-info-name" class="font-bold text-sm text-white truncate"></span>
-                            </div>
-                            <div id="board-info-meta" class="text-gray-400 space-y-0.5"></div>
-                            <div id="board-info-actions" class="mt-2 flex gap-2"></div>
                         </div>
                     </div>
                 </div>
@@ -288,6 +329,7 @@
                     </div>
                 </div>
 
+            </div>
             </div>
         </div>
     </div>

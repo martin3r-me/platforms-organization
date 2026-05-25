@@ -23,6 +23,7 @@ use Platform\Organization\Services\EntityHierarchyService;
 use Platform\Organization\Services\EntityHierarchyResolver;
 use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
+use Platform\Organization\Services\DimensionRadarService;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationPerspective;
 use Platform\Organization\Models\OrganizationSkill;
@@ -558,6 +559,13 @@ class Show extends Component
                 'max_minutes' => 0,
             ];
         }
+    }
+
+    #[Computed]
+    public function dimensionRadar(): array
+    {
+        return resolve(DimensionRadarService::class)
+            ->computeRadar($this->entity->id, $this->entity->team_id);
     }
 
     #[Computed]

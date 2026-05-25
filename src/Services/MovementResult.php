@@ -29,6 +29,7 @@ class MovementResult
         return [
             'metrics' => $metrics,
             'metrics_by_group' => $this->metricsByGroupArray(),
+            'metrics_by_dimension' => $this->metricsByDimensionArray(),
             'days' => $this->days,
             'group' => $this->group,
             'available_groups' => $this->availableGroups,
@@ -62,6 +63,25 @@ class MovementResult
         $result = [];
         foreach ($this->byGroup() as $groupKey => $deltas) {
             $result[$groupKey] = array_map(fn (MetricDelta $d) => $d->toArray(), $deltas);
+        }
+
+        return $result;
+    }
+
+    protected function metricsByDimensionArray(): array
+    {
+        $allDefs = resolve(EntityLinkRegistry::class)->allMetricDefinitions();
+        $dimensions = EntityLinkRegistry::allDimensions();
+        $result = [];
+
+        foreach ($this->deltas as $key => $delta) {
+            // For cascaded keys (key_cascaded), look up the base key
+            $lookupKey = str_ends_with($key, '_cascaded') ? substr($key, 0, -9) : $key;
+            $dim = $allDefs[$lookupKey]['dimension'] ?? null;
+
+            if ($dim && isset($dimensions[$dim])) {
+                $result[$dim][] = $delta->toArray();
+            }
         }
 
         return $result;

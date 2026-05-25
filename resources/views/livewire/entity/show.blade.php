@@ -273,12 +273,35 @@
                 @endif
             </div>
 
+            {{-- ═══ Block A2: Dimensionen-Radar ═══ --}}
+            @php $radar = $this->dimensionRadar; @endphp
+            @if(!empty($radar))
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                    <h2 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">7&frac12; Dimensionen</h2>
+                    @include('organization::livewire.entity.partials.dimension-radar', ['radar' => $radar])
+                </div>
+            @endif
+
             {{-- ═══ Block B: Bewegung (7 Tage) ═══ --}}
             @php $movement = $this->movement; @endphp
             @if(!empty($movement['metrics']))
-                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6" x-data="{ movementGrouping: 'dimension' }">
                     <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-sm font-semibold text-[var(--ui-secondary)]">Bewegung (7 Tage)</h2>
+                        <div class="flex items-center gap-3">
+                            <h2 class="text-sm font-semibold text-[var(--ui-secondary)]">Bewegung (7 Tage)</h2>
+                            <div class="flex bg-[var(--ui-muted-5)] rounded p-0.5 border border-[var(--ui-border)]/30">
+                                <button @click="movementGrouping = 'dimension'"
+                                    class="px-2 py-0.5 text-[10px] rounded transition-colors"
+                                    :class="movementGrouping === 'dimension' ? 'bg-white text-[var(--ui-secondary)] shadow-sm' : 'text-[var(--ui-muted)]'">
+                                    Dimension
+                                </button>
+                                <button @click="movementGrouping = 'module'"
+                                    class="px-2 py-0.5 text-[10px] rounded transition-colors"
+                                    :class="movementGrouping === 'module' ? 'bg-white text-[var(--ui-secondary)] shadow-sm' : 'text-[var(--ui-muted)]'">
+                                    Modul
+                                </button>
+                            </div>
+                        </div>
                         <div class="flex gap-1">
                             <button wire:click="$set('movementStream', null)"
                                 class="px-2 py-1 text-[10px] rounded transition-colors {{ !$movementStream ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]' }}">
@@ -311,42 +334,81 @@
                         </div>
                     @endif
 
-                    {{-- Full Metric Grid (shown when stream filter active or many metrics) --}}
+                    {{-- Full Metric Grid --}}
                     @php
                         $totalMetrics = collect($movement['metrics'])->filter(fn($m) => $m['current'] > 0 || $m['previous'] > 0)->count();
+                        $dimensionLabels = \Platform\Organization\Services\EntityLinkRegistry::allDimensions();
                     @endphp
                     @if($movementStream || $totalMetrics > 5)
-                        @foreach($movement['metrics_by_group'] as $groupKey => $metrics)
-                            <div class="mb-3">
-                                <div class="text-[10px] font-medium text-[var(--ui-muted)] uppercase mb-1.5">
-                                    {{ ucfirst($groupKey) }}
-                                </div>
-                                <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                    @foreach($metrics as $m)
-                                        @if($m['current'] != 0 || $m['previous'] != 0)
-                                            <div class="py-2 px-2.5 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/20">
-                                                <div class="text-sm font-bold text-[var(--ui-text)]">
-                                                    {{ $m['current_formatted'] }}
-                                                    @if($m['delta'] != 0)
-                                                        <span class="text-[10px] ml-1
-                                                            {{ $m['sentiment'] === 'positive' ? 'text-green-600' : '' }}
-                                                            {{ $m['sentiment'] === 'negative' ? 'text-red-600' : '' }}
-                                                            {{ $m['sentiment'] === 'neutral' ? 'text-[var(--ui-muted)]' : '' }}
-                                                        ">{{ $m['delta_formatted'] }}</span>
+                        {{-- Dimension grouping --}}
+                        <div x-show="movementGrouping === 'dimension'">
+                            @foreach($movement['metrics_by_dimension'] as $dimKey => $metrics)
+                                <div class="mb-3">
+                                    <div class="text-[10px] font-medium text-[var(--ui-muted)] uppercase mb-1.5">
+                                        {{ $dimensionLabels[$dimKey]['label'] ?? ucfirst($dimKey) }}
+                                    </div>
+                                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                        @foreach($metrics as $m)
+                                            @if($m['current'] != 0 || $m['previous'] != 0)
+                                                <div class="py-2 px-2.5 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/20">
+                                                    <div class="text-sm font-bold text-[var(--ui-text)]">
+                                                        {{ $m['current_formatted'] }}
+                                                        @if($m['delta'] != 0)
+                                                            <span class="text-[10px] ml-1
+                                                                {{ $m['sentiment'] === 'positive' ? 'text-green-600' : '' }}
+                                                                {{ $m['sentiment'] === 'negative' ? 'text-red-600' : '' }}
+                                                                {{ $m['sentiment'] === 'neutral' ? 'text-[var(--ui-muted)]' : '' }}
+                                                            ">{{ $m['delta_formatted'] }}</span>
+                                                        @endif
+                                                    </div>
+                                                    <div class="text-[10px] text-[var(--ui-muted)]">{{ $m['label'] }}</div>
+                                                    @if($m['ratio'])
+                                                        <div class="mt-1 h-1 bg-[var(--ui-border)]/30 rounded-full overflow-hidden">
+                                                            <div class="h-full bg-blue-500 rounded-full" style="width: {{ min($m['ratio'], 100) }}%"></div>
+                                                        </div>
                                                     @endif
                                                 </div>
-                                                <div class="text-[10px] text-[var(--ui-muted)]">{{ $m['label'] }}</div>
-                                                @if($m['ratio'])
-                                                    <div class="mt-1 h-1 bg-[var(--ui-border)]/30 rounded-full overflow-hidden">
-                                                        <div class="h-full bg-blue-500 rounded-full" style="width: {{ min($m['ratio'], 100) }}%"></div>
-                                                    </div>
-                                                @endif
-                                            </div>
-                                        @endif
-                                    @endforeach
+                                            @endif
+                                        @endforeach
+                                    </div>
                                 </div>
-                            </div>
-                        @endforeach
+                            @endforeach
+                        </div>
+
+                        {{-- Module grouping (original) --}}
+                        <div x-show="movementGrouping === 'module'" x-cloak>
+                            @foreach($movement['metrics_by_group'] as $groupKey => $metrics)
+                                <div class="mb-3">
+                                    <div class="text-[10px] font-medium text-[var(--ui-muted)] uppercase mb-1.5">
+                                        {{ ucfirst($groupKey) }}
+                                    </div>
+                                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
+                                        @foreach($metrics as $m)
+                                            @if($m['current'] != 0 || $m['previous'] != 0)
+                                                <div class="py-2 px-2.5 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/20">
+                                                    <div class="text-sm font-bold text-[var(--ui-text)]">
+                                                        {{ $m['current_formatted'] }}
+                                                        @if($m['delta'] != 0)
+                                                            <span class="text-[10px] ml-1
+                                                                {{ $m['sentiment'] === 'positive' ? 'text-green-600' : '' }}
+                                                                {{ $m['sentiment'] === 'negative' ? 'text-red-600' : '' }}
+                                                                {{ $m['sentiment'] === 'neutral' ? 'text-[var(--ui-muted)]' : '' }}
+                                                            ">{{ $m['delta_formatted'] }}</span>
+                                                        @endif
+                                                    </div>
+                                                    <div class="text-[10px] text-[var(--ui-muted)]">{{ $m['label'] }}</div>
+                                                    @if($m['ratio'])
+                                                        <div class="mt-1 h-1 bg-[var(--ui-border)]/30 rounded-full overflow-hidden">
+                                                            <div class="h-full bg-blue-500 rounded-full" style="width: {{ min($m['ratio'], 100) }}%"></div>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            @endif
+                                        @endforeach
+                                    </div>
+                                </div>
+                            @endforeach
+                        </div>
                     @endif
                 </div>
             @endif

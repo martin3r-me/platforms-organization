@@ -3,6 +3,7 @@
 namespace Platform\Organization\Services;
 
 use Platform\Organization\Contracts\EntityLinkProvider;
+use Platform\Organization\Contracts\HasCostDriverMetrics;
 use Platform\Organization\Contracts\HasMetricDefinitions;
 use Platform\Organization\Contracts\HasPersonMetrics;
 
@@ -461,6 +462,33 @@ class EntityLinkRegistry
 
             foreach ($metrics as $entityId => $entityMetrics) {
                 foreach ($entityMetrics as $key => $value) {
+                    $result[$entityId][$key] = ($result[$entityId][$key] ?? 0) + $value;
+                }
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Ruft costDriverAdjustments() aller Provider auf, die HasCostDriverMetrics implementieren.
+     *
+     * @param array<int, int[]> $groupLinksByEntity [entityId => [groupIds]]
+     * @return array<int, array<string, float>> [entityId => ['cashflow_in' => x, ...]]
+     */
+    public function computeCostDriverAdjustments(array $groupLinksByEntity): array
+    {
+        $result = [];
+
+        foreach ($this->providers as $provider) {
+            if (!$provider instanceof HasCostDriverMetrics) {
+                continue;
+            }
+
+            $adjustments = $provider->costDriverAdjustments($groupLinksByEntity);
+
+            foreach ($adjustments as $entityId => $metrics) {
+                foreach ($metrics as $key => $value) {
                     $result[$entityId][$key] = ($result[$entityId][$key] ?? 0) + $value;
                 }
             }

@@ -93,6 +93,24 @@ class SnapshotEntitiesCommand extends Command
         $registry = resolve(EntityLinkRegistry::class);
         $itemMetrics = $registry->computeMetricsBatch($linksByEntityAndType);
 
+        // 3b. Compute cost-driver adjustments
+        $groupLinksByEntity = $linksByEntityAndType;
+        // Extract only bank account group links for cost-driver context
+        $groupLinksForCostDriver = [];
+        foreach ($groupLinksByEntity as $eid => $typeMap) {
+            if (isset($typeMap['drip_bank_account_group'])) {
+                $groupLinksForCostDriver[$eid] = $typeMap['drip_bank_account_group'];
+            }
+        }
+        if (!empty($groupLinksForCostDriver)) {
+            $costDriverAdjustments = $registry->computeCostDriverAdjustments($groupLinksForCostDriver);
+            foreach ($costDriverAdjustments as $entityId => $adjustments) {
+                foreach ($adjustments as $key => $value) {
+                    $itemMetrics[$entityId][$key] = ($itemMetrics[$entityId][$key] ?? 0) + $value;
+                }
+            }
+        }
+
         // 4. Compute time summaries via EntityTimeResolver
         $resolver = new EntityTimeResolver();
         $contextPairs = $resolver->resolveContextPairsBatch($entityIds);

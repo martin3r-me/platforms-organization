@@ -55,7 +55,7 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
                 ],
                 'entity_id' => [
                     'type' => 'integer',
-                    'description' => 'Shortcut für dimension="entity": Organization-Entity-ID. Wird automatisch in dimension_item_id aufgelöst. Ersetzt dimension_item_id.',
+                    'description' => 'Shortcut für entity-basierte Dimensionen (entity, cost-driver): Organization-Entity-ID. Wird automatisch in dimension_item_id aufgelöst.',
                 ],
                 'percentage' => [
                     'type' => 'number',
@@ -94,16 +94,19 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
             }
 
             // entity_id shortcut: resolve Organization Entity ID → DimensionValue ID
-            if ($entityId && $dimension === 'entity') {
-                $def = OrganizationDimensionDefinition::findByKey('entity');
-                if ($def) {
+            // Works for any dimension with value_source='entity' (entity, cost-driver, etc.)
+            if ($entityId) {
+                $def = OrganizationDimensionDefinition::findByKey($dimension);
+                if ($def && $def->value_source === 'entity') {
                     $dimValue = OrganizationDimensionValue::where('dimension_definition_id', $def->id)
                         ->where('metadata->source_entity_id', $entityId)
                         ->first();
                     if (!$dimValue) {
-                        return ToolResult::error('NOT_FOUND', "Keine DimensionValue für Entity-ID {$entityId} gefunden. Existiert diese Entity?");
+                        return ToolResult::error('NOT_FOUND', "Keine DimensionValue für Entity-ID {$entityId} in Dimension '{$dimension}' gefunden.");
                     }
                     $dimensionItemId = $dimValue->id;
+                } elseif ($def) {
+                    return ToolResult::error('VALIDATION_ERROR', "entity_id-Shortcut ist nur für entity-basierte Dimensionen verfügbar. Nutze dimension_item_id.");
                 }
             }
 

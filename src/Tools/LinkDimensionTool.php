@@ -6,6 +6,8 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
+use Platform\Organization\Models\OrganizationDimensionDefinition;
+use Platform\Organization\Models\OrganizationDimensionValue;
 use Platform\Organization\Services\DimensionLinkService;
 
 /**
@@ -49,11 +51,15 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
                 ],
                 'dimension_item_id' => [
                     'type' => 'integer',
-                    'description' => 'ERFORDERLICH: ID des Dimensions-Elements (z.B. customer_id, cost_center_id, person_id). Nutze die jeweiligen GET-Tools um IDs zu ermitteln.',
+                    'description' => 'ID des Dimensions-Elements. Nutze organization.dimension_values.GET um IDs zu ermitteln. Alternativ bei dimension="entity": entity_id angeben.',
+                ],
+                'entity_id' => [
+                    'type' => 'integer',
+                    'description' => 'Shortcut für dimension="entity": Organization-Entity-ID. Wird automatisch in dimension_item_id aufgelöst. Ersetzt dimension_item_id.',
                 ],
                 'percentage' => [
                     'type' => 'number',
-                    'description' => 'Optional: Prozent-Anteil (0-100). Nur relevant bei cost-centers (multi_percent Modus).',
+                    'description' => 'Optional: Prozent-Anteil (0-100). Relevant bei multi_percent-Dimensionen (z.B. cost-centers) oder Kostenaufteilung.',
                 ],
                 'is_primary' => [
                     'type' => 'boolean',
@@ -68,7 +74,7 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
                     'description' => 'Optional: Enddatum (YYYY-MM-DD).',
                 ],
             ],
-            'required' => ['dimension', 'context_type', 'context_id', 'dimension_item_id'],
+            'required' => ['dimension', 'context_type', 'context_id'],
         ];
     }
 
@@ -79,6 +85,7 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
             $contextType = $arguments['context_type'] ?? '';
             $contextId = (int) ($arguments['context_id'] ?? 0);
             $dimensionItemId = (int) ($arguments['dimension_item_id'] ?? 0);
+            $entityId = isset($arguments['entity_id']) ? (int) $arguments['entity_id'] : null;
 
             $cfg = DimensionLinkService::getDimension($dimension);
             if (!$cfg) {
@@ -86,8 +93,22 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', "Unbekannte Dimension '{$dimension}'. Verfügbar: {$available}");
             }
 
+            // entity_id shortcut: resolve Organization Entity ID → DimensionValue ID
+            if ($entityId && $dimension === 'entity') {
+                $def = OrganizationDimensionDefinition::findByKey('entity');
+                if ($def) {
+                    $dimValue = OrganizationDimensionValue::where('dimension_definition_id', $def->id)
+                        ->where('metadata->source_entity_id', $entityId)
+                        ->first();
+                    if (!$dimValue) {
+                        return ToolResult::error('NOT_FOUND', "Keine DimensionValue für Entity-ID {$entityId} gefunden. Existiert diese Entity?");
+                    }
+                    $dimensionItemId = $dimValue->id;
+                }
+            }
+
             if (!$contextType || !$contextId || !$dimensionItemId) {
-                return ToolResult::error('VALIDATION_ERROR', 'context_type, context_id und dimension_item_id sind erforderlich.');
+                return ToolResult::error('VALIDATION_ERROR', 'context_type, context_id und dimension_item_id (oder entity_id bei dimension="entity") sind erforderlich.');
             }
 
             // Enforcement: Kostenstellen dürfen nur an Entities gehängt werden
@@ -104,7 +125,7 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
                 $item = $cfg['model']::find($dimensionItemId);
             } else {
                 // Generic dimension (entity, vsm-system, etc.)
-                $item = \Platform\Organization\Models\OrganizationDimensionValue::where('id', $dimensionItemId)
+                $item = OrganizationDimensionValue::where('id', $dimensionItemId)
                     ->where('dimension_definition_id', $cfg['definition_id'] ?? 0)
                     ->first();
             }

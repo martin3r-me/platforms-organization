@@ -224,6 +224,7 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\DeleteEntityTool());
 
             // Dimension Link Tools (generisch für alle Dimensionen)
+            $registry->register(new \Platform\Organization\Tools\ListDimensionValuesTool());
             $registry->register(new \Platform\Organization\Tools\ListDimensionLinksTool());
             $registry->register(new \Platform\Organization\Tools\LinkDimensionTool());
             $registry->register(new \Platform\Organization\Tools\UnlinkDimensionTool());

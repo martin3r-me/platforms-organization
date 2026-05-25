@@ -323,7 +323,7 @@
                                 </div>
                                 <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
                                     @foreach($metrics as $m)
-                                        @if($m['current'] > 0 || $m['previous'] > 0)
+                                        @if($m['current'] != 0 || $m['previous'] != 0)
                                             <div class="py-2 px-2.5 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/20">
                                                 <div class="text-sm font-bold text-[var(--ui-text)]">
                                                     {{ $m['current_formatted'] }}

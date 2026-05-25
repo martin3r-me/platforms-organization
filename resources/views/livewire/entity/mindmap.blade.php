@@ -9,7 +9,12 @@
             ['label' => 'Einheiten', 'href' => route('organization.entities.index')],
             ['label' => $entity->name ?? 'Details', 'href' => route('organization.entities.show', $entity)],
             ['label' => 'Mindmap'],
-        ]" />
+        ]">
+            <x-ui-button variant="ghost" size="sm" href="{{ route('organization.entities.board', $entity) }}">
+                @svg('heroicon-o-squares-2x2', 'w-4 h-4')
+                <span>VSM Board</span>
+            </x-ui-button>
+        </x-ui-page-actionbar>
     </x-slot>
 
     <div class="relative w-full flex-1 min-h-0">

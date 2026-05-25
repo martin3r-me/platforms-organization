@@ -5,15 +5,23 @@
     $m = $ent['metrics'] ?? [];
     $itemsPct = ($m['items_total'] ?? 0) > 0 ? round(($m['items_done'] / $m['items_total']) * 100) : 0;
 @endphp
-<div class="board-card {{ $movementClass }} relative rounded-lg cursor-pointer select-none overflow-hidden"
+<div class="board-card {{ $movementClass }} relative rounded-lg cursor-pointer select-none overflow-hidden shrink-0"
      style="width:190px;background:rgba(15,23,42,0.85);backdrop-filter:blur(8px);border:1px solid rgba(255,255,255,0.06)"
      data-entity-id="{{ $ent['id'] }}">
     {{-- Left accent --}}
     <div class="absolute left-0 top-0 bottom-0 w-[3px] rounded-l-lg" style="background:{{ $bandColor }}"></div>
 
     <div class="pl-3 pr-2 py-2">
-        {{-- Name + Type --}}
-        <div class="font-medium text-[11px] text-white truncate leading-tight">{{ $ent['name'] }}</div>
+        {{-- Name + Type + Recursive Badge --}}
+        <div class="flex items-center gap-1">
+            <div class="font-medium text-[11px] text-white truncate leading-tight flex-1">{{ $ent['name'] }}</div>
+            @if(!empty($ent['is_recursive']))
+                <a href="{{ route('organization.entities.board', $ent['id']) }}"
+                   class="shrink-0 w-5 h-5 flex items-center justify-center rounded bg-white/10 text-[10px] text-cyan-400 hover:bg-cyan-500/20 transition-colors"
+                   title="Sub-Board öffnen"
+                   onclick="event.stopPropagation()">↻</a>
+            @endif
+        </div>
         <div class="text-[9px] text-gray-500 truncate">{{ $ent['type'] }}</div>
 
         {{-- Metrics row --}}

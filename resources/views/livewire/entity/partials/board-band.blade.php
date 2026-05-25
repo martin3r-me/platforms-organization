@@ -4,7 +4,7 @@
         <span class="text-[9px] text-gray-600 tabular-nums">({{ count($band['entities']) }})</span>
     </div>
     @if(count($band['entities']) > 0)
-        <div class="flex flex-wrap gap-2">
+        <div class="flex flex-nowrap gap-2 overflow-x-auto pb-1">
             @foreach($band['entities'] as $ent)
                 @include('organization::livewire.entity.partials.board-card', ['ent' => $ent, 'bandColor' => $band['color']])
             @endforeach

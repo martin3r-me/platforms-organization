@@ -205,10 +205,66 @@ class Board extends Component
             ];
         }
 
-        // 9. Dummy Ticker
+        // 9. Variety Metrics (Dummy per band)
+        $varietyMetrics = [];
+        foreach ($systemCodes as $code) {
+            $entityCount = count($bands[$code]['entities']);
+            $required = max(2, $entityCount + rand(0, 3));
+            $available = $entityCount;
+            $gap = $available >= $required ? 'balanced' : ($required - $available <= 1 ? 'marginal' : 'deficit');
+            $varietyMetrics[$code] = [
+                'required' => $required,
+                'available' => $available,
+                'gap' => $gap,
+            ];
+        }
+
+        // 10. Algedonic Alerts (Dummy)
+        $algedonicAlerts = [
+            [
+                'from' => 'S1',
+                'to' => 'S5',
+                'message' => 'Kritische Überlast in Operations — Eskalation an Policy',
+                'severity' => 'critical',
+                'timestamp' => now()->subMinutes(12)->format('H:i'),
+            ],
+        ];
+
+        // 11. Recursive entities (entities with children)
+        $recursiveEntityIds = OrganizationEntityRelationship::query()
+            ->whereIn('from_entity_id', $entityIds)
+            ->whereHas('relationType', fn ($q) => $q->whereIn('code', ['contains', 'manages']))
+            ->pluck('from_entity_id')
+            ->unique()
+            ->all();
+
+        // Mark entities as recursive
+        foreach (['bands', 'envBand', 'unassigned'] as $group) {
+            if ($group === 'bands') {
+                foreach ($bands as $code => &$band) {
+                    foreach ($band['entities'] as &$entityItem) {
+                        $entityItem['is_recursive'] = in_array($entityItem['id'], $recursiveEntityIds);
+                    }
+                    unset($entityItem);
+                }
+                unset($band);
+            } elseif ($group === 'envBand') {
+                foreach ($envBand['entities'] as &$entityItem) {
+                    $entityItem['is_recursive'] = in_array($entityItem['id'], $recursiveEntityIds);
+                }
+                unset($entityItem);
+            } else {
+                foreach ($unassigned as &$entityItem) {
+                    $entityItem['is_recursive'] = in_array($entityItem['id'], $recursiveEntityIds);
+                }
+                unset($entityItem);
+            }
+        }
+
+        // 12. Dummy Ticker
         $ticker = $this->generateDummyTicker();
 
-        // 10. Regulation Loops
+        // 13. Regulation Loops
         $regulationLoops = [
             ['from' => 'S5', 'to' => 'S3', 'label' => 'Policy → Control', 'color' => $vsmColors['S5']],
             ['from' => 'S4', 'to' => 'S3', 'label' => 'Intelligence → Control', 'color' => $vsmColors['S4']],
@@ -229,6 +285,9 @@ class Board extends Component
             'regulationLoops' => $regulationLoops,
             'vsmColors' => $vsmColors,
             'flowColors' => $flowColors,
+            'varietyMetrics' => $varietyMetrics,
+            'algedonicAlerts' => $algedonicAlerts,
+            'recursiveEntityIds' => $recursiveEntityIds,
         ];
     }
 

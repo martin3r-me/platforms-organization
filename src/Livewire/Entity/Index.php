@@ -214,7 +214,7 @@ class Index extends Component
         }
 
         return OrganizationDimensionLink::where('dimension_definition_id', $definition->id)
-            ->where('linkable_type', OrganizationEntity::class)
+            ->whereIn('linkable_type', [OrganizationEntity::class, 'organization_entity'])
             ->whereIn('linkable_id', OrganizationEntity::forTeam($teamId)->pluck('id'))
             ->with('value')
             ->get()

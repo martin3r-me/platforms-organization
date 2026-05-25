@@ -6,8 +6,6 @@ use Platform\Organization\Livewire\Entity\Show as EntityShow;
 use Platform\Organization\Livewire\Entity\Mindmap as EntityMindmap;
 use Platform\Organization\Livewire\CostCenter\Index as CostCenterIndex;
 use Platform\Organization\Livewire\CostCenter\Show as CostCenterShow;
-use Platform\Organization\Livewire\VsmSystem\Index as VsmSystemIndex;
-use Platform\Organization\Livewire\VsmSystem\Show as VsmSystemShow;
 use Platform\Organization\Livewire\Perspective\Index as PerspectiveIndex;
 use Platform\Organization\Livewire\Perspective\Show as PerspectiveShow;
 use Platform\Organization\Livewire\Settings\EntityType\Index as EntityTypeIndex;
@@ -44,10 +42,6 @@ Route::get('/entities/{entity}/mindmap', EntityMindmap::class)->name('organizati
 // Dimensionen: Kostenstellen
 Route::get('/cost-centers', CostCenterIndex::class)->name('organization.cost-centers.index');
 Route::get('/cost-centers/{costCenter}', CostCenterShow::class)->name('organization.cost-centers.show');
-
-// Dimensionen: VSM Systeme
-Route::get('/vsm-systems', VsmSystemIndex::class)->name('organization.vsm-systems.index');
-Route::get('/vsm-systems/{vsmSystem}', VsmSystemShow::class)->name('organization.vsm-systems.show');
 
 // Dimensionen: Perspektiven
 Route::get('/perspectives', PerspectiveIndex::class)->name('organization.perspectives.index');

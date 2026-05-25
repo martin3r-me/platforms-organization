@@ -96,6 +96,18 @@
         @endif
     </x-ui-table-cell>
     <x-ui-table-cell compact="true">
+        @php $vsmValues = $vsmSystemMap[$entity->id] ?? []; @endphp
+        @if(count($vsmValues) > 0)
+            <div class="flex flex-wrap gap-1">
+                @foreach($vsmValues as $val)
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/10" title="{{ $val['name'] }}">{{ $val['code'] }}</span>
+                @endforeach
+            </div>
+        @else
+            <span class="text-xs text-[var(--ui-muted)]">&ndash;</span>
+        @endif
+    </x-ui-table-cell>
+    <x-ui-table-cell compact="true">
         @if($entity->is_active)
             <x-ui-badge variant="success" size="sm">Aktiv</x-ui-badge>
         @else

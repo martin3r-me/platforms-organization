@@ -13,7 +13,6 @@ class OrganizationSeeder extends Seeder
     {
         $this->call([
             // Lookup-Tables
-            OrganizationVsmSystemSeeder::class,
             OrganizationEntityTypeGroupSeeder::class,
             OrganizationEntityTypeSeeder::class,
             OrganizationEntityRelationTypeSeeder::class,

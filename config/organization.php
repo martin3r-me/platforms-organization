@@ -39,11 +39,6 @@ return [
                             'route' => 'organization.cost-centers.index',
                             'icon' => 'heroicon-o-currency-dollar',
                         ],
-                        'vsm-systems' => [
-                            'title' => 'VSM Systeme',
-                            'route' => 'organization.vsm-systems.index',
-                            'icon' => 'heroicon-o-rectangle-group',
-                        ],
                     ],
                 ],
                 'processes' => [

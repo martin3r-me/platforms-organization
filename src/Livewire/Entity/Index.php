@@ -5,6 +5,8 @@ namespace Platform\Organization\Livewire\Entity;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use Platform\Organization\Models\OrganizationDimensionDefinition;
+use Platform\Organization\Models\OrganizationDimensionLink;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntityTypeGroup;
@@ -58,7 +60,7 @@ class Index extends Component
     #[On('perspective-switched')]
     public function onPerspectiveSwitched(): void
     {
-        unset($this->entities, $this->stats, $this->parentEntities, $this->entityMovements);
+        unset($this->entities, $this->stats, $this->parentEntities, $this->entityMovements, $this->vsmSystemMap);
     }
 
     protected function getActivePerspective()
@@ -196,6 +198,29 @@ class Index extends Component
         }
 
         return resolve(SnapshotMovementService::class)->forEntitiesBatch($entityIds, 7);
+    }
+
+    /**
+     * VSM-System dimension values per entity: [entity_id => Collection of value objects]
+     */
+    #[Computed]
+    public function vsmSystemMap(): array
+    {
+        $teamId = auth()->user()->currentTeam->id;
+        $definition = OrganizationDimensionDefinition::findByKey('vsm-system');
+
+        if (!$definition) {
+            return [];
+        }
+
+        return OrganizationDimensionLink::where('dimension_definition_id', $definition->id)
+            ->where('linkable_type', OrganizationEntity::class)
+            ->whereIn('linkable_id', OrganizationEntity::forTeam($teamId)->pluck('id'))
+            ->with('value')
+            ->get()
+            ->groupBy('linkable_id')
+            ->map(fn ($links) => $links->pluck('value')->filter()->sortBy('sort_order')->values())
+            ->toArray();
     }
 
     #[Computed]

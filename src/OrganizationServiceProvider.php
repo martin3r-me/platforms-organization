@@ -186,12 +186,6 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\UpdateCostCenterTool());
             $registry->register(new \Platform\Organization\Tools\DeleteCostCenterTool());
 
-            // VSM System Tools
-            $registry->register(new \Platform\Organization\Tools\ListVsmSystemsTool());
-            $registry->register(new \Platform\Organization\Tools\CreateVsmSystemTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateVsmSystemTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteVsmSystemTool());
-
             // VSM Function Tools
             $registry->register(new \Platform\Organization\Tools\ListVsmFunctionsTool());
             $registry->register(new \Platform\Organization\Tools\CreateVsmFunctionTool());

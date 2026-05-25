@@ -67,6 +67,7 @@
             <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Übergeordnet</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Relationen</x-ui-table-header-cell>
+            <x-ui-table-header-cell compact="true">VSM</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Bewegung</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Erstellt</x-ui-table-header-cell>
@@ -76,7 +77,7 @@
             {{-- Root Entities (ohne Parent) --}}
             @if($this->entities['root']->count() > 0)
                 @foreach($this->entities['root'] as $entity)
-                    @include('organization::livewire.entity.partials.table-row', ['entity' => $entity, 'entityMovements' => $this->entityMovements])
+                    @include('organization::livewire.entity.partials.table-row', ['entity' => $entity, 'entityMovements' => $this->entityMovements, 'vsmSystemMap' => $this->vsmSystemMap])
                 @endforeach
             @endif
 
@@ -111,7 +112,7 @@
                     </x-ui-table-cell>
                 </x-ui-table-row>
                 @foreach($entities as $entity)
-                    @include('organization::livewire.entity.partials.table-row', ['entity' => $entity, 'entityMovements' => $this->entityMovements])
+                    @include('organization::livewire.entity.partials.table-row', ['entity' => $entity, 'entityMovements' => $this->entityMovements, 'vsmSystemMap' => $this->vsmSystemMap])
                 @endforeach
             @endforeach
         </x-ui-table-body>

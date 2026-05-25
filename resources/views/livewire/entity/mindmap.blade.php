@@ -144,9 +144,9 @@
 
         // ─── Dimensions (VSM + Cost Centers) ───
         var dimensions = { vsm: false, costCenter: false };
-        // VSM Y-layers — S1 (Operations) bottom, S5 (Policy) top
-        var VSM_Y = { S1: -360, S2: -180, S3: 0, S4: 180, S5: 360 };
-        var VSM_LABELS = { S1: 'S1 · Operations', S2: 'S2 · Coordination', S3: 'S3 · Control', S4: 'S4 · Intelligence', S5: 'S5 · Policy' };
+        // VSM Y-layers — S1 (Operations) bottom, S5 (Policy) top, ENV outermost
+        var VSM_Y = { S1: -360, S2: -180, S3: 0, S4: 180, S5: 360, ENV: -540 };
+        var VSM_LABELS = { S1: 'S1 · Operations', S2: 'S2 · Coordination', S3: 'S3 · Control', S4: 'S4 · Intelligence', S5: 'S5 · Policy', ENV: 'ENV · Umwelt' };
         // Per-level accent colors (HSV ramp warm→cool)
         var VSM_COLORS = {
             S1: { hex: 0x10b981, css: '#10b981' }, // emerald — operations
@@ -154,6 +154,7 @@
             S3: { hex: 0x3b82f6, css: '#3b82f6' }, // blue — control
             S4: { hex: 0x8b5cf6, css: '#8b5cf6' }, // violet — intelligence
             S5: { hex: 0xec4899, css: '#ec4899' }, // pink — identity
+            ENV: { hex: 0x64748b, css: '#64748b' }, // slate — environment
         };
         // VSM grid layout — hard-positioned per level
         var VSM_GRID_SPACING = 95;
@@ -166,12 +167,12 @@
             if (!n) return false;
             if ((n.category || 'entity') !== 'entity') return false;
             if (n.val > 15) return false; // center = system itself
-            return !hasVsm(n);
+            return n.vsm && n.vsm.code === 'ENV';
         }
 
         function assignVsmGridPositions() {
-            var codes = ['S1', 'S2', 'S3', 'S4', 'S5'];
-            var byLevel = { S1: [], S2: [], S3: [], S4: [], S5: [] };
+            var codes = ['S1', 'S2', 'S3', 'S4', 'S5', 'ENV'];
+            var byLevel = { S1: [], S2: [], S3: [], S4: [], S5: [], ENV: [] };
             allNodes.forEach(function(n) {
                 if (hasVsm(n)) byLevel[n.vsm.code].push(n);
             });
@@ -722,7 +723,7 @@
 
         // ─── VSM stats ───
         function computeVsmStats() {
-            var stats = { S1: 0, S2: 0, S3: 0, S4: 0, S5: 0 };
+            var stats = { S1: 0, S2: 0, S3: 0, S4: 0, S5: 0, ENV: 0 };
             allNodes.forEach(function(n) {
                 if (!n.vsm || !n.vsm.code) return;
                 if (stats[n.vsm.code] != null) stats[n.vsm.code]++;
@@ -748,7 +749,7 @@
             var counts = Object.values(stats);
             var maxCount = Math.max.apply(null, counts.concat([1]));
             var size = 1100;
-            var codes = ['S1', 'S2', 'S3', 'S4', 'S5'];
+            var codes = ['S1', 'S2', 'S3', 'S4', 'S5', 'ENV'];
 
             codes.forEach(function(code) {
                 var y = VSM_Y[code];
@@ -864,12 +865,13 @@
             if (!panel || !rows) return;
 
             var stats = computeVsmStats();
-            var codes = ['S1', 'S2', 'S3', 'S4', 'S5'];
-            var counts = codes.map(function(c) { return stats[c]; });
+            var allCodes = ['S1', 'S2', 'S3', 'S4', 'S5', 'ENV'];
+            var systemCodes = ['S1', 'S2', 'S3', 'S4', 'S5'];
+            var counts = allCodes.map(function(c) { return stats[c]; });
             var max = Math.max.apply(null, counts.concat([1]));
 
             rows.innerHTML = '';
-            codes.forEach(function(code) {
+            allCodes.forEach(function(code) {
                 var count = stats[code];
                 var isEmpty = count === 0;
                 var pct = max > 0 ? Math.round((count / max) * 100) : 0;
@@ -888,8 +890,8 @@
                 rows.appendChild(cell);
             });
 
-            // Diagnosis: S3/S4 balance + empty-level warning
-            var empty = codes.filter(function(c) { return stats[c] === 0; });
+            // Diagnosis: S3/S4 balance + empty-level warning (only system levels S1-S5)
+            var empty = systemCodes.filter(function(c) { return stats[c] === 0; });
             var s3 = stats.S3, s4 = stats.S4;
             var diagText = '';
             var diagClass = 'text-gray-500';

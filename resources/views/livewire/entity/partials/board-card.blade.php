@@ -15,11 +15,15 @@
         {{-- Name + Type + Recursive Badge --}}
         <div class="flex items-center gap-1">
             <div class="font-medium text-[11px] text-white truncate leading-tight flex-1">{{ $ent['name'] }}</div>
+            <button data-entity-detail="{{ $ent['id'] }}"
+                    class="board-card-detail-btn shrink-0 w-5 h-5 flex items-center justify-center rounded bg-white/10 text-[10px] text-gray-400 hover:bg-white/20 hover:text-white transition-all opacity-0"
+                    title="Detail"
+                    onclick="event.stopPropagation()">&#9654;</button>
             @if(!empty($ent['is_recursive']))
                 <a href="{{ route('organization.entities.board', $ent['id']) }}"
                    class="shrink-0 w-5 h-5 flex items-center justify-center rounded bg-white/10 text-[10px] text-cyan-400 hover:bg-cyan-500/20 transition-colors"
                    title="Sub-Board öffnen"
-                   onclick="event.stopPropagation()">↻</a>
+                   onclick="event.stopPropagation()">&#8635;</a>
             @endif
         </div>
         <div class="text-[9px] text-gray-500 truncate">{{ $ent['type'] }}</div>

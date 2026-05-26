@@ -4,12 +4,26 @@
     </x-slot>
 
     <x-slot name="actionbar">
-        <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Einheiten', 'href' => route('organization.entities.index')],
-            ['label' => $entity->name ?? 'Details', 'href' => route('organization.entities.show', $entity)],
-            ['label' => 'VSM Board'],
-        ]">
+        @php
+            $breadcrumbs = [
+                ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+                ['label' => 'Einheiten', 'href' => route('organization.entities.index')],
+                ['label' => $entity->name ?? 'Details', 'href' => route('organization.entities.show', $entity)],
+            ];
+
+            if ($viewMode === 'system') {
+                $breadcrumbs[] = ['label' => 'VSM Board'];
+            } elseif ($viewMode === 'band') {
+                $breadcrumbs[] = ['label' => 'VSM Board', 'href' => route('organization.entities.board', $entity)];
+                $bandDetail = $this->bandDetail;
+                $breadcrumbs[] = ['label' => ($bandDetail['label'] ?? $band) . ' Band'];
+            } elseif ($viewMode === 'entity') {
+                $breadcrumbs[] = ['label' => 'VSM Board', 'href' => route('organization.entities.board', $entity)];
+                $entityDetail = $this->entityDetail;
+                $breadcrumbs[] = ['label' => $entityDetail['entity']['name'] ?? 'Entity'];
+            }
+        @endphp
+        <x-ui-page-actionbar :breadcrumbs="$breadcrumbs">
             <x-ui-button variant="ghost" size="sm" href="{{ route('organization.entities.mindmap', $entity) }}">
                 @svg('heroicon-o-globe-alt', 'w-4 h-4')
                 <span>Mindmap</span>
@@ -18,6 +32,8 @@
     </x-slot>
 
     <div id="board-container" class="relative w-full flex-1 min-h-0 overflow-hidden" style="background:#080c18">
+
+    @if($viewMode === 'system')
         {{-- Canvas layer for animated flows --}}
         <canvas id="board-flows" class="absolute inset-0 w-full h-full z-0" wire:ignore></canvas>
 
@@ -332,9 +348,17 @@
             </div>
             </div>
         </div>
+
+    @elseif($viewMode === 'band')
+        @include('organization::livewire.entity.partials.board-band-detail')
+    @elseif($viewMode === 'entity')
+        @include('organization::livewire.entity.partials.board-entity-detail')
+    @endif
     </div>
 
+    @if($viewMode === 'system')
     <script id="board-data" type="application/json">@json($this->boardData)</script>
+    @endif
 
     <style>
         @keyframes tickerSlideIn {
@@ -351,6 +375,9 @@
         .board-card:hover {
             transform: translateY(-2px);
             box-shadow: 0 8px 25px rgba(0,0,0,0.4);
+        }
+        .board-card:hover .board-card-detail-btn {
+            opacity: 1;
         }
         .board-card.selected {
             ring: 2px;
@@ -389,7 +416,16 @@
 
     <script type="module">
         // ---- Data ----
-        const data = JSON.parse(document.getElementById('board-data').textContent);
+        const dataEl = document.getElementById('board-data');
+        if (!dataEl) {
+            // Non-system view, skip canvas initialization
+            Livewire.on('board-data-updated', function(event) {
+                window.location.reload();
+            });
+            // stop module execution
+            throw new Error('Board canvas not needed in this view mode');
+        }
+        const data = JSON.parse(dataEl.textContent);
         const canvas = document.getElementById('board-flows');
         const ctx = canvas.getContext('2d');
 
@@ -584,7 +620,24 @@
         // ---- Card click -> Info panel ----
         let selectedCardId = null;
 
+        const wireEl = document.querySelector('[wire\\:id]');
+        const wireId = wireEl?.getAttribute('wire:id');
+
         document.addEventListener('click', function(e) {
+            // Band label click → drill into band
+            const bandBtn = e.target.closest('[data-band-click]');
+            if (bandBtn && wireId) {
+                Livewire.find(wireId).call('showBand', bandBtn.dataset.bandClick);
+                return;
+            }
+
+            // Entity detail button click
+            const detailBtn = e.target.closest('[data-entity-detail]');
+            if (detailBtn && wireId) {
+                Livewire.find(wireId).call('showEntity', parseInt(detailBtn.dataset.entityDetail));
+                return;
+            }
+
             const card = e.target.closest('.board-card[data-entity-id]');
             if (card) {
                 const id = card.dataset.entityId;
@@ -600,7 +653,8 @@
         document.addEventListener('dblclick', function(e) {
             const card = e.target.closest('.board-card[data-entity-id]');
             if (card) {
-                window.location.href = '/organization/entities/' + card.dataset.entityId;
+                const id = parseInt(card.dataset.entityId);
+                Livewire.find(document.querySelector('[wire\\:id]').getAttribute('wire:id')).call('showEntity', id);
             }
         });
 
@@ -654,7 +708,9 @@
             }
             document.getElementById('board-info-meta').innerHTML = meta;
 
-            let actions = '<a href="/organization/entities/' + id + '" class="px-2.5 py-1 bg-white/10 text-white rounded hover:bg-white/20 transition-colors flex items-center gap-1 text-[11px]">Details</a>';
+            const wireId = document.querySelector('[wire\\:id]')?.getAttribute('wire:id');
+            let actions = '<button onclick="Livewire.find(\'' + wireId + '\').call(\'showEntity\', ' + id + ')" class="px-2.5 py-1 bg-white/10 text-white rounded hover:bg-white/20 transition-colors flex items-center gap-1 text-[11px]">&#9654; Detail</button>';
+            actions += '<a href="/organization/entities/' + id + '" class="px-2.5 py-1 bg-white/5 text-gray-400 rounded hover:bg-white/10 transition-colors flex items-center gap-1 text-[11px]">Entity</a>';
             actions += '<a href="/organization/entities/' + id + '/mindmap" class="px-2.5 py-1 bg-white/5 text-gray-400 rounded hover:bg-white/10 transition-colors flex items-center gap-1 text-[11px]">Mindmap</a>';
             document.getElementById('board-info-actions').innerHTML = actions;
 

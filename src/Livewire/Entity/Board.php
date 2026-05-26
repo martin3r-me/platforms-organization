@@ -5,6 +5,7 @@ namespace Platform\Organization\Livewire\Entity;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Url;
 use Platform\Organization\Models\OrganizationDimensionDefinition;
 use Platform\Organization\Models\OrganizationDimensionLink;
 use Platform\Organization\Models\OrganizationEntity;
@@ -18,9 +19,46 @@ class Board extends Component
 {
     public OrganizationEntity $entity;
 
+    public ?string $viewMode = 'system';
+
+    #[Url]
+    public ?string $band = null;
+
+    #[Url]
+    public ?int $focus = null;
+
     public function mount(OrganizationEntity $entity)
     {
         $this->entity = $entity->load(['type.group']);
+
+        if ($this->focus) {
+            $this->viewMode = 'entity';
+        } elseif ($this->band) {
+            $this->viewMode = 'band';
+        }
+    }
+
+    public function showBand(string $code): void
+    {
+        $this->band = $code;
+        $this->focus = null;
+        $this->viewMode = 'band';
+        unset($this->bandDetail);
+    }
+
+    public function showEntity(int $id): void
+    {
+        $this->focus = $id;
+        $this->band = null;
+        $this->viewMode = 'entity';
+        unset($this->entityDetail);
+    }
+
+    public function showSystem(): void
+    {
+        $this->band = null;
+        $this->focus = null;
+        $this->viewMode = 'system';
     }
 
     #[On('perspective-switched')]
@@ -446,6 +484,242 @@ class Board extends Component
             'autonomyIndex' => $autonomyIndex,
             'stabilityIndicator' => $stabilityIndicator,
         ];
+    }
+
+    #[Computed]
+    public function bandDetail(): ?array
+    {
+        if ($this->viewMode !== 'band' || !$this->band) {
+            return null;
+        }
+
+        $data = $this->boardData;
+        $code = $this->band;
+
+        // Find band entities
+        $bandEntities = [];
+        $bandColor = '#64748b';
+        $bandLabel = $code;
+
+        if ($code === 'ENV') {
+            $bandEntities = $data['envBand']['entities'];
+            $bandColor = $data['vsmColors']['ENV'];
+            $bandLabel = $data['envBand']['label'];
+        } elseif (isset($data['bands'][$code])) {
+            $bandEntities = $data['bands'][$code]['entities'];
+            $bandColor = $data['bands'][$code]['color'];
+            $bandLabel = $data['bands'][$code]['label'];
+        }
+
+        $bandEntityIds = array_column($bandEntities, 'id');
+
+        // Internal relationships (both endpoints in this band)
+        $internalRelationships = [];
+        $crossBandRelationships = [];
+        foreach ($data['relationships'] as $rel) {
+            $fromIn = in_array($rel['from'], $bandEntityIds);
+            $toIn = in_array($rel['to'], $bandEntityIds);
+            if ($fromIn && $toIn) {
+                $internalRelationships[] = $rel;
+            } elseif ($fromIn || $toIn) {
+                $crossBandRelationships[] = $rel;
+            }
+        }
+
+        // Band-specific metrics
+        $load = $data['systemLoad'][$code] ?? null;
+        $regulation = $data['regulationHealth'][$code] ?? null;
+        $variety = $data['varietyMetrics'][$code] ?? null;
+
+        // Stability for entities in this band
+        $bandStability = [];
+        foreach ($bandEntityIds as $eid) {
+            if (isset($data['stabilityIndicator'][$eid])) {
+                $bandStability[$eid] = $data['stabilityIndicator'][$eid];
+            }
+        }
+
+        // Autonomy (only for S1)
+        $bandAutonomy = [];
+        if ($code === 'S1') {
+            foreach ($bandEntityIds as $eid) {
+                if (isset($data['autonomyIndex'][$eid])) {
+                    $bandAutonomy[$eid] = $data['autonomyIndex'][$eid];
+                }
+            }
+        }
+
+        return [
+            'code' => $code,
+            'label' => $bandLabel,
+            'color' => $bandColor,
+            'entities' => $bandEntities,
+            'internalRelationships' => $internalRelationships,
+            'crossBandRelationships' => $crossBandRelationships,
+            'load' => $load,
+            'regulation' => $regulation,
+            'variety' => $variety,
+            'stability' => $bandStability,
+            'autonomy' => $bandAutonomy,
+        ];
+    }
+
+    #[Computed]
+    public function entityDetail(): ?array
+    {
+        if ($this->viewMode !== 'entity' || !$this->focus) {
+            return null;
+        }
+
+        $data = $this->boardData;
+        $entityId = $this->focus;
+
+        // Find entity in boardData
+        $entityData = null;
+        $bandCode = null;
+        $bandColor = '#374151';
+        foreach ($data['bands'] as $code => $band) {
+            foreach ($band['entities'] as $ent) {
+                if ($ent['id'] === $entityId) {
+                    $entityData = $ent;
+                    $bandCode = $code;
+                    $bandColor = $band['color'];
+                    break 2;
+                }
+            }
+        }
+        if (!$entityData) {
+            foreach ($data['envBand']['entities'] as $ent) {
+                if ($ent['id'] === $entityId) {
+                    $entityData = $ent;
+                    $bandCode = 'ENV';
+                    $bandColor = $data['vsmColors']['ENV'];
+                    break;
+                }
+            }
+        }
+        if (!$entityData) {
+            foreach ($data['unassigned'] as $ent) {
+                if ($ent['id'] === $entityId) {
+                    $entityData = $ent;
+                    $bandCode = null;
+                    break;
+                }
+            }
+        }
+
+        if (!$entityData) {
+            return null;
+        }
+
+        // Full movement details
+        $movementService = resolve(SnapshotMovementService::class);
+        $movementResult = $movementService->forEntity($entityId, 7);
+        $movementArray = $movementResult->toArray();
+
+        // 14-day time series
+        $timeSeries = $movementService->timeSeries($entityId, 14);
+
+        // Relationships in/out
+        $incomingRelationships = [];
+        $outgoingRelationships = [];
+        foreach ($data['relationships'] as $rel) {
+            if ($rel['to'] === $entityId) {
+                // Find source entity name
+                $rel['entity_name'] = $this->findEntityName($data, $rel['from']);
+                $incomingRelationships[] = $rel;
+            }
+            if ($rel['from'] === $entityId) {
+                $rel['entity_name'] = $this->findEntityName($data, $rel['to']);
+                $outgoingRelationships[] = $rel;
+            }
+        }
+
+        // Stability & Autonomy
+        $stability = $data['stabilityIndicator'][$entityId] ?? null;
+        $autonomy = ($bandCode === 'S1' && isset($data['autonomyIndex'][$entityId]))
+            ? $data['autonomyIndex'][$entityId]
+            : null;
+
+        // Children (recursive entities)
+        $children = [];
+        $isRecursive = !empty($entityData['is_recursive']);
+        if ($isRecursive) {
+            $childEntities = OrganizationEntity::where('parent_entity_id', $entityId)
+                ->active()
+                ->with(['type.group'])
+                ->get();
+
+            if ($childEntities->isNotEmpty()) {
+                $childIds = $childEntities->pluck('id')->all();
+                $childMovements = $movementService->forEntitiesBatch($childIds, 7);
+
+                $childSnapshots = OrganizationEntitySnapshot::query()
+                    ->whereIn('entity_id', $childIds)
+                    ->where('snapshot_date', '>=', now()->subDays(3))
+                    ->orderByDesc('snapshot_date')
+                    ->orderByDesc('snapshot_period')
+                    ->get()
+                    ->unique('entity_id')
+                    ->keyBy('entity_id');
+
+                foreach ($childEntities as $child) {
+                    $snap = $childSnapshots[$child->id] ?? null;
+                    $metrics = $snap?->metrics ?? [];
+                    $mv = $childMovements[$child->id] ?? ['score' => 0, 'delta_count' => 0, 'positive' => 0, 'negative' => 0, 'top_delta' => null];
+                    $children[] = [
+                        'id' => $child->id,
+                        'name' => $child->name,
+                        'type' => $child->type?->name ?? 'Sonstige',
+                        'metrics' => [
+                            'items_total' => $metrics['items_total'] ?? 0,
+                            'items_done' => $metrics['items_done'] ?? 0,
+                            'time_h' => round(($metrics['time_total_minutes'] ?? 0) / 60, 1),
+                            'okr_perf' => ($metrics['okr_performance_count'] ?? 0) > 0
+                                ? round(($metrics['okr_performance_sum'] / $metrics['okr_performance_count']) * 100)
+                                : null,
+                        ],
+                        'movement' => $mv,
+                        'is_recursive' => false,
+                    ];
+                }
+            }
+        }
+
+        // Determine type group
+        $entity = OrganizationEntity::with('type.group')->find($entityId);
+        $typeGroup = $entity?->type?->group?->code ?? null;
+
+        return [
+            'entity' => $entityData,
+            'bandCode' => $bandCode,
+            'bandColor' => $bandColor,
+            'movement' => $movementArray,
+            'timeSeries' => $timeSeries,
+            'incomingRelationships' => $incomingRelationships,
+            'outgoingRelationships' => $outgoingRelationships,
+            'stability' => $stability,
+            'autonomy' => $autonomy,
+            'children' => $children,
+            'isRecursive' => $isRecursive,
+            'typeGroup' => $typeGroup,
+        ];
+    }
+
+    protected function findEntityName(array $data, int $entityId): string
+    {
+        foreach ($data['bands'] as $band) {
+            foreach ($band['entities'] as $ent) {
+                if ($ent['id'] === $entityId) return $ent['name'];
+            }
+        }
+        foreach ($data['envBand']['entities'] as $ent) {
+            if ($ent['id'] === $entityId) return $ent['name'];
+        }
+        foreach ($data['unassigned'] as $ent) {
+            if ($ent['id'] === $entityId) return $ent['name'];
+        }
+        return 'Unknown';
     }
 
     protected function generateDummyTicker(): array

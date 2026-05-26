@@ -1,6 +1,6 @@
 <div class="flex-1 min-h-[60px] px-2 py-1.5 rounded-lg mb-1" style="background:{{ $band['color'] }}08;border-left:3px solid {{ $band['color'] }}40" data-band-code="{{ $code }}">
     <div class="flex items-center gap-2 mb-1">
-        <span class="text-[10px] uppercase tracking-wider font-bold" style="color:{{ $band['color'] }}">{{ $band['label'] }}</span>
+        <button data-band-click="{{ $code }}" class="text-[10px] uppercase tracking-wider font-bold hover:underline hover:brightness-125 transition-all cursor-pointer" style="color:{{ $band['color'] }}">{{ $band['label'] }}</button>
         <span class="text-[9px] text-gray-600 tabular-nums">({{ count($band['entities']) }})</span>
     </div>
     @if(count($band['entities']) > 0)

@@ -28,6 +28,7 @@ use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationPerspective;
 use Platform\Organization\Models\OrganizationSkill;
 use Platform\Organization\Models\OrganizationSoftSkill;
+use Platform\Organization\Models\OrganizationSignal;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -47,6 +48,9 @@ class Show extends Component
     // Skills tab
     public string $personSkillSearch = '';
     public string $personSoftSkillSearch = '';
+
+    // Signals tab
+    public string $signalStatusFilter = '';
 
     #[On('perspective-switched')]
     public function onPerspectiveSwitched(): void
@@ -1313,6 +1317,55 @@ class Show extends Component
         $this->entity->softSkills()->updateExistingPivot($softSkillId, ['level' => $level]);
         unset($this->entitySoftSkills);
         $this->dispatch('toast', message: 'Level aktualisiert');
+    }
+
+    // ── Signals Tab ────────────────────────────────────────────
+
+    #[Computed]
+    public function entitySignals(): \Illuminate\Support\Collection
+    {
+        $query = OrganizationSignal::query()
+            ->where('entity_id', $this->entity->id)
+            ->with(['definition:id,name,pattern_type', 'resolvedByUser:id,name'])
+            ->orderByRaw("FIELD(status, 'open', 'acknowledged', 'resolved', 'dismissed')")
+            ->orderByDesc('created_at');
+
+        if ($this->signalStatusFilter) {
+            $query->where('status', $this->signalStatusFilter);
+        }
+
+        return $query->get();
+    }
+
+    public function acknowledgeSignal(int $signalId): void
+    {
+        $signal = OrganizationSignal::where('id', $signalId)
+            ->where('entity_id', $this->entity->id)
+            ->firstOrFail();
+        $signal->update(['status' => 'acknowledged']);
+        unset($this->entitySignals);
+    }
+
+    public function resolveSignal(int $signalId): void
+    {
+        $signal = OrganizationSignal::where('id', $signalId)
+            ->where('entity_id', $this->entity->id)
+            ->firstOrFail();
+        $signal->update([
+            'status' => 'resolved',
+            'resolved_at' => now(),
+            'resolved_by' => auth()->id(),
+        ]);
+        unset($this->entitySignals);
+    }
+
+    public function dismissSignal(int $signalId): void
+    {
+        $signal = OrganizationSignal::where('id', $signalId)
+            ->where('entity_id', $this->entity->id)
+            ->firstOrFail();
+        $signal->update(['status' => 'dismissed']);
+        unset($this->entitySignals);
     }
 
     public function render()

@@ -30,6 +30,7 @@ use Platform\Organization\Livewire\JobProfile\Show as JobProfileShow;
 use Platform\Organization\Livewire\Role\Index as RoleIndex;
 use Platform\Organization\Livewire\Settings\SignalDefinition\Index as SignalDefinitionIndex;
 use Platform\Organization\Livewire\Settings\SignalDefinition\Show as SignalDefinitionShow;
+use Platform\Organization\Livewire\Signal\Show as SignalShow;
 use Platform\Organization\Livewire\Skill\Index as SkillIndex;
 
 Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organization.dashboard');
@@ -38,6 +39,9 @@ Route::get('/entities', EntityIndex::class)->name('organization.entities.index')
 Route::get('/entities/{entity}', EntityShow::class)->name('organization.entities.show');
 Route::get('/entities/{entity}/mindmap', EntityMindmap::class)->name('organization.entities.mindmap');
 Route::get('/entities/{entity}/board', EntityBoard::class)->name('organization.entities.board');
+
+// Signals
+Route::get('/signals/{signal}', SignalShow::class)->name('organization.signals.show');
 
 // Dimensionen: Kostenstellen
 Route::get('/cost-centers', CostCenterIndex::class)->name('organization.cost-centers.index');

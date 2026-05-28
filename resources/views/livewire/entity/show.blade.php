@@ -628,6 +628,22 @@
                                 Skills
                             </button>
                         @endif
+                        <button
+                            @click="tab = 'signals'"
+                            :class="tab === 'signals'
+                                ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
+                                : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                            class="px-4 py-2.5 text-sm transition-colors flex items-center gap-1.5"
+                        >
+                            @svg('heroicon-o-bell-alert', 'w-4 h-4 inline-block -mt-0.5')
+                            Signale
+                            @php
+                                $openSignalCount = \Platform\Organization\Models\OrganizationSignal::where('entity_id', $this->entity->id)->where('status', 'open')->count();
+                            @endphp
+                            @if($openSignalCount > 0)
+                                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-white bg-red-500 rounded-full">{{ $openSignalCount }}</span>
+                            @endif
+                        </button>
                     </nav>
                 </div>
 
@@ -1162,6 +1178,136 @@
                         </div>
                     </div>
                 @endif
+
+                {{-- Tab: Signale --}}
+                <div x-show="tab === 'signals'" x-cloak>
+                    <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                        {{-- Header with filter --}}
+                        <div class="flex items-center justify-between mb-4">
+                            <h3 class="text-sm font-semibold text-[var(--ui-secondary)] flex items-center gap-2">
+                                @svg('heroicon-o-bell-alert', 'w-4 h-4 text-[var(--ui-primary)]')
+                                Algedonic Alerts
+                            </h3>
+                            <select
+                                wire:model.live="signalStatusFilter"
+                                class="rounded-md border-gray-300 shadow-sm text-xs py-1.5 px-3"
+                            >
+                                <option value="">Alle</option>
+                                <option value="open">Offen</option>
+                                <option value="acknowledged">Bestätigt</option>
+                                <option value="resolved">Gelöst</option>
+                                <option value="dismissed">Verworfen</option>
+                            </select>
+                        </div>
+
+                        @if($this->entitySignals->isEmpty())
+                            <div class="text-center py-8">
+                                @svg('heroicon-o-bell-slash', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
+                                <p class="text-sm text-[var(--ui-muted)]">Keine Signale{{ $signalStatusFilter ? ' mit Status "' . $signalStatusFilter . '"' : '' }}.</p>
+                            </div>
+                        @else
+                            <div class="space-y-3">
+                                @foreach($this->entitySignals as $signal)
+                                    <div class="border border-[var(--ui-border)] rounded-lg p-4" wire:key="signal-{{ $signal->id }}">
+                                        <div class="flex items-start justify-between gap-4">
+                                            {{-- Left: Severity + Definition + Pattern --}}
+                                            <div class="flex items-start gap-3 min-w-0 flex-1">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium flex-shrink-0
+                                                    @if($signal->severity === 'critical') bg-red-100 text-red-800
+                                                    @elseif($signal->severity === 'warning') bg-amber-100 text-amber-800
+                                                    @else bg-blue-100 text-blue-800
+                                                    @endif
+                                                ">
+                                                    {{ ucfirst($signal->severity) }}
+                                                </span>
+                                                <div class="min-w-0">
+                                                    <div class="flex items-center gap-2 flex-wrap">
+                                                        <a href="{{ route('organization.signals.show', $signal) }}" class="text-sm font-medium text-[var(--ui-primary)] hover:underline">
+                                                            {{ $signal->definition?->name ?? 'Unbekannt' }}
+                                                        </a>
+                                                        @if($signal->definition?->pattern_type)
+                                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
+                                                                @switch($signal->definition->pattern_type)
+                                                                    @case('threshold') Schwellenwert @break
+                                                                    @case('trend') Trend @break
+                                                                    @case('cross_dimension') Kreuz-Dimension @break
+                                                                    @case('ratio') Verhältnis @break
+                                                                    @default {{ $signal->definition->pattern_type }}
+                                                                @endswitch
+                                                            </span>
+                                                        @endif
+                                                    </div>
+                                                    <p class="text-sm text-[var(--ui-muted)] mt-1">{{ $signal->message }}</p>
+
+                                                    {{-- Trigger Metrics (expandable) --}}
+                                                    @if($signal->trigger_metrics)
+                                                        <div x-data="{ showMetrics: false }" class="mt-1.5">
+                                                            <button @click="showMetrics = !showMetrics" class="text-xs text-[var(--ui-primary)] hover:underline flex items-center gap-1">
+                                                                @svg('heroicon-o-chart-bar', 'w-3 h-3')
+                                                                <span x-text="showMetrics ? 'Metriken ausblenden' : 'Metriken anzeigen'"></span>
+                                                            </button>
+                                                            <div x-show="showMetrics" x-cloak class="mt-1.5 text-xs text-[var(--ui-muted)] bg-gray-50 rounded p-2 font-mono">
+                                                                @foreach($signal->trigger_metrics as $key => $value)
+                                                                    <div>{{ $key }}: {{ is_array($value) ? json_encode($value) : $value }}</div>
+                                                                @endforeach
+                                                            </div>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            </div>
+
+                                            {{-- Right: Status + Time + Actions --}}
+                                            <div class="flex flex-col items-end gap-2 flex-shrink-0">
+                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
+                                                    @if($signal->status === 'open') bg-yellow-100 text-yellow-800
+                                                    @elseif($signal->status === 'acknowledged') bg-blue-100 text-blue-800
+                                                    @elseif($signal->status === 'resolved') bg-green-100 text-green-800
+                                                    @else bg-gray-100 text-gray-600
+                                                    @endif
+                                                ">
+                                                    @switch($signal->status)
+                                                        @case('open') Offen @break
+                                                        @case('acknowledged') Bestätigt @break
+                                                        @case('resolved') Gelöst @break
+                                                        @case('dismissed') Verworfen @break
+                                                    @endswitch
+                                                </span>
+                                                <span class="text-xs text-[var(--ui-muted)]">{{ $signal->created_at->format('d.m.Y H:i') }}</span>
+
+                                                @if($signal->status === 'resolved' && $signal->resolvedByUser)
+                                                    <span class="text-xs text-[var(--ui-muted)]">von {{ $signal->resolvedByUser->name }}</span>
+                                                @endif
+
+                                                {{-- Action Buttons --}}
+                                                <div class="flex items-center gap-1.5 mt-1">
+                                                    @if($signal->status === 'open')
+                                                        <button wire:click="acknowledgeSignal({{ $signal->id }})" class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors">
+                                                            @svg('heroicon-o-check', 'w-3 h-3')
+                                                            Bestätigen
+                                                        </button>
+                                                        <button wire:click="dismissSignal({{ $signal->id }})" class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors">
+                                                            @svg('heroicon-o-x-mark', 'w-3 h-3')
+                                                            Verwerfen
+                                                        </button>
+                                                    @elseif($signal->status === 'acknowledged')
+                                                        <button wire:click="resolveSignal({{ $signal->id }})" class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border border-green-300 text-green-700 bg-green-50 hover:bg-green-100 transition-colors">
+                                                            @svg('heroicon-o-check-circle', 'w-3 h-3')
+                                                            Lösen
+                                                        </button>
+                                                        <button wire:click="dismissSignal({{ $signal->id }})" class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors">
+                                                            @svg('heroicon-o-x-mark', 'w-3 h-3')
+                                                            Verwerfen
+                                                        </button>
+                                                    @endif
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </div>
             </div>
         </div>
     <!-- Create Team Modal -->

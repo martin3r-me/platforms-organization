@@ -13,6 +13,7 @@
                         'package-check' => 'package',
                         'badge-check' => 'badge',
                         'target' => 'viewfinder-circle',
+                        'user-voice' => 'user',
                     ];
                     $iconName = $iconMap[$iconName] ?? $iconName;
                 @endphp

@@ -453,9 +453,21 @@ class Show extends Component
     #[Computed]
     public function linkTypeIconSvgs(): array
     {
+        $iconMap = [
+            'user-check' => 'user',
+            'user-voice' => 'user',
+            'folder-kanban' => 'folder',
+            'briefcase-globe' => 'briefcase',
+            'server-cog' => 'server',
+            'package-check' => 'package',
+            'badge-check' => 'badge',
+            'target' => 'viewfinder-circle',
+        ];
+
         $svgs = [];
         foreach ($this->linkTypeConfig as $type => $config) {
-            $svgs[$type] = svg('heroicon-o-' . $config['icon'], 'w-4 h-4 text-[var(--ui-muted)]')->toHtml();
+            $icon = $iconMap[$config['icon']] ?? $config['icon'];
+            $svgs[$type] = svg('heroicon-o-' . $icon, 'w-4 h-4 text-[var(--ui-muted)]')->toHtml();
         }
         return $svgs;
     }

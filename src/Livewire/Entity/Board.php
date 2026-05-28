@@ -6,11 +6,13 @@ use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
+use Illuminate\Support\Str;
 use Platform\Organization\Models\OrganizationDimensionDefinition;
 use Platform\Organization\Models\OrganizationDimensionLink;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
+use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\EntityHierarchyResolver;
 use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
@@ -396,28 +398,26 @@ class Board extends Component
             ];
         }
 
-        // 14. Algedonic Alerts (derived from real data: congested bands + oscillating entities)
+        // 14. Algedonic Alerts (from persisted signals)
         $algedonicAlerts = [];
-        $congestedBands = array_filter($systemLoad, fn ($l) => $l['congested']);
-        if (!empty($congestedBands)) {
-            $worstBand = array_key_first($congestedBands);
+        $openSignals = OrganizationSignal::forTeam($teamId)
+            ->open()
+            ->whereIn('entity_id', $entityIds)
+            ->with('entity')
+            ->orderByDesc('severity')
+            ->orderByDesc('created_at')
+            ->limit(5)
+            ->get();
+
+        foreach ($openSignals as $signal) {
+            $signalEntityId = $signal->entity_id;
+            $fromBand = $entityBandMap[$signalEntityId] ?? 'S1';
             $algedonicAlerts[] = [
-                'from' => $worstBand,
+                'from' => $fromBand,
                 'to' => 'S5',
-                'message' => 'Überlast in ' . $worstBand . ' — ' . $congestedBands[$worstBand]['open_items'] . ' offene Items',
-                'severity' => 'critical',
-                'timestamp' => now()->format('H:i'),
-            ];
-        }
-        $oscillating = array_filter($stabilityIndicator, fn ($s) => $s['status'] === 'oscillating');
-        if (!empty($oscillating) && empty($algedonicAlerts)) {
-            $first = array_values($oscillating)[0];
-            $algedonicAlerts[] = [
-                'from' => 'S2',
-                'to' => 'S5',
-                'message' => 'Oszillation erkannt: ' . $first['name'],
-                'severity' => 'warning',
-                'timestamp' => now()->format('H:i'),
+                'message' => $signal->message,
+                'severity' => $signal->severity,
+                'timestamp' => $signal->created_at->format('H:i'),
             ];
         }
 
@@ -452,8 +452,40 @@ class Board extends Component
             }
         }
 
-        // 16. Dummy Ticker
-        $ticker = $this->generateDummyTicker();
+        // 16. Ticker (from persisted signals, last 24h)
+        $ticker = [];
+        $recentSignals = OrganizationSignal::forTeam($teamId)
+            ->recent(24)
+            ->whereIn('entity_id', $entityIds)
+            ->with(['entity', 'definition'])
+            ->orderByDesc('created_at')
+            ->limit(10)
+            ->get();
+
+        $tickerIcons = [
+            'critical' => 'exclamation-triangle',
+            'warning' => 'shield-exclamation',
+            'info' => 'information-circle',
+        ];
+        $tickerTypes = [
+            'threshold' => 'alert',
+            'trend' => 'regulation',
+            'cross_dimension' => 'emergence',
+            'ratio' => 'intervention',
+        ];
+
+        foreach ($recentSignals as $sig) {
+            $patternType = $sig->definition?->pattern_type ?? 'threshold';
+            $sigBand = $entityBandMap[$sig->entity_id] ?? 'S1';
+            $ticker[] = [
+                'type' => $tickerTypes[$patternType] ?? 'alert',
+                'level' => $sigBand,
+                'icon' => $tickerIcons[$sig->severity] ?? 'information-circle',
+                'message' => Str::limit($sig->message, 60),
+                'detail' => $sig->message,
+                'timestamp' => $sig->created_at->format('H:i'),
+            ];
+        }
 
         // 17. Regulation Loops
         $regulationLoops = [
@@ -720,33 +752,6 @@ class Board extends Component
             if ($ent['id'] === $entityId) return $ent['name'];
         }
         return 'Unknown';
-    }
-
-    protected function generateDummyTicker(): array
-    {
-        $events = [
-            ['type' => 'regulation', 'level' => 'S3', 'icon' => 'adjustments-vertical', 'message' => 'Kapazitätsausgleich S1 ausgelöst', 'detail' => 'Ressourcen-Reallokation zwischen Operations-Einheiten'],
-            ['type' => 'intervention', 'level' => 'S5', 'icon' => 'shield-exclamation', 'message' => 'Policy-Review initiiert', 'detail' => 'Quartals-Überprüfung der Steuerungsmechanismen'],
-            ['type' => 'emergence', 'level' => 'S1', 'icon' => 'sparkles', 'message' => 'Neue Kooperation emergiert', 'detail' => 'Selbstorganisierte Zusammenarbeit zwischen zwei S1-Einheiten'],
-            ['type' => 'alert', 'level' => 'S4', 'icon' => 'exclamation-triangle', 'message' => 'Umwelt-Signal: Marktveränderung', 'detail' => 'Intelligence erkennt signifikante Veränderung im Wettbewerbsumfeld'],
-            ['type' => 'regulation', 'level' => 'S2', 'icon' => 'arrows-right-left', 'message' => 'Anti-oszillatorische Dämpfung', 'detail' => 'Koordination stabilisiert schwankende Auslastung'],
-            ['type' => 'intervention', 'level' => 'S3', 'icon' => 'cog-6-tooth', 'message' => 'Audit-Zyklus gestartet', 'detail' => 'Kontrollsystem überprüft Performance-Metriken'],
-            ['type' => 'emergence', 'level' => 'S2', 'icon' => 'light-bulb', 'message' => 'Synergieeffekt erkannt', 'detail' => 'Koordination identifiziert Effizienzpotenzial'],
-            ['type' => 'alert', 'level' => 'ENV', 'icon' => 'globe-alt', 'message' => 'Externe Disruption möglich', 'detail' => 'Umwelt-Monitoring detektiert regulatorische Veränderung'],
-            ['type' => 'regulation', 'level' => 'S4', 'icon' => 'eye', 'message' => 'Zukunftsradar-Update', 'detail' => 'Intelligence aktualisiert strategische Prognosen'],
-            ['type' => 'intervention', 'level' => 'S5', 'icon' => 'flag', 'message' => 'Identitäts-Alignment', 'detail' => 'Policy stellt Kohärenz zwischen Strategie und Werten sicher'],
-        ];
-
-        $result = [];
-        $now = now();
-        foreach ($events as $i => $event) {
-            $event['timestamp'] = $now->copy()->subMinutes(rand(5, 120))->format('H:i');
-            $result[] = $event;
-        }
-
-        usort($result, fn ($a, $b) => strcmp($b['timestamp'], $a['timestamp']));
-
-        return $result;
     }
 
     public function render()

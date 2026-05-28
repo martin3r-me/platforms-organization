@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Platform\Organization\Console\Commands\EvaluateSignalsCommand;
 use Platform\Organization\Console\Commands\GenerateReportsCommand;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
 use Platform\Organization\Console\Commands\SnapshotEntitiesCommand;
@@ -26,6 +27,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 SeedOrganizationData::class,
                 GenerateReportsCommand::class,
                 SnapshotEntitiesCommand::class,
+                EvaluateSignalsCommand::class,
             ]);
         }
 
@@ -158,6 +160,13 @@ class OrganizationServiceProvider extends ServiceProvider
             ->dailyAt('18:00')
             ->withoutOverlapping();
 
+        Schedule::command('organization:evaluate-signals')
+            ->dailyAt('08:15')
+            ->withoutOverlapping();
+
+        Schedule::command('organization:evaluate-signals')
+            ->dailyAt('18:15')
+            ->withoutOverlapping();
     }
 
     /**
@@ -330,6 +339,14 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\AssignPersonSoftSkillTool());
             $registry->register(new \Platform\Organization\Tools\UpdatePersonSoftSkillTool());
             $registry->register(new \Platform\Organization\Tools\RemovePersonSoftSkillTool());
+
+            // Signal (Algedonic) Tools
+            $registry->register(new \Platform\Organization\Tools\ListSignalDefinitionsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateSignalDefinitionTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateSignalDefinitionTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteSignalDefinitionTool());
+            $registry->register(new \Platform\Organization\Tools\ListSignalsTool());
+            $registry->register(new \Platform\Organization\Tools\AcknowledgeSignalTool());
 
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);

@@ -28,6 +28,8 @@ use Platform\Organization\Livewire\PlannedTimes\Index as PlannedTimesIndex;
 use Platform\Organization\Livewire\JobProfile\Index as JobProfileIndex;
 use Platform\Organization\Livewire\JobProfile\Show as JobProfileShow;
 use Platform\Organization\Livewire\Role\Index as RoleIndex;
+use Platform\Organization\Livewire\Settings\SignalDefinition\Index as SignalDefinitionIndex;
+use Platform\Organization\Livewire\Settings\SignalDefinition\Show as SignalDefinitionShow;
 use Platform\Organization\Livewire\Skill\Index as SkillIndex;
 
 Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organization.dashboard');
@@ -64,6 +66,10 @@ Route::get('/settings/interlink-categories/{interlinkCategory}', InterlinkCatego
 // Settings: Interlink-Typen
 Route::get('/settings/interlink-types', InterlinkTypeIndex::class)->name('organization.settings.interlink-types.index');
 Route::get('/settings/interlink-types/{interlinkType}', InterlinkTypeShow::class)->name('organization.settings.interlink-types.show');
+
+// Settings: Signal-Definitionen
+Route::get('/settings/signal-definitions', SignalDefinitionIndex::class)->name('organization.settings.signal-definitions.index');
+Route::get('/settings/signal-definitions/{signalDefinition}', SignalDefinitionShow::class)->name('organization.settings.signal-definitions.show');
 
 // Interlinks
 Route::get('/interlinks', InterlinkIndex::class)->name('organization.interlinks.index');

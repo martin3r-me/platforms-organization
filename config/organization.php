@@ -91,6 +91,11 @@ return [
                             'route' => 'organization.settings.interlink-types.index',
                             'icon' => 'heroicon-o-link',
                         ],
+                        'signal-definitions' => [
+                            'title' => 'Signaldefinitionen',
+                            'route' => 'organization.settings.signal-definitions.index',
+                            'icon' => 'heroicon-o-bell-alert',
+                        ],
                     ],
                 ],
             ],

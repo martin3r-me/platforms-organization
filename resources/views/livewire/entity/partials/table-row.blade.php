@@ -12,6 +12,7 @@
                         'server-cog' => 'server',
                         'package-check' => 'package',
                         'badge-check' => 'badge',
+                        'target' => 'viewfinder-circle',
                     ];
                     $iconName = $iconMap[$iconName] ?? $iconName;
                 @endphp

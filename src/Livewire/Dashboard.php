@@ -9,6 +9,7 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Services\EntityDimensionBridge;
+use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\EntityHierarchyResolver;
 use Platform\Organization\Services\EntityLinkRegistry;
@@ -37,6 +38,7 @@ class Dashboard extends Component
             $this->topEntitiesByActivity,
             $this->personOverview,
             $this->insightStatements,
+            $this->signalOverview,
         );
     }
 
@@ -663,6 +665,23 @@ class Dashboard extends Component
             }
         }
 
+        // Signal alerts
+        $signalData = $this->signalOverview;
+        if ($signalData['total_open'] > 0) {
+            $criticalCount = $signalData['signals']->where('severity', 'critical')->count();
+            if ($criticalCount > 0) {
+                $statements[] = [
+                    'text' => "{$criticalCount} kritische" . ($criticalCount === 1 ? 's Signal' : ' Signale') . " offen — Handlung erforderlich.",
+                    'type' => 'warning',
+                ];
+            } elseif ($signalData['total_open'] > 0) {
+                $statements[] = [
+                    'text' => "{$signalData['total_open']} offene" . ($signalData['total_open'] === 1 ? 's Signal' : ' Signale') . ".",
+                    'type' => 'info',
+                ];
+            }
+        }
+
         // Person danger metrics (generic)
         $personData = $this->personOverview;
         if ($personData['person_count'] > 0) {
@@ -679,6 +698,37 @@ class Dashboard extends Component
         }
 
         return array_slice($statements, 0, 5);
+    }
+
+    #[Computed]
+    public function signalOverview(): array
+    {
+        $teamId = $this->getTeamId();
+        if (!$teamId) {
+            return ['counts' => [], 'signals' => [], 'total_open' => 0];
+        }
+
+        $counts = OrganizationSignal::where('team_id', $teamId)
+            ->selectRaw("status, COUNT(*) as cnt")
+            ->groupBy('status')
+            ->pluck('cnt', 'status')
+            ->toArray();
+
+        $totalOpen = ($counts['open'] ?? 0) + ($counts['acknowledged'] ?? 0);
+
+        $signals = OrganizationSignal::where('team_id', $teamId)
+            ->whereIn('status', ['open', 'acknowledged'])
+            ->with(['definition:id,name,pattern_type', 'entity:id,name'])
+            ->orderByRaw("FIELD(severity, 'critical', 'warning', 'info')")
+            ->orderByDesc('created_at')
+            ->limit(8)
+            ->get();
+
+        return [
+            'counts' => $counts,
+            'signals' => $signals,
+            'total_open' => $totalOpen,
+        ];
     }
 
     // --- Helper Methods ---

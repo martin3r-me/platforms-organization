@@ -78,6 +78,7 @@
             $linkDist = $this->linkTypeDistribution;
             $topEntities = $this->topEntitiesByActivity;
             $personOverview = $this->personOverview;
+            $signalOverview = $this->signalOverview;
         @endphp
 
         {{-- 1. Insight Banner --}}
@@ -164,6 +165,78 @@
                 <x-ui-dashboard-tile title="Abrechnung" :count="0" icon="banknotes" variant="secondary" />
             @endif
         </div>
+
+        {{-- 2a. Offene Signale --}}
+        @if($signalOverview['total_open'] > 0)
+            <x-ui-panel title="Offene Signale" subtitle="Algedonic Alerts" class="mb-8">
+                {{-- Summary Badges --}}
+                <div class="flex items-center gap-3 mb-4 flex-wrap">
+                    @if(($signalOverview['counts']['open'] ?? 0) > 0)
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-yellow-50 text-yellow-700 border border-yellow-200">
+                            <span class="w-2 h-2 rounded-full bg-yellow-500"></span>
+                            Offen: {{ $signalOverview['counts']['open'] }}
+                        </span>
+                    @endif
+                    @if(($signalOverview['counts']['acknowledged'] ?? 0) > 0)
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-blue-50 text-blue-700 border border-blue-200">
+                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
+                            Bestätigt: {{ $signalOverview['counts']['acknowledged'] }}
+                        </span>
+                    @endif
+                    @php
+                        $criticalCount = $signalOverview['signals']->where('severity', 'critical')->count();
+                        $warningCount = $signalOverview['signals']->where('severity', 'warning')->count();
+                    @endphp
+                    @if($criticalCount > 0)
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-red-50 text-red-700 border border-red-200">
+                            @svg('heroicon-o-exclamation-triangle', 'w-3.5 h-3.5')
+                            {{ $criticalCount }} Critical
+                        </span>
+                    @endif
+                    @if($warningCount > 0)
+                        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium bg-amber-50 text-amber-700 border border-amber-200">
+                            @svg('heroicon-o-exclamation-circle', 'w-3.5 h-3.5')
+                            {{ $warningCount }} Warning
+                        </span>
+                    @endif
+                </div>
+
+                {{-- Signal List --}}
+                <div class="space-y-2">
+                    @foreach($signalOverview['signals'] as $signal)
+                        <div class="flex items-center justify-between p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)] hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-colors">
+                            <div class="flex items-center gap-3 min-w-0">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium flex-shrink-0
+                                    @if($signal->severity === 'critical') bg-red-100 text-red-800
+                                    @elseif($signal->severity === 'warning') bg-amber-100 text-amber-800
+                                    @else bg-blue-100 text-blue-800
+                                    @endif
+                                ">
+                                    {{ ucfirst($signal->severity) }}
+                                </span>
+                                <div class="min-w-0">
+                                    <a href="{{ route('organization.signals.show', $signal) }}"
+                                       class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate block">
+                                        {{ $signal->definition?->name ?? 'Signal' }}
+                                    </a>
+                                    <div class="text-xs text-[var(--ui-muted)]">
+                                        {{ $signal->entity?->name ?? '' }}
+                                        &middot; {{ $signal->created_at->diffForHumans() }}
+                                    </div>
+                                </div>
+                            </div>
+                            <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium flex-shrink-0
+                                @if($signal->status === 'open') bg-yellow-100 text-yellow-800
+                                @else bg-blue-100 text-blue-800
+                                @endif
+                            ">
+                                {{ $signal->status === 'open' ? 'Offen' : 'Bestätigt' }}
+                            </span>
+                        </div>
+                    @endforeach
+                </div>
+            </x-ui-panel>
+        @endif
 
         {{-- 2b. Team-Bewegung (7 Tage) --}}
         @php $teamMovement = $this->teamMovement; @endphp

@@ -8,7 +8,6 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
-use Platform\Organization\Console\Commands\DetectProcessChainsCommand;
 use Platform\Organization\Console\Commands\GenerateReportsCommand;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
 use Platform\Organization\Console\Commands\SnapshotEntitiesCommand;
@@ -27,7 +26,6 @@ class OrganizationServiceProvider extends ServiceProvider
                 SeedOrganizationData::class,
                 GenerateReportsCommand::class,
                 SnapshotEntitiesCommand::class,
-                DetectProcessChainsCommand::class,
             ]);
         }
 
@@ -43,12 +41,6 @@ class OrganizationServiceProvider extends ServiceProvider
             'organization_person_job_profile' => \Platform\Organization\Models\OrganizationPersonJobProfile::class,
             'organization_role'               => \Platform\Organization\Models\OrganizationRole::class,
             'organization_role_assignment'    => \Platform\Organization\Models\OrganizationRoleAssignment::class,
-            'organization_process'               => \Platform\Organization\Models\OrganizationProcess::class,
-            'organization_process_step'          => \Platform\Organization\Models\OrganizationProcessStep::class,
-            'organization_process_chain'         => \Platform\Organization\Models\OrganizationProcessChain::class,
-            'organization_process_chain_member'  => \Platform\Organization\Models\OrganizationProcessChainMember::class,
-            'organization_process_run'           => \Platform\Organization\Models\OrganizationProcessRun::class,
-            'organization_process_run_step'      => \Platform\Organization\Models\OrganizationProcessRunStep::class,
         ]);
 
         // Schritt 1: Config laden
@@ -166,10 +158,6 @@ class OrganizationServiceProvider extends ServiceProvider
             ->dailyAt('18:00')
             ->withoutOverlapping();
 
-        Schedule::command('organization:detect-process-chains')
-            ->dailyAt('02:00')
-            ->onOneServer()
-            ->withoutOverlapping();
     }
 
     /**
@@ -298,77 +286,6 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\UpdateRoleAssignmentTool());
             $registry->register(new \Platform\Organization\Tools\DeleteRoleAssignmentTool());
 
-            // Process Tools (Prozess-Definition)
-            $registry->register(new \Platform\Organization\Tools\ListProcessesTool());
-            $registry->register(new \Platform\Organization\Tools\CreateProcessTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateProcessTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteProcessTool());
-
-            // Process Step Tools
-            $registry->register(new \Platform\Organization\Tools\ListProcessStepsTool());
-            $registry->register(new \Platform\Organization\Tools\CreateProcessStepTool());
-            $registry->register(new \Platform\Organization\Tools\BulkCreateProcessStepsTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateProcessStepTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteProcessStepTool());
-
-            // Process Flow Tools (Verbindungen zwischen Steps)
-            $registry->register(new \Platform\Organization\Tools\ListProcessFlowsTool());
-            $registry->register(new \Platform\Organization\Tools\CreateProcessFlowTool());
-            $registry->register(new \Platform\Organization\Tools\BulkCreateProcessFlowsTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateProcessFlowTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteProcessFlowTool());
-            $registry->register(new \Platform\Organization\Tools\BulkDeleteProcessFlowsTool());
-
-            // Process Trigger Tools
-            $registry->register(new \Platform\Organization\Tools\ListProcessTriggersTool());
-            $registry->register(new \Platform\Organization\Tools\CreateProcessTriggerTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateProcessTriggerTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteProcessTriggerTool());
-
-            // Process Output Tools
-            $registry->register(new \Platform\Organization\Tools\ListProcessOutputsTool());
-            $registry->register(new \Platform\Organization\Tools\CreateProcessOutputTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateProcessOutputTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteProcessOutputTool());
-
-            // Process Step Entity Tools (wer macht was im Step)
-            $registry->register(new \Platform\Organization\Tools\ListProcessStepEntitiesTool());
-            $registry->register(new \Platform\Organization\Tools\CreateProcessStepEntityTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateProcessStepEntityTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteProcessStepEntityTool());
-
-            // Process Step Interlink Tools (welche Interlinks am Step)
-            $registry->register(new \Platform\Organization\Tools\ListProcessStepInterlinksTool());
-            $registry->register(new \Platform\Organization\Tools\CreateProcessStepInterlinkTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateProcessStepInterlinkTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteProcessStepInterlinkTool());
-
-            // Process Snapshot Tools
-            $registry->register(new \Platform\Organization\Tools\CreateProcessSnapshotTool());
-            $registry->register(new \Platform\Organization\Tools\ListProcessSnapshotsTool());
-            $registry->register(new \Platform\Organization\Tools\GetProcessSnapshotTool());
-            $registry->register(new \Platform\Organization\Tools\CompareProcessSnapshotsTool());
-
-            // Process Improvement Tools
-            $registry->register(new \Platform\Organization\Tools\CreateProcessImprovementTool());
-            $registry->register(new \Platform\Organization\Tools\ListProcessImprovementsTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateProcessImprovementTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteProcessImprovementTool());
-
-            // Process Chain Tools (Sprint 1: BPMN-Prozessketten)
-            $registry->register(new \Platform\Organization\Tools\ListProcessChainsTool());
-            $registry->register(new \Platform\Organization\Tools\CreateProcessChainTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateProcessChainTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteProcessChainTool());
-            $registry->register(new \Platform\Organization\Tools\AddProcessToChainTool());
-            $registry->register(new \Platform\Organization\Tools\RemoveProcessFromChainTool());
-            $registry->register(new \Platform\Organization\Tools\DetectProcessChainsTool());
-
-            // Process Run Tools (Execution Tracking)
-            $registry->register(new \Platform\Organization\Tools\ListProcessRunsTool());
-            $registry->register(new \Platform\Organization\Tools\CreateProcessRunTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateProcessRunTool());
-            $registry->register(new \Platform\Organization\Tools\CompleteProcessRunStepTool());
 
             // Movement & Metric Definition Tools
             $registry->register(new \Platform\Organization\Tools\EntityMovementTool());

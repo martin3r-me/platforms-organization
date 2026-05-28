@@ -6,17 +6,13 @@ use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Models\OrganizationTimeEntry;
-use Platform\Organization\Services\EntityHierarchyResolver;
 use Platform\Organization\Services\EntityLinkRegistry;
 use Platform\Organization\Services\PersonActivityRegistry;
-use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -64,67 +60,6 @@ class Dashboard extends Component
             return 0;
         }
         return (int) OrganizationEntity::forTeam($teamId)->active()->count();
-    }
-
-    public function getRootEntitiesProperty(): int
-    {
-        $teamId = $this->getTeamId();
-        if (!$teamId) {
-            return 0;
-        }
-
-        $user = auth()->user();
-        $perspective = PerspectiveService::getActive($teamId, $user->id);
-        $resolver = resolve(EntityHierarchyResolver::class);
-
-        return count($resolver->getRootIds($perspective, $teamId));
-    }
-
-    public function getLeafEntitiesProperty(): int
-    {
-        $teamId = $this->getTeamId();
-        if (!$teamId) {
-            return 0;
-        }
-        return (int) OrganizationEntity::forTeam($teamId)
-            ->whereDoesntHave('children')
-            ->count();
-    }
-
-    public function getRecentEntitiesProperty()
-    {
-        $teamId = $this->getTeamId();
-        if (!$teamId) {
-            return collect();
-        }
-        return OrganizationEntity::forTeam($teamId)
-            ->with(['type'])
-            ->orderBy('created_at', 'desc')
-            ->limit(5)
-            ->get();
-    }
-
-    public function getEntitiesByTypeProperty()
-    {
-        $teamId = $this->getTeamId();
-        if (!$teamId) {
-            return collect();
-        }
-
-        $types = OrganizationEntityType::getActiveOrdered();
-        $counts = OrganizationEntity::forTeam($teamId)
-            ->selectRaw('entity_type_id, COUNT(*) as aggregate_count')
-            ->groupBy('entity_type_id')
-            ->pluck('aggregate_count', 'entity_type_id');
-
-        return $types->map(function ($type) use ($counts) {
-            return (object) [
-                'id' => $type->id,
-                'name' => $type->name,
-                'icon' => $type->icon,
-                'count' => (int) ($counts[$type->id] ?? 0),
-            ];
-        });
     }
 
     #[Computed]

@@ -179,13 +179,13 @@ class OrganizationServiceProvider extends ServiceProvider
             ->dailyAt('18:15')
             ->withoutOverlapping();
 
-        // Inference scheduling: create triggers for due prompts (2x daily, after snapshots)
+        // Inference scheduling: create triggers for due prompts (Mo + Do morgens)
         Schedule::command('organization:schedule-inference')
-            ->dailyAt('08:05')
+            ->weeklyOn(1, '08:05') // Montag
             ->withoutOverlapping();
 
         Schedule::command('organization:schedule-inference')
-            ->dailyAt('18:05')
+            ->weeklyOn(4, '08:05') // Donnerstag
             ->withoutOverlapping();
 
         // Process inference triggers: every minute (cheap polling)

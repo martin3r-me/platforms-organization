@@ -106,7 +106,7 @@ class OrganizationSignalInferencePrompt extends Model
     {
         return $query->where(function ($q) {
             $q->whereNull('last_evaluated_at')
-                ->orWhere('last_evaluated_at', '<=', now()->subHours(24));
+                ->orWhere('last_evaluated_at', '<=', now()->subHours(72));
         });
     }
 }

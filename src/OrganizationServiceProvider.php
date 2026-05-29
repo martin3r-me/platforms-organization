@@ -415,6 +415,10 @@ class OrganizationServiceProvider extends ServiceProvider
             // Prompt Precision Stats
             $registry->register(new \Platform\Organization\Tools\ListPromptStatsTool());
 
+            // Inference Debug Tools
+            $registry->register(new \Platform\Organization\Tools\InferenceHealthCheckTool());
+            $registry->register(new \Platform\Organization\Tools\InferenceLogsTool());
+
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

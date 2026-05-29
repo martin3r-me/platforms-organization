@@ -53,7 +53,7 @@ class InferenceHealthCheckTool implements ToolContract, ToolMetadataContract
         ];
 
         // 2. Model config
-        $model = config('ai.anthropic.inference_model', 'claude-sonnet-4-20250514');
+        $model = config('ai.anthropic.inference_model', 'claude-sonnet-4-6-20250219');
         $checks['model'] = $model;
 
         // 3. Config merge check

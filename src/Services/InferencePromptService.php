@@ -88,7 +88,7 @@ class InferencePromptService
                 $context,
                 [
                     'system' => $systemPrompt,
-                    'model' => config('ai.anthropic.inference_model', 'claude-sonnet-4-20250514'),
+                    'model' => config('ai.anthropic.inference_model', 'claude-sonnet-4-6-20250219'),
                     'max_tokens' => 4096,
                     'max_iterations' => 20,
                     'tools' => $actionTools,
@@ -112,7 +112,7 @@ class InferencePromptService
 
             // Update run with model and token usage
             $run->update([
-                'llm_model' => $result['model'] ?? 'claude-sonnet-4-20250514',
+                'llm_model' => $result['model'] ?? 'claude-sonnet-4-6-20250219',
                 'token_usage' => $result['token_usage'] ?? null,
             ]);
 
@@ -191,7 +191,7 @@ class InferencePromptService
             $context,
             [
                 'system' => $systemPrompt,
-                'model' => config('ai.anthropic.inference_model', 'claude-sonnet-4-20250514'),
+                'model' => config('ai.anthropic.inference_model', 'claude-sonnet-4-6-20250219'),
                 'max_tokens' => 8192,
                 'max_iterations' => 5,
                 // meta-tools (discover + execute) are included by default

@@ -30,6 +30,8 @@ class OrganizationInquiry extends Model
         'completed_at',
         'follow_up_signal_id',
         'aggregated_result',
+        'parent_inquiry_id',
+        'depth',
     ];
 
     protected $casts = [
@@ -37,6 +39,7 @@ class OrganizationInquiry extends Model
         'aggregated_result' => 'array',
         'due_date' => 'date',
         'completed_at' => 'datetime',
+        'depth' => 'integer',
     ];
 
     protected static function booted(): void
@@ -70,6 +73,16 @@ class OrganizationInquiry extends Model
     public function inferenceRun(): BelongsTo
     {
         return $this->belongsTo(OrganizationInferenceRun::class, 'inference_run_id');
+    }
+
+    public function parentInquiry(): BelongsTo
+    {
+        return $this->belongsTo(self::class, 'parent_inquiry_id');
+    }
+
+    public function childInquiries(): HasMany
+    {
+        return $this->hasMany(self::class, 'parent_inquiry_id');
     }
 
     public function recipients(): HasMany

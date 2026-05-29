@@ -46,7 +46,7 @@ class CreateInquiryTool implements ToolContract, ToolMetadataContract
                 'inquiry_type' => [
                     'type' => 'string',
                     'description' => 'ERFORDERLICH: assessment, clarification, validation, follow_up, context_request, periodic_check_in.',
-                    'enum' => ['assessment', 'clarification', 'validation', 'follow_up', 'context_request', 'periodic_check_in'],
+                    'enum' => ['assessment', 'clarification', 'validation', 'follow_up', 'context_request', 'periodic_check_in', 'escalation'],
                 ],
                 'fields' => [
                     'type' => 'array',
@@ -82,6 +82,10 @@ class CreateInquiryTool implements ToolContract, ToolMetadataContract
                 'inference_run_id' => [
                     'type' => 'integer',
                     'description' => 'Optional: ID des auslösenden Inference-Runs.',
+                ],
+                'parent_inquiry_id' => [
+                    'type' => 'integer',
+                    'description' => 'Optional: ID der übergeordneten Inquiry (für Follow-Up-Ketten).',
                 ],
             ],
             'required' => ['entity_id', 'recipients', 'inquiry_type', 'fields'],
@@ -143,10 +147,73 @@ class CreateInquiryTool implements ToolContract, ToolMetadataContract
                 }
             }
 
+            // Validate recipients have linked_user_id
+            $recipientEntities = OrganizationEntity::whereIn('id', $recipientIds)
+                ->where('team_id', $rootTeamId)
+                ->get();
+
+            foreach ($recipientEntities as $re) {
+                if (! $re->linked_user_id) {
+                    return ToolResult::error('VALIDATION_ERROR', "Empfänger \"{$re->name}\" hat keinen verknüpften User (linked_user_id). Nur Entities mit Platform-User können Inquiries erhalten.");
+                }
+            }
+
+            if ($recipientEntities->count() !== count($recipientIds)) {
+                return ToolResult::error('NOT_FOUND', 'Eine oder mehrere Empfänger-Entities wurden nicht gefunden.');
+            }
+
             // Validate fields
             $fields = $arguments['fields'] ?? [];
             if (empty($fields)) {
                 return ToolResult::error('VALIDATION_ERROR', 'Mindestens ein Formular-Feld erforderlich.');
+            }
+
+            // Depth calculation
+            $parentInquiryId = ! empty($arguments['parent_inquiry_id']) ? (int) $arguments['parent_inquiry_id'] : null;
+            $depth = 0;
+            $parentInquiry = null;
+
+            if ($parentInquiryId) {
+                $parentInquiry = OrganizationInquiry::where('id', $parentInquiryId)
+                    ->where('team_id', $rootTeamId)
+                    ->first();
+
+                if (! $parentInquiry) {
+                    return ToolResult::error('NOT_FOUND', 'Parent-Inquiry nicht gefunden.');
+                }
+
+                $depth = $parentInquiry->depth + 1;
+            }
+
+            // Escalation check
+            $inquiryType = $arguments['inquiry_type'];
+            $contextSummary = $arguments['context_summary'] ?? null;
+            $maxDepth = config('organization.inference.max_inquiry_depth', 3);
+
+            if ($depth >= $maxDepth) {
+                $escalationUserId = config('organization.inference.escalation_user_id');
+
+                if ($escalationUserId) {
+                    $escalationEntity = OrganizationEntity::where('team_id', $rootTeamId)
+                        ->where('linked_user_id', $escalationUserId)
+                        ->first();
+
+                    if ($escalationEntity) {
+                        // Build context chain from ancestor inquiries
+                        $chain = [];
+                        $current = $parentInquiry;
+                        while ($current) {
+                            $chain[] = "Runde {$current->depth}: [{$current->inquiry_type}] {$current->context_summary}";
+                            $current = $current->parentInquiry;
+                        }
+                        $chain = array_reverse($chain);
+                        $chainText = implode("\n", $chain);
+
+                        $contextSummary = "ESKALATION: Maximale Inquiry-Tiefe ({$maxDepth}) erreicht.\n\nVerlauf:\n{$chainText}\n\nAktuelle Runde: {$contextSummary}";
+                        $inquiryType = 'escalation';
+                        $recipientEntities = collect([$escalationEntity]);
+                    }
+                }
             }
 
             $dueDate = ! empty($arguments['due_date'])
@@ -159,19 +226,22 @@ class CreateInquiryTool implements ToolContract, ToolMetadataContract
                 'inference_run_id' => ! empty($arguments['inference_run_id']) ? (int) $arguments['inference_run_id'] : null,
                 'inference_prompt_id' => ! empty($arguments['inference_prompt_id']) ? (int) $arguments['inference_prompt_id'] : null,
                 'entity_id' => $entityId,
-                'inquiry_type' => $arguments['inquiry_type'],
+                'inquiry_type' => $inquiryType,
                 'recipient_mode' => $arguments['recipient_mode'] ?? 'all',
                 'fields' => $fields,
-                'context_summary' => $arguments['context_summary'] ?? null,
+                'context_summary' => $contextSummary,
                 'status' => 'pending',
                 'due_date' => $dueDate,
+                'parent_inquiry_id' => $parentInquiryId,
+                'depth' => $depth,
             ]);
 
-            // Create recipient records
-            foreach ($recipientIds as $recipientId) {
+            // Create recipient records with resolved linked_user_id
+            foreach ($recipientEntities as $recipientEntity) {
                 OrganizationInquiryRecipient::create([
                     'inquiry_id' => $inquiry->id,
-                    'recipient_entity_id' => (int) $recipientId,
+                    'recipient_entity_id' => $recipientEntity->id,
+                    'recipient_user_id' => $recipientEntity->linked_user_id,
                     'channel' => 'portal',
                     'status' => 'pending',
                 ]);
@@ -181,9 +251,11 @@ class CreateInquiryTool implements ToolContract, ToolMetadataContract
                 'id' => $inquiry->id,
                 'uuid' => $inquiry->uuid,
                 'inquiry_type' => $inquiry->inquiry_type,
-                'recipients_count' => count($recipientIds),
+                'depth' => $depth,
+                'recipients_count' => $recipientEntities->count(),
                 'due_date' => $dueDate,
-                'message' => 'Inquiry erstellt und an ' . count($recipientIds) . ' Empfänger verteilt.',
+                'escalated' => $depth >= $maxDepth && config('organization.inference.escalation_user_id'),
+                'message' => 'Inquiry erstellt und an ' . $recipientEntities->count() . ' Empfänger verteilt.' . ($depth >= $maxDepth ? ' (Eskalation)' : ''),
             ]);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Erstellen der Inquiry: ' . $e->getMessage());

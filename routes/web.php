@@ -36,6 +36,8 @@ use Platform\Organization\Livewire\Settings\InferencePrompt\Index as InferencePr
 use Platform\Organization\Livewire\Inference\RunIndex as InferenceRunIndex;
 use Platform\Organization\Livewire\Memory\Index as MemoryIndex;
 use Platform\Organization\Livewire\Inquiry\Index as InquiryIndex;
+use Platform\Organization\Livewire\Inquiry\MyInquiries;
+use Platform\Organization\Livewire\Inquiry\Respond as InquiryRespond;
 use Platform\Organization\Livewire\Synthesis\Index as SynthesisIndex;
 use Platform\Organization\Livewire\Synthesis\Show as SynthesisShow;
 use Platform\Organization\Livewire\Skill\Index as SkillIndex;
@@ -56,6 +58,8 @@ Route::get('/settings/inference-prompts', InferencePromptIndex::class)->name('or
 Route::get('/inference-runs', InferenceRunIndex::class)->name('organization.inference-runs.index');
 Route::get('/memory', MemoryIndex::class)->name('organization.memory.index');
 Route::get('/inquiries', InquiryIndex::class)->name('organization.inquiries.index');
+Route::get('/my-inquiries', MyInquiries::class)->name('organization.my-inquiries.index');
+Route::get('/my-inquiries/{recipient}', InquiryRespond::class)->name('organization.my-inquiries.respond');
 Route::get('/synthesis-reports', SynthesisIndex::class)->name('organization.synthesis-reports.index');
 Route::get('/synthesis-reports/{report}', SynthesisShow::class)->name('organization.synthesis-reports.show');
 

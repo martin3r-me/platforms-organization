@@ -101,6 +101,12 @@ return [
             ],
         ],
     ],
+    'inference' => [
+        'max_inquiry_depth' => 3,
+        'escalation_user_id' => null,
+        'inquiry_check_interval_hours' => 6,
+    ],
+
     'billables' => [
         [
             'model' => \Platform\Organization\Models\OrganizationEntity::class,

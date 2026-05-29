@@ -209,6 +209,20 @@
     <div>
         <h4 x-show="!collapsed" class="px-4 py-3 text-xs tracking-wide font-semibold text-[color:var(--ui-muted)] uppercase">Inference</h4>
 
+        {{-- Meine Inquiries --}}
+        <a href="{{ route('organization.my-inquiries.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/my-inquiries')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-inbox class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Meine Inquiries</span>
+        </a>
+
         {{-- Signale --}}
         <a href="{{ route('organization.signals.index') }}"
            class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"

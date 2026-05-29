@@ -72,7 +72,7 @@ class ExecuteInferenceRunTool implements ToolContract, ToolMetadataContract
                 'created_at' => now(),
             ]);
 
-            InferenceWorkerJob::dispatch($trigger)->onQueue('inference');
+            InferenceWorkerJob::dispatch($trigger);
 
             return ToolResult::success([
                 'trigger_id' => $trigger->id,

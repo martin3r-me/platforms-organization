@@ -33,14 +33,7 @@ class ProcessInferenceTriggersCommand extends Command
             // Mark as processing
             $trigger->update(['status' => 'processing']);
 
-            // Determine queue based on priority
-            $queue = match (true) {
-                $trigger->priority >= 80 => 'inference-urgent',
-                $trigger->trigger_type === 'synthesis' => 'synthesis',
-                default => 'inference',
-            };
-
-            InferenceWorkerJob::dispatch($trigger)->onQueue($queue);
+            InferenceWorkerJob::dispatch($trigger);
             $dispatched++;
         }
 

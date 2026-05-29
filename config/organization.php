@@ -105,6 +105,7 @@ return [
         'max_inquiry_depth' => 3,
         'escalation_user_id' => null,
         'inquiry_check_interval_hours' => 6,
+        'default_interval_hours' => 72,
     ],
 
     'billables' => [

@@ -31,6 +31,7 @@ class OrganizationSignalInferencePrompt extends Model
         'scope_type',
         'scope_value',
         'is_active',
+        'schedule_interval_hours',
         'last_evaluated_at',
     ];
 
@@ -38,6 +39,7 @@ class OrganizationSignalInferencePrompt extends Model
         'data_sources' => 'array',
         'scope_value' => 'array',
         'is_active' => 'boolean',
+        'schedule_interval_hours' => 'integer',
         'last_evaluated_at' => 'datetime',
     ];
 
@@ -104,9 +106,14 @@ class OrganizationSignalInferencePrompt extends Model
 
     public function scopeDue($query)
     {
-        return $query->where(function ($q) {
+        $defaultHours = config('organization.inference.default_interval_hours', 72);
+
+        return $query->where(function ($q) use ($defaultHours) {
             $q->whereNull('last_evaluated_at')
-                ->orWhere('last_evaluated_at', '<=', now()->subHours(72));
+                ->orWhereRaw(
+                    'last_evaluated_at <= NOW() - INTERVAL COALESCE(schedule_interval_hours, ?) HOUR',
+                    [$defaultHours]
+                );
         });
     }
 }

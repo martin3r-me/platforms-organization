@@ -78,6 +78,10 @@ class UpdateSignalInferencePromptTool implements ToolContract, ToolMetadataContr
                     'type' => 'boolean',
                     'description' => 'Optional: aktiv/inaktiv.',
                 ],
+                'schedule_interval_hours' => [
+                    'type' => 'integer',
+                    'description' => 'Optional: Evaluierungs-Intervall in Stunden (24=täglich, 72=~2x/Woche, 168=wöchentlich). null = globaler Default.',
+                ],
             ],
             'required' => ['inference_prompt_id'],
         ]);
@@ -174,6 +178,12 @@ class UpdateSignalInferencePromptTool implements ToolContract, ToolMetadataContr
                 $update['is_active'] = (bool) $arguments['is_active'];
             }
 
+            if (array_key_exists('schedule_interval_hours', $arguments)) {
+                $update['schedule_interval_hours'] = $arguments['schedule_interval_hours'] !== null
+                    ? (int) $arguments['schedule_interval_hours']
+                    : null;
+            }
+
             if (! empty($update)) {
                 $prompt->update($update);
             }
@@ -190,6 +200,7 @@ class UpdateSignalInferencePromptTool implements ToolContract, ToolMetadataContr
                 'default_severity' => $prompt->default_severity,
                 'scope_type' => $prompt->scope_type,
                 'is_active' => (bool) $prompt->is_active,
+                'schedule_interval_hours' => $prompt->schedule_interval_hours,
                 'message' => 'Inference-Prompt erfolgreich aktualisiert.',
             ]);
         } catch (\Throwable $e) {

@@ -78,6 +78,10 @@ class CreateSignalInferencePromptTool implements ToolContract, ToolMetadataContr
                     'description' => 'Optional: aktiv/inaktiv. Default: true.',
                     'default' => true,
                 ],
+                'schedule_interval_hours' => [
+                    'type' => 'integer',
+                    'description' => 'Optional: Wie oft der Prompt evaluiert wird (in Stunden). Beispiele: 24 = täglich, 72 = ~2x/Woche, 168 = wöchentlich. Default: globaler Wert (72h).',
+                ],
             ],
             'required' => ['name', 'vsm_system', 'prompt_template'],
         ];
@@ -128,6 +132,7 @@ class CreateSignalInferencePromptTool implements ToolContract, ToolMetadataContr
                 'scope_type' => $scopeType,
                 'scope_value' => $arguments['scope_value'] ?? null,
                 'is_active' => (bool) ($arguments['is_active'] ?? true),
+                'schedule_interval_hours' => isset($arguments['schedule_interval_hours']) ? (int) $arguments['schedule_interval_hours'] : null,
                 'team_id' => $rootTeamId,
                 'user_id' => $context->user?->id,
             ]);
@@ -143,6 +148,7 @@ class CreateSignalInferencePromptTool implements ToolContract, ToolMetadataContr
                 'default_severity' => $prompt->default_severity,
                 'scope_type' => $prompt->scope_type,
                 'is_active' => (bool) $prompt->is_active,
+                'schedule_interval_hours' => $prompt->schedule_interval_hours,
                 'message' => 'Inference-Prompt erfolgreich erstellt.',
             ]);
         } catch (\Throwable $e) {

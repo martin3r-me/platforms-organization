@@ -245,11 +245,11 @@ Nutze die folgenden Tools um deine Diagnose zu dokumentieren:
 
 3. **organization_inference_do_nothing** — Explizit: Alles in Ordnung. Wird protokolliert. Nutze dies wenn die Lage unauffällig ist.
 
-### Daten-Tools (über discover_tools + execute_tool)
+### Daten-Tools (über execute_tool)
 
-Für zusätzliche Daten nutze:
-1. **discover_tools** — Suche nach verfügbaren Daten-Tools (z.B. query="entities", "time_entries", "signals")
-2. **execute_tool** — Führe ein gefundenes Tool aus: execute_tool(tool="organization.entities.GET", arguments={"type": "project"})
+Für zusätzliche Daten nutze **execute_tool**:
+- **Tool-Suche**: execute_tool(tool="tool_registry.SEARCH", arguments={"query": "entities"})
+- **Tool ausführen**: execute_tool(tool="organization.entities.GET", arguments={"type": "project"})
 
 Beispiele für Daten-Tools: organization.entities.GET, organization.signals.GET, organization.time_entries.GET, organization.entity_relationships.GET, organization.memory.GET, organization.entity_movement.GET u.v.m.
 

@@ -30,7 +30,14 @@ use Platform\Organization\Livewire\JobProfile\Show as JobProfileShow;
 use Platform\Organization\Livewire\Role\Index as RoleIndex;
 use Platform\Organization\Livewire\Settings\SignalDefinition\Index as SignalDefinitionIndex;
 use Platform\Organization\Livewire\Settings\SignalDefinition\Show as SignalDefinitionShow;
+use Platform\Organization\Livewire\Signal\Index as SignalIndex;
 use Platform\Organization\Livewire\Signal\Show as SignalShow;
+use Platform\Organization\Livewire\Settings\InferencePrompt\Index as InferencePromptIndex;
+use Platform\Organization\Livewire\Inference\RunIndex as InferenceRunIndex;
+use Platform\Organization\Livewire\Memory\Index as MemoryIndex;
+use Platform\Organization\Livewire\Inquiry\Index as InquiryIndex;
+use Platform\Organization\Livewire\Synthesis\Index as SynthesisIndex;
+use Platform\Organization\Livewire\Synthesis\Show as SynthesisShow;
 use Platform\Organization\Livewire\Skill\Index as SkillIndex;
 
 Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organization.dashboard');
@@ -41,7 +48,16 @@ Route::get('/entities/{entity}/mindmap', EntityMindmap::class)->name('organizati
 Route::get('/entities/{entity}/board', EntityBoard::class)->name('organization.entities.board');
 
 // Signals
+Route::get('/signals', SignalIndex::class)->name('organization.signals.index');
 Route::get('/signals/{signal}', SignalShow::class)->name('organization.signals.show');
+
+// Inference
+Route::get('/settings/inference-prompts', InferencePromptIndex::class)->name('organization.settings.inference-prompts.index');
+Route::get('/inference-runs', InferenceRunIndex::class)->name('organization.inference-runs.index');
+Route::get('/memory', MemoryIndex::class)->name('organization.memory.index');
+Route::get('/inquiries', InquiryIndex::class)->name('organization.inquiries.index');
+Route::get('/synthesis-reports', SynthesisIndex::class)->name('organization.synthesis-reports.index');
+Route::get('/synthesis-reports/{report}', SynthesisShow::class)->name('organization.synthesis-reports.show');
 
 // Dimensionen: Kostenstellen
 Route::get('/cost-centers', CostCenterIndex::class)->name('organization.cost-centers.index');

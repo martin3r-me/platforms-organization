@@ -62,42 +62,6 @@ return [
                     'route' => 'organization.dashboard',
                     'icon' => 'heroicon-o-home',
                 ],
-                'inference' => [
-                    'title' => 'Inference',
-                    'icon' => 'heroicon-o-cpu-chip',
-                    'items' => [
-                        'signals' => [
-                            'title' => 'Signale',
-                            'route' => 'organization.signals.index',
-                            'icon' => 'heroicon-o-bell-alert',
-                        ],
-                        'inference-prompts' => [
-                            'title' => 'Inference Prompts',
-                            'route' => 'organization.settings.inference-prompts.index',
-                            'icon' => 'heroicon-o-cpu-chip',
-                        ],
-                        'inference-runs' => [
-                            'title' => 'Inference Runs',
-                            'route' => 'organization.inference-runs.index',
-                            'icon' => 'heroicon-o-play',
-                        ],
-                        'memory' => [
-                            'title' => 'Memory',
-                            'route' => 'organization.memory.index',
-                            'icon' => 'heroicon-o-circle-stack',
-                        ],
-                        'inquiries' => [
-                            'title' => 'Inquiries',
-                            'route' => 'organization.inquiries.index',
-                            'icon' => 'heroicon-o-question-mark-circle',
-                        ],
-                        'synthesis-reports' => [
-                            'title' => 'Synthesis Reports',
-                            'route' => 'organization.synthesis-reports.index',
-                            'icon' => 'heroicon-o-document-text',
-                        ],
-                    ],
-                ],
                 'settings' => [
                     'title' => 'Einstellungen',
                     'icon' => 'heroicon-o-cog-6-tooth',

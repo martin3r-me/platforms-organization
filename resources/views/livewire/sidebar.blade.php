@@ -205,6 +205,81 @@
         </a>
     </div>
 
+    {{-- Abschnitt: Inference --}}
+    <div>
+        <h4 x-show="!collapsed" class="px-4 py-3 text-xs tracking-wide font-semibold text-[color:var(--ui-muted)] uppercase">Inference</h4>
+
+        {{-- Signale --}}
+        <a href="{{ route('organization.signals.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/signals')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-bell-alert class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Signale</span>
+        </a>
+
+        {{-- Inference Runs --}}
+        <a href="{{ route('organization.inference-runs.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/inference-runs')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-play class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Inference Runs</span>
+        </a>
+
+        {{-- Memory --}}
+        <a href="{{ route('organization.memory.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/memory')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-circle-stack class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Memory</span>
+        </a>
+
+        {{-- Inquiries --}}
+        <a href="{{ route('organization.inquiries.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/inquiries')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-question-mark-circle class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Inquiries</span>
+        </a>
+
+        {{-- Synthesis Reports --}}
+        <a href="{{ route('organization.synthesis-reports.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/synthesis-reports')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-document-text class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Synthesis Reports</span>
+        </a>
+    </div>
+
     {{-- Abschnitt: Schnellzugriff --}}
     <div x-show="!collapsed">
         <h4 class="px-4 py-3 text-xs tracking-wide font-semibold text-[color:var(--ui-muted)] uppercase">Schnellzugriff</h4>
@@ -257,6 +332,20 @@
            wire:navigate>
             <x-heroicon-o-arrows-right-left class="w-6 h-6 flex-shrink-0"/>
             <span x-show="!collapsed" class="truncate">Relation Types</span>
+        </a>
+
+        {{-- Inference Prompts --}}
+        <a href="{{ route('organization.settings.inference-prompts.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/settings/inference-prompts')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-cpu-chip class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Inference Prompts</span>
         </a>
 
         {{-- Signaldefinitionen --}}

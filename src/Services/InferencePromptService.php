@@ -6,7 +6,7 @@ use Illuminate\Support\Facades\Log;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
-use Platform\Core\Services\AiToolLoopRunner;
+use Platform\Core\Services\ClaudeToolLoopRunner;
 use Platform\Organization\Models\OrganizationInferenceRun;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Models\OrganizationSignalInferencePrompt;
@@ -73,59 +73,64 @@ class InferencePromptService
             // 3. Build user message with evaluation context
             $userMessage = $this->buildUserMessage($prompt, $evaluation);
 
-            // 4. Define available action tools
+            // 4. Action tools exposed directly (Claude calls them by name).
+            //    All other tools (read, search, etc.) are available via
+            //    discover_tools + execute_tool (MCP pattern, full ToolRegistry).
             $actionTools = $this->getActionToolNames($prompt->vsm_system);
 
-            // 5. Get all read tools + action tools for preloading
-            $preloadTools = array_merge(
-                $this->getReadToolNames(),
-                $actionTools
+            // 5. Run via ClaudeToolLoopRunner
+            $runner = ClaudeToolLoopRunner::make();
+
+            $result = $runner->run(
+                [
+                    ['role' => 'user', 'content' => $userMessage],
+                ],
+                $context,
+                [
+                    'system' => $systemPrompt,
+                    'model' => config('services.anthropic.inference_model', 'claude-sonnet-4-20250514'),
+                    'max_tokens' => 4096,
+                    'max_iterations' => 20,
+                    'tools' => $actionTools,
+                    // include_meta_tools defaults to true → discover_tools + execute_tool
+                    'temperature' => 0.3,
+                    'on_tool_result' => function (string $toolName, array $args, array $result) use (&$stats) {
+                        if ($toolName === 'organization.signal_inference.create_signal') {
+                            if (! empty($result['data']['id']) && empty($result['data']['skipped'])) {
+                                $stats['signals_created']++;
+                            }
+                        } elseif ($toolName === 'organization.memory.POST') {
+                            $stats['memory_updates']++;
+                        } elseif ($toolName === 'organization.inquiries.create') {
+                            $stats['inquiries_created']++;
+                        } elseif ($toolName === 'organization.inference.do_nothing') {
+                            $stats['do_nothing_count']++;
+                        }
+                    },
+                ]
             );
 
-            // 6. Run the LLM via AiToolLoopRunner
-            $runner = AiToolLoopRunner::make();
-
-            $messages = [
-                ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => $userMessage],
-            ];
-
-            $result = $runner->run($messages, 'gpt-4o', $context, [
-                'max_iterations' => 20,
-                'max_output_tokens' => 4000,
-                'skip_discovery_tools' => true,
-                'preload_tools' => $preloadTools,
-                'include_web_search' => false,
-                'reasoning' => ['effort' => 'high'],
-                'on_tool_result' => function (string $toolName, array $args, array $result) use (&$stats) {
-                    // Track what the LLM does
-                    if ($toolName === 'organization.signal_inference.create_signal') {
-                        if (! empty($result['data']['id']) && empty($result['data']['skipped'])) {
-                            $stats['signals_created']++;
-                        }
-                    } elseif ($toolName === 'organization.memory.POST') {
-                        $stats['memory_updates']++;
-                    } elseif ($toolName === 'organization.inquiries.create') {
-                        $stats['inquiries_created']++;
-                    } elseif ($toolName === 'organization.inference.do_nothing') {
-                        $stats['do_nothing_count']++;
-                    }
-                },
-            ]);
-
-            // Update run with LLM model and token usage
+            // Update run with model and token usage
             $run->update([
-                'llm_model' => 'gpt-4o',
+                'llm_model' => $result['model'] ?? 'claude-sonnet-4-20250514',
                 'token_usage' => $result['token_usage'] ?? null,
             ]);
 
             // Update last_evaluated_at
             $prompt->update(['last_evaluated_at' => now()]);
 
+            Log::info('[InferencePromptService] Prompt executed', [
+                'prompt_id' => $prompt->id,
+                'iterations' => $result['iterations'],
+                'tool_calls' => count($result['tool_calls']),
+                'stats' => $stats,
+            ]);
+
         } catch (\Throwable $e) {
             Log::error('[InferencePromptService] Prompt execution failed', [
                 'prompt_id' => $prompt->id,
                 'error' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
             ]);
         }
 
@@ -143,7 +148,7 @@ class InferencePromptService
         [$periodStart, $periodEnd] = match ($reportType) {
             'monthly' => [now()->subMonth()->startOfMonth(), now()->subMonth()->endOfMonth()],
             'quarterly' => [now()->subQuarter()->startOfQuarter(), now()->subQuarter()->endOfQuarter()],
-            default => [now()->subWeek()->startOfWeek(), now()->subWeek()->endOfWeek()], // weekly
+            default => [now()->subWeek()->startOfWeek(), now()->subWeek()->endOfWeek()],
         };
 
         // Load signals for the period
@@ -177,21 +182,19 @@ class InferencePromptService
             . "Signale der Periode (" . count($signalSummary) . "):\n"
             . json_encode($signalSummary, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
 
-        $runner = AiToolLoopRunner::make();
+        $runner = ClaudeToolLoopRunner::make();
 
         $result = $runner->run(
             [
-                ['role' => 'system', 'content' => $systemPrompt],
                 ['role' => 'user', 'content' => $userMessage],
             ],
-            'gpt-4o',
             $context,
             [
+                'system' => $systemPrompt,
+                'model' => config('services.anthropic.inference_model', 'claude-sonnet-4-20250514'),
+                'max_tokens' => 8192,
                 'max_iterations' => 5,
-                'max_output_tokens' => 8000,
-                'skip_discovery_tools' => true,
-                'include_web_search' => false,
-                'reasoning' => ['effort' => 'high'],
+                // meta-tools (discover + execute) are included by default
             ]
         );
 
@@ -205,7 +208,7 @@ class InferencePromptService
             'period_start' => $periodStart,
             'period_end' => $periodEnd,
             'title' => $title,
-            'content' => $result['assistant'] ?? '',
+            'content' => $result['assistant_text'] ?? '',
             'signals_included' => $signals->pluck('id')->toArray(),
             'algedonic_signals' => $algedonicSignals->pluck('id')->toArray(),
             'status' => 'draft',
@@ -228,19 +231,27 @@ class InferencePromptService
 
 Du bist ein autonomer diagnostischer Analyst. Du hast Zugang zu allen Organisationsdaten über die verfügbaren Tools. Du kannst Entities nachschlagen, Beziehungen traversieren, Zeiterfassungen prüfen, Rollen und Skills abfragen.
 
-### Verfügbare Aktionen
+### Aktions-Tools (direkt aufrufbar)
 
 Nutze die folgenden Tools um deine Diagnose zu dokumentieren:
 
-1. **organization.signal_inference.create_signal** — Erzeuge ein Signal wenn du ein Problem erkennst. Wähle die passende Severity:
+1. **organization_signal_inference_create_signal** — Erzeuge ein Signal wenn du ein Problem erkennst. Wähle die passende Severity:
    - `info`: Beobachtung, kein Handlungsbedarf
    - `warning`: Aufmerksamkeit erforderlich
    - `critical`: Handlungsbedarf
    - `algedonic`: Existenzielle Bedrohung — kurzschließt an S5
 
-2. **organization.memory.POST** — Speichere eine Erkenntnis als Memory-Entry (Baseline, Entity-Profile, Suppression, etc.)
+2. **organization_memory_POST** — Speichere eine Erkenntnis als Memory-Entry (Baseline, Entity-Profile, Suppression, etc.)
 
-3. **organization.inference.do_nothing** — Explizit: Alles in Ordnung. Wird protokolliert. Nutze dies wenn die Lage unauffällig ist.
+3. **organization_inference_do_nothing** — Explizit: Alles in Ordnung. Wird protokolliert. Nutze dies wenn die Lage unauffällig ist.
+
+### Daten-Tools (über discover_tools + execute_tool)
+
+Für zusätzliche Daten nutze:
+1. **discover_tools** — Suche nach verfügbaren Daten-Tools (z.B. query="entities", "time_entries", "signals")
+2. **execute_tool** — Führe ein gefundenes Tool aus: execute_tool(tool="organization.entities.GET", arguments={"type": "project"})
+
+Beispiele für Daten-Tools: organization.entities.GET, organization.signals.GET, organization.time_entries.GET, organization.entity_relationships.GET, organization.memory.GET, organization.entity_movement.GET u.v.m.
 
 ### Memory-Kontext beachten
 
@@ -262,7 +273,7 @@ Nutze severity `algedonic` NUR bei echten existenziellen Bedrohungen:
 
 ### do_nothing ist wertvoll
 
-Wenn die Lage in Ordnung ist, rufe `organization.inference.do_nothing` auf mit einer kurzen Begründung. Das ist kein Fehler — es ist eine aktive diagnostische Entscheidung.
+Wenn die Lage in Ordnung ist, rufe `organization_inference_do_nothing` auf mit einer kurzen Begründung. Das ist kein Fehler — es ist eine aktive diagnostische Entscheidung.
 PROMPT;
 
         return $baseInstructions;
@@ -281,7 +292,7 @@ PROMPT;
         $message .= "- Offene Signale: {$existingSignals}\n";
         $message .= "- Inference-Prompt-ID: {$prompt->id}\n\n";
 
-        // Entity data (truncated for context window)
+        // Entity data
         $entities = $evaluation['entities'] ?? [];
         if (! empty($entities)) {
             $message .= "## Entity-Daten\n\n";
@@ -333,29 +344,6 @@ PROMPT;
         return $tools;
     }
 
-    protected function getReadToolNames(): array
-    {
-        return [
-            'organization.entities.GET',
-            'organization.entity_relationships.GET',
-            'organization.interlinks.GET',
-            'organization.cost_centers.GET',
-            'organization.time_entries.GET',
-            'organization.time_entries.summarize',
-            'organization.job_profiles.GET',
-            'organization.role_assignments.GET',
-            'organization.skills.GET',
-            'organization.person_skills.GET',
-            'organization.perspectives.GET',
-            'organization.vsm_functions.GET',
-            'organization.dimension_values.GET',
-            'organization.reports.GET',
-            'organization.signals.GET',
-            'organization.memory.GET',
-            'organization.entity_movement.GET',
-        ];
-    }
-
     protected function buildToolContext(int $teamId): ToolContext
     {
         $team = Team::find($teamId);
@@ -370,7 +358,6 @@ PROMPT;
         }
 
         if (! $user) {
-            // Fallback: create a minimal context
             $user = User::first();
         }
 

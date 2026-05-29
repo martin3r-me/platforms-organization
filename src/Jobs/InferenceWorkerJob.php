@@ -9,8 +9,6 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Contracts\ToolContext;
-use Platform\Core\Models\User;
-use Platform\Core\Services\AiToolLoopRunner;
 use Platform\Organization\Models\OrganizationInferenceRun;
 use Platform\Organization\Models\OrganizationInferenceTrigger;
 use Platform\Organization\Models\OrganizationSignalInferencePrompt;

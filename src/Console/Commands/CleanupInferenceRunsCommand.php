@@ -10,12 +10,14 @@ class CleanupInferenceRunsCommand extends Command
 {
     protected $signature = 'organization:cleanup-inference-runs';
 
-    protected $description = 'Mark stale "running" inference runs as failed after 10 minutes';
+    protected $description = 'Mark stale "running" inference runs as failed when inactive for 15+ minutes';
 
     public function handle(): int
     {
-        $cutoff = now()->subMinutes(10);
+        $cutoff = now()->subMinutes(15);
 
+        // A run is stale when its updated_at (heartbeat) hasn't been touched in 15 min.
+        // Active runs touch updated_at after each prompt evaluation.
         $staleRuns = OrganizationInferenceRun::where('status', 'running')
             ->where('updated_at', '<', $cutoff)
             ->get();

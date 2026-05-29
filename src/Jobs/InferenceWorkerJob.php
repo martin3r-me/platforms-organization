@@ -18,7 +18,7 @@ class InferenceWorkerJob implements ShouldQueue
 {
     use Dispatchable, InteractsWithQueue, Queueable, SerializesModels;
 
-    public int $timeout = 300; // 5 minutes max
+    public int $timeout = 900; // 15 minutes max per job
     public int $tries = 1;    // No retry for LLM calls
 
     public function __construct(
@@ -91,6 +91,8 @@ class InferenceWorkerJob implements ShouldQueue
         $totalEntities = 0;
 
         foreach ($prompts as $prompt) {
+            $run->touch(); // Heartbeat: signal that run is still active
+
             $result = $service->executePrompt($prompt, $trigger->team_id, $run);
 
             $totalSignals += $result['signals_created'] ?? 0;

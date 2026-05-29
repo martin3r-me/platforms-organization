@@ -5,17 +5,7 @@
                 @php
                     $iconName = str_replace('heroicons.', '', $entity->type->icon);
                     // Map non-existent icons to valid alternatives
-                    $iconMap = [
-                        'user-check' => 'user',
-                        'folder-kanban' => 'folder',
-                        'briefcase-globe' => 'briefcase',
-                        'server-cog' => 'server',
-                        'package-check' => 'package',
-                        'badge-check' => 'badge',
-                        'target' => 'viewfinder-circle',
-                        'user-voice' => 'user',
-                    ];
-                    $iconName = $iconMap[$iconName] ?? $iconName;
+                    $iconName = app('safe-svg')->resolve($iconName, 'heroicon-o-') ?? 'cube';
                 @endphp
                 @svg('heroicon-o-' . $iconName, 'w-5 h-5 text-[var(--ui-muted)] mr-3')
             @endif

@@ -717,8 +717,8 @@
                                         </div>
 
                                         {{-- Type Icon --}}
-                                        @if($rootTypeIcon)
-                                            @svg('heroicon-o-' . $rootTypeIcon, 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
+                                        @if($rootTypeIcon && ($safeRootIcon = app('safe-svg')->resolve($rootTypeIcon, 'heroicon-o-')))
+                                            @svg('heroicon-o-' . $safeRootIcon, 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
                                         @endif
 
                                         {{-- Name --}}

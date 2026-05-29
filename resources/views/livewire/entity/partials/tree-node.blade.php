@@ -75,8 +75,8 @@
                 @endif
             </div>
 
-            @if($node['type_icon'])
-                @svg('heroicon-o-' . $node['type_icon'], 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
+            @if($node['type_icon'] && ($safeIcon = app('safe-svg')->resolve($node['type_icon'], 'heroicon-o-')))
+                @svg('heroicon-o-' . $safeIcon, 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
             @endif
 
             <a href="{{ route('organization.entities.show', $node['id']) }}"

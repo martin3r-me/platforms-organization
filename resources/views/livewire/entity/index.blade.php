@@ -93,17 +93,7 @@
                             @if($entityType->icon)
                                 @php
                                     $iconName = str_replace('heroicons.', '', $entityType->icon);
-                                    $iconMap = [
-                                        'user-check' => 'user',
-                                        'folder-kanban' => 'folder',
-                                        'briefcase-globe' => 'briefcase',
-                                        'server-cog' => 'server',
-                                        'package-check' => 'package',
-                                        'badge-check' => 'badge',
-                                        'target' => 'viewfinder-circle',
-                                        'user-voice' => 'user',
-                                    ];
-                                    $iconName = $iconMap[$iconName] ?? $iconName;
+                                    $iconName = app('safe-svg')->resolve($iconName, 'heroicon-o-') ?? 'cube';
                                 @endphp
                                 @svg('heroicon-o-' . $iconName, 'w-4 h-4 text-[var(--ui-muted)]')
                             @endif

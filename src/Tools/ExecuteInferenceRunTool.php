@@ -42,6 +42,10 @@ class ExecuteInferenceRunTool implements ToolContract, ToolMetadataContract
                     'description' => 'Optional: Alle Prompts eines VSM-Systems evaluieren.',
                     'enum' => ['s1', 's2', 's3', 's3_star', 's4', 's5'],
                 ],
+                'sync' => [
+                    'type' => 'boolean',
+                    'description' => 'Optional: Synchron ausführen statt Queue (für Debugging). Default: false.',
+                ],
             ],
         ];
     }
@@ -72,7 +76,11 @@ class ExecuteInferenceRunTool implements ToolContract, ToolMetadataContract
                 'created_at' => now(),
             ]);
 
-            InferenceWorkerJob::dispatch($trigger);
+            if (! empty($arguments['sync'])) {
+                InferenceWorkerJob::dispatchSync($trigger);
+            } else {
+                InferenceWorkerJob::dispatch($trigger);
+            }
 
             return ToolResult::success([
                 'trigger_id' => $trigger->id,

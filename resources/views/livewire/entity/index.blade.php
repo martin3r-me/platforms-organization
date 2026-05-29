@@ -31,6 +31,10 @@
                             <input type="checkbox" wire:model.live="showInactive" id="showInactive" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
                             <label for="showInactive" class="ml-2 text-sm text-[var(--ui-secondary)]">Inaktive anzeigen</label>
                         </div>
+                        <div class="flex items-center">
+                            <input type="checkbox" wire:model.live="onlyWithSignals" id="onlyWithSignals" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                            <label for="onlyWithSignals" class="ml-2 text-sm text-[var(--ui-secondary)]">Nur mit Signalen</label>
+                        </div>
                     </div>
                 </div>
                 <div>
@@ -69,6 +73,7 @@
             <x-ui-table-header-cell compact="true">Relationen</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">VSM</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
+            <x-ui-table-header-cell compact="true">Signale</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Bewegung</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Erstellt</x-ui-table-header-cell>
         </x-ui-table-header>
@@ -77,7 +82,7 @@
             {{-- Root Entities (ohne Parent) --}}
             @if($this->entities['root']->count() > 0)
                 @foreach($this->entities['root'] as $entity)
-                    @include('organization::livewire.entity.partials.table-row', ['entity' => $entity, 'entityMovements' => $this->entityMovements, 'vsmSystemMap' => $this->vsmSystemMap])
+                    @include('organization::livewire.entity.partials.table-row', ['entity' => $entity, 'entityMovements' => $this->entityMovements, 'vsmSystemMap' => $this->vsmSystemMap, 'signalCounts' => $this->signalCounts])
                 @endforeach
             @endif
 
@@ -88,7 +93,7 @@
                     $entityType = $firstEntity->type;
                 @endphp
                 <x-ui-table-row compact="true" class="bg-[var(--ui-muted-5)]/30">
-                    <x-ui-table-cell compact="true" colspan="9">
+                    <x-ui-table-cell compact="true" colspan="10">
                         <div class="flex items-center gap-2 py-2">
                             @if($entityType->icon)
                                 @php
@@ -104,7 +109,7 @@
                     </x-ui-table-cell>
                 </x-ui-table-row>
                 @foreach($entities as $entity)
-                    @include('organization::livewire.entity.partials.table-row', ['entity' => $entity, 'entityMovements' => $this->entityMovements, 'vsmSystemMap' => $this->vsmSystemMap])
+                    @include('organization::livewire.entity.partials.table-row', ['entity' => $entity, 'entityMovements' => $this->entityMovements, 'vsmSystemMap' => $this->vsmSystemMap, 'signalCounts' => $this->signalCounts])
                 @endforeach
             @endforeach
         </x-ui-table-body>

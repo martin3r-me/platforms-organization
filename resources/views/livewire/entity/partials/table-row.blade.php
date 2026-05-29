@@ -107,6 +107,23 @@
         @endif
     </x-ui-table-cell>
     <x-ui-table-cell compact="true">
+        @php $sc = $signalCounts[$entity->id] ?? null; @endphp
+        @if($sc)
+            <a href="{{ route('organization.entities.show', $entity) }}?tab=signals" class="flex items-center gap-1">
+                @if(($sc['algedonic_count'] ?? 0) > 0 || ($sc['critical_count'] ?? 0) > 0)
+                    <span class="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></span>
+                @elseif(($sc['warning_count'] ?? 0) > 0)
+                    <span class="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0"></span>
+                @else
+                    <span class="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0"></span>
+                @endif
+                <span class="text-[10px] text-[var(--ui-muted)]">{{ $sc['total'] }}</span>
+            </a>
+        @else
+            <span class="text-xs text-[var(--ui-muted)]">&ndash;</span>
+        @endif
+    </x-ui-table-cell>
+    <x-ui-table-cell compact="true">
         @php $mv = ($entityMovements[$entity->id] ?? null); @endphp
         @if($mv && $mv['delta_count'] > 0)
             <div class="flex items-center gap-1.5">

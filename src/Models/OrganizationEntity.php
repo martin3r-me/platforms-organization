@@ -5,6 +5,7 @@ namespace Platform\Organization\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Platform\ActivityLog\Traits\LogsActivity;
 use Symfony\Component\Uid\UuidV7;
@@ -280,6 +281,14 @@ class OrganizationEntity extends Model
     public function nameHistory()
     {
         return $this->hasMany(OrganizationEntityNameHistory::class, 'entity_id');
+    }
+
+    /**
+     * Signals (algedonic/inference signals for this entity)
+     */
+    public function signals(): HasMany
+    {
+        return $this->hasMany(OrganizationSignal::class, 'entity_id');
     }
 
     /**

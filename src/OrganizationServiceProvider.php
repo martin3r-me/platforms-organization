@@ -8,6 +8,7 @@ use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
+use Platform\Organization\Console\Commands\CleanupInferenceRunsCommand;
 use Platform\Organization\Console\Commands\EvaluateSignalsCommand;
 use Platform\Organization\Console\Commands\GenerateReportsCommand;
 use Platform\Organization\Console\Commands\ProcessInferenceTriggersCommand;
@@ -34,6 +35,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 ProcessInferenceTriggersCommand::class,
                 ScheduleInferenceCommand::class,
                 ScheduleSynthesisCommand::class,
+                CleanupInferenceRunsCommand::class,
             ]);
         }
 

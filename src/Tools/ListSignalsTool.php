@@ -28,7 +28,7 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['team_id', 'status', 'severity', 'entity_id', 'signal_definition_id']),
+            $this->getStandardGetSchema(['team_id', 'status', 'severity', 'entity_id', 'signal_definition_id', 'source']),
             [
                 'properties' => [
                     'team_id' => [
@@ -42,6 +42,11 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
                     'severity' => [
                         'type' => 'string',
                         'description' => 'Optional: Filter nach Severity (info, warning, critical).',
+                    ],
+                    'source' => [
+                        'type' => 'string',
+                        'description' => 'Optional: Filter nach Quelle (rule, inference).',
+                        'enum' => ['rule', 'inference'],
                     ],
                     'entity_id' => [
                         'type' => 'integer',
@@ -67,7 +72,7 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
 
             $q = OrganizationSignal::query()
                 ->where('team_id', $rootTeamId)
-                ->with(['entity:id,name', 'definition:id,name,pattern_type']);
+                ->with(['entity:id,name', 'definition:id,name,pattern_type', 'inferencePrompt:id,name,vsm_system']);
 
             if (! empty($arguments['status'])) {
                 $q->where('status', $arguments['status']);
@@ -85,7 +90,11 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
                 $q->where('signal_definition_id', (int) $arguments['signal_definition_id']);
             }
 
-            $this->applyStandardFilters($q, $arguments, ['team_id', 'status', 'severity', 'entity_id', 'signal_definition_id', 'created_at']);
+            if (! empty($arguments['source'])) {
+                $q->where('source', $arguments['source']);
+            }
+
+            $this->applyStandardFilters($q, $arguments, ['team_id', 'status', 'severity', 'entity_id', 'signal_definition_id', 'source', 'created_at']);
             $this->applyStandardSearch($q, $arguments, ['message']);
             $this->applyStandardSort($q, $arguments, ['id', 'created_at', 'severity', 'status'], 'created_at', 'desc');
 
@@ -96,9 +105,13 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
                 'uuid' => $signal->uuid,
                 'entity_id' => $signal->entity_id,
                 'entity_name' => $signal->entity?->name,
+                'source' => $signal->source ?? 'rule',
                 'signal_definition_id' => $signal->signal_definition_id,
                 'definition_name' => $signal->definition?->name,
                 'pattern_type' => $signal->definition?->pattern_type,
+                'inference_prompt_id' => $signal->inference_prompt_id,
+                'inference_prompt_name' => $signal->inferencePrompt?->name,
+                'inference_vsm_system' => $signal->inferencePrompt?->vsm_system,
                 'status' => $signal->status,
                 'severity' => $signal->severity,
                 'message' => $signal->message,

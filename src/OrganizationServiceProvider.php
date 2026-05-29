@@ -348,6 +348,14 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\ListSignalsTool());
             $registry->register(new \Platform\Organization\Tools\AcknowledgeSignalTool());
 
+            // Signal Inference (Semantic Layer)
+            $registry->register(new \Platform\Organization\Tools\ListSignalInferencePromptsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateSignalInferencePromptTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateSignalInferencePromptTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteSignalInferencePromptTool());
+            $registry->register(new \Platform\Organization\Tools\EvaluateSignalInferenceTool());
+            $registry->register(new \Platform\Organization\Tools\CreateInferenceSignalTool());
+
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

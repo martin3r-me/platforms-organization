@@ -20,7 +20,9 @@ class OrganizationSignal extends Model
     protected $fillable = [
         'uuid',
         'team_id',
+        'source',
         'signal_definition_id',
+        'inference_prompt_id',
         'entity_id',
         'status',
         'severity',
@@ -61,6 +63,11 @@ class OrganizationSignal extends Model
     public function entity(): BelongsTo
     {
         return $this->belongsTo(OrganizationEntity::class, 'entity_id');
+    }
+
+    public function inferencePrompt(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationSignalInferencePrompt::class, 'inference_prompt_id');
     }
 
     public function resolvedByUser(): BelongsTo

@@ -7,6 +7,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationInferencePromptStat;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Models\OrganizationSignalInferencePrompt;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
@@ -45,7 +46,7 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
                 'severity' => [
                     'type' => 'string',
                     'description' => 'Optional: info, warning, critical. Default: default_severity des Prompts.',
-                    'enum' => ['info', 'warning', 'critical'],
+                    'enum' => ['info', 'warning', 'critical', 'algedonic'],
                 ],
                 'message' => [
                     'type' => 'string',
@@ -121,7 +122,7 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
 
             // Resolve severity
             $severity = $arguments['severity'] ?? $prompt->default_severity ?? 'warning';
-            if (! in_array($severity, ['info', 'warning', 'critical'])) {
+            if (! in_array($severity, ['info', 'warning', 'critical', 'algedonic'])) {
                 $severity = 'warning';
             }
 
@@ -136,6 +137,16 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
                 'message' => $message,
                 'trigger_metrics' => $arguments['evidence'] ?? null,
             ]);
+
+            // Update prompt stats: signals_created
+            try {
+                $period = now()->startOfMonth()->toDateString();
+                $stat = OrganizationInferencePromptStat::firstOrCreate(
+                    ['inference_prompt_id' => $promptId, 'period' => $period],
+                    ['signals_created' => 0, 'signals_acknowledged' => 0, 'signals_dismissed' => 0, 'signals_resolved' => 0, 'precision' => 0.0]
+                );
+                $stat->increment('signals_created');
+            } catch (\Throwable) {}
 
             return ToolResult::success([
                 'id' => $signal->id,

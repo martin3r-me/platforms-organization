@@ -9,6 +9,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationMemoryEntry;
 use Platform\Organization\Models\OrganizationPerspective;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Models\OrganizationSignalInferencePrompt;
@@ -161,7 +162,10 @@ class EvaluateSignalInferenceTool implements ToolContract, ToolMetadataContract
                     ])
                     ->toArray();
 
-                // 10. Update last_evaluated_at
+                // 10. Load Memory context (Layer 3)
+                $memoryContext = $this->loadMemoryContext($rootTeamId, $entityIdList, $prompt->id);
+
+                // 11. Update last_evaluated_at
                 $prompt->update(['last_evaluated_at' => now()]);
 
                 $evaluations[] = [
@@ -180,6 +184,7 @@ class EvaluateSignalInferenceTool implements ToolContract, ToolMetadataContract
                     'entities' => $entityData,
                     'communication_summary' => $communicationSummary,
                     'existing_signals' => $existingSignals,
+                    'memory_context' => $memoryContext,
                 ];
             }
 
@@ -431,6 +436,72 @@ class EvaluateSignalInferenceTool implements ToolContract, ToolMetadataContract
                 ->toArray();
 
             return $activities;
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    protected function loadMemoryContext(int $teamId, array $entityIds, int $promptId): array
+    {
+        try {
+            $memory = [];
+
+            // Entity profiles & baselines & suppressions for relevant entities
+            $entityMemory = OrganizationMemoryEntry::forTeam($teamId)
+                ->whereIn('entity_id', $entityIds)
+                ->active()
+                ->valid()
+                ->whereIn('memory_type', ['entity_profile', 'baseline', 'suppression', 'relationship'])
+                ->select(['id', 'entity_id', 'memory_type', 'content', 'structured_data', 'confidence'])
+                ->orderByDesc('confidence')
+                ->limit(50)
+                ->get();
+
+            $memory['entity_memory'] = $entityMemory->map(fn ($m) => [
+                'entity_id' => $m->entity_id,
+                'type' => $m->memory_type,
+                'content' => $m->content,
+                'structured_data' => $m->structured_data,
+                'confidence' => $m->confidence,
+            ])->toArray();
+
+            // Prompt-specific experience
+            $promptMemory = OrganizationMemoryEntry::forTeam($teamId)
+                ->where('inference_prompt_id', $promptId)
+                ->active()
+                ->valid()
+                ->whereIn('memory_type', ['prompt_experience', 'suppression'])
+                ->select(['id', 'memory_type', 'content', 'structured_data', 'confidence'])
+                ->orderByDesc('confidence')
+                ->limit(10)
+                ->get();
+
+            $memory['prompt_experience'] = $promptMemory->map(fn ($m) => [
+                'type' => $m->memory_type,
+                'content' => $m->content,
+                'structured_data' => $m->structured_data,
+                'confidence' => $m->confidence,
+            ])->toArray();
+
+            // Recent inquiry outcomes for these entities
+            $inquiryMemory = OrganizationMemoryEntry::forTeam($teamId)
+                ->whereIn('entity_id', $entityIds)
+                ->active()
+                ->valid()
+                ->ofType('inquiry_outcome')
+                ->select(['id', 'entity_id', 'content', 'confidence', 'created_at'])
+                ->latest()
+                ->limit(10)
+                ->get();
+
+            $memory['inquiry_outcomes'] = $inquiryMemory->map(fn ($m) => [
+                'entity_id' => $m->entity_id,
+                'content' => $m->content,
+                'confidence' => $m->confidence,
+                'date' => $m->created_at?->format('Y-m-d'),
+            ])->toArray();
+
+            return $memory;
         } catch (\Throwable) {
             return [];
         }

@@ -77,6 +77,16 @@ class OrganizationSignalInferencePrompt extends Model
         return $this->hasMany(OrganizationSignal::class, 'inference_prompt_id');
     }
 
+    public function memoryEntries(): HasMany
+    {
+        return $this->hasMany(OrganizationMemoryEntry::class, 'inference_prompt_id');
+    }
+
+    public function stats(): HasMany
+    {
+        return $this->hasMany(OrganizationInferencePromptStat::class, 'inference_prompt_id');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('is_active', true);

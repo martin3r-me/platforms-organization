@@ -41,7 +41,7 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
                     ],
                     'severity' => [
                         'type' => 'string',
-                        'description' => 'Optional: Filter nach Severity (info, warning, critical).',
+                        'description' => 'Optional: Filter nach Severity (info, warning, critical, algedonic).',
                     ],
                     'source' => [
                         'type' => 'string',

@@ -10,6 +10,9 @@ use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Platform\Organization\Console\Commands\EvaluateSignalsCommand;
 use Platform\Organization\Console\Commands\GenerateReportsCommand;
+use Platform\Organization\Console\Commands\ProcessInferenceTriggersCommand;
+use Platform\Organization\Console\Commands\ScheduleInferenceCommand;
+use Platform\Organization\Console\Commands\ScheduleSynthesisCommand;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
 use Platform\Organization\Console\Commands\SnapshotEntitiesCommand;
 use Platform\Core\PlatformCore;
@@ -28,11 +31,15 @@ class OrganizationServiceProvider extends ServiceProvider
                 GenerateReportsCommand::class,
                 SnapshotEntitiesCommand::class,
                 EvaluateSignalsCommand::class,
+                ProcessInferenceTriggersCommand::class,
+                ScheduleInferenceCommand::class,
+                ScheduleSynthesisCommand::class,
             ]);
         }
 
         $this->app->singleton(\Platform\Organization\Services\EntityLinkRegistry::class);
         $this->app->singleton(\Platform\Organization\Services\PersonActivityRegistry::class);
+        $this->app->singleton(\Platform\Organization\Services\InferencePromptService::class);
     }
 
     public function boot(): void
@@ -152,6 +159,7 @@ class OrganizationServiceProvider extends ServiceProvider
 
     protected function registerSchedule(): void
     {
+        // Snapshots: 2x daily
         Schedule::command('organization:snapshot-entities --period=morning')
             ->dailyAt('08:00')
             ->withoutOverlapping();
@@ -160,12 +168,37 @@ class OrganizationServiceProvider extends ServiceProvider
             ->dailyAt('18:00')
             ->withoutOverlapping();
 
+        // Rule-based signal evaluation: 2x daily
         Schedule::command('organization:evaluate-signals')
             ->dailyAt('08:15')
             ->withoutOverlapping();
 
         Schedule::command('organization:evaluate-signals')
             ->dailyAt('18:15')
+            ->withoutOverlapping();
+
+        // Inference scheduling: create triggers for due prompts (2x daily, after snapshots)
+        Schedule::command('organization:schedule-inference')
+            ->dailyAt('08:05')
+            ->withoutOverlapping();
+
+        Schedule::command('organization:schedule-inference')
+            ->dailyAt('18:05')
+            ->withoutOverlapping();
+
+        // Process inference triggers: every minute (cheap polling)
+        Schedule::command('organization:process-inference-triggers')
+            ->everyMinute()
+            ->withoutOverlapping();
+
+        // Weekly synthesis report: Friday 16:00
+        Schedule::command('organization:schedule-synthesis --type=weekly')
+            ->weeklyOn(5, '16:00')
+            ->withoutOverlapping();
+
+        // Monthly synthesis report: 1st of month 08:00
+        Schedule::command('organization:schedule-synthesis --type=monthly')
+            ->monthlyOn(1, '08:00')
             ->withoutOverlapping();
     }
 
@@ -355,6 +388,32 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\DeleteSignalInferencePromptTool());
             $registry->register(new \Platform\Organization\Tools\EvaluateSignalInferenceTool());
             $registry->register(new \Platform\Organization\Tools\CreateInferenceSignalTool());
+            $registry->register(new \Platform\Organization\Tools\DoNothingInferenceTool());
+
+            // Organizational Memory (Layer 3)
+            $registry->register(new \Platform\Organization\Tools\ListMemoryEntriesTool());
+            $registry->register(new \Platform\Organization\Tools\CreateMemoryEntryTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateMemoryEntryTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteMemoryEntryTool());
+
+            // Inquiry System (Formular-Engine)
+            $registry->register(new \Platform\Organization\Tools\ListInquiriesTool());
+            $registry->register(new \Platform\Organization\Tools\CreateInquiryTool());
+            $registry->register(new \Platform\Organization\Tools\RespondInquiryTool());
+            $registry->register(new \Platform\Organization\Tools\CancelInquiryTool());
+            $registry->register(new \Platform\Organization\Tools\RemindInquiryTool());
+            $registry->register(new \Platform\Organization\Tools\InquiryComplianceTool());
+
+            // Inference Runs
+            $registry->register(new \Platform\Organization\Tools\ListInferenceRunsTool());
+            $registry->register(new \Platform\Organization\Tools\ExecuteInferenceRunTool());
+
+            // Synthesis Reports
+            $registry->register(new \Platform\Organization\Tools\ListSynthesisReportsTool());
+            $registry->register(new \Platform\Organization\Tools\GenerateSynthesisReportTool());
+
+            // Prompt Precision Stats
+            $registry->register(new \Platform\Organization\Tools\ListPromptStatsTool());
 
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);

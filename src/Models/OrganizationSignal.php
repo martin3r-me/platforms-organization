@@ -4,6 +4,7 @@ namespace Platform\Organization\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 use Platform\ActivityLog\Traits\LogsActivity;
@@ -30,6 +31,7 @@ class OrganizationSignal extends Model
         'trigger_metrics',
         'resolved_at',
         'resolved_by',
+        'dismissed_reason',
     ];
 
     protected $casts = [
@@ -73,6 +75,11 @@ class OrganizationSignal extends Model
     public function resolvedByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'resolved_by');
+    }
+
+    public function scopeAlgedonic($query)
+    {
+        return $query->where('severity', 'algedonic');
     }
 
     public function scopeOpen($query)

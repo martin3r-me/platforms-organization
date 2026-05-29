@@ -281,7 +281,8 @@ PROMPT;
 
     protected function buildUserMessage(OrganizationSignalInferencePrompt $prompt, array $evaluation): string
     {
-        $entityCount = count($evaluation['entities'] ?? []);
+        $entities = $evaluation['entities'] ?? [];
+        $entityCount = count($entities);
         $existingSignals = count($evaluation['existing_signals'] ?? []);
 
         $message = "## Diagnostische Frage\n\n{$prompt->prompt_template}\n\n";
@@ -292,40 +293,100 @@ PROMPT;
         $message .= "- Offene Signale: {$existingSignals}\n";
         $message .= "- Inference-Prompt-ID: {$prompt->id}\n\n";
 
-        // Entity data
-        $entities = $evaluation['entities'] ?? [];
+        // Entity data — compact format to stay within token limits
         if (! empty($entities)) {
             $message .= "## Entity-Daten\n\n";
-            $message .= json_encode($entities, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n\n";
+            $message .= $this->formatEntitiesCompact($entities) . "\n\n";
         }
 
-        // Communication summary
+        // Communication summary — only if non-empty
         $comms = $evaluation['communication_summary'] ?? [];
+        $comms = array_filter($comms);
         if (! empty($comms)) {
             $message .= "## Kommunikations-Zusammenfassung\n\n";
-            $message .= json_encode($comms, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n\n";
+            $message .= json_encode($comms, JSON_UNESCAPED_UNICODE) . "\n\n";
         }
 
-        // Existing signals
+        // Existing signals — compact
         $signals = $evaluation['existing_signals'] ?? [];
         if (! empty($signals)) {
-            $message .= "## Bestehende offene Signale\n\n";
-            $message .= json_encode($signals, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n\n";
+            $message .= "## Bestehende offene Signale ({$existingSignals})\n\n";
+            foreach ($signals as $s) {
+                $message .= "- [{$s['severity']}] Entity #{$s['entity_id']}: {$s['message']}\n";
+            }
+            $message .= "\n";
         }
 
-        // Memory context
+        // Memory context — only non-empty sections
         $memory = $evaluation['memory_context'] ?? [];
-        if (! empty($memory)) {
+        $memoryParts = [];
+        foreach ($memory as $key => $entries) {
+            if (! empty($entries)) {
+                $memoryParts[$key] = $entries;
+            }
+        }
+        if (! empty($memoryParts)) {
             $message .= "## Memory-Kontext (gelerntes Wissen)\n\n";
-            $message .= json_encode($memory, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT) . "\n\n";
+            $message .= json_encode($memoryParts, JSON_UNESCAPED_UNICODE) . "\n\n";
         }
 
         $message .= "## Aufgabe\n\n";
         $message .= "Analysiere die Daten im Kontext der diagnostischen Frage. ";
         $message .= "Nutze die verfügbaren Tools um deine Erkenntnisse zu dokumentieren. ";
-        $message .= "Du kannst bei Bedarf zusätzliche Daten über die Organization-Read-Tools laden.";
+        $message .= "Für Details zu einzelnen Entities nutze execute_tool(tool=\"organization.entities.GET\", arguments={\"id\": <id>}).";
 
         return $message;
+    }
+
+    /**
+     * Format entities in a compact text format instead of verbose JSON.
+     * Reduces token count by ~70% compared to JSON_PRETTY_PRINT.
+     */
+    protected function formatEntitiesCompact(array $entities): string
+    {
+        $lines = [];
+
+        foreach ($entities as $entity) {
+            $id = $entity['id'];
+            $name = $entity['name'];
+            $type = $entity['type'] ?? '?';
+            $parent = $entity['parent'] ?? '-';
+            $vsm = ! empty($entity['vsm_functions']) ? implode(',', $entity['vsm_functions']) : '-';
+
+            // Snapshot: extract key metrics only (non-null, non-zero)
+            $snapshotSummary = '-';
+            if (! empty($entity['snapshot_latest'])) {
+                $metrics = array_filter($entity['snapshot_latest'], fn ($v) => $v !== null && $v !== 0 && $v !== '');
+                if (! empty($metrics)) {
+                    $parts = [];
+                    foreach ($metrics as $k => $v) {
+                        $parts[] = "{$k}={$v}";
+                    }
+                    $snapshotSummary = implode(', ', array_slice($parts, 0, 8));
+                    if (count($parts) > 8) {
+                        $snapshotSummary .= ' (+' . (count($parts) - 8) . ')';
+                    }
+                }
+            }
+
+            // Movement: only non-zero deltas
+            $movementSummary = '-';
+            if (! empty($entity['movement_7d'])) {
+                $deltas = array_filter($entity['movement_7d'], fn ($v) => $v !== null && $v !== 0 && $v !== 0.0);
+                if (! empty($deltas)) {
+                    $parts = [];
+                    foreach ($deltas as $k => $v) {
+                        $sign = $v > 0 ? '+' : '';
+                        $parts[] = "{$k}:{$sign}{$v}";
+                    }
+                    $movementSummary = implode(', ', array_slice($parts, 0, 5));
+                }
+            }
+
+            $lines[] = "#{$id} {$name} [{$type}] parent={$parent} vsm={$vsm} | snap: {$snapshotSummary} | mov7d: {$movementSummary}";
+        }
+
+        return implode("\n", $lines);
     }
 
     protected function getActionToolNames(string $vsmSystem): array

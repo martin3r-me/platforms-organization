@@ -11,20 +11,20 @@
             ['label' => $signal->definition?->name ?? 'Signal'],
         ]">
             @if($signal->status === 'open')
-                <x-ui-button variant="primary" size="sm" wire:click="acknowledgeSignal">
+                <x-ui-button variant="primary" size="sm" wire:click="startAction('acknowledge')">
                     @svg('heroicon-o-check', 'w-4 h-4')
                     <span>Bestätigen</span>
                 </x-ui-button>
-                <x-ui-button variant="ghost" size="sm" wire:click="dismissSignal">
+                <x-ui-button variant="ghost" size="sm" wire:click="startAction('dismiss')">
                     @svg('heroicon-o-x-mark', 'w-4 h-4')
                     <span>Verwerfen</span>
                 </x-ui-button>
             @elseif($signal->status === 'acknowledged')
-                <x-ui-button variant="primary" size="sm" wire:click="resolveSignal">
+                <x-ui-button variant="primary" size="sm" wire:click="startAction('resolve')">
                     @svg('heroicon-o-check-circle', 'w-4 h-4')
                     <span>Lösen</span>
                 </x-ui-button>
-                <x-ui-button variant="ghost" size="sm" wire:click="dismissSignal">
+                <x-ui-button variant="ghost" size="sm" wire:click="startAction('dismiss')">
                     @svg('heroicon-o-x-mark', 'w-4 h-4')
                     <span>Verwerfen</span>
                 </x-ui-button>
@@ -280,4 +280,53 @@
             </div>
         </div>
     </x-ui-page-container>
+
+    {{-- Action Reason Modal --}}
+    @if($pendingAction)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" wire:click.self="cancelAction">
+            <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
+                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-1">
+                    @switch($pendingAction)
+                        @case('acknowledge') Signal bestätigen @break
+                        @case('resolve') Signal lösen @break
+                        @case('dismiss') Signal verwerfen @break
+                    @endswitch
+                </h3>
+                <p class="text-sm text-[var(--ui-muted)] mb-4">
+                    @switch($pendingAction)
+                        @case('acknowledge') Was macht dieses Signal relevant? @break
+                        @case('resolve') Was wurde unternommen? @break
+                        @case('dismiss') Warum ist dieses Signal nicht relevant? @break
+                    @endswitch
+                </p>
+
+                <textarea
+                    wire:model="actionReason"
+                    rows="3"
+                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm mb-4"
+                    placeholder="{{ match($pendingAction) { 'acknowledge' => 'z.B. Bestätigt, prüfen wir im nächsten Weekly...', 'resolve' => 'z.B. Interlink angelegt, Zuständigkeit geklärt...', 'dismiss' => 'z.B. Entity bewusst inaktiv, kein Handlungsbedarf...' } }}"
+                    autofocus
+                ></textarea>
+
+                <div class="flex items-center justify-end gap-3">
+                    <button wire:click="cancelAction" class="text-sm text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]">
+                        Abbrechen
+                    </button>
+                    <button
+                        wire:click="confirmAction"
+                        class="px-4 py-2 rounded-md text-sm font-medium transition
+                            {{ $pendingAction === 'dismiss'
+                                ? 'bg-gray-600 text-white hover:bg-gray-700'
+                                : 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] hover:opacity-90' }}"
+                    >
+                        @switch($pendingAction)
+                            @case('acknowledge') Bestätigen @break
+                            @case('resolve') Lösen @break
+                            @case('dismiss') Verwerfen @break
+                        @endswitch
+                    </button>
+                </div>
+            </div>
+        </div>
+    @endif
 </x-ui-page>

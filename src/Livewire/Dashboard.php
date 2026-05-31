@@ -13,6 +13,8 @@ use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\EntityLinkRegistry;
 use Platform\Organization\Services\PersonActivityRegistry;
 use Platform\Organization\Services\SnapshotMovementService;
+use Platform\Organization\Services\EnvironmentMovementService;
+use Platform\Organization\Models\OrganizationEnvironmentSource;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -35,6 +37,7 @@ class Dashboard extends Component
             $this->personOverview,
             $this->insightStatements,
             $this->signalOverview,
+            $this->environmentRadar,
         );
     }
 
@@ -774,6 +777,77 @@ class Dashboard extends Component
         }
 
         return 'progressing'; // default for entities without prior data
+    }
+
+    #[Computed]
+    public function environmentRadar(): array
+    {
+        $teamId = $this->getTeamId();
+        if (!$teamId) {
+            return ['sources' => [], 'has_data' => false];
+        }
+
+        $sources = OrganizationEnvironmentSource::forTeam($teamId)
+            ->active()
+            ->get();
+
+        if ($sources->isEmpty()) {
+            return ['sources' => [], 'has_data' => false];
+        }
+
+        $service = resolve(EnvironmentMovementService::class);
+        $categoryColors = [
+            'branche' => 'indigo',
+            'technologie' => 'cyan',
+            'wirtschaft' => 'amber',
+            'arbeitsmarkt' => 'rose',
+            'regulatorik' => 'red',
+            'wetter' => 'sky',
+            'wettbewerb' => 'orange',
+        ];
+
+        $grouped = [];
+        foreach ($sources as $source) {
+            $movement = $service->forSource($source->id);
+            $category = $source->category ?? 'sonstige';
+
+            $entry = [
+                'id' => $source->id,
+                'name' => $source->name,
+                'category' => $category,
+                'category_color' => $categoryColors[$category] ?? 'gray',
+                'last_pulled_at' => $source->last_pulled_at?->format('d.m. H:i'),
+                'has_snapshot' => $movement['has_data'],
+                'sentiment_score' => null,
+                'relevance_score' => null,
+                'summary' => null,
+                'topics' => [],
+                'delta' => null,
+            ];
+
+            if ($movement['has_data']) {
+                $metrics = $movement['latest']['metrics'] ?? [];
+                $entry['sentiment_score'] = $metrics['sentiment_score'] ?? null;
+                $entry['relevance_score'] = $metrics['relevance_score'] ?? null;
+                $entry['summary'] = $movement['latest']['summary'] ?? null;
+                $entry['topics'] = $metrics['topics'] ?? [];
+                $entry['delta'] = $movement['delta'];
+            }
+
+            $grouped[$category][] = $entry;
+        }
+
+        $allSources = [];
+        foreach ($grouped as $entries) {
+            foreach ($entries as $entry) {
+                $allSources[] = $entry;
+            }
+        }
+
+        return [
+            'sources' => $allSources,
+            'has_data' => count($allSources) > 0,
+        ];
     }
 
     public function render()

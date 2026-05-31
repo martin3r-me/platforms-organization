@@ -485,6 +485,85 @@
             </x-ui-panel>
         @endif
 
+        {{-- Umwelt-Radar --}}
+        @php $envRadar = $this->environmentRadar; @endphp
+        @if($envRadar['has_data'])
+            <x-ui-panel title="Umwelt-Radar" subtitle="Externe Signale">
+                <div class="space-y-2">
+                    @foreach($envRadar['sources'] as $src)
+                        <div class="p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)]">
+                            <div class="flex items-center gap-2 mb-1.5">
+                                {{-- Category Badge --}}
+                                @php
+                                    $badgeColors = [
+                                        'indigo' => 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/40 dark:text-indigo-300',
+                                        'cyan' => 'bg-cyan-100 text-cyan-700 dark:bg-cyan-900/40 dark:text-cyan-300',
+                                        'amber' => 'bg-amber-100 text-amber-700 dark:bg-amber-900/40 dark:text-amber-300',
+                                        'rose' => 'bg-rose-100 text-rose-700 dark:bg-rose-900/40 dark:text-rose-300',
+                                        'red' => 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300',
+                                        'sky' => 'bg-sky-100 text-sky-700 dark:bg-sky-900/40 dark:text-sky-300',
+                                        'orange' => 'bg-orange-100 text-orange-700 dark:bg-orange-900/40 dark:text-orange-300',
+                                        'gray' => 'bg-gray-100 text-gray-700 dark:bg-gray-900/40 dark:text-gray-300',
+                                    ];
+                                    $bc = $badgeColors[$src['category_color']] ?? $badgeColors['gray'];
+                                @endphp
+                                <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium {{ $bc }}">
+                                    {{ ucfirst($src['category']) }}
+                                </span>
+
+                                <span class="text-sm font-medium text-[var(--ui-secondary)] truncate flex-1">{{ $src['name'] }}</span>
+
+                                {{-- Sentiment Indicator --}}
+                                @if($src['sentiment_score'] !== null)
+                                    @php
+                                        $sentColor = $src['sentiment_score'] >= 0.6 ? 'bg-green-500' : ($src['sentiment_score'] >= 0.3 ? 'bg-yellow-500' : 'bg-red-500');
+                                    @endphp
+                                    <span class="w-2.5 h-2.5 rounded-full {{ $sentColor }} shrink-0" title="Sentiment: {{ round($src['sentiment_score'] * 100) }}%"></span>
+                                @endif
+
+                                {{-- Delta Arrow --}}
+                                @if($src['delta'] && $src['delta']['sentiment_change'] != 0)
+                                    @if($src['delta']['sentiment_change'] > 0)
+                                        <span class="text-green-500 text-xs">&#9650;</span>
+                                    @else
+                                        <span class="text-red-500 text-xs">&#9660;</span>
+                                    @endif
+                                @endif
+                            </div>
+
+                            {{-- Relevance Bar --}}
+                            @if($src['relevance_score'] !== null)
+                                <div class="flex items-center gap-2 mb-1.5">
+                                    <span class="text-[10px] text-[var(--ui-muted)] w-12 shrink-0">Relevanz</span>
+                                    <div class="flex-1 h-1 bg-[var(--ui-border)]/30 rounded-full overflow-hidden">
+                                        <div class="h-full bg-blue-500 rounded-full" style="width: {{ min(round($src['relevance_score'] * 100), 100) }}%"></div>
+                                    </div>
+                                    <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ round($src['relevance_score'] * 100) }}%</span>
+                                </div>
+                            @endif
+
+                            {{-- Summary --}}
+                            @if($src['summary'])
+                                <p class="text-xs text-[var(--ui-muted)] line-clamp-2 mb-1.5">{{ $src['summary'] }}</p>
+                            @endif
+
+                            {{-- Topics + Pull Date --}}
+                            <div class="flex items-center justify-between gap-2">
+                                <div class="flex flex-wrap gap-1 min-w-0">
+                                    @foreach(array_slice($src['topics'] ?? [], 0, 4) as $topic)
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[9px] text-[var(--ui-muted)] border border-[var(--ui-border)]/30">{{ $topic }}</span>
+                                    @endforeach
+                                </div>
+                                @if($src['last_pulled_at'])
+                                    <span class="text-[9px] text-[var(--ui-muted)] whitespace-nowrap shrink-0">{{ $src['last_pulled_at'] }}</span>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </x-ui-panel>
+        @endif
+
         {{-- ============================================================ --}}
         {{-- TIER 3: Kontext                                              --}}
         {{-- ============================================================ --}}

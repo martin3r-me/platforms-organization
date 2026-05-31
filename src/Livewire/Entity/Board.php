@@ -14,6 +14,7 @@ use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\EntityHierarchyResolver;
+use Platform\Organization\Services\EnvironmentMovementService;
 use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
 
@@ -497,6 +498,10 @@ class Board extends Component
             ['from' => 'S1', 'to' => 'ENV', 'label' => 'Operations → Environment', 'color' => $vsmColors['S1']],
         ];
 
+        // 18. Environment Sources
+        $environmentSources = resolve(EnvironmentMovementService::class)
+            ->buildInferenceContext($teamId);
+
         return [
             'bands' => $bands,
             'envBand' => $envBand,
@@ -515,6 +520,7 @@ class Board extends Component
             'regulationHealth' => $regulationHealth,
             'autonomyIndex' => $autonomyIndex,
             'stabilityIndicator' => $stabilityIndicator,
+            'environmentSources' => $environmentSources,
         ];
     }
 

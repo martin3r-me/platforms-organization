@@ -185,6 +185,74 @@
                             'boardData' => $this->boardData,
                         ])
 
+                        {{-- Environment Radar Panel --}}
+                        @php $envSources = $this->boardData['environmentSources'] ?? []; @endphp
+                        <div x-data="{ open: true }" class="bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl text-xs overflow-hidden">
+                            <button @click="open = !open" class="w-full px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">
+                                @svg('heroicon-o-globe-alt', 'w-4 h-4 text-purple-400')
+                                <span>Umwelt-Radar</span>
+                                @if(count($envSources) > 0)
+                                    <span class="ml-1 text-[9px] text-gray-500">({{ count($envSources) }})</span>
+                                @endif
+                                <span class="ml-auto text-gray-600 text-[10px]" x-text="open ? '&#9660;' : '&#9654;'"></span>
+                            </button>
+                            <div x-show="open" x-collapse class="p-2 space-y-1.5">
+                                @forelse($envSources as $envSrc)
+                                    <div class="px-2 py-1.5 rounded bg-gray-800/40">
+                                        <div class="flex items-center gap-1.5">
+                                            {{-- Category dot --}}
+                                            @php
+                                                $catDotColors = [
+                                                    'branche' => 'bg-indigo-400',
+                                                    'technologie' => 'bg-cyan-400',
+                                                    'wirtschaft' => 'bg-amber-400',
+                                                    'arbeitsmarkt' => 'bg-rose-400',
+                                                    'regulatorik' => 'bg-red-400',
+                                                    'wetter' => 'bg-sky-400',
+                                                    'wettbewerb' => 'bg-orange-400',
+                                                ];
+                                                $dotColor = $catDotColors[$envSrc['category']] ?? 'bg-gray-400';
+                                            @endphp
+                                            <span class="w-1.5 h-1.5 rounded-full {{ $dotColor }} shrink-0"></span>
+
+                                            {{-- Source name --}}
+                                            <span class="text-gray-300 text-[11px] font-medium truncate flex-1">{{ $envSrc['source'] }}</span>
+
+                                            {{-- Sentiment circle --}}
+                                            @if($envSrc['sentiment'] !== null)
+                                                @php
+                                                    $sentBoardColor = $envSrc['sentiment'] >= 0.6 ? 'bg-green-500' : ($envSrc['sentiment'] >= 0.3 ? 'bg-yellow-500' : 'bg-red-500');
+                                                @endphp
+                                                <span class="w-2 h-2 rounded-full {{ $sentBoardColor }} shrink-0" title="Sentiment: {{ round($envSrc['sentiment'] * 100) }}%"></span>
+                                            @endif
+
+                                            {{-- Delta indicator --}}
+                                            @if(isset($envSrc['delta']) && $envSrc['delta']['sentiment_change'] != 0)
+                                                @if($envSrc['delta']['sentiment_change'] > 0)
+                                                    <span class="text-green-400 text-[9px]">&#9650;</span>
+                                                @else
+                                                    <span class="text-red-400 text-[9px]">&#9660;</span>
+                                                @endif
+                                            @endif
+                                        </div>
+
+                                        {{-- Topics --}}
+                                        @if(!empty($envSrc['topics']))
+                                            <div class="flex flex-wrap gap-0.5 mt-1 pl-3">
+                                                @foreach(array_slice($envSrc['topics'], 0, 3) as $topic)
+                                                    <span class="inline-flex px-1 py-0 rounded bg-gray-700/50 text-[8px] text-gray-500">{{ $topic }}</span>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </div>
+                                @empty
+                                    <div class="px-2 py-1.5 text-[10px] text-gray-600 italic">
+                                        Keine Umweltdaten
+                                    </div>
+                                @endforelse
+                            </div>
+                        </div>
+
                         {{-- Legend (collapsible, collapsed by default) --}}
                         <div x-data="{ open: false }" class="bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl text-xs overflow-hidden">
                             <button @click="open = !open" class="w-full px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2 hover:bg-white/5 transition-colors">

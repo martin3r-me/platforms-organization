@@ -20,6 +20,18 @@ class ResolveContextTool implements ToolContract, ToolMetadataContract
      * Friendly short names → morph alias.
      * Allows callers to use intuitive names without knowing the exact morph alias.
      */
+    /**
+     * Parent fallback: morph alias → [fk_field, parent_morph_alias].
+     * When an object has no direct entity link, resolve via its parent.
+     */
+    protected const PARENT_MAP = [
+        'planner_task' => ['project_id', 'project'],
+        'dev_issue' => ['dev_board_id', 'dev_package'],
+        'helpdesk_ticket' => ['helpdesk_board_id', 'helpdesk_board'],
+        'change_action' => ['change_project_id', 'change_project'],
+        'change_phase' => ['change_project_id', 'change_project'],
+    ];
+
     protected const ALIAS_MAP = [
         // Planner
         'project' => 'project',
@@ -156,6 +168,31 @@ class ResolveContextTool implements ToolContract, ToolMetadataContract
 
             // Find linked entities via dimension bridge
             $links = EntityDimensionBridge::linksForLinkables($linkableTypes, [$objectId], true);
+            $resolvedVia = null;
+
+            // Parent fallback: if no direct link, try resolving via parent object
+            if ($links->isEmpty() && isset(self::PARENT_MAP[$morphAlias])) {
+                [$fkField, $parentAlias] = self::PARENT_MAP[$morphAlias];
+
+                // Load the object to get its parent FK
+                if ($fqcn && class_exists($fqcn)) {
+                    $object = $fqcn::find($objectId);
+                    $parentId = $object?->{$fkField};
+
+                    if ($parentId) {
+                        $parentFqcn = Relation::getMorphedModel($parentAlias);
+                        $parentLinkableTypes = [$parentAlias];
+                        if ($parentFqcn) {
+                            $parentLinkableTypes[] = $parentFqcn;
+                        }
+
+                        $links = EntityDimensionBridge::linksForLinkables($parentLinkableTypes, [$parentId], true);
+                        if ($links->isNotEmpty()) {
+                            $resolvedVia = $parentAlias;
+                        }
+                    }
+                }
+            }
 
             if ($links->isEmpty()) {
                 return ToolResult::success([
@@ -163,7 +200,7 @@ class ResolveContextTool implements ToolContract, ToolMetadataContract
                     'resolved_morph_alias' => $morphAlias,
                     'object_id' => $objectId,
                     'entities' => [],
-                    'message' => 'Keine Entity-Verknüpfung gefunden für dieses Objekt.',
+                    'message' => 'Keine Entity-Verknüpfung gefunden — weder direkt noch über Parent-Objekt.',
                 ]);
             }
 
@@ -204,12 +241,18 @@ class ResolveContextTool implements ToolContract, ToolMetadataContract
                 ];
             }
 
-            return ToolResult::success([
+            $response = [
                 'object_type' => $objectType,
                 'resolved_morph_alias' => $morphAlias,
                 'object_id' => $objectId,
                 'entities' => $entities,
-            ]);
+            ];
+
+            if ($resolvedVia) {
+                $response['resolved_via'] = $resolvedVia;
+            }
+
+            return ToolResult::success($response);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Auflösen des Kontexts: ' . $e->getMessage());
         }

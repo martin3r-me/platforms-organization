@@ -243,6 +243,18 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\DeleteTimeEntryTool());
             $registry->register(new \Platform\Organization\Tools\SummarizeTimeEntriesTool());
 
+            // Planned Time Tools
+            $registry->register(new \Platform\Organization\Tools\CreatePlannedTimeTool());
+            $registry->register(new \Platform\Organization\Tools\ListPlannedTimeTool());
+            $registry->register(new \Platform\Organization\Tools\UpdatePlannedTimeTool());
+            $registry->register(new \Platform\Organization\Tools\DeletePlannedTimeTool());
+
+            // Planned Period Tools (Soll-Zeiträume)
+            $registry->register(new \Platform\Organization\Tools\CreatePlannedPeriodTool());
+            $registry->register(new \Platform\Organization\Tools\ListPlannedPeriodTool());
+            $registry->register(new \Platform\Organization\Tools\UpdatePlannedPeriodTool());
+            $registry->register(new \Platform\Organization\Tools\DeletePlannedPeriodTool());
+
             // Entity Type Group Tools
             $registry->register(new \Platform\Organization\Tools\ListEntityTypeGroupsTool());
             $registry->register(new \Platform\Organization\Tools\CreateEntityTypeGroupTool());

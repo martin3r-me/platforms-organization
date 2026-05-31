@@ -21,6 +21,8 @@ class ContextTypeRegistry
         'task' => 'Platform\Planner\Models\PlannerTask',
         'ticket' => 'Platform\Helpdesk\Models\HelpdeskTicket',
         'company' => 'Platform\Crm\Models\CrmCompany',
+        'sprint' => 'Platform\Planner\Models\PlannerSprint',
+        'change_project' => 'Platform\Change\Models\ChangeProject',
     ];
 
     /**

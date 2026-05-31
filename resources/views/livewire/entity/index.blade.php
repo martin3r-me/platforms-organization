@@ -65,53 +65,41 @@
     </x-slot>
 
     <x-ui-page-container>
+        @php
+            $roots = $this->entities['roots'];
+            $childrenByParent = $this->entities['childrenByParent'];
+        @endphp
+
         <x-ui-table compact="true">
         <x-ui-table-header>
             <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
-            <x-ui-table-header-cell compact="true">Übergeordnet</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Relationen</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">VSM</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Signale</x-ui-table-header-cell>
             <x-ui-table-header-cell compact="true">Bewegung</x-ui-table-header-cell>
-            <x-ui-table-header-cell compact="true">Erstellt</x-ui-table-header-cell>
         </x-ui-table-header>
-        
-        <x-ui-table-body>
-            {{-- Root Entities (ohne Parent) --}}
-            @if($this->entities['root']->count() > 0)
-                @foreach($this->entities['root'] as $entity)
-                    @include('organization::livewire.entity.partials.table-row', ['entity' => $entity, 'entityMovements' => $this->entityMovements, 'vsmSystemMap' => $this->vsmSystemMap, 'signalCounts' => $this->signalCounts])
-                @endforeach
-            @endif
 
-            {{-- Child Entities gruppiert nach Entity-Typ --}}
-            @foreach($this->entities['byType'] as $entityTypeId => $entities)
-                @php
-                    $firstEntity = $entities->first();
-                    $entityType = $firstEntity->type;
-                @endphp
-                <x-ui-table-row compact="true" class="bg-[var(--ui-muted-5)]/30">
-                    <x-ui-table-cell compact="true" colspan="10">
-                        <div class="flex items-center gap-2 py-2">
-                            @if($entityType->icon)
-                                @php
-                                    $iconName = str_replace('heroicons.', '', $entityType->icon);
-                                    $iconName = app('safe-svg')->resolve($iconName, 'heroicon-o-') ?? 'cube';
-                                @endphp
-                                @svg('heroicon-o-' . $iconName, 'w-4 h-4 text-[var(--ui-muted)]')
-                            @endif
-                            <span class="text-sm font-semibold text-[var(--ui-secondary)]">{{ $entityType->name }}</span>
-                            <span class="text-xs text-[var(--ui-muted)]">({{ $entityType->group->name }})</span>
-                            <span class="text-xs text-[var(--ui-muted)]">– {{ $entities->count() }} {{ $entities->count() === 1 ? 'Entity' : 'Entities' }}</span>
+        <x-ui-table-body>
+            @forelse($roots as $entity)
+                @include('organization::livewire.entity.partials.tree-table-row', [
+                    'entity' => $entity,
+                    'depth' => 0,
+                    'childrenByParent' => $childrenByParent,
+                    'entityMovements' => $this->entityMovements,
+                    'vsmSystemMap' => $this->vsmSystemMap,
+                    'signalCounts' => $this->signalCounts,
+                ])
+            @empty
+                <x-ui-table-row compact="true">
+                    <x-ui-table-cell compact="true" colspan="7">
+                        <div class="py-8 text-center text-sm text-[var(--ui-muted)]">
+                            Keine Einheiten gefunden.
                         </div>
                     </x-ui-table-cell>
                 </x-ui-table-row>
-                @foreach($entities as $entity)
-                    @include('organization::livewire.entity.partials.table-row', ['entity' => $entity, 'entityMovements' => $this->entityMovements, 'vsmSystemMap' => $this->vsmSystemMap, 'signalCounts' => $this->signalCounts])
-                @endforeach
-            @endforeach
+            @endforelse
         </x-ui-table-body>
         </x-ui-table>
     </x-ui-page-container>

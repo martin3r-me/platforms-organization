@@ -83,6 +83,7 @@ class Index extends Component
             ->with([
                 'type.group',
                 'parent',
+                'children.type.group',
                 'team',
                 'user',
                 'relationsFrom.relationType',
@@ -129,32 +130,24 @@ class Index extends Component
         }
 
         $entities = $query->orderBy('name')->get();
+        $entityIds = $entities->pluck('id')->toArray();
 
-        // Determine root/child split based on perspective
+        // Build hierarchical tree: roots with nested children
         if (!$resolver->isDefaultHierarchy($perspective)) {
             $parentMap = $resolver->getParentMap($perspective, $teamId);
-            $entityIds = $entities->pluck('id')->toArray();
-
-            $rootEntities = $entities->filter(function ($e) use ($parentMap) {
-                return ($parentMap[$e->id] ?? null) === null;
-            })->sortBy('name');
-
-            $childEntities = $entities->filter(function ($e) use ($parentMap) {
-                return ($parentMap[$e->id] ?? null) !== null;
-            })->sortBy('name');
+            $rootEntities = $entities->filter(fn($e) => ($parentMap[$e->id] ?? null) === null)->sortBy('name');
         } else {
-            $rootEntities = $entities->whereNull('parent_entity_id')->sortBy('name');
-            $childEntities = $entities->whereNotNull('parent_entity_id')->sortBy('name');
+            // Root = no parent OR parent not in the current filtered result set
+            $rootEntities = $entities->filter(fn($e) => $e->parent_entity_id === null || !in_array($e->parent_entity_id, $entityIds))->sortBy('name');
         }
 
-        // Gruppiere Child-Entities nach Entity-Typ und sortiere nach Typ-Name
-        $groupedByType = $childEntities->groupBy('entity_type_id')->sortBy(function ($group) {
-            return $group->first()->type->name ?? '';
-        });
+        // Group children by parent_id from the loaded set
+        $childrenByParent = $entities->filter(fn($e) => $e->parent_entity_id !== null && in_array($e->parent_entity_id, $entityIds))->groupBy('parent_entity_id');
 
         return [
-            'root' => $rootEntities,
-            'byType' => $groupedByType,
+            'roots' => $rootEntities,
+            'childrenByParent' => $childrenByParent,
+            'all' => $entities,
         ];
     }
 

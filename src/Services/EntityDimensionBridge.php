@@ -185,14 +185,14 @@ class EntityDimensionBridge
      */
     public static function linksForLinkables(array $linkableTypes, array $linkableIds, bool $withEntity = true): Collection
     {
-        $defId = static::definitionId();
-        if (!$defId || empty($linkableTypes) || empty($linkableIds)) {
+        $defIds = static::allEntitySourcedDefIds();
+        if (empty($defIds) || empty($linkableTypes) || empty($linkableIds)) {
             return collect();
         }
 
         static::ensureMaps();
 
-        $query = OrganizationDimensionLink::where('dimension_definition_id', $defId)
+        $query = OrganizationDimensionLink::whereIn('dimension_definition_id', $defIds)
             ->whereIn('linkable_type', $linkableTypes)
             ->whereIn('linkable_id', $linkableIds);
 
@@ -202,10 +202,11 @@ class EntityDimensionBridge
 
         $links = $query->get();
 
-        // Attach virtual entity_id + eager-load entity if requested
+        // Attach virtual entity_id from whichever dimension the link belongs to
         $entityIds = [];
         foreach ($links as $link) {
-            $eid = static::$dimValueToEntity[$link->dimension_value_id] ?? null;
+            $reverseMap = static::$allDimValueToEntity[$link->dimension_definition_id] ?? [];
+            $eid = $reverseMap[$link->dimension_value_id] ?? null;
             $link->entity_id = $eid;
             if ($eid) {
                 $entityIds[] = $eid;

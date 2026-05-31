@@ -82,10 +82,9 @@ class GetEntitySummaryTool implements ToolContract, ToolMetadataContract
             }
             $linksTotal = array_sum($mergedCounts);
 
-            // Signal counts
+            // Signal counts — use status='open' to match ListSignalsTool behavior
             $signals = OrganizationSignal::whereIn('entity_id', $entityIds)
-                ->whereNull('resolved_at')
-                ->whereNull('deleted_at')
+                ->where('status', 'open')
                 ->selectRaw('severity, count(*) as cnt')
                 ->groupBy('severity')
                 ->pluck('cnt', 'severity')

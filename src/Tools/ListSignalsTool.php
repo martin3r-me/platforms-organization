@@ -7,6 +7,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Core\Tools\Concerns\HasStandardGetOperations;
+use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
@@ -38,6 +39,10 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
                     'entity_id' => [
                         'type' => 'integer',
                         'description' => 'Direkter Filter: nur Signale dieser Entity. Beispiel: entity_id=5',
+                    ],
+                    'include_children' => [
+                        'type' => 'boolean',
+                        'description' => 'Optional: true = auch Signale von Kind-Entities einschließen. Nur wirksam mit entity_id. Default: false.',
                     ],
                     'status' => [
                         'type' => 'string',
@@ -85,7 +90,18 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
             }
 
             if (! empty($arguments['entity_id'])) {
-                $q->where('entity_id', (int) $arguments['entity_id']);
+                $entityId = (int) $arguments['entity_id'];
+
+                if (!empty($arguments['include_children'])) {
+                    $childIds = OrganizationEntity::where('parent_entity_id', $entityId)
+                        ->where('team_id', $rootTeamId)
+                        ->where('is_active', true)
+                        ->pluck('id')
+                        ->toArray();
+                    $q->whereIn('entity_id', array_merge([$entityId], $childIds));
+                } else {
+                    $q->where('entity_id', $entityId);
+                }
             }
 
             if (! empty($arguments['signal_definition_id'])) {

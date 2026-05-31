@@ -51,7 +51,7 @@ class CreateSignalInferencePromptTool implements ToolContract, ToolMetadataContr
                 ],
                 'data_sources' => [
                     'type' => 'array',
-                    'description' => 'Optional: Welche Datenquellen abgefragt werden. Default: ["snapshots", "movement"]. Möglich: snapshots, movement, correspondence, recordings, activity_log, zukunftsbild.',
+                    'description' => 'Optional: Welche Datenquellen abgefragt werden. Default: ["snapshots", "movement"]. Möglich: snapshots, movement, correspondence, recordings, activity_log, zukunftsbild, environment.',
                     'items' => ['type' => 'string'],
                 ],
                 'dimension' => [

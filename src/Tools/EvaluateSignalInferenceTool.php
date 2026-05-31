@@ -152,6 +152,14 @@ class EvaluateSignalInferenceTool implements ToolContract, ToolMetadataContract
                     }
                 }
 
+                // 8c. Environment data (if data_sources includes environment)
+                if (in_array('environment', $prompt->data_sources ?? [])) {
+                    $envContext = $this->getEnvironmentContext($rootTeamId);
+                    if (!empty($envContext)) {
+                        $communicationSummary['environment'] = $envContext;
+                    }
+                }
+
                 // 9. Existing open signals for these entities (dedup)
                 $existingSignals = OrganizationSignal::whereIn('entity_id', $entityIdList)
                     ->where('team_id', $rootTeamId)
@@ -511,6 +519,17 @@ class EvaluateSignalInferenceTool implements ToolContract, ToolMetadataContract
             }
 
             return ['forecast_context' => implode("\n", $lines)];
+        } catch (\Throwable) {
+            return [];
+        }
+    }
+
+    protected function getEnvironmentContext(int $rootTeamId): array
+    {
+        try {
+            $service = new \Platform\Organization\Services\EnvironmentMovementService();
+
+            return $service->buildInferenceContext($rootTeamId);
         } catch (\Throwable) {
             return [];
         }

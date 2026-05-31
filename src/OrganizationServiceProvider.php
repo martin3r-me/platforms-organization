@@ -15,6 +15,7 @@ use Platform\Organization\Console\Commands\ProcessInferenceTriggersCommand;
 use Platform\Organization\Console\Commands\ScheduleInferenceCommand;
 use Platform\Organization\Console\Commands\ScheduleSynthesisCommand;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
+use Platform\Organization\Console\Commands\PullEnvironmentSourcesCommand;
 use Platform\Organization\Console\Commands\SnapshotEntitiesCommand;
 use Platform\Core\PlatformCore;
 use Platform\Core\Routing\ModuleRouter;
@@ -36,6 +37,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 ScheduleInferenceCommand::class,
                 ScheduleSynthesisCommand::class,
                 CleanupInferenceRunsCommand::class,
+                PullEnvironmentSourcesCommand::class,
             ]);
         }
 
@@ -197,6 +199,11 @@ class OrganizationServiceProvider extends ServiceProvider
         // Monthly synthesis report: 1st of month 08:00
         Schedule::command('organization:schedule-synthesis --type=monthly')
             ->monthlyOn(1, '08:00')
+            ->withoutOverlapping();
+
+        // Environment data pulling: hourly
+        Schedule::command('organization:pull-environment-sources')
+            ->hourly()
             ->withoutOverlapping();
     }
 
@@ -416,6 +423,13 @@ class OrganizationServiceProvider extends ServiceProvider
             // Inference Debug Tools
             $registry->register(new \Platform\Organization\Tools\InferenceHealthCheckTool());
             $registry->register(new \Platform\Organization\Tools\InferenceLogsTool());
+
+            // Environment Data Layer
+            $registry->register(new \Platform\Organization\Tools\ListEnvironmentSourcesTool());
+            $registry->register(new \Platform\Organization\Tools\CreateEnvironmentSourceTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateEnvironmentSourceTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteEnvironmentSourceTool());
+            $registry->register(new \Platform\Organization\Tools\ListEnvironmentSnapshotsTool());
 
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);

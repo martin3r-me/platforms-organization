@@ -30,4 +30,35 @@ class StorePlannedTime
 
         return $planned->fresh();
     }
+
+    public function update(OrganizationTimePlanned $planned, array $data): OrganizationTimePlanned
+    {
+        $update = [];
+
+        if (array_key_exists('planned_minutes', $data)) {
+            $update['planned_minutes'] = $data['planned_minutes'];
+        }
+
+        if (array_key_exists('note', $data)) {
+            $update['note'] = $data['note'];
+        }
+
+        if (array_key_exists('is_active', $data)) {
+            $update['is_active'] = $data['is_active'];
+        }
+
+        if (array_key_exists('context_type', $data)) {
+            $update['context_type'] = $data['context_type'];
+        }
+
+        if (array_key_exists('context_id', $data)) {
+            $update['context_id'] = $data['context_id'];
+        }
+
+        if (!empty($update)) {
+            $planned->update($update);
+        }
+
+        return $planned->fresh();
+    }
 }

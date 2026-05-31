@@ -23,6 +23,9 @@ class ContextTypeRegistry
         'company' => 'Platform\Crm\Models\CrmCompany',
         'sprint' => 'Platform\Planner\Models\PlannerSprint',
         'change_project' => 'Platform\Change\Models\ChangeProject',
+        'issue' => 'Platform\Dev\Models\DevIssue',
+        'package' => 'Platform\Dev\Models\DevPackage',
+        'board' => 'Platform\Dev\Models\DevBoard',
     ];
 
     /**

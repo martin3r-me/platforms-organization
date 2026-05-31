@@ -224,8 +224,24 @@ class InferencePromptService
     {
         $vsmPrompt = self::VSM_SYSTEM_PROMPTS[$prompt->vsm_system] ?? self::VSM_SYSTEM_PROMPTS['s3'];
 
+        // Leitbild / SemanticLayer injizieren
+        $leitbildBlock = '';
+        try {
+            $team = Team::find($prompt->team_id);
+            if ($team) {
+                $resolver = resolve(\Platform\Core\SemanticLayer\Services\SemanticLayerResolver::class);
+                $resolved = $resolver->resolveFor($team, 'inference');
+                if (!$resolved->isEmpty()) {
+                    $leitbildBlock = "\n\n## Organisatorischer Bewertungsrahmen\n\n" . $resolved->rendered_block;
+                }
+            }
+        } catch (\Throwable) {
+            // SemanticLayer module may not be available
+        }
+
         $baseInstructions = <<<PROMPT
 {$vsmPrompt}
+{$leitbildBlock}
 
 ## Allgemeine Regeln
 

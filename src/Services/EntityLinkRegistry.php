@@ -432,6 +432,40 @@ class EntityLinkRegistry
                 'type' => self::TYPE_FLOW,
                 'aggregation_mode' => 'rolled_up',
             ],
+
+            // Terminal-Kommunikation
+            'terminal_messages_7d' => [
+                'label' => 'Nachrichten (7 Tage)',
+                'group' => 'core',
+                'direction' => 'neutral',
+                'unit' => 'count',
+                'dimension' => self::DIMENSION_ENERGY,
+                'type' => self::TYPE_FLOW,
+            ],
+            'terminal_messages_30d' => [
+                'label' => 'Nachrichten (30 Tage)',
+                'group' => 'core',
+                'direction' => 'neutral',
+                'unit' => 'count',
+                'dimension' => self::DIMENSION_ENERGY,
+                'type' => self::TYPE_FLOW,
+            ],
+            'terminal_participants_7d' => [
+                'label' => 'Aktive Teilnehmer (7 Tage)',
+                'group' => 'core',
+                'direction' => 'neutral',
+                'unit' => 'count',
+                'dimension' => self::DIMENSION_ORG_CAPITAL,
+                'type' => self::TYPE_STOCK,
+            ],
+            'terminal_last_message_days' => [
+                'label' => 'Tage seit letzter Nachricht',
+                'group' => 'core',
+                'direction' => 'neutral',
+                'unit' => 'days',
+                'dimension' => self::DIMENSION_ENERGY,
+                'type' => self::TYPE_MODULATOR,
+            ],
         ];
     }
 

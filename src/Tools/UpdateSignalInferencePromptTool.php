@@ -55,7 +55,7 @@ class UpdateSignalInferencePromptTool implements ToolContract, ToolMetadataContr
                 ],
                 'data_sources' => [
                     'type' => 'array',
-                    'description' => 'Optional: Neue Datenquellen.',
+                    'description' => 'Optional: Neue Datenquellen. Möglich: snapshots, movement, correspondence, recordings, activity_log, zukunftsbild.',
                     'items' => ['type' => 'string'],
                 ],
                 'dimension' => [

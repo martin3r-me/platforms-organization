@@ -17,6 +17,7 @@ use Platform\Organization\Services\PersonActivityRegistry;
 use Platform\Organization\Services\PersonAggregationService;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\Log;
 
 class SnapshotEntitiesCommand extends Command
 {
@@ -148,6 +149,99 @@ class SnapshotEntitiesCommand extends Command
             $personMetrics[$entityId] = array_merge($personMetrics[$entityId] ?? [], $metrics);
         }
 
+        // 5c. Compute terminal communication metrics per entity
+        $terminalMetrics = [];
+        try {
+            $morphMap = Relation::morphMap();
+            $entityMorphType = array_search(OrganizationEntity::class, $morphMap, true);
+            if ($entityMorphType === false) {
+                $entityMorphType = OrganizationEntity::class;
+            }
+
+            // Find all terminal channels linked to these entities via context morph
+            $channelsByEntity = DB::table('terminal_channels')
+                ->where('context_type', $entityMorphType)
+                ->whereIn('context_id', $entityIds)
+                ->select('id', 'context_id')
+                ->get()
+                ->groupBy('context_id');
+
+            if ($channelsByEntity->isNotEmpty()) {
+                $allChannelIds = $channelsByEntity->flatten()->pluck('id')->all();
+                $now = Carbon::now();
+                $sevenDaysAgo = $now->copy()->subDays(7);
+                $thirtyDaysAgo = $now->copy()->subDays(30);
+
+                // Batch query: messages count 7d per channel
+                $messages7d = DB::table('terminal_messages')
+                    ->whereIn('channel_id', $allChannelIds)
+                    ->where('created_at', '>=', $sevenDaysAgo)
+                    ->groupBy('channel_id')
+                    ->select('channel_id', DB::raw('COUNT(*) as cnt'))
+                    ->pluck('cnt', 'channel_id');
+
+                // Batch query: messages count 30d per channel
+                $messages30d = DB::table('terminal_messages')
+                    ->whereIn('channel_id', $allChannelIds)
+                    ->where('created_at', '>=', $thirtyDaysAgo)
+                    ->groupBy('channel_id')
+                    ->select('channel_id', DB::raw('COUNT(*) as cnt'))
+                    ->pluck('cnt', 'channel_id');
+
+                // Batch query: distinct participants 7d per channel
+                $participants7d = DB::table('terminal_messages')
+                    ->whereIn('channel_id', $allChannelIds)
+                    ->where('created_at', '>=', $sevenDaysAgo)
+                    ->whereNotNull('user_id')
+                    ->groupBy('channel_id')
+                    ->select('channel_id', DB::raw('COUNT(DISTINCT user_id) as cnt'))
+                    ->pluck('cnt', 'channel_id');
+
+                // Batch query: last message date per channel
+                $lastMessageDates = DB::table('terminal_messages')
+                    ->whereIn('channel_id', $allChannelIds)
+                    ->groupBy('channel_id')
+                    ->select('channel_id', DB::raw('MAX(created_at) as last_at'))
+                    ->pluck('last_at', 'channel_id');
+
+                // Aggregate per entity (entity may have multiple channels)
+                foreach ($channelsByEntity as $entityId => $channels) {
+                    $channelIds = $channels->pluck('id')->all();
+                    $m7d = 0;
+                    $m30d = 0;
+                    $p7d = 0;
+                    $lastAt = null;
+
+                    foreach ($channelIds as $cid) {
+                        $m7d += (int) ($messages7d[$cid] ?? 0);
+                        $m30d += (int) ($messages30d[$cid] ?? 0);
+                        $p7d += (int) ($participants7d[$cid] ?? 0);
+
+                        $channelLast = $lastMessageDates[$cid] ?? null;
+                        if ($channelLast !== null) {
+                            if ($lastAt === null || $channelLast > $lastAt) {
+                                $lastAt = $channelLast;
+                            }
+                        }
+                    }
+
+                    $daysSinceLastMessage = null;
+                    if ($lastAt !== null) {
+                        $daysSinceLastMessage = (int) Carbon::parse($lastAt)->diffInDays($now);
+                    }
+
+                    $terminalMetrics[$entityId] = [
+                        'terminal_messages_7d' => $m7d,
+                        'terminal_messages_30d' => $m30d,
+                        'terminal_participants_7d' => $p7d,
+                        'terminal_last_message_days' => $daysSinceLastMessage,
+                    ];
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Snapshot: Terminal metrics failed', ['error' => $e->getMessage()]);
+        }
+
         // 6. Cascade metrics through entity hierarchy
         $hierarchyService = new EntityHierarchyService();
         $childMap = $hierarchyService->buildChildMap($entities);
@@ -170,6 +264,13 @@ class SnapshotEntitiesCommand extends Command
             foreach ($items as $key => $value) {
                 $metrics[$key] = $value;
                 $allProviderKeys[$key] = true;
+            }
+
+            // Merge terminal metrics
+            if (isset($terminalMetrics[$entity->id])) {
+                foreach ($terminalMetrics[$entity->id] as $key => $value) {
+                    $metrics[$key] = $value;
+                }
             }
 
             $ownMetricsMap[$entity->id] = $metrics;

@@ -165,6 +165,11 @@ class Show extends Component
         ];
     }
 
+    public function edit()
+    {
+        $this->activeTab = 'data';
+    }
+
     public function save()
     {
         $this->validate([

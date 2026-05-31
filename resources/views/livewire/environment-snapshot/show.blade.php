@@ -120,85 +120,69 @@
     <x-ui-page-container>
         <div class="space-y-6">
             {{-- Zusammenfassung --}}
-            <x-ui-card>
-                <x-ui-card-header>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider">Zusammenfassung</h3>
-                </x-ui-card-header>
-                <x-ui-card-body>
-                    <p class="text-sm text-[var(--ui-secondary)] whitespace-pre-line">{{ $snapshot->summary }}</p>
-                </x-ui-card-body>
-            </x-ui-card>
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Zusammenfassung</h3>
+                <p class="text-sm text-[var(--ui-secondary)] whitespace-pre-line">{{ $snapshot->summary }}</p>
+            </div>
 
             {{-- Org-Relevanz-Reasoning --}}
             @if(!empty($metrics['org_relevance_reasoning']))
-                <x-ui-card>
-                    <x-ui-card-header>
-                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider">Org-Relevanz</h3>
-                    </x-ui-card-header>
-                    <x-ui-card-body>
-                        <p class="text-sm text-[var(--ui-muted)]">{{ $metrics['org_relevance_reasoning'] }}</p>
-                    </x-ui-card-body>
-                </x-ui-card>
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Org-Relevanz</h3>
+                    <p class="text-sm text-[var(--ui-muted)]">{{ $metrics['org_relevance_reasoning'] }}</p>
+                </div>
             @endif
 
             {{-- Topics mit Feedback --}}
             @if(!empty($topics))
-                <x-ui-card>
-                    <x-ui-card-header>
-                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider">Topics</h3>
-                    </x-ui-card-header>
-                    <x-ui-card-body>
-                        <div class="flex flex-wrap gap-3">
-                            @foreach($topics as $topic)
-                                @php
-                                    $topicStatus = $this->getTopicStatus($snapshot->source_id, $topic);
-                                    $badgeVariant = match($topicStatus) {
-                                        'useful' => 'success',
-                                        'noise' => 'danger',
-                                        default => 'info',
-                                    };
-                                @endphp
-                                <span class="inline-flex items-center gap-1">
-                                    <x-ui-badge variant="{{ $badgeVariant }}">{{ $topic }}</x-ui-badge>
-                                    <button
-                                        wire:click="rateTopic({{ $snapshot->source_id }}, '{{ addslashes($topic) }}', 'useful')"
-                                        class="text-green-600 hover:text-green-800 text-sm p-0.5 {{ $topicStatus === 'useful' ? 'font-bold' : 'opacity-50 hover:opacity-100' }}"
-                                        title="Relevant"
-                                    >&#10003;</button>
-                                    <button
-                                        wire:click="rateTopic({{ $snapshot->source_id }}, '{{ addslashes($topic) }}', 'noise')"
-                                        class="text-red-600 hover:text-red-800 text-sm p-0.5 {{ $topicStatus === 'noise' ? 'font-bold' : 'opacity-50 hover:opacity-100' }}"
-                                        title="Rauschen"
-                                    >&#10007;</button>
-                                </span>
-                            @endforeach
-                        </div>
-                    </x-ui-card-body>
-                </x-ui-card>
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Topics</h3>
+                    <div class="flex flex-wrap gap-3">
+                        @foreach($topics as $topic)
+                            @php
+                                $topicStatus = $this->getTopicStatus($snapshot->source_id, $topic);
+                                $badgeVariant = match($topicStatus) {
+                                    'useful' => 'success',
+                                    'noise' => 'danger',
+                                    default => 'info',
+                                };
+                            @endphp
+                            <span class="inline-flex items-center gap-1">
+                                <x-ui-badge variant="{{ $badgeVariant }}">{{ $topic }}</x-ui-badge>
+                                <button
+                                    wire:click="rateTopic({{ $snapshot->source_id }}, '{{ addslashes($topic) }}', 'useful')"
+                                    class="text-green-600 hover:text-green-800 text-sm p-0.5 {{ $topicStatus === 'useful' ? 'font-bold' : 'opacity-50 hover:opacity-100' }}"
+                                    title="Relevant"
+                                >&#10003;</button>
+                                <button
+                                    wire:click="rateTopic({{ $snapshot->source_id }}, '{{ addslashes($topic) }}', 'noise')"
+                                    class="text-red-600 hover:text-red-800 text-sm p-0.5 {{ $topicStatus === 'noise' ? 'font-bold' : 'opacity-50 hover:opacity-100' }}"
+                                    title="Rauschen"
+                                >&#10007;</button>
+                            </span>
+                        @endforeach
+                    </div>
+                </div>
             @endif
 
             {{-- Raw Items --}}
             @if(!empty($snapshot->raw_items))
-                <x-ui-card>
-                    <x-ui-card-header>
-                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider">Raw Items ({{ count($snapshot->raw_items) }})</h3>
-                    </x-ui-card-header>
-                    <x-ui-card-body>
-                        <div class="space-y-2">
-                            @foreach($snapshot->raw_items as $item)
-                                <div class="text-sm border-l-2 border-gray-300 pl-3 py-1">
-                                    <strong>{{ $item['title'] ?? '' }}</strong>
-                                    @if(!empty($item['link']))
-                                        <a href="{{ $item['link'] }}" target="_blank" class="text-[var(--ui-primary)] ml-1">Link</a>
-                                    @endif
-                                    @if(!empty($item['description']))
-                                        <p class="text-[var(--ui-muted)] mt-0.5">{{ $item['description'] }}</p>
-                                    @endif
-                                </div>
-                            @endforeach
-                        </div>
-                    </x-ui-card-body>
-                </x-ui-card>
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Raw Items ({{ count($snapshot->raw_items) }})</h3>
+                    <div class="space-y-2">
+                        @foreach($snapshot->raw_items as $item)
+                            <div class="text-sm border-l-2 border-gray-300 pl-3 py-1">
+                                <strong>{{ $item['title'] ?? '' }}</strong>
+                                @if(!empty($item['link']))
+                                    <a href="{{ $item['link'] }}" target="_blank" class="text-[var(--ui-primary)] ml-1">Link</a>
+                                @endif
+                                @if(!empty($item['description']))
+                                    <p class="text-[var(--ui-muted)] mt-0.5">{{ $item['description'] }}</p>
+                                @endif
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
             @endif
         </div>
     </x-ui-page-container>

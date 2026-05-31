@@ -66,42 +66,52 @@
 
     <x-ui-page-container>
         @php
-            $roots = $this->entities['roots'];
+            $rootsByGroup = $this->entities['rootsByGroup'];
             $childrenByParent = $this->entities['childrenByParent'];
         @endphp
 
-        <x-ui-table compact="true">
-        <x-ui-table-header>
-            <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
-            <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
-            <x-ui-table-header-cell compact="true">Relationen</x-ui-table-header-cell>
-            <x-ui-table-header-cell compact="true">VSM</x-ui-table-header-cell>
-            <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
-            <x-ui-table-header-cell compact="true">Signale</x-ui-table-header-cell>
-            <x-ui-table-header-cell compact="true">Bewegung</x-ui-table-header-cell>
-        </x-ui-table-header>
+        @if($rootsByGroup->isEmpty())
+            <div class="py-12 text-center">
+                @svg('heroicon-o-building-office', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-3')
+                <p class="text-sm text-[var(--ui-muted)]">Keine Einheiten gefunden.</p>
+            </div>
+        @else
+            @foreach($rootsByGroup as $groupId => $groupEntities)
+                @php $groupName = $groupEntities->first()->type->group->name ?? 'Sonstige'; @endphp
+                <div class="mb-6">
+                    {{-- Group Header --}}
+                    <div class="flex items-center gap-2 mb-2 px-1">
+                        <h3 class="text-xs font-bold text-[var(--ui-muted)] uppercase tracking-wider">{{ $groupName }}</h3>
+                        <span class="text-[10px] text-[var(--ui-muted)]">({{ $groupEntities->count() }})</span>
+                    </div>
 
-        <x-ui-table-body>
-            @forelse($roots as $entity)
-                @include('organization::livewire.entity.partials.tree-table-row', [
-                    'entity' => $entity,
-                    'depth' => 0,
-                    'childrenByParent' => $childrenByParent,
-                    'entityMovements' => $this->entityMovements,
-                    'vsmSystemMap' => $this->vsmSystemMap,
-                    'signalCounts' => $this->signalCounts,
-                ])
-            @empty
-                <x-ui-table-row compact="true">
-                    <x-ui-table-cell compact="true" colspan="7">
-                        <div class="py-8 text-center text-sm text-[var(--ui-muted)]">
-                            Keine Einheiten gefunden.
-                        </div>
-                    </x-ui-table-cell>
-                </x-ui-table-row>
-            @endforelse
-        </x-ui-table-body>
-        </x-ui-table>
+                    <x-ui-table compact="true">
+                    <x-ui-table-header>
+                        <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
+                        <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
+                        <x-ui-table-header-cell compact="true">Relationen</x-ui-table-header-cell>
+                        <x-ui-table-header-cell compact="true">VSM</x-ui-table-header-cell>
+                        <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
+                        <x-ui-table-header-cell compact="true">Signale</x-ui-table-header-cell>
+                        <x-ui-table-header-cell compact="true">Bewegung</x-ui-table-header-cell>
+                    </x-ui-table-header>
+
+                    <x-ui-table-body>
+                        @foreach($groupEntities as $entity)
+                            @include('organization::livewire.entity.partials.tree-table-row', [
+                                'entity' => $entity,
+                                'depth' => 0,
+                                'childrenByParent' => $childrenByParent,
+                                'entityMovements' => $this->entityMovements,
+                                'vsmSystemMap' => $this->vsmSystemMap,
+                                'signalCounts' => $this->signalCounts,
+                            ])
+                        @endforeach
+                    </x-ui-table-body>
+                    </x-ui-table>
+                </div>
+            @endforeach
+        @endif
     </x-ui-page-container>
 
     <!-- Create Entity Modal -->

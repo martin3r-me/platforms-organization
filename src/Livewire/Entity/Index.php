@@ -135,17 +135,23 @@ class Index extends Component
         // Build hierarchical tree: roots with nested children
         if (!$resolver->isDefaultHierarchy($perspective)) {
             $parentMap = $resolver->getParentMap($perspective, $teamId);
-            $rootEntities = $entities->filter(fn($e) => ($parentMap[$e->id] ?? null) === null)->sortBy('name');
+            $rootEntities = $entities->filter(fn($e) => ($parentMap[$e->id] ?? null) === null);
         } else {
             // Root = no parent OR parent not in the current filtered result set
-            $rootEntities = $entities->filter(fn($e) => $e->parent_entity_id === null || !in_array($e->parent_entity_id, $entityIds))->sortBy('name');
+            $rootEntities = $entities->filter(fn($e) => $e->parent_entity_id === null || !in_array($e->parent_entity_id, $entityIds));
         }
+
+        // Group roots by type group, then sort by group name, within each group sort by name
+        $rootsByGroup = $rootEntities
+            ->groupBy(fn($e) => $e->type->group->id ?? 0)
+            ->sortBy(fn($group) => $group->first()->type->group->sort_order ?? $group->first()->type->group->name ?? '')
+            ->map(fn($group) => $group->sortBy('name'));
 
         // Group children by parent_id from the loaded set
         $childrenByParent = $entities->filter(fn($e) => $e->parent_entity_id !== null && in_array($e->parent_entity_id, $entityIds))->groupBy('parent_entity_id');
 
         return [
-            'roots' => $rootEntities,
+            'rootsByGroup' => $rootsByGroup,
             'childrenByParent' => $childrenByParent,
             'all' => $entities,
         ];

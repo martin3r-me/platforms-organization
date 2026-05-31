@@ -16,6 +16,7 @@ use Platform\Organization\Console\Commands\ScheduleInferenceCommand;
 use Platform\Organization\Console\Commands\ScheduleSynthesisCommand;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
 use Platform\Organization\Console\Commands\DecayEnvironmentRelevanceCommand;
+use Platform\Organization\Console\Commands\SeedEnvironmentSourcesCommand;
 use Platform\Organization\Console\Commands\PullEnvironmentSourcesCommand;
 use Platform\Organization\Console\Commands\SnapshotEntitiesCommand;
 use Platform\Core\PlatformCore;
@@ -40,6 +41,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 CleanupInferenceRunsCommand::class,
                 PullEnvironmentSourcesCommand::class,
                 DecayEnvironmentRelevanceCommand::class,
+                SeedEnvironmentSourcesCommand::class,
             ]);
         }
 

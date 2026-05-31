@@ -85,6 +85,7 @@ class EnvironmentMovementService
 
             $entry = [
                 'source' => $source->name,
+                'cluster' => $source->cluster,
                 'category' => $source->category,
                 'summary' => $movement['latest']['summary'] ?? '',
                 'sentiment' => $movement['latest']['metrics']['sentiment_score'] ?? null,
@@ -106,8 +107,15 @@ class EnvironmentMovementService
             $context[] = $entry;
         }
 
-        // Sort by learned relevance (highest first, unknown = 0.5)
-        usort($context, fn ($a, $b) => ($b['learned_relevance'] ?? 0.5) <=> ($a['learned_relevance'] ?? 0.5));
+        // Sort by cluster, then by learned relevance (highest first, unknown = 0.5)
+        usort($context, function ($a, $b) {
+            $clusterCmp = ($a['cluster'] ?? '') <=> ($b['cluster'] ?? '');
+            if ($clusterCmp !== 0) {
+                return $clusterCmp;
+            }
+
+            return ($b['learned_relevance'] ?? 0.5) <=> ($a['learned_relevance'] ?? 0.5);
+        });
 
         return $context;
     }

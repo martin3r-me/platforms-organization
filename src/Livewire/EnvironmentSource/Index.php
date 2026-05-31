@@ -11,6 +11,7 @@ class Index extends Component
 {
     public $search = '';
     public $categoryFilter = '';
+    public $clusterFilter = '';
     public $showInactive = false;
     public $modalShow = false;
     public $editingId = null;
@@ -19,6 +20,7 @@ class Index extends Component
         'name' => '',
         'source_type' => 'rss',
         'category' => 'industry',
+        'cluster' => 'dach',
         'url' => '',
         'pull_interval_hours' => 6,
         'extraction_prompt' => '',
@@ -28,6 +30,7 @@ class Index extends Component
     protected $queryString = [
         'search' => ['except' => ''],
         'categoryFilter' => ['except' => ''],
+        'clusterFilter' => ['except' => ''],
         'showInactive' => ['except' => false],
     ];
 
@@ -53,17 +56,34 @@ class Index extends Component
             $query->where('category', $this->categoryFilter);
         }
 
+        if ($this->clusterFilter) {
+            $query->inCluster($this->clusterFilter);
+        }
+
         if (! $this->showInactive) {
             $query->active();
         }
 
-        return $query->orderBy('name')->get();
+        return $query->orderBy('cluster')->orderBy('name')->get();
     }
 
     #[Computed]
     public function categories()
     {
-        return ['industry', 'technology', 'regulation', 'market', 'competition', 'talent', 'sustainability', 'other'];
+        return ['industry', 'technology', 'regulation', 'market', 'competition', 'talent', 'sustainability', 'macro', 'geopolitics', 'gastronomy', 'other'];
+    }
+
+    #[Computed]
+    public function clusters()
+    {
+        return [
+            'dach' => 'DACH / Deutschland',
+            'europa' => 'Europa',
+            'global' => 'Global',
+            'tech_ai' => 'Technologie & KI',
+            'strategic' => 'Strategische Tiefenanalyse',
+            'society' => 'Gesellschaft & Konsum',
+        ];
     }
 
     public function create()
@@ -72,6 +92,7 @@ class Index extends Component
         $this->form['is_active'] = true;
         $this->form['source_type'] = 'rss';
         $this->form['category'] = 'industry';
+        $this->form['cluster'] = 'dach';
         $this->form['pull_interval_hours'] = 6;
         $this->modalShow = true;
     }
@@ -86,6 +107,7 @@ class Index extends Component
             'name' => $source->name,
             'source_type' => $source->source_type,
             'category' => $source->category,
+            'cluster' => $source->cluster ?? 'dach',
             'url' => $source->config['url'] ?? '',
             'pull_interval_hours' => $source->pull_interval_hours,
             'extraction_prompt' => $source->config['extraction_prompt'] ?? '',
@@ -100,8 +122,9 @@ class Index extends Component
             'form.name' => ['required', 'string', 'max:255'],
             'form.source_type' => ['required', 'string', 'in:rss'],
             'form.category' => ['required', 'string'],
+            'form.cluster' => ['required', 'string'],
             'form.url' => ['required', 'url', 'max:2048'],
-            'form.pull_interval_hours' => ['required', 'integer', 'min:1', 'max:168'],
+            'form.pull_interval_hours' => ['required', 'integer', 'min:1', 'max:720'],
             'form.extraction_prompt' => ['nullable', 'string', 'max:1000'],
             'form.is_active' => ['boolean'],
         ]);
@@ -110,6 +133,7 @@ class Index extends Component
             'name' => $this->form['name'],
             'source_type' => $this->form['source_type'],
             'category' => $this->form['category'],
+            'cluster' => $this->form['cluster'],
             'pull_interval_hours' => (int) $this->form['pull_interval_hours'],
             'is_active' => (bool) $this->form['is_active'],
             'config' => [

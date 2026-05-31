@@ -24,6 +24,7 @@ class OrganizationEnvironmentSource extends Model
         'name',
         'source_type',
         'category',
+        'cluster',
         'config',
         'pull_interval_hours',
         'is_active',
@@ -81,6 +82,11 @@ class OrganizationEnvironmentSource extends Model
     public function scopeForTeam($query, int $teamId)
     {
         return $query->where('team_id', $teamId);
+    }
+
+    public function scopeInCluster($query, string $cluster)
+    {
+        return $query->where('cluster', $cluster);
     }
 
     public function scopeDue($query)

@@ -27,6 +27,19 @@
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>
                     <div class="space-y-3">
                         <div>
+                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Cluster</label>
+                            <select
+                                name="clusterFilter"
+                                wire:model.live="clusterFilter"
+                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm"
+                            >
+                                <option value="">Alle Cluster</option>
+                                @foreach($this->clusters as $key => $label)
+                                    <option value="{{ $key }}">{{ $label }}</option>
+                                @endforeach
+                            </select>
+                        </div>
+                        <div>
                             <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Kategorie</label>
                             <select
                                 name="categoryFilter"
@@ -59,6 +72,7 @@
         <x-ui-table compact="true">
             <x-ui-table-header>
                 <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
+                <x-ui-table-header-cell compact="true">Cluster</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Kategorie</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">URL</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Intervall</x-ui-table-header-cell>
@@ -75,6 +89,9 @@
                             <span class="font-medium">{{ $source->name }}</span>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
+                            <x-ui-badge variant="muted">{{ $this->clusters[$source->cluster] ?? $source->cluster ?? '-' }}</x-ui-badge>
+                        </x-ui-table-cell>
+                        <x-ui-table-cell compact="true">
                             <x-ui-badge variant="info">{{ ucfirst($source->category) }}</x-ui-badge>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
@@ -83,7 +100,11 @@
                             </span>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
-                            {{ $source->pull_interval_hours }}h
+                            @php
+                                $h = $source->pull_interval_hours;
+                                $label = $h <= 24 ? "{$h}h" : ($h <= 168 ? round($h/24) . 'd' : round($h/168) . 'w');
+                            @endphp
+                            {{ $label }}
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
                             @if($source->last_pulled_at)
@@ -118,7 +139,7 @@
                     </x-ui-table-row>
                 @empty
                     <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="8">
+                        <x-ui-table-cell compact="true" colspan="9">
                             <div class="text-center text-[var(--ui-muted)] py-8">
                                 Keine Quellen vorhanden. Erstelle eine neue Quelle um Umwelt-Daten zu erfassen.
                             </div>
@@ -139,18 +160,28 @@
             <form wire:submit.prevent="store" class="space-y-4">
                 <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required placeholder="z.B. t3n Digital" />
 
-                <div>
-                    <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Kategorie</label>
-                    <select name="category" wire:model.live="form.category" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50">
-                        @foreach($this->categories as $cat)
-                            <option value="{{ $cat }}">{{ ucfirst($cat) }}</option>
-                        @endforeach
-                    </select>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Cluster</label>
+                        <select name="cluster" wire:model.live="form.cluster" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50">
+                            @foreach($this->clusters as $key => $label)
+                                <option value="{{ $key }}">{{ $label }}</option>
+                            @endforeach
+                        </select>
+                    </div>
+                    <div>
+                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Kategorie</label>
+                        <select name="category" wire:model.live="form.category" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50">
+                            @foreach($this->categories as $cat)
+                                <option value="{{ $cat }}">{{ ucfirst($cat) }}</option>
+                            @endforeach
+                        </select>
+                    </div>
                 </div>
 
                 <x-ui-input-text name="url" label="Feed-URL" wire:model.live="form.url" required placeholder="https://example.com/feed.xml" />
 
-                <x-ui-input-number name="pull_interval_hours" label="Pull-Intervall (Stunden)" wire:model.live="form.pull_interval_hours" min="1" max="168" />
+                <x-ui-input-number name="pull_interval_hours" label="Pull-Intervall (Stunden)" wire:model.live="form.pull_interval_hours" min="1" max="720" />
 
                 <x-ui-input-textarea name="extraction_prompt" label="Extraktions-Prompt (optional)" wire:model.live="form.extraction_prompt" placeholder="Zusaetzlicher Kontext fuer die LLM-Extraktion..." rows="3" />
 

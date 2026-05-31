@@ -288,6 +288,10 @@ class EntityLinkRegistry
             'canvas' => 'Canvas',
             'finance' => 'Finanzen',
             'persons' => 'Personen',
+            'process' => 'Prozesse',
+            'change' => 'Change',
+            'correspondence' => 'Korrespondenz',
+            'whisper' => 'Gespräche',
         ];
 
         $groups = [];

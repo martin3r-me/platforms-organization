@@ -98,7 +98,7 @@
                         $topics = $metrics['topics'] ?? [];
                         $itemCount = $metrics['new_items_count'] ?? 0;
                     @endphp
-                    <x-ui-table-row compact="true" class="cursor-pointer" wire:click="toggleExpand({{ $snapshot->id }})">
+                    <x-ui-table-row compact="true" class="cursor-pointer" onclick="window.location='{{ route('organization.environment-snapshots.show', $snapshot) }}'">
                         <x-ui-table-cell compact="true">
                             <span class="text-xs">{{ $snapshot->snapshot_date->format('d.m.Y') }}</span>
                         </x-ui-table-cell>
@@ -140,77 +140,6 @@
                             {{ $itemCount }}
                         </x-ui-table-cell>
                     </x-ui-table-row>
-
-                    {{-- Expanded Details --}}
-                    @if($expandedId === $snapshot->id)
-                        <x-ui-table-row compact="true">
-                            <x-ui-table-cell compact="true" colspan="7">
-                                <div class="p-4 bg-[var(--ui-muted-5)] rounded-lg space-y-3">
-                                    <div>
-                                        <h4 class="text-xs font-bold text-[var(--ui-secondary)] uppercase mb-1">Zusammenfassung</h4>
-                                        <p class="text-sm text-[var(--ui-secondary)]">{{ $snapshot->summary }}</p>
-                                    </div>
-
-                                    @if(!empty($metrics['org_relevance_reasoning']))
-                                        <div>
-                                            <h4 class="text-xs font-bold text-[var(--ui-secondary)] uppercase mb-1">Org-Relevanz</h4>
-                                            <p class="text-sm text-[var(--ui-muted)]">{{ $metrics['org_relevance_reasoning'] }}</p>
-                                        </div>
-                                    @endif
-
-                                    @if(!empty($topics))
-                                        <div>
-                                            <h4 class="text-xs font-bold text-[var(--ui-secondary)] uppercase mb-1">Alle Topics</h4>
-                                            <div class="flex flex-wrap gap-2">
-                                                @foreach($topics as $topic)
-                                                    @php
-                                                        $topicStatus = $this->getTopicStatus($snapshot->source_id, $topic);
-                                                        $badgeVariant = match($topicStatus) {
-                                                            'useful' => 'success',
-                                                            'noise' => 'danger',
-                                                            default => 'info',
-                                                        };
-                                                    @endphp
-                                                    <span class="inline-flex items-center gap-0.5">
-                                                        <x-ui-badge variant="{{ $badgeVariant }}">{{ $topic }}</x-ui-badge>
-                                                        <button
-                                                            wire:click="rateTopic({{ $snapshot->source_id }}, '{{ addslashes($topic) }}', 'useful')"
-                                                            class="text-green-600 hover:text-green-800 text-xs p-0.5 {{ $topicStatus === 'useful' ? 'font-bold' : 'opacity-50 hover:opacity-100' }}"
-                                                            title="Relevant"
-                                                        >&#10003;</button>
-                                                        <button
-                                                            wire:click="rateTopic({{ $snapshot->source_id }}, '{{ addslashes($topic) }}', 'noise')"
-                                                            class="text-red-600 hover:text-red-800 text-xs p-0.5 {{ $topicStatus === 'noise' ? 'font-bold' : 'opacity-50 hover:opacity-100' }}"
-                                                            title="Rauschen"
-                                                        >&#10007;</button>
-                                                    </span>
-                                                @endforeach
-                                            </div>
-                                        </div>
-                                    @endif
-
-                                    @if(!empty($snapshot->raw_items))
-                                        <div>
-                                            <h4 class="text-xs font-bold text-[var(--ui-secondary)] uppercase mb-1">Raw Items ({{ count($snapshot->raw_items) }})</h4>
-                                            <div class="space-y-1 max-h-64 overflow-y-auto">
-                                                @foreach($snapshot->raw_items as $item)
-                                                    <div class="text-xs border-l-2 border-gray-300 pl-2">
-                                                        <strong>{{ $item['title'] ?? '' }}</strong>
-                                                        @if(!empty($item['link']))
-                                                            <a href="{{ $item['link'] }}" target="_blank" class="text-[var(--ui-primary)] ml-1">Link</a>
-                                                        @endif
-                                                        @if(!empty($item['description']))
-                                                            <p class="text-[var(--ui-muted)] mt-0.5">{{ \Illuminate\Support\Str::limit($item['description'], 150) }}</p>
-                                                        @endif
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        </div>
-                                    @endif
-                                </div>
-                            </x-ui-table-cell>
-                        </x-ui-table-row>
-                    @endif
                 @empty
                     <x-ui-table-row compact="true">
                         <x-ui-table-cell compact="true" colspan="7">

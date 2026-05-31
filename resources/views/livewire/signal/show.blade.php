@@ -218,6 +218,27 @@
                         <p class="text-sm text-[var(--ui-secondary)]">{{ $signal->message }}</p>
                     </div>
 
+                    @if($signal->suggested_actions && count($signal->suggested_actions) > 0)
+                        <div>
+                            <h3 class="text-sm font-medium text-[var(--ui-muted)] mb-2">Handlungsoptionen</h3>
+                            <div class="space-y-2">
+                                @foreach($signal->suggested_actions as $action)
+                                    <div class="py-3 px-4 bg-blue-50 rounded-lg border border-blue-200">
+                                        <div class="flex items-start gap-2">
+                                            @svg('heroicon-o-light-bulb', 'w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0')
+                                            <div>
+                                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $action['title'] }}</div>
+                                                @if(!empty($action['description']))
+                                                    <p class="text-xs text-[var(--ui-muted)] mt-0.5">{{ $action['description'] }}</p>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        </div>
+                    @endif
+
                     @if($signal->trigger_metrics && count($signal->trigger_metrics) > 0)
                         <div>
                             <h3 class="text-sm font-medium text-[var(--ui-muted)] mb-2">Trigger-Metriken</h3>

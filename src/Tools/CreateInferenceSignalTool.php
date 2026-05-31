@@ -56,6 +56,19 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
                     'type' => 'object',
                     'description' => 'Optional: Quellen-Referenzen (z.B. transcript_ids, correspondence_ids, snapshot_keys).',
                 ],
+                'suggested_actions' => [
+                    'type' => 'array',
+                    'description' => 'Optional: 1-3 konkrete Handlungsoptionen. Jede Option hat title (kurze Aktion) und description (Erklärung warum/wie).',
+                    'items' => [
+                        'type' => 'object',
+                        'properties' => [
+                            'title' => ['type' => 'string', 'description' => 'Kurze Handlungsaufforderung (z.B. "Weekly mit Team X einrichten")'],
+                            'description' => ['type' => 'string', 'description' => 'Erklärung und erwartete Wirkung'],
+                        ],
+                        'required' => ['title'],
+                    ],
+                    'maxItems' => 3,
+                ],
             ],
             'required' => ['inference_prompt_id', 'entity_id', 'message'],
         ];
@@ -126,6 +139,24 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
                 $severity = 'warning';
             }
 
+            // Validate suggested_actions
+            $suggestedActions = null;
+            if (! empty($arguments['suggested_actions']) && is_array($arguments['suggested_actions'])) {
+                $suggestedActions = array_slice(
+                    array_map(fn ($a) => [
+                        'title' => trim((string) ($a['title'] ?? '')),
+                        'description' => trim((string) ($a['description'] ?? '')),
+                    ], $arguments['suggested_actions']),
+                    0,
+                    3
+                );
+                $suggestedActions = array_filter($suggestedActions, fn ($a) => $a['title'] !== '');
+                $suggestedActions = array_values($suggestedActions);
+                if (empty($suggestedActions)) {
+                    $suggestedActions = null;
+                }
+            }
+
             // Create signal
             $signal = OrganizationSignal::create([
                 'team_id' => $rootTeamId,
@@ -136,6 +167,7 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
                 'severity' => $severity,
                 'message' => $message,
                 'trigger_metrics' => $arguments['evidence'] ?? null,
+                'suggested_actions' => $suggestedActions,
             ]);
 
             // Update prompt stats: signals_created

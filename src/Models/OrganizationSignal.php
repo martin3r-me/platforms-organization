@@ -29,6 +29,7 @@ class OrganizationSignal extends Model
         'severity',
         'message',
         'trigger_metrics',
+        'suggested_actions',
         'resolved_at',
         'resolved_by',
         'dismissed_reason',
@@ -36,6 +37,7 @@ class OrganizationSignal extends Model
 
     protected $casts = [
         'trigger_metrics' => 'array',
+        'suggested_actions' => 'array',
         'resolved_at' => 'datetime',
     ];
 

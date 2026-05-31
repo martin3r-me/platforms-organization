@@ -273,6 +273,10 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\UpdateEntityTool());
             $registry->register(new \Platform\Organization\Tools\DeleteEntityTool());
 
+            // Entity Traversal & Aggregation Tools
+            $registry->register(new \Platform\Organization\Tools\GetEntityDetailTool());
+            $registry->register(new \Platform\Organization\Tools\GetEntitySummaryTool());
+
             // Dimension Link Tools (generisch für alle Dimensionen)
             $registry->register(new \Platform\Organization\Tools\ListDimensionValuesTool());
             $registry->register(new \Platform\Organization\Tools\ListDimensionLinksTool());

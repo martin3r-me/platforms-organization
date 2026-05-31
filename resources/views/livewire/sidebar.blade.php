@@ -205,6 +205,39 @@
         </a>
     </div>
 
+    {{-- Abschnitt: Umwelt --}}
+    <div>
+        <h4 x-show="!collapsed" class="px-4 py-3 text-xs tracking-wide font-semibold text-[color:var(--ui-muted)] uppercase">Umwelt</h4>
+
+        {{-- Quellen --}}
+        <a href="{{ route('organization.environment-sources.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/environment-sources')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-globe-alt class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Quellen</span>
+        </a>
+
+        {{-- Snapshots --}}
+        <a href="{{ route('organization.environment-snapshots.index') }}"
+           class="relative flex items-center px-3 py-2 my-1 rounded-md font-medium transition"
+           :class="[
+               window.location.pathname.includes('/environment-snapshots')
+                   ? 'bg-[color:var(--ui-primary)] text-[color:var(--ui-on-primary)] shadow'
+                   : 'text-[color:var(--ui-secondary)] hover:bg-[color:var(--ui-primary-5)] hover:text-[color:var(--ui-primary)]',
+               collapsed ? 'justify-center' : 'gap-3'
+           ]"
+           wire:navigate>
+            <x-heroicon-o-camera class="w-6 h-6 flex-shrink-0"/>
+            <span x-show="!collapsed" class="truncate">Snapshots</span>
+        </a>
+    </div>
+
     {{-- Abschnitt: Inference --}}
     <div>
         <h4 x-show="!collapsed" class="px-4 py-3 text-xs tracking-wide font-semibold text-[color:var(--ui-muted)] uppercase">Inference</h4>

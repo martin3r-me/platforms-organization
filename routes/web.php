@@ -41,6 +41,8 @@ use Platform\Organization\Livewire\Inquiry\Respond as InquiryRespond;
 use Platform\Organization\Livewire\Synthesis\Index as SynthesisIndex;
 use Platform\Organization\Livewire\Synthesis\Show as SynthesisShow;
 use Platform\Organization\Livewire\Skill\Index as SkillIndex;
+use Platform\Organization\Livewire\EnvironmentSource\Index as EnvironmentSourceIndex;
+use Platform\Organization\Livewire\EnvironmentSnapshot\Index as EnvironmentSnapshotIndex;
 
 Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organization.dashboard');
 
@@ -112,6 +114,10 @@ Route::get('/job-profiles', JobProfileIndex::class)->name('organization.job-prof
 Route::get('/job-profiles/{jobProfile}', JobProfileShow::class)->name('organization.job-profiles.show');
 Route::get('/roles', RoleIndex::class)->name('organization.roles.index');
 Route::get('/skills', SkillIndex::class)->name('organization.skills.index');
+
+// Umwelt: Environment Sources & Snapshots
+Route::get('/environment-sources', EnvironmentSourceIndex::class)->name('organization.environment-sources.index');
+Route::get('/environment-snapshots', EnvironmentSnapshotIndex::class)->name('organization.environment-snapshots.index');
 
 // Error Tracking Test (temporär)
 Route::get('/test-error/{type?}', function (string $type = 'exception') {

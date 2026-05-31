@@ -46,6 +46,7 @@ class InferencePromptService
             'memory_updates' => 0,
             'do_nothing_count' => 0,
             'entities_analyzed' => 0,
+            'environment_ratings' => 0,
         ];
 
         try {
@@ -76,7 +77,7 @@ class InferencePromptService
             // 4. Action tools exposed directly (Claude calls them by name).
             //    All other tools (read, search, etc.) are available via
             //    discover_tools + execute_tool (MCP pattern, full ToolRegistry).
-            $actionTools = $this->getActionToolNames($prompt->vsm_system);
+            $actionTools = $this->getActionToolNames($prompt->vsm_system, $prompt->data_sources ?? null);
 
             // 5. Run via ClaudeToolLoopRunner
             $runner = ClaudeToolLoopRunner::make();
@@ -105,6 +106,8 @@ class InferencePromptService
                             $stats['inquiries_created']++;
                         } elseif ($toolName === 'organization.inference.do_nothing') {
                             $stats['do_nothing_count']++;
+                        } elseif ($toolName === 'organization.environment.rate_source') {
+                            $stats['environment_ratings']++;
                         }
                     },
                 ]
@@ -287,6 +290,14 @@ Nutze severity `algedonic` NUR bei echten existenziellen Bedrohungen:
 - Schlüsselposition vakant + Entity ohne Fortschritt
 - Kritische Schwellwerte dauerhaft unterschritten
 
+### Umwelt-Quellen bewerten
+
+Wenn environment-Daten im Kontext enthalten sind, bewerte nach deiner Analyse JEDE Quelle mit `organization_environment_rate_source`:
+- relevance_rating: Wie nützlich war die Quelle für deine Diagnose?
+- cited_in_signal: Hast du ein Signal erzeugt das auf diesen Daten basiert?
+- topics_useful/topics_noise: Welche Themen waren relevant vs. Rauschen?
+Dies verbessert zukünftige Extraktionen.
+
 ### do_nothing ist wertvoll
 
 Wenn die Lage in Ordnung ist, rufe `organization_inference_do_nothing` auf mit einer kurzen Begründung. Das ist kein Fehler — es ist eine aktive diagnostische Entscheidung.
@@ -405,7 +416,7 @@ PROMPT;
         return implode("\n", $lines);
     }
 
-    protected function getActionToolNames(string $vsmSystem): array
+    protected function getActionToolNames(string $vsmSystem, ?array $dataSources = null): array
     {
         $tools = [
             'organization.signal_inference.create_signal',
@@ -416,6 +427,11 @@ PROMPT;
         // S3* does NOT get ask_inquiry
         if ($vsmSystem !== 's3_star') {
             $tools[] = 'organization.inquiries.create';
+        }
+
+        // Include rate_source tool when environment data is in context
+        if (in_array('environment', $dataSources ?? [])) {
+            $tools[] = 'organization.environment.rate_source';
         }
 
         return $tools;

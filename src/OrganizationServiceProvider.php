@@ -15,6 +15,7 @@ use Platform\Organization\Console\Commands\ProcessInferenceTriggersCommand;
 use Platform\Organization\Console\Commands\ScheduleInferenceCommand;
 use Platform\Organization\Console\Commands\ScheduleSynthesisCommand;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
+use Platform\Organization\Console\Commands\DecayEnvironmentRelevanceCommand;
 use Platform\Organization\Console\Commands\PullEnvironmentSourcesCommand;
 use Platform\Organization\Console\Commands\SnapshotEntitiesCommand;
 use Platform\Core\PlatformCore;
@@ -38,6 +39,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 ScheduleSynthesisCommand::class,
                 CleanupInferenceRunsCommand::class,
                 PullEnvironmentSourcesCommand::class,
+                DecayEnvironmentRelevanceCommand::class,
             ]);
         }
 
@@ -204,6 +206,11 @@ class OrganizationServiceProvider extends ServiceProvider
         // Environment data pulling: hourly
         Schedule::command('organization:pull-environment-sources')
             ->hourly()
+            ->withoutOverlapping();
+
+        // Environment relevance decay: weekly
+        Schedule::command('organization:decay-environment-relevance')
+            ->weekly()
             ->withoutOverlapping();
     }
 
@@ -430,6 +437,7 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\UpdateEnvironmentSourceTool());
             $registry->register(new \Platform\Organization\Tools\DeleteEnvironmentSourceTool());
             $registry->register(new \Platform\Organization\Tools\ListEnvironmentSnapshotsTool());
+            $registry->register(new \Platform\Organization\Tools\RateEnvironmentSourceTool());
 
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);

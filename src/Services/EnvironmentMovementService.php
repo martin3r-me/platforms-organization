@@ -4,6 +4,7 @@ namespace Platform\Organization\Services;
 
 use Platform\Organization\Models\OrganizationEnvironmentSnapshot;
 use Platform\Organization\Models\OrganizationEnvironmentSource;
+use Platform\Organization\Models\OrganizationMemoryEntry;
 
 class EnvironmentMovementService
 {
@@ -56,9 +57,26 @@ class EnvironmentMovementService
             return [];
         }
 
+        // Load source_relevance memories indexed by source_id
+        $relevanceMemories = OrganizationMemoryEntry::forTeam($teamId)
+            ->ofType('source_relevance')
+            ->active()
+            ->valid()
+            ->get()
+            ->keyBy(fn ($m) => $m->structured_data['source_id'] ?? null);
+
         $context = [];
 
         foreach ($sources as $source) {
+            $memory = $relevanceMemories->get($source->id);
+            $learnedRelevance = $memory ? (float) ($memory->structured_data['relevance_rating'] ?? 0.5) : 0.5;
+            $feedbackConfidence = $memory ? (float) $memory->confidence : 0.0;
+
+            // Skip sources with very low learned relevance and high confidence
+            if ($learnedRelevance < 0.2 && $feedbackConfidence >= 0.7) {
+                continue;
+            }
+
             $movement = $this->forSource($source->id);
 
             if (! $movement['has_data']) {
@@ -73,6 +91,8 @@ class EnvironmentMovementService
                 'relevance' => $movement['latest']['metrics']['relevance_score'] ?? null,
                 'topics' => $movement['latest']['metrics']['topics'] ?? [],
                 'snapshot_date' => $movement['latest']['date'] ?? null,
+                'learned_relevance' => $learnedRelevance,
+                'feedback_confidence' => $feedbackConfidence,
             ];
 
             if ($movement['delta']) {
@@ -85,6 +105,9 @@ class EnvironmentMovementService
 
             $context[] = $entry;
         }
+
+        // Sort by learned relevance (highest first, unknown = 0.5)
+        usort($context, fn ($a, $b) => ($b['learned_relevance'] ?? 0.5) <=> ($a['learned_relevance'] ?? 0.5));
 
         return $context;
     }

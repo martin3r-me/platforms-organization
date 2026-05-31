@@ -43,8 +43,8 @@ class CreateMemoryEntryTool implements ToolContract, ToolMetadataContract
                 ],
                 'memory_type' => [
                     'type' => 'string',
-                    'description' => 'ERFORDERLICH: entity_profile, baseline, suppression, relationship, prompt_experience, inquiry_outcome.',
-                    'enum' => ['entity_profile', 'baseline', 'suppression', 'relationship', 'prompt_experience', 'inquiry_outcome'],
+                    'description' => 'ERFORDERLICH: entity_profile, baseline, suppression, relationship, prompt_experience, inquiry_outcome, source_relevance.',
+                    'enum' => ['entity_profile', 'baseline', 'suppression', 'relationship', 'prompt_experience', 'inquiry_outcome', 'source_relevance'],
                 ],
                 'content' => [
                     'type' => 'string',
@@ -86,7 +86,7 @@ class CreateMemoryEntryTool implements ToolContract, ToolMetadataContract
             $rootTeamId = (int) $resolved['root_team_id'];
 
             $memoryType = $arguments['memory_type'] ?? '';
-            $validTypes = ['entity_profile', 'baseline', 'suppression', 'relationship', 'prompt_experience', 'inquiry_outcome'];
+            $validTypes = ['entity_profile', 'baseline', 'suppression', 'relationship', 'prompt_experience', 'inquiry_outcome', 'source_relevance'];
             if (! in_array($memoryType, $validTypes)) {
                 return ToolResult::error('VALIDATION_ERROR', 'memory_type muss einer von: ' . implode(', ', $validTypes));
             }

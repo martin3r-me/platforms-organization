@@ -4,8 +4,10 @@ namespace Platform\Organization\Services;
 
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
+use Platform\Core\Models\Team;
 use Platform\Organization\Models\OrganizationEnvironmentSnapshot;
 use Platform\Organization\Models\OrganizationEnvironmentSource;
+use Platform\Organization\Models\OrganizationMemoryEntry;
 
 class EnvironmentPullService
 {
@@ -33,6 +35,7 @@ class EnvironmentPullService
                 'sentiment_score' => $extracted['sentiment_score'] ?? null,
                 'relevance_score' => $extracted['relevance_score'] ?? null,
                 'topics' => $extracted['topics'] ?? [],
+                'org_relevance_reasoning' => $extracted['org_relevance_reasoning'] ?? null,
             ],
             'summary' => $extracted['summary'] ?? '',
             'raw_items' => array_slice($items, 0, 20),
@@ -133,6 +136,65 @@ class EnvironmentPullService
         ];
     }
 
+    public function buildExtractionContext(OrganizationEnvironmentSource $source): string
+    {
+        $parts = [];
+
+        // 1. Leitbild (Perspektive) via SemanticLayerResolver
+        try {
+            $team = Team::find($source->team_id);
+            if ($team) {
+                $resolver = resolve(\Platform\Core\SemanticLayer\Services\SemanticLayerResolver::class);
+                $resolved = $resolver->resolveFor($team, 'environment');
+                if (! $resolved->isEmpty()) {
+                    $parts[] = "## Organisation\n" . $resolved->rendered_block;
+                }
+            }
+        } catch (\Throwable) {
+            // SemanticLayer module may not be available
+        }
+
+        // 2. Zukunftsbild (Focus Area Titles)
+        try {
+            $forecast = \Platform\Okr\Models\Forecast::where('team_id', $source->team_id)
+                ->latest()
+                ->first();
+            if ($forecast) {
+                $focusTitles = $forecast->focusAreas()->pluck('title')->implode(', ');
+                if ($focusTitles) {
+                    $parts[] = "## Strategische Fokusfelder\n{$focusTitles}";
+                }
+            }
+        } catch (\Throwable) {
+            // OKR module may not be available
+        }
+
+        // 3. Gelerntes Feedback aus source_relevance Memory
+        $relevanceMemory = OrganizationMemoryEntry::forTeam($source->team_id)
+            ->ofType('source_relevance')
+            ->active()
+            ->valid()
+            ->where('content', 'like', '%' . $source->name . '%')
+            ->orderByDesc('confidence')
+            ->first();
+
+        if ($relevanceMemory && ! empty($relevanceMemory->structured_data)) {
+            $data = $relevanceMemory->structured_data;
+            $feedbackParts = [];
+            if (! empty($data['topics_useful'])) {
+                $feedbackParts[] = 'Besonders relevante Themen: ' . implode(', ', $data['topics_useful']);
+            }
+            if (! empty($data['topics_noise'])) {
+                $feedbackParts[] = 'Als irrelevant bekannte Themen: ' . implode(', ', $data['topics_noise']);
+            }
+            if (! empty($feedbackParts)) {
+                $parts[] = "## Gelerntes Feedback\n" . implode("\n", $feedbackParts);
+            }
+        }
+
+        return implode("\n\n", $parts);
+    }
+
     public function extractWithLlm(OrganizationEnvironmentSource $source, array $items): array
     {
         $apiKey = config('ai.anthropic.api_key');
@@ -151,6 +213,25 @@ class EnvironmentPullService
         }
         $userMessage .= "Feed-Items:\n\n{$itemsText}";
 
+        $orgContext = $this->buildExtractionContext($source);
+
+        $systemPrompt = "Du extrahierst strukturierte Informationen aus Nachrichten-Feeds für eine spezifische Organisation.";
+        if ($orgContext) {
+            $systemPrompt .= "\n\n{$orgContext}";
+        }
+        $systemPrompt .= <<<'PROMPT'
+
+
+Bewerte relevance_score aus der Perspektive DIESER Organisation:
+- 1.0 = direkt relevant für strategische Fokusfelder oder Kerngeschäft
+- 0.7 = relevant für die Branche/Umfeld
+- 0.3 = allgemein interessant, kein direkter Bezug
+- 0.0 = irrelevant
+
+Antworte mit validem JSON:
+{"summary": "2-3 Sätze Zusammenfassung", "sentiment_score": <-1 bis 1>, "relevance_score": <0 bis 1>, "topics": ["topic1", "topic2"], "org_relevance_reasoning": "1 Satz warum relevant/irrelevant"}
+PROMPT;
+
         try {
             $response = Http::withHeaders([
                 'x-api-key' => $apiKey,
@@ -160,7 +241,7 @@ class EnvironmentPullService
                 'model' => 'claude-haiku-4-5',
                 'max_tokens' => 1024,
                 'temperature' => 0,
-                'system' => 'Du extrahierst strukturierte Informationen aus Nachrichten-Feeds. Antworte ausschließlich mit validem JSON in diesem Format: {"summary": "2-3 Sätze Zusammenfassung", "sentiment_score": <-1.0 bis 1.0>, "relevance_score": <0.0 bis 1.0>, "topics": ["topic1", "topic2"]}. sentiment_score: -1 = sehr negativ, 0 = neutral, 1 = sehr positiv. relevance_score: 0 = irrelevant, 1 = hochrelevant für die angegebene Kategorie.',
+                'system' => $systemPrompt,
                 'messages' => [
                     ['role' => 'user', 'content' => $userMessage],
                 ],
@@ -188,6 +269,7 @@ class EnvironmentPullService
                         'sentiment_score' => max(-1.0, min(1.0, (float) ($parsed['sentiment_score'] ?? 0))),
                         'relevance_score' => max(0.0, min(1.0, (float) ($parsed['relevance_score'] ?? 0.5))),
                         'topics' => array_slice((array) ($parsed['topics'] ?? []), 0, 10),
+                        'org_relevance_reasoning' => $parsed['org_relevance_reasoning'] ?? null,
                     ];
                 }
             }

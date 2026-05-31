@@ -10,6 +10,7 @@ use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Services\EntityLinkRegistry;
+use Platform\Organization\Services\PersonActivityRegistry;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
 class GetEntityDetailTool implements ToolContract, ToolMetadataContract
@@ -168,6 +169,22 @@ class GetEntityDetailTool implements ToolContract, ToolMetadataContract
                 $registry = resolve(EntityLinkRegistry::class);
                 $metrics = $registry->computeMetricsBatch($linksByEntityAndType);
                 $result['metrics'] = $metrics[$entityId] ?? [];
+            }
+
+            // Person-Entity: include user-bridged data (assigned tasks, tickets etc.)
+            if ($entity->linked_user_id) {
+                $result['linked_user_id'] = $entity->linked_user_id;
+                $personRegistry = resolve(PersonActivityRegistry::class);
+
+                $result['vital_signs'] = $personRegistry->allVitalSigns(
+                    $entity->linked_user_id,
+                    $rootTeamId
+                );
+                $result['responsibilities'] = $personRegistry->allResponsibilities(
+                    $entity->linked_user_id,
+                    $rootTeamId,
+                    10
+                );
             }
 
             return ToolResult::success(['entity' => $result]);

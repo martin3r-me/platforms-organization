@@ -10,6 +10,7 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Services\EntityLinkRegistry;
+use Platform\Organization\Services\PersonActivityRegistry;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
 class GetEntitySummaryTool implements ToolContract, ToolMetadataContract
@@ -121,7 +122,22 @@ class GetEntitySummaryTool implements ToolContract, ToolMetadataContract
                 }
             }
 
-            return ToolResult::success([
+            // Person-Entity: add user-bridged vital signs
+            $personSummary = null;
+            if ($entity->linked_user_id) {
+                $personRegistry = resolve(PersonActivityRegistry::class);
+                $vitalSigns = $personRegistry->allVitalSigns($entity->linked_user_id, $rootTeamId);
+
+                // Flatten vital signs into a simple key→value map
+                $personSummary = ['linked_user_id' => $entity->linked_user_id];
+                foreach ($vitalSigns as $section => $signs) {
+                    foreach ($signs as $sign) {
+                        $personSummary[$section . '_' . $sign['key']] = $sign['value'];
+                    }
+                }
+            }
+
+            $response = [
                 'entity_id' => $entityId,
                 'entity_name' => $entity->name,
                 'includes_children' => $includeChildren,
@@ -130,7 +146,13 @@ class GetEntitySummaryTool implements ToolContract, ToolMetadataContract
                 'links_by_type' => $mergedCounts,
                 'links_total' => $linksTotal,
                 'metrics' => $mergedMetrics,
-            ]);
+            ];
+
+            if ($personSummary) {
+                $response['person'] = $personSummary;
+            }
+
+            return ToolResult::success($response);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Laden des Entity-Summary: ' . $e->getMessage());
         }

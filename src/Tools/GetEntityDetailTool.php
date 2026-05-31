@@ -38,15 +38,18 @@ class GetEntityDetailTool implements ToolContract, ToolMetadataContract
                 ],
                 'include_children' => [
                     'type' => 'boolean',
-                    'description' => 'Optional: direkte Kind-Entities mitladen (Default: false).',
+                    'description' => 'Optional: direkte Kind-Entities mitladen (Default: true).',
+                    'default' => true,
                 ],
                 'include_links' => [
                     'type' => 'boolean',
-                    'description' => 'Optional: alle verknüpften Objekte gruppiert nach Typ mit Metadaten laden (Default: false).',
+                    'description' => 'Optional: alle verknüpften Objekte gruppiert nach Typ mit Metadaten laden (Default: true).',
+                    'default' => true,
                 ],
                 'include_metrics' => [
                     'type' => 'boolean',
-                    'description' => 'Optional: berechnete KPIs aller Provider laden (Default: false).',
+                    'description' => 'Optional: berechnete KPIs aller Provider laden (Default: true).',
+                    'default' => true,
                 ],
             ],
             'required' => ['entity_id'],
@@ -83,8 +86,8 @@ class GetEntityDetailTool implements ToolContract, ToolMetadataContract
                 'description' => $entity->description,
             ];
 
-            // Children
-            if (!empty($arguments['include_children'])) {
+            // Children (default: true)
+            if ($arguments['include_children'] ?? true) {
                 $children = OrganizationEntity::where('parent_entity_id', $entityId)
                     ->where('team_id', $rootTeamId)
                     ->where('is_active', true)
@@ -101,74 +104,74 @@ class GetEntityDetailTool implements ToolContract, ToolMetadataContract
                 ])->toArray();
             }
 
-            // Links
-            if (!empty($arguments['include_links'])) {
+            // Links + Metrics: load dimension links once, reuse for both
+            $includeLinks = $arguments['include_links'] ?? true;
+            $includeMetrics = $arguments['include_metrics'] ?? true;
+
+            if ($includeLinks || $includeMetrics) {
                 $links = EntityDimensionBridge::linksForEntity($entityId);
                 $registry = resolve(EntityLinkRegistry::class);
-                $typeConfig = $registry->allLinkTypeConfig();
                 $reverseMorphMap = array_flip(Relation::morphMap());
 
-                // Group by morph alias
+                // Group by morph alias (needed for both links and metrics)
                 $grouped = [];
                 foreach ($links as $link) {
                     $alias = $reverseMorphMap[$link->linkable_type] ?? $link->linkable_type;
                     $grouped[$alias][] = $link->linkable_id;
                 }
 
-                $linkResults = [];
-                foreach ($grouped as $alias => $ids) {
-                    $ids = array_unique($ids);
-                    $config = $typeConfig[$alias] ?? [];
-                    $label = $config['label'] ?? $alias;
+                if ($includeLinks) {
+                    $typeConfig = $registry->allLinkTypeConfig();
+                    $linkResults = [];
 
-                    // Resolve FQCN and batch-load models
-                    $fqcn = Relation::getMorphedModel($alias);
-                    $items = [];
+                    foreach ($grouped as $alias => $ids) {
+                        $ids = array_unique($ids);
+                        $config = $typeConfig[$alias] ?? [];
+                        $label = $config['label'] ?? $alias;
 
-                    if ($fqcn && class_exists($fqcn)) {
-                        $provider = $registry->getProvider($alias);
-                        $query = $fqcn::whereIn('id', $ids);
+                        // Resolve FQCN and batch-load models
+                        $fqcn = Relation::getMorphedModel($alias);
+                        $items = [];
 
-                        if ($provider) {
-                            $provider->applyEagerLoading($query, $alias, $fqcn);
+                        if ($fqcn && class_exists($fqcn)) {
+                            $provider = $registry->getProvider($alias);
+                            $query = $fqcn::whereIn('id', $ids);
+
+                            if ($provider) {
+                                $provider->applyEagerLoading($query, $alias, $fqcn);
+                            }
+
+                            $models = $query->get();
+
+                            foreach ($models as $model) {
+                                $meta = $provider ? $provider->extractMetadata($alias, $model) : [];
+                                $items[] = array_merge(
+                                    ['id' => $model->id],
+                                    $meta
+                                );
+                            }
                         }
 
-                        $models = $query->get();
-
-                        foreach ($models as $model) {
-                            $meta = $provider ? $provider->extractMetadata($alias, $model) : [];
-                            $items[] = array_merge(
-                                ['id' => $model->id],
-                                $meta
-                            );
-                        }
+                        $linkResults[] = [
+                            'type' => $alias,
+                            'label' => $label,
+                            'count' => count($ids),
+                            'items' => $items,
+                        ];
                     }
 
-                    $linkResults[] = [
-                        'type' => $alias,
-                        'label' => $label,
-                        'count' => count($ids),
-                        'items' => $items,
-                    ];
+                    $result['links'] = $linkResults;
                 }
 
-                $result['links'] = $linkResults;
-            }
+                if ($includeMetrics) {
+                    $linksByEntityAndType = [];
+                    foreach ($grouped as $alias => $ids) {
+                        $linksByEntityAndType[$entityId][$alias] = array_unique($ids);
+                    }
 
-            // Metrics
-            if (!empty($arguments['include_metrics'])) {
-                $links = EntityDimensionBridge::linksForEntity($entityId);
-                $reverseMorphMap = array_flip(Relation::morphMap());
-
-                $linksByEntityAndType = [];
-                foreach ($links as $link) {
-                    $alias = $reverseMorphMap[$link->linkable_type] ?? $link->linkable_type;
-                    $linksByEntityAndType[$entityId][$alias][] = $link->linkable_id;
+                    $metrics = $registry->computeMetricsBatch($linksByEntityAndType);
+                    $result['metrics'] = $metrics[$entityId] ?? [];
                 }
-
-                $registry = resolve(EntityLinkRegistry::class);
-                $metrics = $registry->computeMetricsBatch($linksByEntityAndType);
-                $result['metrics'] = $metrics[$entityId] ?? [];
             }
 
             // Person-Entity: include user-bridged data (assigned tasks, tickets etc.)

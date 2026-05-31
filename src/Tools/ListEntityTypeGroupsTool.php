@@ -23,18 +23,18 @@ class ListEntityTypeGroupsTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/entity-type-groups - Listet Entity Type Groups (global). Unterstützt filters/search/sort/limit/offset.';
+        return 'GET /organization/entity-type-groups - Listet Entity Type Groups (global). Gruppen kategorisieren Entity Types (z.B. "Strukturelle Einheiten", "Operative Einheiten"). Jede Gruppe enthält mehrere Entity Types.';
     }
 
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['is_active', 'sort_order', 'name']),
+            $this->getStandardGetSchema(),
             [
                 'properties' => [
                     'is_active' => [
                         'type' => 'boolean',
-                        'description' => 'Optional: aktive/inaktive Gruppen. Default: true.',
+                        'description' => 'Optional: true = nur aktive, false = nur inaktive. Default: true.',
                         'default' => true,
                     ],
                 ],
@@ -59,7 +59,7 @@ class ListEntityTypeGroupsTool implements ToolContract, ToolMetadataContract
                 $q->where('is_active', false);
             }
 
-            $this->applyStandardFilters($q, $arguments, ['is_active', 'sort_order', 'name', 'created_at']);
+            $this->applyStandardFilters($q, $arguments, ['created_at']);
             $this->applyStandardSearch($q, $arguments, ['name', 'description']);
             $this->applyStandardSort($q, $arguments, ['sort_order', 'name', 'id', 'created_at'], 'sort_order', 'asc');
 

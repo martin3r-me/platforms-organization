@@ -22,39 +22,41 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/signals - Listet ausgelöste Signale (algedonic alerts) im Team. Unterstützt filters/search/sort/limit/offset.';
+        return 'GET /organization/signals - Listet ausgelöste Signale (algedonic alerts) im Team. Signale sind VSM-Alarme die auf Probleme hinweisen. Filtere nach entity_id für eine bestimmte Entity, status="open" für offene, severity="critical"/"algedonic" für dringende.';
     }
 
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['team_id', 'status', 'severity', 'entity_id', 'signal_definition_id', 'source']),
+            $this->getStandardGetSchema(),
             [
                 'properties' => [
                     'team_id' => [
                         'type' => 'integer',
                         'description' => 'Optional: Team-ID. Default: Team aus Kontext.',
                     ],
+                    'entity_id' => [
+                        'type' => 'integer',
+                        'description' => 'Direkter Filter: nur Signale dieser Entity. Beispiel: entity_id=5',
+                    ],
                     'status' => [
                         'type' => 'string',
-                        'description' => 'Optional: Filter nach Status (open, acknowledged, resolved, dismissed).',
+                        'description' => 'Direkter Filter: open | acknowledged | resolved | dismissed. Beispiel: status="open"',
+                        'enum' => ['open', 'acknowledged', 'resolved', 'dismissed'],
                     ],
                     'severity' => [
                         'type' => 'string',
-                        'description' => 'Optional: Filter nach Severity (info, warning, critical, algedonic).',
+                        'description' => 'Direkter Filter: info | warning | critical | algedonic. Beispiel: severity="critical"',
+                        'enum' => ['info', 'warning', 'critical', 'algedonic'],
                     ],
                     'source' => [
                         'type' => 'string',
-                        'description' => 'Optional: Filter nach Quelle (rule, inference).',
+                        'description' => 'Direkter Filter: rule (regelbasiert) | inference (KI-generiert).',
                         'enum' => ['rule', 'inference'],
-                    ],
-                    'entity_id' => [
-                        'type' => 'integer',
-                        'description' => 'Optional: Filter nach Entity-ID.',
                     ],
                     'signal_definition_id' => [
                         'type' => 'integer',
-                        'description' => 'Optional: Filter nach Signal-Definition-ID.',
+                        'description' => 'Direkter Filter: nur Signale dieser Definition.',
                     ],
                 ],
             ]
@@ -94,7 +96,7 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
                 $q->where('source', $arguments['source']);
             }
 
-            $this->applyStandardFilters($q, $arguments, ['team_id', 'status', 'severity', 'entity_id', 'signal_definition_id', 'source', 'created_at']);
+            $this->applyStandardFilters($q, $arguments, ['created_at']);
             $this->applyStandardSearch($q, $arguments, ['message']);
             $this->applyStandardSort($q, $arguments, ['id', 'created_at', 'severity', 'status'], 'created_at', 'desc');
 

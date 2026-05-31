@@ -23,27 +23,27 @@ class ListEntityTypesTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/entity-types - Listet Entity Types (global). Nutze dieses Tool bevor du entity_type_id an anderen Modulen setzt (IDs nie raten). Unterstützt filters/search/sort/limit/offset.';
+        return 'GET /organization/entity-types - Listet Entity Types (global). WICHTIG: IDs nie raten — immer erst dieses Tool aufrufen. Filtere nach code für exakten Match oder entity_type_group_id für eine Gruppe.';
     }
 
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['is_active', 'entity_type_group_id', 'code', 'sort_order', 'name']),
+            $this->getStandardGetSchema(),
             [
                 'properties' => [
                     'is_active' => [
                         'type' => 'boolean',
-                        'description' => 'Optional: aktive/inaktive Entity Types. Default: true.',
+                        'description' => 'Optional: true = nur aktive, false = nur inaktive. Default: true.',
                         'default' => true,
                     ],
                     'entity_type_group_id' => [
                         'type' => 'integer',
-                        'description' => 'Optional: Filter nach Entity Type Group ID.',
+                        'description' => 'Direkter Filter: nur Types dieser Gruppe. Nutze entity_type_groups.GET für IDs.',
                     ],
                     'code' => [
                         'type' => 'string',
-                        'description' => 'Optional: Exakter code-Filter.',
+                        'description' => 'Direkter Filter: exakter Code-Match. Beispiel: code="department"',
                     ],
                 ],
             ]
@@ -67,15 +67,15 @@ class ListEntityTypesTool implements ToolContract, ToolMetadataContract
                 $q->where('is_active', false);
             }
 
-            if (array_key_exists('entity_type_group_id', $arguments) && $arguments['entity_type_group_id'] !== null && $arguments['entity_type_group_id'] !== '') {
+            if (!empty($arguments['entity_type_group_id'])) {
                 $q->where('entity_type_group_id', (int)$arguments['entity_type_group_id']);
             }
 
-            if (array_key_exists('code', $arguments) && $arguments['code'] !== null && $arguments['code'] !== '') {
+            if (!empty($arguments['code'])) {
                 $q->where('code', trim((string)$arguments['code']));
             }
 
-            $this->applyStandardFilters($q, $arguments, ['is_active', 'entity_type_group_id', 'code', 'sort_order', 'name', 'created_at']);
+            $this->applyStandardFilters($q, $arguments, ['created_at']);
             $this->applyStandardSearch($q, $arguments, ['name', 'code', 'description']);
             $this->applyStandardSort($q, $arguments, ['sort_order', 'name', 'code', 'id', 'created_at'], 'sort_order', 'asc');
 

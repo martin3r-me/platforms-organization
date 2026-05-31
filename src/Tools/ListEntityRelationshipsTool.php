@@ -25,43 +25,47 @@ class ListEntityRelationshipsTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/entity-relationships - Listet Beziehungen zwischen Entities im Team. Unterstützt filters/search/sort/limit/offset. Nutze from_entity_id oder to_entity_id um Relationen einer bestimmten Entity zu finden.';
+        return 'GET /organization/entity-relationships - Listet Beziehungen zwischen Entities. Nutze entity_id um ALLE Relationen einer Entity zu sehen (beide Richtungen). Oder from_entity_id / to_entity_id für eine Richtung. relation_type_code filtert nach Beziehungstyp ohne vorherige ID-Abfrage.';
     }
 
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['team_id', 'from_entity_id', 'to_entity_id', 'relation_type_id']),
+            $this->getStandardGetSchema(),
             [
                 'properties' => [
                     'team_id' => [
                         'type' => 'integer',
                         'description' => 'Optional: Team-ID. Default: Team aus Kontext. Wird auf Root/Elterteam aufgelöst.',
                     ],
+                    'entity_id' => [
+                        'type' => 'integer',
+                        'description' => 'Direkter Filter: alle Relationen dieser Entity (egal ob from oder to). Beispiel: entity_id=5 zeigt alles was mit Entity 5 verbunden ist.',
+                    ],
                     'from_entity_id' => [
                         'type' => 'integer',
-                        'description' => 'Optional: Filter nach Quell-Entity ID.',
+                        'description' => 'Direkter Filter: nur Relationen VON dieser Entity (ausgehend).',
                     ],
                     'to_entity_id' => [
                         'type' => 'integer',
-                        'description' => 'Optional: Filter nach Ziel-Entity ID.',
-                    ],
-                    'entity_id' => [
-                        'type' => 'integer',
-                        'description' => 'Optional: Filter nach Entity ID (sowohl als from als auch to). Zeigt alle Relationen einer Entity.',
+                        'description' => 'Direkter Filter: nur Relationen ZU dieser Entity (eingehend).',
                     ],
                     'relation_type_id' => [
                         'type' => 'integer',
-                        'description' => 'Optional: Filter nach Relation Type ID. Nutze organization.relation_types.GET.',
+                        'description' => 'Direkter Filter: nur Relationen dieses Typs (ID).',
+                    ],
+                    'relation_type_code' => [
+                        'type' => 'string',
+                        'description' => 'Direkter Filter: nur Relationen dieses Typs (Code). Beispiel: relation_type_code="reports_to". Erspart vorherige ID-Abfrage.',
                     ],
                     'active_only' => [
                         'type' => 'boolean',
-                        'description' => 'Optional: Nur zeitlich gültige Relationen. Default: false.',
+                        'description' => 'Optional: true = nur zeitlich gültige Relationen (valid_from/to). Default: false.',
                         'default' => false,
                     ],
                     'include_relations' => [
                         'type' => 'boolean',
-                        'description' => 'Optional: Entity-Namen und Relation Type mitladen. Default: true.',
+                        'description' => 'Optional: Entity-Namen und Relation-Type-Details mitladen. Default: true.',
                         'default' => true,
                     ],
                 ],
@@ -80,23 +84,28 @@ class ListEntityRelationshipsTool implements ToolContract, ToolMetadataContract
 
             $q = OrganizationEntityRelationship::query()->where('team_id', $rootTeamId);
 
-            if (array_key_exists('entity_id', $arguments) && $arguments['entity_id'] !== null) {
+            if (!empty($arguments['entity_id'])) {
                 $entityId = (int) $arguments['entity_id'];
                 $q->where(function ($query) use ($entityId) {
                     $query->where('from_entity_id', $entityId)
                           ->orWhere('to_entity_id', $entityId);
                 });
             } else {
-                if (array_key_exists('from_entity_id', $arguments) && $arguments['from_entity_id'] !== null) {
+                if (!empty($arguments['from_entity_id'])) {
                     $q->where('from_entity_id', (int) $arguments['from_entity_id']);
                 }
-                if (array_key_exists('to_entity_id', $arguments) && $arguments['to_entity_id'] !== null) {
+                if (!empty($arguments['to_entity_id'])) {
                     $q->where('to_entity_id', (int) $arguments['to_entity_id']);
                 }
             }
 
-            if (array_key_exists('relation_type_id', $arguments) && $arguments['relation_type_id'] !== null) {
+            if (!empty($arguments['relation_type_id'])) {
                 $q->where('relation_type_id', (int) $arguments['relation_type_id']);
+            } elseif (!empty($arguments['relation_type_code'])) {
+                $relType = \Platform\Organization\Models\OrganizationEntityRelationType::where('code', $arguments['relation_type_code'])->first();
+                if ($relType) {
+                    $q->where('relation_type_id', $relType->id);
+                }
             }
 
             if (!empty($arguments['active_only'])) {
@@ -108,7 +117,7 @@ class ListEntityRelationshipsTool implements ToolContract, ToolMetadataContract
                 $q->with(['fromEntity', 'toEntity', 'relationType']);
             }
 
-            $this->applyStandardFilters($q, $arguments, ['team_id', 'from_entity_id', 'to_entity_id', 'relation_type_id', 'created_at']);
+            $this->applyStandardFilters($q, $arguments, ['created_at']);
             $this->applyStandardSearch($q, $arguments, []);
             $this->applyStandardSort($q, $arguments, ['id', 'created_at', 'valid_from', 'valid_to'], 'created_at', 'desc');
 

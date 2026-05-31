@@ -27,27 +27,31 @@ class ListDimensionValuesTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/dimension-values - Listet Werte einer Dimension (z.B. entity, vsm-system, cost-center). Nutze dieses Tool um dimension_item_id für dimension_links.POST zu finden. Unterstützt search/filters/sort/limit/offset.';
+        return 'GET /organization/dimension-values - Listet Werte einer Dimension. WICHTIG: Nutze dieses Tool um dimension_item_id für dimension_links.POST zu finden (IDs nie raten). Dimensionen: entity, vsm-system, vsm-function, cost-center. Filtere nach code für exakten Match.';
     }
 
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['dimension', 'is_active', 'source_entity_id']),
+            $this->getStandardGetSchema(),
             [
                 'properties' => [
                     'dimension' => [
                         'type' => 'string',
-                        'description' => 'ERFORDERLICH: Dimensions-Key (z.B. "entity", "vsm-system", "vsm-function", "cost-center").',
+                        'description' => 'ERFORDERLICH: Dimensions-Key. Beispiel: "entity", "vsm-system", "vsm-function", "cost-center".',
+                    ],
+                    'code' => [
+                        'type' => 'string',
+                        'description' => 'Direkter Filter: exakter Code-Match. Beispiel: code="S1" für VSM System 1.',
                     ],
                     'is_active' => [
                         'type' => 'boolean',
-                        'description' => 'Optional: Nur aktive/inaktive Werte. Default: true.',
+                        'description' => 'Optional: true = nur aktive, false = nur inaktive. Default: true.',
                         'default' => true,
                     ],
                     'source_entity_id' => [
                         'type' => 'integer',
-                        'description' => 'Optional: Für dimension="entity" — filtert nach der verknüpften Organization-Entity-ID (metadata.source_entity_id).',
+                        'description' => 'Direkter Filter (nur dimension="entity"): filtert nach verknüpfter Organization-Entity-ID.',
                     ],
                 ],
                 'required' => ['dimension'],
@@ -87,12 +91,15 @@ class ListDimensionValuesTool implements ToolContract, ToolMetadataContract
                 $q->where('is_active', false);
             }
 
-            // source_entity_id shortcut for entity dimension
-            if (isset($arguments['source_entity_id'])) {
+            if (!empty($arguments['code'])) {
+                $q->where('code', trim((string) $arguments['code']));
+            }
+
+            if (!empty($arguments['source_entity_id'])) {
                 $q->where('metadata->source_entity_id', (int) $arguments['source_entity_id']);
             }
 
-            $this->applyStandardFilters($q, $arguments, ['dimension', 'is_active', 'source_entity_id', 'code', 'name']);
+            $this->applyStandardFilters($q, $arguments, ['created_at']);
             $this->applyStandardSearch($q, $arguments, ['code', 'name', 'description']);
             $this->applyStandardSort($q, $arguments, ['name', 'code', 'id', 'sort_order'], 'sort_order', 'asc');
 

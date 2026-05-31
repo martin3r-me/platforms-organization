@@ -21,8 +21,8 @@ return new class extends Migration
             $table->boolean('is_active')->default(true);
             $table->timestamps();
 
-            $table->index(['context_type', 'context_id', 'is_active']);
-            $table->index(['context_type', 'context_id']);
+            $table->index(['context_type', 'context_id', 'is_active'], 'org_time_periods_ctx_active_idx');
+            $table->index(['context_type', 'context_id'], 'org_time_periods_ctx_idx');
         });
     }
 

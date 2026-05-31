@@ -87,13 +87,17 @@ class GetEntityDetailTool implements ToolContract, ToolMetadataContract
             ];
 
             // Children (default: true)
-            if ($arguments['include_children'] ?? true) {
+            $includeChildren = $arguments['include_children'] ?? true;
+            $childIds = [];
+            if ($includeChildren) {
                 $children = OrganizationEntity::where('parent_entity_id', $entityId)
                     ->where('team_id', $rootTeamId)
                     ->where('is_active', true)
                     ->with('type')
                     ->orderBy('name')
                     ->get();
+
+                $childIds = $children->pluck('id')->toArray();
 
                 $result['children'] = $children->map(fn($c) => [
                     'id' => $c->id,
@@ -105,19 +109,23 @@ class GetEntityDetailTool implements ToolContract, ToolMetadataContract
             }
 
             // Links + Metrics: load dimension links once, reuse for both
+            // Include child entity links when include_children is active
             $includeLinks = $arguments['include_links'] ?? true;
             $includeMetrics = $arguments['include_metrics'] ?? true;
 
             if ($includeLinks || $includeMetrics) {
-                $links = EntityDimensionBridge::linksForEntity($entityId);
+                $linkEntityIds = array_merge([$entityId], $childIds);
+                $links = EntityDimensionBridge::linksForEntities($linkEntityIds);
                 $registry = resolve(EntityLinkRegistry::class);
                 $reverseMorphMap = array_flip(Relation::morphMap());
 
-                // Group by morph alias (needed for both links and metrics)
+                // Group by morph alias, track entity_id per linkable
                 $grouped = [];
+                $linkableEntityMap = []; // linkable_id → entity_id
                 foreach ($links as $link) {
                     $alias = $reverseMorphMap[$link->linkable_type] ?? $link->linkable_type;
                     $grouped[$alias][] = $link->linkable_id;
+                    $linkableEntityMap[$alias][$link->linkable_id] = $link->entity_id;
                 }
 
                 if ($includeLinks) {
@@ -145,10 +153,15 @@ class GetEntityDetailTool implements ToolContract, ToolMetadataContract
 
                             foreach ($models as $model) {
                                 $meta = $provider ? $provider->extractMetadata($alias, $model) : [];
-                                $items[] = array_merge(
-                                    ['id' => $model->id],
-                                    $meta
-                                );
+                                $item = array_merge(['id' => $model->id], $meta);
+
+                                // Attribute to source entity when children are included
+                                $sourceEntityId = $linkableEntityMap[$alias][$model->id] ?? null;
+                                if ($sourceEntityId && $sourceEntityId !== $entityId) {
+                                    $item['via_entity_id'] = $sourceEntityId;
+                                }
+
+                                $items[] = $item;
                             }
                         }
 
@@ -164,13 +177,24 @@ class GetEntityDetailTool implements ToolContract, ToolMetadataContract
                 }
 
                 if ($includeMetrics) {
+                    // Build per-entity link map for metric computation
                     $linksByEntityAndType = [];
-                    foreach ($grouped as $alias => $ids) {
-                        $linksByEntityAndType[$entityId][$alias] = array_unique($ids);
+                    foreach ($links as $link) {
+                        $eid = $link->entity_id ?? $entityId;
+                        $alias = $reverseMorphMap[$link->linkable_type] ?? $link->linkable_type;
+                        $linksByEntityAndType[$eid][$alias][] = $link->linkable_id;
                     }
 
-                    $metrics = $registry->computeMetricsBatch($linksByEntityAndType);
-                    $result['metrics'] = $metrics[$entityId] ?? [];
+                    $allMetrics = $registry->computeMetricsBatch($linksByEntityAndType);
+
+                    // Merge metrics across entity + children
+                    $mergedMetrics = [];
+                    foreach ($allMetrics as $eid => $entityMetrics) {
+                        foreach ($entityMetrics as $key => $value) {
+                            $mergedMetrics[$key] = ($mergedMetrics[$key] ?? 0) + $value;
+                        }
+                    }
+                    $result['metrics'] = $mergedMetrics;
                 }
             }
 

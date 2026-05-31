@@ -43,8 +43,13 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
                 ],
                 'category' => [
                     'type' => 'string',
-                    'description' => 'ERFORDERLICH: Kategorie (wirtschaft, arbeitsmarkt, wetter, regulatorik, branche, wettbewerb, technologie).',
-                    'enum' => ['wirtschaft', 'arbeitsmarkt', 'wetter', 'regulatorik', 'branche', 'wettbewerb', 'technologie'],
+                    'description' => 'ERFORDERLICH: Thematische Kategorie.',
+                    'enum' => ['industry', 'technology', 'regulation', 'market', 'competition', 'talent', 'sustainability', 'macro', 'geopolitics', 'gastronomy', 'other'],
+                ],
+                'cluster' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Geographisch/strategischer Cluster.',
+                    'enum' => ['dach', 'europa', 'global', 'tech_ai', 'strategic', 'society'],
                 ],
                 'config' => [
                     'type' => 'object',
@@ -83,7 +88,7 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'source_type muss rss sein.');
             }
 
-            $validCategories = ['wirtschaft', 'arbeitsmarkt', 'wetter', 'regulatorik', 'branche', 'wettbewerb', 'technologie'];
+            $validCategories = ['industry', 'technology', 'regulation', 'market', 'competition', 'talent', 'sustainability', 'macro', 'geopolitics', 'gastronomy', 'other'];
             $category = $arguments['category'] ?? '';
             if (! in_array($category, $validCategories)) {
                 return ToolResult::error('VALIDATION_ERROR', 'category muss einer der folgenden Werte sein: ' . implode(', ', $validCategories));
@@ -98,10 +103,17 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'config.url ist bei source_type=rss erforderlich.');
             }
 
+            $validClusters = ['dach', 'europa', 'global', 'tech_ai', 'strategic', 'society'];
+            $cluster = $arguments['cluster'] ?? null;
+            if ($cluster && ! in_array($cluster, $validClusters)) {
+                return ToolResult::error('VALIDATION_ERROR', 'cluster muss einer der folgenden Werte sein: ' . implode(', ', $validClusters));
+            }
+
             $source = OrganizationEnvironmentSource::create([
                 'name' => $name,
                 'source_type' => $sourceType,
                 'category' => $category,
+                'cluster' => $cluster,
                 'config' => $config,
                 'pull_interval_hours' => (int) ($arguments['pull_interval_hours'] ?? 24),
                 'is_active' => (bool) ($arguments['is_active'] ?? true),
@@ -115,6 +127,7 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
                 'name' => $source->name,
                 'source_type' => $source->source_type,
                 'category' => $source->category,
+                'cluster' => $source->cluster,
                 'config' => $source->config,
                 'pull_interval_hours' => $source->pull_interval_hours,
                 'is_active' => (bool) $source->is_active,

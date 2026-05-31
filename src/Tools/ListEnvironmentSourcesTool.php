@@ -87,6 +87,7 @@ class ListEnvironmentSourcesTool implements ToolContract, ToolMetadataContract
                 'name' => $source->name,
                 'source_type' => $source->source_type,
                 'category' => $source->category,
+                'cluster' => $source->cluster,
                 'config' => $source->config,
                 'pull_interval_hours' => $source->pull_interval_hours,
                 'is_active' => (bool) $source->is_active,

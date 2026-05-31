@@ -48,8 +48,13 @@ class UpdateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
                 ],
                 'category' => [
                     'type' => 'string',
-                    'description' => 'Optional: Kategorie (wirtschaft, arbeitsmarkt, wetter, regulatorik, branche, wettbewerb, technologie).',
-                    'enum' => ['wirtschaft', 'arbeitsmarkt', 'wetter', 'regulatorik', 'branche', 'wettbewerb', 'technologie'],
+                    'description' => 'Optional: Thematische Kategorie.',
+                    'enum' => ['industry', 'technology', 'regulation', 'market', 'competition', 'talent', 'sustainability', 'macro', 'geopolitics', 'gastronomy', 'other'],
+                ],
+                'cluster' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Geographisch/strategischer Cluster.',
+                    'enum' => ['dach', 'europa', 'global', 'tech_ai', 'strategic', 'society'],
                 ],
                 'config' => [
                     'type' => 'object',
@@ -115,12 +120,21 @@ class UpdateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
             }
 
             if (array_key_exists('category', $arguments)) {
-                $validCategories = ['wirtschaft', 'arbeitsmarkt', 'wetter', 'regulatorik', 'branche', 'wettbewerb', 'technologie'];
+                $validCategories = ['industry', 'technology', 'regulation', 'market', 'competition', 'talent', 'sustainability', 'macro', 'geopolitics', 'gastronomy', 'other'];
                 $cat = $arguments['category'];
                 if (! in_array($cat, $validCategories)) {
                     return ToolResult::error('VALIDATION_ERROR', 'category muss einer der folgenden Werte sein: ' . implode(', ', $validCategories));
                 }
                 $update['category'] = $cat;
+            }
+
+            if (array_key_exists('cluster', $arguments)) {
+                $validClusters = ['dach', 'europa', 'global', 'tech_ai', 'strategic', 'society'];
+                $cl = $arguments['cluster'];
+                if ($cl !== null && ! in_array($cl, $validClusters)) {
+                    return ToolResult::error('VALIDATION_ERROR', 'cluster muss einer der folgenden Werte sein: ' . implode(', ', $validClusters));
+                }
+                $update['cluster'] = $cl;
             }
 
             if (array_key_exists('config', $arguments)) {
@@ -150,6 +164,7 @@ class UpdateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
                 'name' => $source->name,
                 'source_type' => $source->source_type,
                 'category' => $source->category,
+                'cluster' => $source->cluster,
                 'config' => $source->config,
                 'pull_interval_hours' => $source->pull_interval_hours,
                 'is_active' => (bool) $source->is_active,

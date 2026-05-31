@@ -22,13 +22,13 @@ class ListEntitiesTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/entities - Listet Organisationseinheiten (Entities) im Team. Unterstützt filters/search/sort/limit/offset. Entities sind die zentralen Knoten der Organisation (Abteilungen, Standorte, Business Units etc.).';
+        return 'GET /organization/entities - Listet Organisationseinheiten (Entities) im Team. Entities sind die zentralen Knoten der Organisation (Abteilungen, Standorte, Business Units etc.). Unterstützt direkte Filter-Parameter: entity_type_id, parent_entity_id, roots_only. Für Baum-Traversierung: erst roots_only=true, dann parent_entity_id=<id> für Kinder.';
     }
 
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['team_id', 'is_active', 'entity_type_id', 'parent_entity_id']),
+            $this->getStandardGetSchema(),
             [
                 'properties' => [
                     'team_id' => [
@@ -37,20 +37,24 @@ class ListEntitiesTool implements ToolContract, ToolMetadataContract
                     ],
                     'is_active' => [
                         'type' => 'boolean',
-                        'description' => 'Optional: aktive/inaktive Entities. Default: true.',
+                        'description' => 'Optional: true = nur aktive, false = nur inaktive. Default: true (nur aktive).',
                         'default' => true,
                     ],
                     'entity_type_id' => [
                         'type' => 'integer',
-                        'description' => 'Optional: Filter nach Entity Type ID.',
+                        'description' => 'Direkter Filter: nur Entities dieses Typs zurückgeben. Beispiel: entity_type_id=11',
                     ],
                     'parent_entity_id' => [
                         'type' => 'integer',
-                        'description' => 'Optional: Filter nach Parent Entity ID (null = nur Root-Entities).',
+                        'description' => 'Direkter Filter: nur direkte Kinder dieser Entity zurückgeben. Beispiel: parent_entity_id=5 liefert alle Kinder von Entity 5.',
+                    ],
+                    'roots_only' => [
+                        'type' => 'boolean',
+                        'description' => 'Direkter Filter: true = nur Root-Entities (ohne Eltern). Nützlich als Einstieg für Baum-Traversierung.',
                     ],
                     'include_relations' => [
                         'type' => 'boolean',
-                        'description' => 'Optional: Typ und Parent mitladen. Default: false.',
+                        'description' => 'Optional: Typ-Name und Parent-Name mitladen. Default: false.',
                     ],
                 ],
             ]
@@ -75,23 +79,21 @@ class ListEntitiesTool implements ToolContract, ToolMetadataContract
                 $q->where('is_active', false);
             }
 
-            if (array_key_exists('entity_type_id', $arguments) && $arguments['entity_type_id'] !== null) {
+            if (!empty($arguments['entity_type_id'])) {
                 $q->where('entity_type_id', (int) $arguments['entity_type_id']);
             }
-            if (array_key_exists('parent_entity_id', $arguments)) {
-                $pid = $arguments['parent_entity_id'];
-                if ($pid === null || $pid === '' || $pid === 'null' || $pid === 0 || $pid === '0') {
-                    $q->whereNull('parent_entity_id');
-                } else {
-                    $q->where('parent_entity_id', (int) $pid);
-                }
+
+            if (!empty($arguments['roots_only'])) {
+                $q->whereNull('parent_entity_id');
+            } elseif (array_key_exists('parent_entity_id', $arguments) && $arguments['parent_entity_id'] !== null && $arguments['parent_entity_id'] !== '') {
+                $q->where('parent_entity_id', (int) $arguments['parent_entity_id']);
             }
 
             if (!empty($arguments['include_relations'])) {
                 $q->with(['type', 'parent']);
             }
 
-            $this->applyStandardFilters($q, $arguments, ['team_id', 'is_active', 'entity_type_id', 'parent_entity_id', 'created_at']);
+            $this->applyStandardFilters($q, $arguments, ['created_at']);
             $this->applyStandardSearch($q, $arguments, ['name', 'code', 'description']);
             $this->applyStandardSort($q, $arguments, ['name', 'code', 'id', 'created_at'], 'name', 'asc');
 

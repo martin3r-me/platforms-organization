@@ -33,7 +33,7 @@
                 @if($this->sourceRelevanceMemories->isNotEmpty())
                     <div>
                         <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Gelernte Relevanz</h3>
-                        <div class="space-y-2">
+                        <div class="space-y-3">
                             @foreach($this->sourceRelevanceMemories as $memory)
                                 @php
                                     $data = $memory->structured_data ?? [];
@@ -48,6 +48,20 @@
                                     <div class="w-full bg-gray-200 rounded-full h-1.5 mt-1">
                                         <div class="h-1.5 rounded-full {{ $rating >= 0.7 ? 'bg-green-500' : ($rating >= 0.4 ? 'bg-yellow-500' : 'bg-red-400') }}" style="width: {{ $rating * 100 }}%"></div>
                                     </div>
+                                    @if(!empty($data['topics_useful']))
+                                        <div class="flex flex-wrap gap-1 mt-1">
+                                            @foreach(array_slice($data['topics_useful'], 0, 5) as $t)
+                                                <x-ui-badge variant="success" size="xs">{{ $t }}</x-ui-badge>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                    @if(!empty($data['topics_noise']))
+                                        <div class="flex flex-wrap gap-1 mt-1">
+                                            @foreach(array_slice($data['topics_noise'], 0, 5) as $t)
+                                                <x-ui-badge variant="danger" size="xs">{{ $t }}</x-ui-badge>
+                                            @endforeach
+                                        </div>
+                                    @endif
                                 </div>
                             @endforeach
                         </div>
@@ -147,9 +161,29 @@
                                     @if(!empty($topics))
                                         <div>
                                             <h4 class="text-xs font-bold text-[var(--ui-secondary)] uppercase mb-1">Alle Topics</h4>
-                                            <div class="flex flex-wrap gap-1">
+                                            <div class="flex flex-wrap gap-2">
                                                 @foreach($topics as $topic)
-                                                    <x-ui-badge variant="info">{{ $topic }}</x-ui-badge>
+                                                    @php
+                                                        $topicStatus = $this->getTopicStatus($snapshot->source_id, $topic);
+                                                        $badgeVariant = match($topicStatus) {
+                                                            'useful' => 'success',
+                                                            'noise' => 'danger',
+                                                            default => 'info',
+                                                        };
+                                                    @endphp
+                                                    <span class="inline-flex items-center gap-0.5">
+                                                        <x-ui-badge variant="{{ $badgeVariant }}">{{ $topic }}</x-ui-badge>
+                                                        <button
+                                                            wire:click="rateTopic({{ $snapshot->source_id }}, '{{ addslashes($topic) }}', 'useful')"
+                                                            class="text-green-600 hover:text-green-800 text-xs p-0.5 {{ $topicStatus === 'useful' ? 'font-bold' : 'opacity-50 hover:opacity-100' }}"
+                                                            title="Relevant"
+                                                        >&#10003;</button>
+                                                        <button
+                                                            wire:click="rateTopic({{ $snapshot->source_id }}, '{{ addslashes($topic) }}', 'noise')"
+                                                            class="text-red-600 hover:text-red-800 text-xs p-0.5 {{ $topicStatus === 'noise' ? 'font-bold' : 'opacity-50 hover:opacity-100' }}"
+                                                            title="Rauschen"
+                                                        >&#10007;</button>
+                                                    </span>
                                                 @endforeach
                                             </div>
                                         </div>

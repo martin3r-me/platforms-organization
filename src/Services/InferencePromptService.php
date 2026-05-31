@@ -27,9 +27,20 @@ class InferencePromptService
 
         's3_star' => 'Du bist der Auditor (VSM System 3*). Du prüfst NICHT Inhalte, sondern ob Informationskanäle funktionieren. Schweigen ist dein primäres Signal. Wenn eine Entity keine Snapshots hat, keine Aktivität zeigt, keine Correspondence — das IST dein Befund. Du stellst KEINE Fragen an Menschen (ask_inquiry steht dir nicht zur Verfügung). Rohdaten sprechen für sich.',
 
-        's4' => 'Du bist ein diagnostischer Analyst für Zukunftsfähigkeit (VSM System 4). Du bewertest: Gibt es Entwicklungspfade? Werden Chancen und Risiken erkannt? Passt die aktuelle Aufstellung zur Zukunft? Fokus auf: Trends, strategische Positionierung, Innovationsfähigkeit.',
+        's4' => 'Du bist ein diagnostischer Analyst für Zukunftsfähigkeit (VSM System 4). Du bewertest: Gibt es Entwicklungspfade? Werden Chancen und Risiken erkannt? Passt die aktuelle Aufstellung zur Zukunft? Fokus auf: Trends, strategische Positionierung, Innovationsfähigkeit.
 
-        's5' => 'Du bist ein diagnostischer Analyst für normative Kohärenz (VSM System 5). Du prüfst: Handelt die Organisation im Einklang mit ihren Werten und Zielen? Gibt es Widersprüche zwischen Strategie und Handeln? Fokus auf: Identität, Werte, Kohärenz.',
+Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
+- Identifiziere Trends die strategische Chancen oder Bedrohungen darstellen
+- Bewerte ob die Organisation auf erkannte Trends vorbereitet ist
+- Verknüpfe externe Entwicklungen mit internen Entities und Capabilities
+- Erzeuge Signale wenn externe Trends eine strategische Reaktion erfordern',
+
+        's5' => 'Du bist ein diagnostischer Analyst für normative Kohärenz (VSM System 5). Du prüfst: Handelt die Organisation im Einklang mit ihren Werten und Zielen? Gibt es Widersprüche zwischen Strategie und Handeln? Fokus auf: Identität, Werte, Kohärenz.
+
+Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
+- Prüfe ob regulatorische Änderungen das Wertesystem der Organisation tangieren
+- Bewerte ob die Organisationsidentität zur sich ändernden Umwelt passt
+- Identifiziere Spannungsfelder zwischen externen Anforderungen und interner Kultur',
     ];
 
     /**
@@ -292,11 +303,19 @@ Nutze severity `algedonic` NUR bei echten existenziellen Bedrohungen:
 
 ### Umwelt-Quellen bewerten
 
-Wenn environment-Daten im Kontext enthalten sind, bewerte nach deiner Analyse JEDE Quelle mit `organization_environment_rate_source`:
-- relevance_rating: Wie nützlich war die Quelle für deine Diagnose?
-- cited_in_signal: Hast du ein Signal erzeugt das auf diesen Daten basiert?
-- topics_useful/topics_noise: Welche Themen waren relevant vs. Rauschen?
-Dies verbessert zukünftige Extraktionen.
+Wenn ein Abschnitt "Umwelt-Kontext" in den Daten enthalten ist:
+
+1. **Analysiere zuerst** — Wie beeinflussen die externen Entwicklungen die Organisation?
+2. **Verknüpfe** — Welche Entities werden von externen Trends betroffen?
+3. **Erzeuge Signale** — Wenn ein externer Trend Handlungsbedarf auslöst
+4. **Bewerte jede Quelle** mit `organization_environment_rate_source`:
+   - relevance_rating: Wie nützlich war die Quelle für deine Diagnose? (0.0-1.0)
+   - cited_in_signal: Hast du ein Signal erzeugt das auf diesen Daten basiert?
+   - topics_useful: Welche Themen waren diagnostisch wertvoll?
+   - topics_noise: Welche Themen waren irrelevant?
+   - reasoning: 1 Satz Begründung
+
+Dies verbessert zukünftige Extraktionen und Priorisierung.
 
 ### do_nothing ist wertvoll
 
@@ -326,8 +345,35 @@ PROMPT;
             $message .= $this->formatEntitiesCompact($entities) . "\n\n";
         }
 
-        // Communication summary — only if non-empty
+        // Environment context — dedicated section (before comms, more prominent)
         $comms = $evaluation['communication_summary'] ?? [];
+        $envData = $comms['environment'] ?? [];
+        if (! empty($envData)) {
+            unset($comms['environment']);
+            $message .= "## Umwelt-Kontext (externe Datenquellen)\n\n";
+            foreach ($envData as $env) {
+                $source = $env['source'] ?? '?';
+                $cluster = $env['cluster'] ?? '?';
+                $category = $env['category'] ?? '?';
+                $message .= "### {$source} [{$cluster}/{$category}]\n";
+                $message .= "Relevanz: " . ($env['relevance'] ?? '?') . " | Sentiment: " . ($env['sentiment'] ?? '?');
+                if (($env['learned_relevance'] ?? 0.5) != 0.5) {
+                    $message .= " | Gelernte Relevanz: {$env['learned_relevance']}";
+                }
+                $message .= "\n";
+                $message .= ($env['summary'] ?? '') . "\n";
+                if (! empty($env['topics'])) {
+                    $message .= "Topics: " . implode(', ', $env['topics']) . "\n";
+                }
+                if (! empty($env['delta'])) {
+                    $d = $env['delta'];
+                    $message .= "Delta: Sentiment " . ($d['sentiment_change'] ?? '0') . ", Relevanz " . ($d['relevance_change'] ?? '0') . "\n";
+                }
+                $message .= "\n";
+            }
+        }
+
+        // Communication summary — only if non-empty
         $comms = array_filter($comms);
         if (! empty($comms)) {
             $message .= "## Kommunikations-Zusammenfassung\n\n";

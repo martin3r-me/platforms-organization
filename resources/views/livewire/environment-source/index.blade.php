@@ -87,6 +87,20 @@
                     <x-ui-table-row compact="true">
                         <x-ui-table-cell compact="true">
                             <span class="font-medium">{{ $source->name }}</span>
+                            @php
+                                $relevanceMemory = $this->sourceRelevanceMemories[$source->id] ?? null;
+                                $learnedData = $relevanceMemory?->structured_data ?? [];
+                            @endphp
+                            @if(!empty($learnedData['topics_useful']) || !empty($learnedData['topics_noise']))
+                                <div class="flex flex-wrap gap-1 mt-1">
+                                    @foreach(array_slice($learnedData['topics_useful'] ?? [], 0, 3) as $t)
+                                        <x-ui-badge variant="success" size="xs">{{ $t }}</x-ui-badge>
+                                    @endforeach
+                                    @foreach(array_slice($learnedData['topics_noise'] ?? [], 0, 3) as $t)
+                                        <x-ui-badge variant="danger" size="xs">{{ $t }}</x-ui-badge>
+                                    @endforeach
+                                </div>
+                            @endif
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
                             <x-ui-badge variant="muted">{{ $this->clusters[$source->cluster] ?? $source->cluster ?? '-' }}</x-ui-badge>

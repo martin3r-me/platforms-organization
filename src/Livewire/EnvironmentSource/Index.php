@@ -5,6 +5,7 @@ namespace Platform\Organization\Livewire\EnvironmentSource;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Platform\Organization\Models\OrganizationEnvironmentSource;
+use Platform\Organization\Models\OrganizationMemoryEntry;
 use Platform\Organization\Services\EnvironmentPullService;
 
 class Index extends Component
@@ -71,6 +72,22 @@ class Index extends Component
     public function categories()
     {
         return ['industry', 'technology', 'regulation', 'market', 'competition', 'talent', 'sustainability', 'macro', 'geopolitics', 'gastronomy', 'other'];
+    }
+
+    #[Computed]
+    public function sourceRelevanceMemories()
+    {
+        $teamId = auth()->user()?->currentTeamRelation?->id;
+        if (! $teamId) {
+            return collect();
+        }
+
+        return OrganizationMemoryEntry::forTeam($teamId)
+            ->ofType('source_relevance')
+            ->active()
+            ->valid()
+            ->get()
+            ->keyBy(fn ($m) => $m->structured_data['source_id'] ?? null);
     }
 
     #[Computed]

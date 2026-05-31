@@ -44,6 +44,7 @@ class Show extends Component
     ];
 
     public ?string $movementStream = null;
+    public bool $analyseLoaded = false;
 
     // Skills tab
     public string $personSkillSearch = '';
@@ -51,6 +52,48 @@ class Show extends Component
 
     // Signals tab
     public string $signalStatusFilter = '';
+
+    public function loadAnalyseData(): void
+    {
+        if ($this->analyseLoaded) {
+            return;
+        }
+        $this->analyseLoaded = true;
+    }
+
+    #[Computed]
+    public function contextSummary(): array
+    {
+        $links = $this->entity->entityLinks;
+        $morphMap = Relation::morphMap();
+        $reverseMorphMap = array_flip($morphMap);
+        $registry = resolve(EntityLinkRegistry::class);
+        $allConfig = $registry->allLinkTypeConfig();
+
+        $counts = [];
+        foreach ($links as $link) {
+            $type = $link->linkable_type;
+            if (isset($reverseMorphMap[$type])) {
+                $type = $reverseMorphMap[$type];
+            }
+            $counts[$type] = ($counts[$type] ?? 0) + 1;
+        }
+
+        $summary = [];
+        foreach ($counts as $type => $count) {
+            $config = $allConfig[$type] ?? null;
+            $label = $config['label'] ?? ucfirst($type);
+            $summary[] = [
+                'type' => $type,
+                'label' => $label,
+                'count' => $count,
+            ];
+        }
+
+        usort($summary, fn($a, $b) => strcmp($a['label'], $b['label']));
+
+        return $summary;
+    }
 
     #[On('perspective-switched')]
     public function onPerspectiveSwitched(): void

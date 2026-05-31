@@ -624,115 +624,108 @@
                     linkIconSvgs: {{ Js::from($this->linkTypeIconSvgs) }},
                     displayRules: {{ Js::from($this->displayRules) }}
                 }">
-                    <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                        @if(count($this->rootEntityLinks) > 0 || count($this->treeNodes) > 0)
-                            {{-- Tree Controls --}}
-                            <div class="flex justify-end gap-2 mb-4" x-data>
-                                <button
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors"
-                                    :class="$store.tree.showDone ? 'border-green-300 text-green-700 bg-green-50 hover:bg-green-100' : 'border-[var(--ui-border)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
-                                    @click="$store.tree.showDone = !$store.tree.showDone"
-                                >
-                                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
-                                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                    </svg>
-                                    <span x-text="$store.tree.showDone ? 'Erledigte ausblenden' : 'Erledigte anzeigen'"></span>
-                                </button>
-                                <button
-                                    class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-[var(--ui-border)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)] transition-colors"
-                                    @click="$store.tree.allExpanded ? $store.tree.collapseAll() : $store.tree.expandAll($wire)"
-                                    :disabled="$store.tree.loading"
-                                >
-                                    <template x-if="$store.tree.loading">
-                                        <svg class="w-3.5 h-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                        </svg>
-                                    </template>
-                                    <template x-if="!$store.tree.loading">
-                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
-                                            <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                                        </svg>
-                                    </template>
-                                    <span x-text="$store.tree.allExpanded ? 'Alle einklappen' : 'Alle aufklappen'"></span>
-                                </button>
+                    <div class="space-y-6">
+                        {{-- ═══ Section 1: Organisationsstruktur (nur Kind-Entities) ═══ --}}
+                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] flex items-center gap-2">
+                                    @svg('heroicon-o-rectangle-group', 'w-4 h-4 text-[var(--ui-primary)]')
+                                    Organisationsstruktur
+                                    @if(count($this->treeNodes) > 0)
+                                        <span class="text-xs font-normal text-[var(--ui-muted)]">({{ $this->totalDescendantCount }} Einheiten)</span>
+                                    @endif
+                                </h3>
+                                @if(count($this->treeNodes) > 0)
+                                    <div class="flex gap-2" x-data>
+                                        <button
+                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-[var(--ui-border)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)] transition-colors"
+                                            @click="$store.tree.allExpanded ? $store.tree.collapseAll() : $store.tree.expandAll($wire)"
+                                            :disabled="$store.tree.loading"
+                                        >
+                                            <template x-if="$store.tree.loading">
+                                                <svg class="w-3.5 h-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                                                </svg>
+                                            </template>
+                                            <template x-if="!$store.tree.loading">
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
+                                                </svg>
+                                            </template>
+                                            <span x-text="$store.tree.allExpanded ? 'Einklappen' : 'Alle aufklappen'"></span>
+                                        </button>
+                                    </div>
+                                @endif
                             </div>
-                            @php
-                                $rootCascaded = $this->cascadedTimeSummary;
-                                $rootTotalMin = $rootCascaded['total_minutes'];
-                                $rootBilledMin = $rootCascaded['billed_minutes'];
-                                $rootOpenMin = $rootTotalMin - $rootBilledMin;
-                                $rootHours = intdiv($rootTotalMin, 60);
-                                $rootMins = $rootTotalMin % 60;
-                                $rootOpenH = intdiv(abs($rootOpenMin), 60);
-                                $rootOpenM = abs($rootOpenMin) % 60;
-                                $rootTypeIcon = null;
-                                if ($entity->type->icon) {
-                                    $icon = str_replace('heroicons.', '', $entity->type->icon);
-                                    $iconMap = ['user-check' => 'user', 'folder-kanban' => 'folder', 'briefcase-globe' => 'briefcase', 'server-cog' => 'server', 'package-check' => 'archive-box', 'badge-check' => 'check-badge'];
-                                    $rootTypeIcon = $iconMap[$icon] ?? $icon;
-                                }
-                            @endphp
 
-                            <div x-data="{ rootExpanded: true }" class="space-y-1">
-                                {{-- Root Entity Node --}}
-                                <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">
-                                    <div class="flex items-center gap-2 cursor-pointer" @click="rootExpanded = !rootExpanded">
-                                        {{-- Chevron --}}
-                                        <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
-                                                class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200"
-                                                :class="{ 'rotate-90': rootExpanded }">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                            @if(count($this->treeNodes) > 0)
+                                <div class="space-y-1">
+                                    @foreach($this->treeNodes as $node)
+                                        @include('organization::livewire.entity.partials.tree-node', ['node' => $node, 'depth' => 0])
+                                    @endforeach
+                                </div>
+                            @else
+                                <div class="py-6 text-center rounded-lg border border-dashed border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                    @svg('heroicon-o-rectangle-group', 'w-6 h-6 text-[var(--ui-muted)] mx-auto mb-2')
+                                    <p class="text-sm text-[var(--ui-muted)]">Keine Untereinheiten vorhanden</p>
+                                </div>
+                            @endif
+                        </div>
+
+                        {{-- ═══ Section 2: Verknüpfungen (eigene Links dieser Entity) ═══ --}}
+                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] flex items-center gap-2">
+                                    @svg('heroicon-o-link', 'w-4 h-4 text-[var(--ui-primary)]')
+                                    Verknüpfungen
+                                    @if(count($this->rootEntityLinks) > 0)
+                                        @php $totalLinkItems = collect($this->rootEntityLinks)->sum(fn($g) => count($g['items'])); @endphp
+                                        <span class="text-xs font-normal text-[var(--ui-muted)]">({{ $totalLinkItems }})</span>
+                                    @endif
+                                </h3>
+                                @if(count($this->rootEntityLinks) > 0)
+                                    <div class="flex gap-2" x-data>
+                                        <button
+                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors"
+                                            :class="$store.tree.showDone ? 'border-green-300 text-green-700 bg-green-50 hover:bg-green-100' : 'border-[var(--ui-border)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
+                                            @click="$store.tree.showDone = !$store.tree.showDone"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
+                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
                                             </svg>
-                                        </div>
+                                            <span x-text="$store.tree.showDone ? 'Erledigte ausblenden' : 'Erledigte anzeigen'"></span>
+                                        </button>
+                                    </div>
+                                @endif
+                            </div>
 
-                                        {{-- Type Icon --}}
-                                        @if($rootTypeIcon && ($safeRootIcon = app('safe-svg')->resolve($rootTypeIcon, 'heroicon-o-')))
-                                            @svg('heroicon-o-' . $safeRootIcon, 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
-                                        @endif
+                            @if(count($this->rootEntityLinks) > 0)
+                                @php
+                                    $rootCascaded = $this->cascadedTimeSummary;
+                                    $rootTotalMin = $rootCascaded['total_minutes'];
+                                    $rootBilledMin = $rootCascaded['billed_minutes'];
+                                    $rootOpenMin = $rootTotalMin - $rootBilledMin;
+                                @endphp
 
-                                        {{-- Name --}}
-                                        <span class="text-sm font-semibold text-[var(--ui-secondary)] truncate">{{ $entity->name }}</span>
-
-                                        {{-- Code --}}
-                                        @if($entity->code)
-                                            <span class="text-xs text-[var(--ui-muted)] font-mono flex-shrink-0">{{ $entity->code }}</span>
-                                        @endif
-
-                                        {{-- Type Badge --}}
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] flex-shrink-0">
-                                            {{ $entity->type->name }}
-                                        </span>
-
-                                        {{-- Time Summary --}}
-                                        @if($rootTotalMin > 0)
-                                            <div class="flex items-center gap-2 ml-auto flex-shrink-0">
-                                                <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ui-secondary)]">
-                                                    @if($rootOpenMin > 0)
-                                                        <span class="w-2 h-2 rounded-full flex-shrink-0 bg-amber-400"></span>
-                                                    @else
-                                                        <span class="w-2 h-2 rounded-full flex-shrink-0 bg-green-500"></span>
-                                                    @endif
-                                                    {{ $rootHours }}:{{ str_pad($rootMins, 2, '0', STR_PAD_LEFT) }}h
-                                                </span>
-                                                @if($rootOpenMin > 0)
-                                                    <span class="text-[10px] text-amber-600 font-medium">
-                                                        {{ $rootOpenH }}:{{ str_pad($rootOpenM, 2, '0', STR_PAD_LEFT) }}h offen
-                                                    </span>
-                                                @endif
-                                            </div>
+                                {{-- Time summary bar --}}
+                                @if($rootTotalMin > 0)
+                                    <div class="flex items-center gap-4 mb-4 pb-3 border-b border-[var(--ui-border)]/30">
+                                        @svg('heroicon-o-clock', 'w-4 h-4 text-[var(--ui-muted)]')
+                                        <span class="text-xs text-[var(--ui-muted)]">Gesamt:</span>
+                                        <span class="text-sm font-semibold text-[var(--ui-secondary)]">{{ intdiv($rootTotalMin, 60) }}:{{ str_pad($rootTotalMin % 60, 2, '0', STR_PAD_LEFT) }}h</span>
+                                        @if($rootOpenMin > 0)
+                                            <span class="text-xs text-amber-600 font-medium">{{ intdiv($rootOpenMin, 60) }}:{{ str_pad($rootOpenMin % 60, 2, '0', STR_PAD_LEFT) }}h offen</span>
                                         @endif
                                     </div>
-                                </div>
+                                @endif
 
-                                {{-- Root Expanded Content --}}
-                                <div x-show="rootExpanded" x-collapse>
-                                    {{-- Root Typ-Gruppen (grouped links) --}}
+                                {{-- Link groups --}}
+                                <div class="space-y-1">
                                     @foreach($this->rootEntityLinks as $group)
-                                        <div x-data="{ groupOpen: false, init() { this.$watch('$store.tree.allExpanded', v => this.groupOpen = v); } }" class="ml-6 border-l-2 border-[var(--ui-border)]/20">
+                                        <div x-data="{ groupOpen: false, init() { this.$watch('$store.tree.allExpanded', v => this.groupOpen = v); } }">
                                             {{-- Group Header --}}
-                                            <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3 cursor-pointer"
+                                            <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2.5 px-3 cursor-pointer"
                                                 @click="groupOpen = !groupOpen">
                                                 <div class="flex items-center gap-2">
                                                     <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
@@ -744,7 +737,7 @@
                                                     </div>
                                                     @svg('heroicon-o-' . $group['icon'], 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
                                                     <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $group['label'] }}</span>
-                                                    <span class="text-xs text-[var(--ui-muted)]">({{ count($group['items']) }})</span>
+                                                    <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-[var(--ui-secondary)] bg-[var(--ui-muted-5)] rounded-full">{{ count($group['items']) }}</span>
                                                     @if(($group['group_logged_minutes'] ?? 0) > 0)
                                                         <span class="text-xs text-[var(--ui-muted)] ml-auto flex-shrink-0">
                                                             {{ intdiv($group['group_logged_minutes'], 60) }}:{{ str_pad($group['group_logged_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h
@@ -753,30 +746,22 @@
                                                 </div>
                                             </div>
 
-                                            {{-- Group Items (Link Leaves) --}}
-                                            <div x-show="groupOpen" x-collapse x-cloak>
+                                            {{-- Group Items --}}
+                                            <div x-show="groupOpen" x-collapse x-cloak class="ml-7 border-l-2 border-[var(--ui-border)]/20">
                                                 @foreach($group['items'] as $link)
                                                     @include('organization::livewire.entity.partials.link-item', ['link' => $link, 'group' => $group])
                                                 @endforeach
                                             </div>
                                         </div>
                                     @endforeach
-
-                                    {{-- Child Entities (expandable tree nodes) --}}
-                                    @foreach($this->treeNodes as $node)
-                                        @include('organization::livewire.entity.partials.tree-node', ['node' => $node, 'depth' => 1])
-                                    @endforeach
                                 </div>
-                            </div>
-                        @else
-                            <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
-                                    @svg('heroicon-o-rectangle-group', 'w-8 h-8 text-[var(--ui-muted)]')
+                            @else
+                                <div class="py-6 text-center rounded-lg border border-dashed border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                    @svg('heroicon-o-link', 'w-6 h-6 text-[var(--ui-muted)] mx-auto mb-2')
+                                    <p class="text-sm text-[var(--ui-muted)]">Keine Verknüpfungen vorhanden</p>
                                 </div>
-                                <p class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Keine Verknüpfungen oder Untereinheiten</p>
-                                <p class="text-xs text-[var(--ui-muted)]">Diese Einheit hat weder Verknüpfungen noch Kinder-Entities</p>
-                            </div>
-                        @endif
+                            @endif
+                        </div>
                     </div>
                 </div>
 

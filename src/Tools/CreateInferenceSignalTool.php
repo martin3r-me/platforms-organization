@@ -69,6 +69,15 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
                     ],
                     'maxItems' => 3,
                 ],
+                'affected_entity_ids' => [
+                    'type' => 'array',
+                    'description' => 'Optional: IDs weiterer betroffener Entities.',
+                    'items' => ['type' => 'integer'],
+                ],
+                'assignee_entity_id' => [
+                    'type' => 'integer',
+                    'description' => 'Optional: ID der Entity, die für die Bearbeitung zuständig ist.',
+                ],
             ],
             'required' => ['inference_prompt_id', 'entity_id', 'message'],
         ];
@@ -157,6 +166,30 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
                 }
             }
 
+            // Validate affected_entity_ids if provided
+            $affectedEntityIds = null;
+            if (! empty($arguments['affected_entity_ids']) && is_array($arguments['affected_entity_ids'])) {
+                $ids = array_map('intval', $arguments['affected_entity_ids']);
+                $existingCount = OrganizationEntity::where('team_id', $rootTeamId)
+                    ->whereIn('id', $ids)
+                    ->count();
+                if ($existingCount !== count($ids)) {
+                    return ToolResult::error('VALIDATION_ERROR', 'Nicht alle affected_entity_ids gehören zum selben Team.');
+                }
+                $affectedEntityIds = $ids;
+            }
+
+            // Validate assignee_entity_id if provided
+            $assigneeEntityId = ! empty($arguments['assignee_entity_id']) ? (int) $arguments['assignee_entity_id'] : null;
+            if ($assigneeEntityId) {
+                $assignee = OrganizationEntity::where('id', $assigneeEntityId)
+                    ->where('team_id', $rootTeamId)
+                    ->first();
+                if (! $assignee) {
+                    return ToolResult::error('NOT_FOUND', 'Assignee-Entity nicht gefunden.');
+                }
+            }
+
             // Create signal
             $signal = OrganizationSignal::create([
                 'team_id' => $rootTeamId,
@@ -168,6 +201,8 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
                 'message' => $message,
                 'trigger_metrics' => $arguments['evidence'] ?? null,
                 'suggested_actions' => $suggestedActions,
+                'affected_entity_ids' => $affectedEntityIds,
+                'assignee_entity_id' => $assigneeEntityId,
             ]);
 
             // Update prompt stats: signals_created

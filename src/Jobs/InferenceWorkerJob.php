@@ -7,6 +7,7 @@ use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Bus\Dispatchable;
 use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Log;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Organization\Models\OrganizationInferenceRun;
@@ -27,12 +28,29 @@ class InferenceWorkerJob implements ShouldQueue
 
     public function handle(): void
     {
-        $startTime = hrtime(true);
         $trigger = $this->trigger;
+        $teamId = $trigger->team_id;
+
+        // Concurrency guard: only one inference run per team at a time
+        $lock = Cache::lock("inference_run_team_{$teamId}", $this->timeout);
+
+        if (! $lock->get()) {
+            // Another run is active for this team — requeue by resetting trigger
+            $trigger->update(['status' => 'pending']);
+
+            Log::info('[InferenceWorkerJob] Lock not acquired, resetting trigger to pending', [
+                'trigger_id' => $trigger->id,
+                'team_id' => $teamId,
+            ]);
+
+            return;
+        }
+
+        $startTime = hrtime(true);
 
         // Create inference run record
         $run = OrganizationInferenceRun::create([
-            'team_id' => $trigger->team_id,
+            'team_id' => $teamId,
             'trigger_id' => $trigger->id,
             'trigger_type' => $trigger->trigger_type,
             'status' => 'running',
@@ -66,9 +84,11 @@ class InferenceWorkerJob implements ShouldQueue
 
             Log::error('[InferenceWorkerJob] Failed', [
                 'trigger_id' => $trigger->id,
-                'team_id' => $trigger->team_id,
+                'team_id' => $teamId,
                 'error' => $e->getMessage(),
             ]);
+        } finally {
+            $lock->release();
         }
     }
 
@@ -89,20 +109,40 @@ class InferenceWorkerJob implements ShouldQueue
         $totalMemory = 0;
         $totalDoNothing = 0;
         $totalEntities = 0;
+        $accumulatedTokens = ['input_tokens' => 0, 'output_tokens' => 0];
+        $lastModel = null;
+
+        // Entity filter from trigger (P6: pass through to executePrompt)
+        $entityFilter = $trigger->prompt_filter['entity_filter'] ?? null;
 
         foreach ($prompts as $prompt) {
             $run->touch(); // Heartbeat: signal that run is still active
 
-            $result = $service->executePrompt($prompt, $trigger->team_id, $run);
+            $result = $service->executePrompt($prompt, $trigger->team_id, $run, $entityFilter);
 
             $totalSignals += $result['signals_created'] ?? 0;
             $totalInquiries += $result['inquiries_created'] ?? 0;
             $totalMemory += $result['memory_updates'] ?? 0;
             $totalDoNothing += $result['do_nothing_count'] ?? 0;
             $totalEntities += $result['entities_analyzed'] ?? 0;
+
+            // Accumulate token usage across prompts
+            if (! empty($result['token_usage'])) {
+                $accumulatedTokens['input_tokens'] += $result['token_usage']['input_tokens'] ?? 0;
+                $accumulatedTokens['output_tokens'] += $result['token_usage']['output_tokens'] ?? 0;
+            }
+            if (! empty($result['llm_model'])) {
+                $lastModel = $result['llm_model'];
+            }
         }
 
         $durationMs = $this->elapsedMs($startTime);
+
+        // Update run with accumulated token usage
+        $run->update([
+            'llm_model' => $lastModel ?? 'claude-sonnet-4-6',
+            'token_usage' => $accumulatedTokens,
+        ]);
 
         $run->markCompleted([
             'prompts_evaluated' => $prompts->count(),

@@ -10,6 +10,7 @@ use Platform\Core\Tools\Concerns\HasStandardizedWriteOperations;
 use Platform\Organization\Models\OrganizationInferencePromptStat;
 use Platform\Organization\Models\OrganizationMemoryEntry;
 use Platform\Organization\Models\OrganizationSignal;
+use Platform\Organization\Models\OrganizationSignalComment;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
 class AcknowledgeSignalTool implements ToolContract, ToolMetadataContract
@@ -47,6 +48,10 @@ class AcknowledgeSignalTool implements ToolContract, ToolMetadataContract
                 'reason' => [
                     'type' => 'string',
                     'description' => 'Optional bei acknowledge/resolve, EMPFOHLEN bei dismiss: Begründung. Bei dismiss wird diese als Suppression in die Memory-Pipeline übernommen.',
+                ],
+                'comment' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Kommentar zur Aktion. Wird als Kommentar am Signal gespeichert.',
                 ],
             ],
             'required' => ['signal_id', 'action'],
@@ -102,6 +107,17 @@ class AcknowledgeSignalTool implements ToolContract, ToolMetadataContract
             };
 
             $signal->update($update);
+
+            // Create comment if provided
+            $comment = trim((string) ($arguments['comment'] ?? ''));
+            if ($comment !== '') {
+                OrganizationSignalComment::create([
+                    'signal_id' => $signal->id,
+                    'user_id' => $context->user?->id,
+                    'author_context' => 'user',
+                    'content' => $comment,
+                ]);
+            }
 
             // Asymmetric learning: create memory entries based on feedback
             $this->processSignalFeedback($signal, $action, $reason, $rootTeamId);

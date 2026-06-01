@@ -49,7 +49,8 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
     public function executePrompt(
         OrganizationSignalInferencePrompt $prompt,
         int $teamId,
-        OrganizationInferenceRun $run
+        OrganizationInferenceRun $run,
+        ?array $entityFilter = null
     ): array {
         $stats = [
             'signals_created' => 0,
@@ -77,6 +78,15 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
             }
 
             $evaluation = $evalData['data']['evaluations'][0] ?? [];
+
+            // Apply entity_filter if provided (from trigger)
+            if ($entityFilter && ! empty($evaluation['entities'])) {
+                $evaluation['entities'] = array_values(array_filter(
+                    $evaluation['entities'],
+                    fn ($e) => in_array($e['id'] ?? null, $entityFilter)
+                ));
+            }
+
             $stats['entities_analyzed'] = count($evaluation['entities'] ?? []);
 
             // 2. Build system prompt based on VSM type
@@ -124,11 +134,9 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
                 ]
             );
 
-            // Update run with model and token usage
-            $run->update([
-                'llm_model' => $result['model'] ?? 'claude-sonnet-4-6',
-                'token_usage' => $result['token_usage'] ?? null,
-            ]);
+            // Return token usage via stats for accumulation in worker
+            $stats['token_usage'] = $result['token_usage'] ?? null;
+            $stats['llm_model'] = $result['model'] ?? 'claude-sonnet-4-6';
 
             // Update last_evaluated_at
             $prompt->update(['last_evaluated_at' => now()]);

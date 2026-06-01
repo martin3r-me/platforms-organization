@@ -63,6 +63,14 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
                         'type' => 'integer',
                         'description' => 'Direkter Filter: nur Signale dieser Definition.',
                     ],
+                    'include_snoozed' => [
+                        'type' => 'boolean',
+                        'description' => 'Optional: true = auch gesnoozde Signale anzeigen. Default: false (nur actionable Signale).',
+                    ],
+                    'assignee_entity_id' => [
+                        'type' => 'integer',
+                        'description' => 'Direkter Filter: nur Signale mit diesem Assignee.',
+                    ],
                 ],
             ]
         );
@@ -79,9 +87,12 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
 
             $q = OrganizationSignal::query()
                 ->where('team_id', $rootTeamId)
-                ->with(['entity:id,name', 'definition:id,name,pattern_type', 'inferencePrompt:id,name,vsm_system']);
+                ->with(['entity:id,name', 'definition:id,name,pattern_type', 'inferencePrompt:id,name,vsm_system', 'assignee:id,name']);
 
-            if (! empty($arguments['status'])) {
+            // Default: only actionable signals (exclude snoozed)
+            if (empty($arguments['include_snoozed']) && empty($arguments['status'])) {
+                $q->actionable();
+            } elseif (! empty($arguments['status'])) {
                 $q->where('status', $arguments['status']);
             }
 
@@ -112,6 +123,10 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
                 $q->where('source', $arguments['source']);
             }
 
+            if (! empty($arguments['assignee_entity_id'])) {
+                $q->where('assignee_entity_id', (int) $arguments['assignee_entity_id']);
+            }
+
             $this->applyStandardFilters($q, $arguments, ['created_at']);
             $this->applyStandardSearch($q, $arguments, ['message']);
             $this->applyStandardSort($q, $arguments, ['id', 'created_at', 'severity', 'status'], 'created_at', 'desc');
@@ -134,6 +149,10 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
                 'severity' => $signal->severity,
                 'message' => $signal->message,
                 'trigger_metrics' => $signal->trigger_metrics,
+                'snooze_until' => $signal->snooze_until?->toIso8601String(),
+                'assignee_entity_id' => $signal->assignee_entity_id,
+                'assignee_name' => $signal->assignee?->name,
+                'affected_entity_ids' => $signal->affected_entity_ids,
                 'resolved_at' => $signal->resolved_at?->toIso8601String(),
                 'created_at' => $signal->created_at?->toIso8601String(),
             ])->values()->toArray();

@@ -104,7 +104,6 @@ class InferenceLogsTool implements ToolContract, ToolMetadataContract
                 if ($extraFilter === null || stripos($text, $extraFilter) !== false) {
                     return true;
                 }
-                return true;
             }
         }
 

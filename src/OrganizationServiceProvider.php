@@ -412,6 +412,8 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\DeleteSignalDefinitionTool());
             $registry->register(new \Platform\Organization\Tools\ListSignalsTool());
             $registry->register(new \Platform\Organization\Tools\AcknowledgeSignalTool());
+            $registry->register(new \Platform\Organization\Tools\CommentSignalTool());
+            $registry->register(new \Platform\Organization\Tools\SnoozeSignalTool());
 
             // Signal Inference (Semantic Layer)
             $registry->register(new \Platform\Organization\Tools\ListSignalInferencePromptsTool());

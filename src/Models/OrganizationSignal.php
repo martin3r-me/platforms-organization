@@ -33,12 +33,17 @@ class OrganizationSignal extends Model
         'resolved_at',
         'resolved_by',
         'dismissed_reason',
+        'snooze_until',
+        'affected_entity_ids',
+        'assignee_entity_id',
     ];
 
     protected $casts = [
         'trigger_metrics' => 'array',
         'suggested_actions' => 'array',
         'resolved_at' => 'datetime',
+        'snooze_until' => 'datetime',
+        'affected_entity_ids' => 'array',
     ];
 
     protected static function booted(): void
@@ -79,6 +84,16 @@ class OrganizationSignal extends Model
         return $this->belongsTo(User::class, 'resolved_by');
     }
 
+    public function comments(): HasMany
+    {
+        return $this->hasMany(OrganizationSignalComment::class, 'signal_id');
+    }
+
+    public function assignee(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationEntity::class, 'assignee_entity_id');
+    }
+
     public function scopeAlgedonic($query)
     {
         return $query->where('severity', 'algedonic');
@@ -97,5 +112,20 @@ class OrganizationSignal extends Model
     public function scopeRecent($query, int $hours = 24)
     {
         return $query->where('created_at', '>=', now()->subHours($hours));
+    }
+
+    public function scopeActionable($query)
+    {
+        return $query->whereIn('status', ['open', 'acknowledged'])
+            ->where(function ($q) {
+                $q->whereNull('snooze_until')
+                    ->orWhere('snooze_until', '<=', now());
+            });
+    }
+
+    public function scopeSnoozed($query)
+    {
+        return $query->whereNotNull('snooze_until')
+            ->where('snooze_until', '>', now());
     }
 }

@@ -7,6 +7,7 @@ use Livewire\Attributes\Computed;
 use Platform\Organization\Models\OrganizationInferencePromptStat;
 use Platform\Organization\Models\OrganizationMemoryEntry;
 use Platform\Organization\Models\OrganizationSignal;
+use Platform\Organization\Models\OrganizationSignalComment;
 
 class Show extends Component
 {
@@ -15,12 +16,23 @@ class Show extends Component
     public string $actionReason = '';
     public string $pendingAction = '';
 
+    // Comments
+    public string $newComment = '';
+    public ?int $replyingTo = null;
+    public string $replyBody = '';
+
+    // Snooze
+    public bool $showSnoozeModal = false;
+    public string $snoozeDuration = '3d';
+    public string $snoozeCustomDate = '';
+
     public function mount(OrganizationSignal $signal)
     {
         $this->signal = $signal->load([
             'definition',
             'entity.type',
             'resolvedByUser:id,name',
+            'assignee:id,name',
         ]);
     }
 
@@ -35,6 +47,16 @@ class Show extends Component
     }
 
     #[Computed]
+    public function signalComments()
+    {
+        return $this->signal->comments()
+            ->rootComments()
+            ->with(['user:id,name', 'replies.user:id,name'])
+            ->orderBy('created_at')
+            ->get();
+    }
+
+    #[Computed]
     public function historicalSignals()
     {
         return OrganizationSignal::where('signal_definition_id', $this->signal->signal_definition_id)
@@ -44,6 +66,8 @@ class Show extends Component
             ->limit(10)
             ->get();
     }
+
+    // --- Actions ---
 
     public function startAction(string $action): void
     {
@@ -195,12 +219,134 @@ class Show extends Component
         }
     }
 
+    // --- Notes (Activity Log) ---
+
     public function addNote(): void
     {
         $this->validate(['newNote' => 'required|string|max:1000']);
         $this->signal->logActivity($this->newNote);
         $this->newNote = '';
         unset($this->signalActivities);
+    }
+
+    // --- Comments ---
+
+    public function addComment(): void
+    {
+        $content = trim($this->newComment);
+        if ($content === '') {
+            return;
+        }
+
+        OrganizationSignalComment::create([
+            'signal_id' => $this->signal->id,
+            'user_id' => auth()->id(),
+            'author_context' => 'user',
+            'content' => $content,
+        ]);
+
+        $this->newComment = '';
+        unset($this->signalComments);
+    }
+
+    public function startReply(int $commentId): void
+    {
+        $this->replyingTo = $commentId;
+        $this->replyBody = '';
+    }
+
+    public function cancelReply(): void
+    {
+        $this->replyingTo = null;
+        $this->replyBody = '';
+    }
+
+    public function submitReply(): void
+    {
+        $content = trim($this->replyBody);
+        if ($content === '' || ! $this->replyingTo) {
+            return;
+        }
+
+        // Verify parent comment belongs to this signal
+        $parent = OrganizationSignalComment::where('id', $this->replyingTo)
+            ->where('signal_id', $this->signal->id)
+            ->first();
+
+        if (! $parent) {
+            return;
+        }
+
+        OrganizationSignalComment::create([
+            'signal_id' => $this->signal->id,
+            'parent_id' => $this->replyingTo,
+            'user_id' => auth()->id(),
+            'author_context' => 'user',
+            'content' => $content,
+        ]);
+
+        $this->replyingTo = null;
+        $this->replyBody = '';
+        unset($this->signalComments);
+    }
+
+    // --- Snooze ---
+
+    public function openSnooze(): void
+    {
+        $this->showSnoozeModal = true;
+        $this->snoozeDuration = '3d';
+        $this->snoozeCustomDate = '';
+    }
+
+    public function cancelSnooze(): void
+    {
+        $this->showSnoozeModal = false;
+    }
+
+    public function confirmSnooze(): void
+    {
+        if ($this->snoozeDuration === 'custom' && $this->snoozeCustomDate) {
+            $snoozeUntil = \Carbon\Carbon::parse($this->snoozeCustomDate)->endOfDay();
+        } else {
+            $snoozeUntil = match ($this->snoozeDuration) {
+                '1d' => now()->addDay(),
+                '3d' => now()->addDays(3),
+                '1w' => now()->addWeek(),
+                '2w' => now()->addWeeks(2),
+                '1m' => now()->addMonth(),
+                default => now()->addDays(3),
+            };
+        }
+
+        $this->signal->update(['snooze_until' => $snoozeUntil]);
+
+        // System comment
+        OrganizationSignalComment::create([
+            'signal_id' => $this->signal->id,
+            'user_id' => auth()->id(),
+            'author_context' => 'system',
+            'content' => 'Wiedervorlage: ' . $snoozeUntil->format('d.m.Y H:i'),
+        ]);
+
+        $this->showSnoozeModal = false;
+        $this->signal->refresh();
+        unset($this->signalComments);
+    }
+
+    public function cancelSnoozeActive(): void
+    {
+        $this->signal->update(['snooze_until' => null]);
+
+        OrganizationSignalComment::create([
+            'signal_id' => $this->signal->id,
+            'user_id' => auth()->id(),
+            'author_context' => 'system',
+            'content' => 'Wiedervorlage aufgehoben.',
+        ]);
+
+        $this->signal->refresh();
+        unset($this->signalComments);
     }
 
     public function render()

@@ -29,7 +29,8 @@ class Index extends Component
         }
 
         $query = OrganizationSignal::forTeam($teamId)
-            ->with(['entity', 'definition', 'inferencePrompt']);
+            ->with(['entity', 'definition', 'inferencePrompt'])
+            ->withCount('comments');
 
         if ($this->search) {
             $query->where(function ($q) {

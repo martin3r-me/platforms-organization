@@ -69,6 +69,7 @@
                 <x-ui-table-header-cell compact="true">Quelle</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Nachricht</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
+                <x-ui-table-header-cell compact="true" class="text-center">@svg('heroicon-o-chat-bubble-left', 'w-4 h-4 inline-block')</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Erstellt</x-ui-table-header-cell>
             </x-ui-table-header>
 
@@ -100,14 +101,26 @@
                             </a>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="{{ match($signal->status) { 'open' => 'warning', 'acknowledged' => 'info', 'resolved' => 'success', 'dismissed' => 'muted', default => 'secondary' } }}">
-                                @switch($signal->status)
-                                    @case('open') Offen @break
-                                    @case('acknowledged') Bestätigt @break
-                                    @case('resolved') Gelöst @break
-                                    @case('dismissed') Verworfen @break
-                                @endswitch
-                            </x-ui-badge>
+                            <div class="flex items-center gap-1.5">
+                                <x-ui-badge variant="{{ match($signal->status) { 'open' => 'warning', 'acknowledged' => 'info', 'resolved' => 'success', 'dismissed' => 'muted', default => 'secondary' } }}">
+                                    @switch($signal->status)
+                                        @case('open') Offen @break
+                                        @case('acknowledged') Bestätigt @break
+                                        @case('resolved') Gelöst @break
+                                        @case('dismissed') Verworfen @break
+                                    @endswitch
+                                </x-ui-badge>
+                                @if($signal->snooze_until && $signal->snooze_until->isFuture())
+                                    <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700" title="Snoozed bis {{ $signal->snooze_until->format('d.m.Y') }}">
+                                        @svg('heroicon-o-clock', 'w-3 h-3')
+                                    </span>
+                                @endif
+                            </div>
+                        </x-ui-table-cell>
+                        <x-ui-table-cell compact="true" class="text-center">
+                            @if($signal->comments_count > 0)
+                                <span class="text-xs text-[var(--ui-muted)] tabular-nums">{{ $signal->comments_count }}</span>
+                            @endif
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
                             <span class="text-sm text-[var(--ui-muted)]">{{ $signal->created_at->format('d.m.Y H:i') }}</span>
@@ -115,7 +128,7 @@
                     </x-ui-table-row>
                 @empty
                     <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="6">
+                        <x-ui-table-cell compact="true" colspan="7">
                             <div class="text-center py-8">
                                 @svg('heroicon-o-bell-slash', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
                                 <p class="text-sm text-[var(--ui-muted)]">Keine Signale gefunden.</p>

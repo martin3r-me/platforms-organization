@@ -317,11 +317,21 @@ class EntityLinkRegistry
                 'dimension' => self::DIMENSION_ORG_CAPITAL,
                 'type' => self::TYPE_STOCK,
             ],
+            'time_planned_minutes' => [
+                'label' => 'Soll-Zeit (geplant)',
+                'group' => 'core',
+                'direction' => 'neutral',
+                'unit' => 'minutes',
+                'dimension' => self::DIMENSION_ENERGY,
+                'type' => self::TYPE_STOCK,
+                'aggregation_mode' => 'rolled_up',
+            ],
             'time_total_minutes' => [
                 'label' => 'Zeiterfassung (gesamt)',
                 'group' => 'core',
                 'direction' => 'neutral',
                 'unit' => 'minutes',
+                'pair' => 'time_planned_minutes',
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_FLOW,
                 'aggregation_mode' => 'rolled_up',
@@ -335,6 +345,15 @@ class EntityLinkRegistry
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_FLOW,
                 'aggregation_mode' => 'rolled_up',
+            ],
+
+            'time_planned_days_remaining' => [
+                'label' => 'Resttage bis Planende',
+                'group' => 'core',
+                'direction' => 'neutral',
+                'unit' => 'days',
+                'dimension' => self::DIMENSION_ENERGY,
+                'type' => self::TYPE_MODULATOR,
             ],
 
             // Person-Entity Metriken

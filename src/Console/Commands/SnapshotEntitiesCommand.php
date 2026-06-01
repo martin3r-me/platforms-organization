@@ -116,6 +116,8 @@ class SnapshotEntitiesCommand extends Command
         $resolver = new EntityTimeResolver();
         $contextPairs = $resolver->resolveContextPairsBatch($entityIds);
         $timeSummaries = $resolver->batchTimeSummaries($contextPairs);
+        $plannedTimeSummaries = $resolver->batchPlannedTimeSummaries($contextPairs);
+        $plannedPeriodSummaries = $resolver->batchPlannedPeriodSummaries($contextPairs);
 
         // 5. Compute person metrics for entities with linked_user_id
         $personMetrics = [];
@@ -246,7 +248,7 @@ class SnapshotEntitiesCommand extends Command
         $hierarchyService = new EntityHierarchyService();
         $childMap = $hierarchyService->buildChildMap($entities);
 
-        $baseKeys = ['links_count', 'time_total_minutes', 'time_billed_minutes'];
+        $baseKeys = ['links_count', 'time_planned_minutes', 'time_total_minutes', 'time_billed_minutes'];
 
         $ownMetricsMap = [];
         $allProviderKeys = [];
@@ -255,10 +257,15 @@ class SnapshotEntitiesCommand extends Command
             $items = $itemMetrics[$entity->id] ?? [];
             $time = $timeSummaries[$entity->id] ?? ['total_minutes' => 0, 'billed_minutes' => 0];
 
+            $planned = $plannedTimeSummaries[$entity->id] ?? ['planned_minutes' => 0];
+            $period = $plannedPeriodSummaries[$entity->id] ?? ['days_remaining' => null];
+
             $metrics = [
                 'links_count' => $linkCountsByEntity[$entity->id] ?? 0,
+                'time_planned_minutes' => $planned['planned_minutes'],
                 'time_total_minutes' => $time['total_minutes'],
                 'time_billed_minutes' => $time['billed_minutes'],
+                'time_planned_days_remaining' => $period['days_remaining'],
             ];
 
             foreach ($items as $key => $value) {

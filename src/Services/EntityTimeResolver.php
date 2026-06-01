@@ -7,6 +7,8 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Models\OrganizationTimePlanned;
+use Platform\Organization\Models\OrganizationTimePeriod;
+use Carbon\Carbon;
 
 class EntityTimeResolver
 {
@@ -294,6 +296,135 @@ class EntityTimeResolver
                 $result[$entityId]['billed_minutes'] += (int) $row->billed_minutes;
             }
         }
+
+        return $result;
+    }
+
+    /**
+     * Batch compute planned time summaries for multiple entities.
+     * Returns: [entityId => ['planned_minutes' => X]]
+     */
+    public function batchPlannedTimeSummaries(array $pairsByEntity): array
+    {
+        if (empty($pairsByEntity)) {
+            return [];
+        }
+
+        $allPairs = [];
+        foreach ($pairsByEntity as $pairs) {
+            foreach ($pairs as $type => $ids) {
+                $allPairs[$type] = array_merge($allPairs[$type] ?? [], $ids);
+            }
+        }
+
+        foreach ($allPairs as $type => $ids) {
+            $allPairs[$type] = array_values(array_unique($ids));
+        }
+
+        if (empty($allPairs)) {
+            return array_fill_keys(array_keys($pairsByEntity), ['planned_minutes' => 0]);
+        }
+
+        $contextToEntities = [];
+        foreach ($pairsByEntity as $entityId => $pairs) {
+            foreach ($pairs as $type => $ids) {
+                foreach (array_unique($ids) as $id) {
+                    $contextToEntities[$type . '|' . $id][] = $entityId;
+                }
+            }
+        }
+
+        $query = OrganizationTimePlanned::query()->where('is_active', true);
+        $query = $this->applyContextPairsToQuery($query, $allPairs);
+        $rows = $query->select('context_type', 'context_id')
+            ->selectRaw('COALESCE(SUM(planned_minutes), 0) as planned_minutes')
+            ->groupBy('context_type', 'context_id')
+            ->get();
+
+        $result = array_fill_keys(array_keys($pairsByEntity), ['planned_minutes' => 0]);
+        foreach ($rows as $row) {
+            $key = $row->context_type . '|' . $row->context_id;
+            foreach ($contextToEntities[$key] ?? [] as $entityId) {
+                $result[$entityId]['planned_minutes'] += (int) $row->planned_minutes;
+            }
+        }
+
+        return $result;
+    }
+
+    /**
+     * Batch compute planned period summaries for multiple entities.
+     * Returns: [entityId => ['planned_start' => ?string, 'planned_end' => ?string, 'days_remaining' => ?int]]
+     */
+    public function batchPlannedPeriodSummaries(array $pairsByEntity): array
+    {
+        if (empty($pairsByEntity)) {
+            return [];
+        }
+
+        $allPairs = [];
+        foreach ($pairsByEntity as $pairs) {
+            foreach ($pairs as $type => $ids) {
+                $allPairs[$type] = array_merge($allPairs[$type] ?? [], $ids);
+            }
+        }
+
+        foreach ($allPairs as $type => $ids) {
+            $allPairs[$type] = array_values(array_unique($ids));
+        }
+
+        $default = ['planned_start' => null, 'planned_end' => null, 'days_remaining' => null];
+
+        if (empty($allPairs)) {
+            return array_fill_keys(array_keys($pairsByEntity), $default);
+        }
+
+        $contextToEntities = [];
+        foreach ($pairsByEntity as $entityId => $pairs) {
+            foreach ($pairs as $type => $ids) {
+                foreach (array_unique($ids) as $id) {
+                    $contextToEntities[$type . '|' . $id][] = $entityId;
+                }
+            }
+        }
+
+        $query = OrganizationTimePeriod::query()->where('is_active', true);
+        $query = $this->applyContextPairsToQuery($query, $allPairs);
+        $rows = $query->select('context_type', 'context_id')
+            ->selectRaw('MIN(planned_start) as earliest_start')
+            ->selectRaw('MAX(planned_end) as latest_end')
+            ->groupBy('context_type', 'context_id')
+            ->get();
+
+        $result = array_fill_keys(array_keys($pairsByEntity), $default);
+        $today = Carbon::today();
+
+        foreach ($rows as $row) {
+            $key = $row->context_type . '|' . $row->context_id;
+            foreach ($contextToEntities[$key] ?? [] as $entityId) {
+                $current = $result[$entityId];
+
+                if ($row->earliest_start !== null) {
+                    if ($current['planned_start'] === null || $row->earliest_start < $current['planned_start']) {
+                        $result[$entityId]['planned_start'] = $row->earliest_start;
+                    }
+                }
+
+                if ($row->latest_end !== null) {
+                    if ($current['planned_end'] === null || $row->latest_end > $current['planned_end']) {
+                        $result[$entityId]['planned_end'] = $row->latest_end;
+                    }
+                }
+            }
+        }
+
+        // Compute days_remaining from latest planned_end
+        foreach ($result as $entityId => &$summary) {
+            if ($summary['planned_end'] !== null) {
+                $summary['days_remaining'] = (int) $today->diffInDays(Carbon::parse($summary['planned_end']), false);
+            }
+        }
+        unset($summary);
 
         return $result;
     }

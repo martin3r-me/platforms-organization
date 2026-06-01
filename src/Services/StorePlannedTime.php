@@ -26,6 +26,8 @@ class StorePlannedTime
             'planned_minutes' => $data['planned_minutes'],
             'note' => $data['note'] ?? null,
             'is_active' => $data['is_active'] ?? true,
+            'valid_from' => $data['valid_from'] ?? null,
+            'valid_to' => $data['valid_to'] ?? null,
         ]);
 
         return $planned->fresh();
@@ -53,6 +55,14 @@ class StorePlannedTime
 
         if (array_key_exists('context_id', $data)) {
             $update['context_id'] = $data['context_id'];
+        }
+
+        if (array_key_exists('valid_from', $data)) {
+            $update['valid_from'] = $data['valid_from'];
+        }
+
+        if (array_key_exists('valid_to', $data)) {
+            $update['valid_to'] = $data['valid_to'];
         }
 
         if (!empty($update)) {

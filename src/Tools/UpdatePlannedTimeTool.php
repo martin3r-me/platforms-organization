@@ -59,6 +59,14 @@ class UpdatePlannedTimeTool implements ToolContract, ToolMetadataContract
                     'type' => 'boolean',
                     'description' => 'Optional: Aktiv-Status.',
                 ],
+                'valid_from' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Gültig ab (YYYY-MM-DD). Leerer String = auf null setzen (unbefristet).',
+                ],
+                'valid_to' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Gültig bis (YYYY-MM-DD). Leerer String = auf null setzen (unbefristet).',
+                ],
             ],
             'required' => ['planned_time_id'],
         ]);
@@ -150,6 +158,23 @@ class UpdatePlannedTimeTool implements ToolContract, ToolMetadataContract
                 $updateData['context_id'] = (int) $newContextId;
             }
 
+            if (array_key_exists('valid_from', $arguments)) {
+                $v = $arguments['valid_from'];
+                $updateData['valid_from'] = ($v === '' || $v === null) ? null : $v;
+            }
+
+            if (array_key_exists('valid_to', $arguments)) {
+                $v = $arguments['valid_to'];
+                $updateData['valid_to'] = ($v === '' || $v === null) ? null : $v;
+            }
+
+            $checkFrom = array_key_exists('valid_from', $updateData) ? $updateData['valid_from'] : $entry->valid_from?->toDateString();
+            $checkTo = array_key_exists('valid_to', $updateData) ? $updateData['valid_to'] : $entry->valid_to?->toDateString();
+
+            if ($checkFrom && $checkTo && $checkFrom > $checkTo) {
+                return ToolResult::error('VALIDATION_ERROR', 'valid_from muss vor oder gleich valid_to sein.');
+            }
+
             $service = app(StorePlannedTime::class);
             $entry = $service->update($entry, $updateData);
 
@@ -164,6 +189,9 @@ class UpdatePlannedTimeTool implements ToolContract, ToolMetadataContract
                 'context_id' => $entry->context_id,
                 'note' => $entry->note,
                 'is_active' => (bool) $entry->is_active,
+                'valid_from' => $entry->valid_from?->toDateString(),
+                'valid_to' => $entry->valid_to?->toDateString(),
+                'period_label' => $entry->period_label,
                 'message' => 'Soll-Zeiteintrag erfolgreich aktualisiert.',
             ]);
         } catch (\Throwable $e) {

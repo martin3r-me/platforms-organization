@@ -23,11 +23,15 @@ class OrganizationTimePlanned extends Model
         'planned_minutes',
         'note',
         'is_active',
+        'valid_from',
+        'valid_to',
     ];
 
     protected $casts = [
         'planned_minutes' => 'integer',
         'is_active' => 'boolean',
+        'valid_from' => 'date',
+        'valid_to' => 'date',
     ];
 
     protected static function booted(): void
@@ -73,6 +77,34 @@ class OrganizationTimePlanned extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeForDate($query, $date)
+    {
+        return $query->where(function ($q) use ($date) {
+            $q->where(fn ($q2) => $q2->whereNull('valid_from')->orWhere('valid_from', '<=', $date))
+              ->where(fn ($q2) => $q2->whereNull('valid_to')->orWhere('valid_to', '>=', $date));
+        });
+    }
+
+    public function scopeForPeriod($query, $from, $to)
+    {
+        return $query->where(function ($q) use ($from, $to) {
+            $q->where(fn ($q2) => $q2->whereNull('valid_to')->orWhere('valid_to', '>=', $from))
+              ->where(fn ($q2) => $q2->whereNull('valid_from')->orWhere('valid_from', '<=', $to));
+        });
+    }
+
+    public function getPeriodLabelAttribute(): string
+    {
+        if ($this->valid_from === null && $this->valid_to === null) {
+            return 'unbefristet';
+        }
+
+        $from = $this->valid_from?->format('d.m.Y') ?? '∞';
+        $to = $this->valid_to?->format('d.m.Y') ?? '∞';
+
+        return "{$from} – {$to}";
     }
 
     public function getHoursAttribute(): float

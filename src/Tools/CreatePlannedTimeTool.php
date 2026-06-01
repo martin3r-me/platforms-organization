@@ -57,6 +57,14 @@ class CreatePlannedTimeTool implements ToolContract, ToolMetadataContract
                     'type' => 'boolean',
                     'description' => 'Optional: Ob der Eintrag aktiv ist. Default: true.',
                 ],
+                'valid_from' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Gültig ab (YYYY-MM-DD). Null = unbefristet.',
+                ],
+                'valid_to' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Gültig bis (YYYY-MM-DD). Null = unbefristet.',
+                ],
             ],
             'required' => ['planned_minutes', 'context_type', 'context_id'],
         ];
@@ -111,6 +119,13 @@ class CreatePlannedTimeTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('NOT_FOUND', "Kontext-Model ({$contextType}) mit ID {$contextId} nicht gefunden.");
             }
 
+            $validFrom = $arguments['valid_from'] ?? null;
+            $validTo = $arguments['valid_to'] ?? null;
+
+            if ($validFrom && $validTo && $validFrom > $validTo) {
+                return ToolResult::error('VALIDATION_ERROR', 'valid_from muss vor oder gleich valid_to sein.');
+            }
+
             $service = app(StorePlannedTime::class);
             $entry = $service->store([
                 'team_id' => (int) $teamId,
@@ -120,6 +135,8 @@ class CreatePlannedTimeTool implements ToolContract, ToolMetadataContract
                 'planned_minutes' => (int) $minutes,
                 'note' => $arguments['note'] ?? null,
                 'is_active' => (bool) ($arguments['is_active'] ?? true),
+                'valid_from' => $validFrom ?: null,
+                'valid_to' => $validTo ?: null,
             ]);
 
             return ToolResult::success([
@@ -133,6 +150,9 @@ class CreatePlannedTimeTool implements ToolContract, ToolMetadataContract
                 'context_id' => $entry->context_id,
                 'note' => $entry->note,
                 'is_active' => (bool) $entry->is_active,
+                'valid_from' => $entry->valid_from?->toDateString(),
+                'valid_to' => $entry->valid_to?->toDateString(),
+                'period_label' => $entry->period_label,
                 'message' => "Soll-Zeiteintrag erfolgreich erstellt ({$entry->planned_minutes} Min / {$entry->hours}h).",
             ]);
         } catch (\Throwable $e) {

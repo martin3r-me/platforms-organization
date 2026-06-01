@@ -58,6 +58,10 @@ class ListPlannedTimeTool implements ToolContract, ToolMetadataContract
                         'type' => 'boolean',
                         'description' => 'Optional: Filter nach aktiv-Status. Default: nur aktive.',
                     ],
+                    'valid_at' => [
+                        'type' => 'string',
+                        'description' => 'Optional: Stichtag-Filter (YYYY-MM-DD). Zeigt nur Einträge, die an diesem Datum gültig sind.',
+                    ],
                 ],
             ]
         );
@@ -100,7 +104,11 @@ class ListPlannedTimeTool implements ToolContract, ToolMetadataContract
                 $query->where('context_type', $contextType);
             }
 
-            $this->applyStandardFilters($query, $arguments, ['team_id', 'user_id', 'is_active', 'context_type', 'context_id']);
+            if (isset($arguments['valid_at'])) {
+                $query->forDate($arguments['valid_at']);
+            }
+
+            $this->applyStandardFilters($query, $arguments, ['team_id', 'user_id', 'is_active', 'context_type', 'context_id', 'valid_at']);
             $this->applyStandardSearch($query, $arguments, ['note']);
             $this->applyStandardSort($query, $arguments, ['planned_minutes', 'created_at', 'id'], 'created_at', 'desc');
 
@@ -129,6 +137,9 @@ class ListPlannedTimeTool implements ToolContract, ToolMetadataContract
                     'context_label' => $contextLabel,
                     'note' => $entry->note,
                     'is_active' => (bool) $entry->is_active,
+                    'valid_from' => $entry->valid_from?->toDateString(),
+                    'valid_to' => $entry->valid_to?->toDateString(),
+                    'period_label' => $entry->period_label,
                     'created_at' => $entry->created_at?->toIso8601String(),
                 ];
             })->values()->toArray();

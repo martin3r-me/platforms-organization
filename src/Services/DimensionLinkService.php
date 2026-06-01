@@ -13,6 +13,46 @@ use Platform\Organization\Models\OrganizationDimensionValue;
 class DimensionLinkService
 {
     /**
+     * Resolve a context type to the canonical morph alias.
+     *
+     * Accepts morph aliases ("organization_process"), full class names
+     * ("Platform\Process\Models\Process"), or short names ("process").
+     * Returns the registered morph alias so that stored linkable_type
+     * values are always consistent with what Sidebar/EntityDimensionBridge
+     * queries expect.
+     */
+    public static function resolveContextType(string $contextType): string
+    {
+        // 1. Already a known morph alias → use as-is
+        if (Relation::getMorphedModel($contextType)) {
+            return $contextType;
+        }
+
+        $morphMap = Relation::morphMap();
+
+        // 2. Full class name → resolve to its alias
+        $alias = array_search($contextType, $morphMap, true);
+        if ($alias !== false) {
+            return $alias;
+        }
+
+        // 3. Short name fallback: find a unique morph alias ending with _<contextType>
+        //    e.g. "process" matches "organization_process"
+        $candidates = [];
+        foreach ($morphMap as $a => $class) {
+            if ($a === $contextType || str_ends_with($a, '_' . $contextType)) {
+                $candidates[] = $a;
+            }
+        }
+        if (count($candidates) === 1) {
+            return $candidates[0];
+        }
+
+        // No match or ambiguous — return as-is (caller's responsibility)
+        return $contextType;
+    }
+
+    /**
      * Legacy registry — kept for backward compatibility with existing
      * cost-center and entity link tables. New dimensions use the
      * generic dimension_definitions/dimension_links tables exclusively.
@@ -77,6 +117,8 @@ class DimensionLinkService
      */
     public function getLinked(string $dimension, string $contextType, int $contextId, ?int $perspectiveId = null): Collection
     {
+        $contextType = self::resolveContextType($contextType);
+
         if (self::isGeneric($dimension)) {
             return $this->getLinkedGeneric($dimension, $contextType, $contextId, $perspectiveId);
         }
@@ -150,6 +192,8 @@ class DimensionLinkService
      */
     public function getLinkedContexts(string $dimension, int $dimensionItemId, ?int $perspectiveId = null): Collection
     {
+        // Note: no resolveContextType here — this is a reverse lookup that returns
+        // all linkable_types, not a query filtered by one.
         if (self::isGeneric($dimension)) {
             return $this->getLinkedContextsGeneric($dimension, $dimensionItemId, $perspectiveId);
         }
@@ -277,6 +321,8 @@ class DimensionLinkService
      */
     public function link(string $dimension, string $contextType, int $contextId, int $dimensionItemId, array $meta = []): bool
     {
+        $contextType = self::resolveContextType($contextType);
+
         if (self::isGeneric($dimension)) {
             return $this->linkGeneric($dimension, $contextType, $contextId, $dimensionItemId, $meta);
         }
@@ -375,6 +421,8 @@ class DimensionLinkService
      */
     public function unlink(string $dimension, string $contextType, int $contextId, int $dimensionItemId, ?int $perspectiveId = null): bool
     {
+        $contextType = self::resolveContextType($contextType);
+
         if (self::isGeneric($dimension)) {
             return $this->unlinkGeneric($dimension, $contextType, $contextId, $dimensionItemId, $perspectiveId);
         }

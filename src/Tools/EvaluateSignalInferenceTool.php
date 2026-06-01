@@ -160,10 +160,10 @@ class EvaluateSignalInferenceTool implements ToolContract, ToolMetadataContract
                     }
                 }
 
-                // 9. Existing open signals for these entities (dedup)
+                // 9. Existing open/acknowledged signals for these entities (dedup)
                 $existingSignals = OrganizationSignal::whereIn('entity_id', $entityIdList)
                     ->where('team_id', $rootTeamId)
-                    ->open()
+                    ->whereIn('status', ['open', 'acknowledged'])
                     ->select(['id', 'entity_id', 'severity', 'message', 'status', 'source', 'inference_prompt_id'])
                     ->latest()
                     ->limit(50)

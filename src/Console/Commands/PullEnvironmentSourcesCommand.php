@@ -10,7 +10,7 @@ class PullEnvironmentSourcesCommand extends Command
 {
     protected $signature = 'organization:pull-environment-sources {--team= : Optional Team-ID} {--source= : Optional einzelne Source-ID}';
 
-    protected $description = 'Pullt Environment-Datenquellen (RSS-Feeds, Wetterdaten, Gesundheitsdaten) und erstellt Snapshots.';
+    protected $description = 'Pullt Environment-Datenquellen (RSS-Feeds) und erstellt Snapshots mit LLM-Extraktion.';
 
     public function handle(): int
     {
@@ -50,12 +50,7 @@ class PullEnvironmentSourcesCommand extends Command
                 $snapshot = $service->pullSource($source);
                 if ($snapshot) {
                     $pulled++;
-                    $detail = match ($source->source_type) {
-                        'weather' => 'Standort: ' . ($snapshot->metrics['location'] ?? '?'),
-                        'health_incidence' => 'KW: ' . ($snapshot->metrics['calendar_week'] ?? '?') . ', Datensätze: ' . count($snapshot->metrics['diseases'] ?? []),
-                        default => 'Items: ' . ($snapshot->metrics['new_items_count'] ?? '?'),
-                    };
-                    $this->info("✓ {$source->name}: Snapshot erstellt ({$detail})");
+                    $this->info("✓ {$source->name}: Snapshot erstellt (Items: {$snapshot->metrics['new_items_count']})");
                 } else {
                     $skipped++;
                     $this->line("– {$source->name}: Keine neuen Items");
@@ -76,12 +71,7 @@ class PullEnvironmentSourcesCommand extends Command
         try {
             $snapshot = $service->pullSource($source);
             if ($snapshot) {
-                $detail = match ($source->source_type) {
-                    'weather' => 'Standort: ' . ($snapshot->metrics['location'] ?? '?'),
-                    'health_incidence' => 'KW: ' . ($snapshot->metrics['calendar_week'] ?? '?') . ', Datensätze: ' . count($snapshot->metrics['diseases'] ?? []),
-                    default => 'Items: ' . ($snapshot->metrics['new_items_count'] ?? '?'),
-                };
-                $this->info("Snapshot erstellt für '{$source->name}' ({$detail})");
+                $this->info("Snapshot erstellt für '{$source->name}' (Items: {$snapshot->metrics['new_items_count']})");
             } else {
                 $this->info("Keine neuen Items für '{$source->name}'.");
             }

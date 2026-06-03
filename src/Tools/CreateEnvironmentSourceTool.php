@@ -20,7 +20,7 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /organization/environment_sources - Erstellt eine Umwelt-Datenquelle (RSS-Feed etc.) für VSM S4/S5 Diagnostik. Wird automatisch gepollt und per LLM analysiert.';
+        return 'POST /organization/environment_sources - Erstellt eine Umwelt-Datenquelle (RSS-Feed, Wetterdaten, Gesundheitsdaten) für VSM S4/S5 Diagnostik. Wird automatisch gepollt und analysiert.';
     }
 
     public function getSchema(): array
@@ -38,22 +38,22 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
                 ],
                 'source_type' => [
                     'type' => 'string',
-                    'description' => 'ERFORDERLICH: Typ der Quelle (aktuell: rss).',
-                    'enum' => ['rss'],
+                    'description' => 'ERFORDERLICH: Typ der Quelle.',
+                    'enum' => ['rss', 'weather', 'health_incidence'],
                 ],
                 'category' => [
                     'type' => 'string',
                     'description' => 'ERFORDERLICH: Thematische Kategorie.',
-                    'enum' => ['industry', 'technology', 'regulation', 'market', 'competition', 'talent', 'sustainability', 'macro', 'geopolitics', 'gastronomy', 'other'],
+                    'enum' => ['industry', 'technology', 'regulation', 'market', 'competition', 'talent', 'sustainability', 'macro', 'geopolitics', 'gastronomy', 'health', 'weather', 'other'],
                 ],
                 'cluster' => [
                     'type' => 'string',
                     'description' => 'Optional: Geographisch/strategischer Cluster.',
-                    'enum' => ['dach', 'europa', 'global', 'tech_ai', 'strategic', 'society'],
+                    'enum' => ['dach', 'europa', 'global', 'tech_ai', 'strategic', 'society', 'regional'],
                 ],
                 'config' => [
                     'type' => 'object',
-                    'description' => 'ERFORDERLICH: Konfiguration. Bei RSS: {url: "https://...", extraction_prompt?: "Zusätzlicher Kontext für LLM"}.',
+                    'description' => 'ERFORDERLICH: Konfiguration. RSS: {url: "..."}. Weather: {latitude: 50.94, longitude: 6.96, location_name?: "Köln"}. Health: {datasets: ["grippeweb", "covid_are"], region?: "Bundesweit"}.',
                 ],
                 'pull_interval_hours' => [
                     'type' => 'integer',
@@ -84,11 +84,12 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
             }
 
             $sourceType = $arguments['source_type'] ?? '';
-            if (! in_array($sourceType, ['rss'])) {
-                return ToolResult::error('VALIDATION_ERROR', 'source_type muss rss sein.');
+            $validSourceTypes = ['rss', 'weather', 'health_incidence'];
+            if (! in_array($sourceType, $validSourceTypes)) {
+                return ToolResult::error('VALIDATION_ERROR', 'source_type muss einer der folgenden Werte sein: ' . implode(', ', $validSourceTypes));
             }
 
-            $validCategories = ['industry', 'technology', 'regulation', 'market', 'competition', 'talent', 'sustainability', 'macro', 'geopolitics', 'gastronomy', 'other'];
+            $validCategories = ['industry', 'technology', 'regulation', 'market', 'competition', 'talent', 'sustainability', 'macro', 'geopolitics', 'gastronomy', 'health', 'weather', 'other'];
             $category = $arguments['category'] ?? '';
             if (! in_array($category, $validCategories)) {
                 return ToolResult::error('VALIDATION_ERROR', 'category muss einer der folgenden Werte sein: ' . implode(', ', $validCategories));
@@ -103,7 +104,21 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'config.url ist bei source_type=rss erforderlich.');
             }
 
-            $validClusters = ['dach', 'europa', 'global', 'tech_ai', 'strategic', 'society'];
+            if ($sourceType === 'weather') {
+                if (empty($config['latitude']) || empty($config['longitude'])) {
+                    return ToolResult::error('VALIDATION_ERROR', 'config.latitude und config.longitude sind bei source_type=weather erforderlich.');
+                }
+            }
+
+            if ($sourceType === 'health_incidence') {
+                $datasets = $config['datasets'] ?? [];
+                $validDatasets = ['grippeweb', 'covid_are'];
+                if (empty($datasets) || ! is_array($datasets) || empty(array_intersect($datasets, $validDatasets))) {
+                    return ToolResult::error('VALIDATION_ERROR', 'config.datasets muss ein Array mit mindestens einem Wert aus [grippeweb, covid_are] sein.');
+                }
+            }
+
+            $validClusters = ['dach', 'europa', 'global', 'tech_ai', 'strategic', 'society', 'regional'];
             $cluster = $arguments['cluster'] ?? null;
             if ($cluster && ! in_array($cluster, $validClusters)) {
                 return ToolResult::error('VALIDATION_ERROR', 'cluster muss einer der folgenden Werte sein: ' . implode(', ', $validClusters));
@@ -115,7 +130,11 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
                 'category' => $category,
                 'cluster' => $cluster,
                 'config' => $config,
-                'pull_interval_hours' => (int) ($arguments['pull_interval_hours'] ?? 24),
+                'pull_interval_hours' => (int) ($arguments['pull_interval_hours'] ?? match ($sourceType) {
+                    'weather' => 12,
+                    'health_incidence' => 24,
+                    default => 24,
+                }),
                 'is_active' => (bool) ($arguments['is_active'] ?? true),
                 'team_id' => $rootTeamId,
                 'user_id' => $context->user?->id,

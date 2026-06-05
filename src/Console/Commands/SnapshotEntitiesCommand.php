@@ -258,14 +258,14 @@ class SnapshotEntitiesCommand extends Command
             $time = $timeSummaries[$entity->id] ?? ['total_minutes' => 0, 'billed_minutes' => 0];
 
             $planned = $plannedTimeSummaries[$entity->id] ?? ['planned_minutes' => 0];
-            $period = $plannedPeriodSummaries[$entity->id] ?? ['days_remaining' => null];
+            $plannedPeriod = $plannedPeriodSummaries[$entity->id] ?? ['days_remaining' => null];
 
             $metrics = [
                 'links_count' => $linkCountsByEntity[$entity->id] ?? 0,
                 'time_planned_minutes' => $planned['planned_minutes'],
                 'time_total_minutes' => $time['total_minutes'],
                 'time_billed_minutes' => $time['billed_minutes'],
-                'time_planned_days_remaining' => $period['days_remaining'],
+                'time_planned_days_remaining' => $plannedPeriod['days_remaining'],
             ];
 
             foreach ($items as $key => $value) {

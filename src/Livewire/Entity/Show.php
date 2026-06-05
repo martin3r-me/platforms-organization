@@ -539,13 +539,11 @@ class Show extends Component
             }
 
             $children = OrganizationEntity::whereIn('id', $childIds)
-                ->with('type')
-                ->orderBy('name')
+                ->with('type.group')
                 ->get();
         } else {
             $children = $this->entity->children()
-                ->with('type')
-                ->orderBy('name')
+                ->with('type.group')
                 ->get();
         }
 
@@ -553,7 +551,44 @@ class Show extends Component
             return [];
         }
 
-        return $this->buildNodesForEntities($children);
+        // Group children by EntityTypeGroup. Within group: type.sort_order then name.
+        // Outer group order: EntityTypeGroup.sort_order.
+        $sortSiblings = fn ($c) => $c->sortBy([
+            ['type.sort_order', 'asc'],
+            ['name', 'asc'],
+        ])->values();
+
+        $childrenByGroup = $children
+            ->groupBy(fn ($e) => $e->type->group->id ?? 0)
+            ->map($sortSiblings)
+            ->sortBy(fn ($group) => $group->first()->type?->group?->sort_order ?? PHP_INT_MAX);
+
+        // Build node data for ALL children in one pass, then redistribute by group.
+        $flatChildren = $childrenByGroup->flatten();
+        $allNodes = $this->buildNodesForEntities($flatChildren);
+        $nodesById = collect($allNodes)->keyBy('id');
+
+        $sections = [];
+        foreach ($childrenByGroup as $groupId => $groupChildren) {
+            $first = $groupChildren->first();
+            $sectionNodes = [];
+            foreach ($groupChildren as $child) {
+                $node = $nodesById->get($child->id);
+                if ($node !== null) {
+                    $sectionNodes[] = $node;
+                }
+            }
+            if (empty($sectionNodes)) {
+                continue;
+            }
+            $sections[] = [
+                'group_id' => $groupId,
+                'group_name' => $first->type?->group?->name ?? 'Sonstige',
+                'nodes' => $sectionNodes,
+            ];
+        }
+
+        return $sections;
     }
 
     #[Computed]
@@ -897,19 +932,23 @@ class Show extends Component
 
             $children = OrganizationEntity::whereIn('id', $childIds)
                 ->with('type')
-                ->orderBy('name')
                 ->get();
         } else {
             $entity = OrganizationEntity::findOrFail($entityId);
             $children = $entity->children()
                 ->with('type')
-                ->orderBy('name')
                 ->get();
         }
 
         if ($children->isEmpty()) {
             return [];
         }
+
+        // Same sibling sort as the top level: EntityType.sort_order, then name.
+        $children = $children->sortBy([
+            ['type.sort_order', 'asc'],
+            ['name', 'asc'],
+        ])->values();
 
         return $this->buildNodesForEntities($children);
     }

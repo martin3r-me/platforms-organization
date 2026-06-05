@@ -660,9 +660,19 @@
                             </div>
 
                             @if(count($this->treeNodes) > 0)
-                                <div class="space-y-1">
-                                    @foreach($this->treeNodes as $node)
-                                        @include('organization::livewire.entity.partials.tree-node', ['node' => $node, 'depth' => 0])
+                                <div class="space-y-6">
+                                    @foreach($this->treeNodes as $section)
+                                        <div>
+                                            <div class="flex items-center gap-2 mb-2 px-1">
+                                                <h4 class="text-xs font-bold text-[var(--ui-muted)] uppercase tracking-wider">{{ $section['group_name'] }}</h4>
+                                                <span class="text-[10px] text-[var(--ui-muted)]">({{ count($section['nodes']) }})</span>
+                                            </div>
+                                            <div class="space-y-1">
+                                                @foreach($section['nodes'] as $node)
+                                                    @include('organization::livewire.entity.partials.tree-node', ['node' => $node, 'depth' => 0])
+                                                @endforeach
+                                            </div>
+                                        </div>
                                     @endforeach
                                 </div>
                             @else

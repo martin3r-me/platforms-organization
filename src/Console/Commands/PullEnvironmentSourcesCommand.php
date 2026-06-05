@@ -10,7 +10,7 @@ class PullEnvironmentSourcesCommand extends Command
 {
     protected $signature = 'organization:pull-environment-sources {--team= : Optional Team-ID} {--source= : Optional einzelne Source-ID}';
 
-    protected $description = 'Pullt Environment-Datenquellen (RSS-Feeds) und erstellt Snapshots mit LLM-Extraktion.';
+    protected $description = 'Pullt Environment-Datenquellen (RSS-Feeds, KPIs) und erstellt Snapshots.';
 
     public function handle(): int
     {
@@ -50,7 +50,11 @@ class PullEnvironmentSourcesCommand extends Command
                 $snapshot = $service->pullSource($source);
                 if ($snapshot) {
                     $pulled++;
-                    $this->info("✓ {$source->name}: Snapshot erstellt (Items: {$snapshot->metrics['new_items_count']})");
+                    if ($source->source_type === 'kpi' && isset($snapshot->metrics['kpi_name'])) {
+                        $this->info("✓ KPI: {$snapshot->metrics['kpi_name']}, Wert: {$snapshot->metrics['value']}");
+                    } else {
+                        $this->info("✓ {$source->name}: Snapshot erstellt (Items: {$snapshot->metrics['new_items_count']})");
+                    }
                 } else {
                     $skipped++;
                     $this->line("– {$source->name}: Keine neuen Items");

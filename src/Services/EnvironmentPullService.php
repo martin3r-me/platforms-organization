@@ -13,6 +13,10 @@ class EnvironmentPullService
 {
     public function pullSource(OrganizationEnvironmentSource $source): ?OrganizationEnvironmentSnapshot
     {
+        if ($source->source_type === 'kpi') {
+            return $this->pullKpiSource($source);
+        }
+
         $items = match ($source->source_type) {
             'rss' => $this->fetchRss($source),
             default => [],
@@ -44,6 +48,133 @@ class EnvironmentPullService
         $source->update(['last_pulled_at' => now()]);
 
         return $snapshot;
+    }
+
+    protected function pullKpiSource(OrganizationEnvironmentSource $source): ?OrganizationEnvironmentSnapshot
+    {
+        if (! class_exists(\Platform\Datawarehouse\Models\DatawarehouseKpi::class)) {
+            Log::info('EnvironmentPullService: Datawarehouse-Modul nicht verfügbar, KPI-Pull übersprungen.', [
+                'source_id' => $source->id,
+            ]);
+            $source->update(['last_pulled_at' => now()]);
+
+            return null;
+        }
+
+        $config = $source->config ?? [];
+        $kpiId = $config['kpi_id'] ?? null;
+
+        if (! $kpiId) {
+            Log::warning('EnvironmentPullService: KPI-Source ohne kpi_id.', ['source_id' => $source->id]);
+            $source->update(['last_pulled_at' => now()]);
+
+            return null;
+        }
+
+        $kpi = \Platform\Datawarehouse\Models\DatawarehouseKpi::find($kpiId);
+        if (! $kpi) {
+            Log::warning('EnvironmentPullService: KPI nicht gefunden.', [
+                'source_id' => $source->id,
+                'kpi_id' => $kpiId,
+            ]);
+            $source->update(['last_pulled_at' => now()]);
+
+            return null;
+        }
+
+        // Refresh KPI cache if stale
+        if (! $kpi->isCacheValid()) {
+            try {
+                $builder = new \Platform\Datawarehouse\Services\KpiQueryBuilder();
+                $builder->executeAndCache($kpi, 'environment_pull');
+                $kpi->refresh();
+            } catch (\Throwable $e) {
+                Log::warning('EnvironmentPullService: KPI-Berechnung fehlgeschlagen.', [
+                    'source_id' => $source->id,
+                    'kpi_id' => $kpiId,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        $value = $kpi->cached_value !== null ? (float) $kpi->cached_value : null;
+        $comparisonValue = $kpi->cached_comparison_value !== null ? (float) $kpi->cached_comparison_value : null;
+
+        // Calculate change percentage
+        $changePct = null;
+        if ($value !== null && $comparisonValue !== null && $comparisonValue != 0) {
+            $changePct = round((($value - $comparisonValue) / abs($comparisonValue)) * 100, 2);
+        }
+
+        $trend = $kpi->trendDirection();
+        $trendValue = $kpi->trendValue();
+        $displayRange = $kpi->displayRangeLabel();
+
+        $metrics = [
+            'kpi_id' => $kpi->id,
+            'kpi_name' => $kpi->name,
+            'value' => $value,
+            'comparison_value' => $comparisonValue,
+            'change_pct' => $changePct,
+            'trend' => $trend,
+            'trend_value' => $trendValue,
+            'display_range' => $displayRange,
+            'unit' => $kpi->unit,
+            'format' => $kpi->format,
+        ];
+
+        // Build summary
+        $formattedValue = $this->formatKpiValue($value, $kpi->decimals ?? 0, $kpi->unit);
+        $trendLabel = match ($trend) {
+            'up' => 'gestiegen',
+            'down' => 'gesunken',
+            default => 'unverändert',
+        };
+
+        $summaryTemplate = $config['summary_template'] ?? null;
+        if ($summaryTemplate) {
+            $summary = str_replace(
+                ['{kpi_name}', '{value}', '{trend_value}', '{trend_label}', '{display_range}', '{unit}'],
+                [$kpi->name, $formattedValue, $trendValue ?? '-', $trendLabel, $displayRange ?? '-', $kpi->unit ?? ''],
+                $summaryTemplate
+            );
+        } else {
+            $summary = "{$kpi->name}: {$formattedValue}";
+            if ($trendValue) {
+                $summary .= " ({$trendValue}, {$trendLabel})";
+            }
+            if ($displayRange) {
+                $summary .= " [{$displayRange}]";
+            }
+        }
+
+        $snapshot = OrganizationEnvironmentSnapshot::create([
+            'team_id' => $source->team_id,
+            'source_id' => $source->id,
+            'snapshot_date' => now()->toDateString(),
+            'metrics' => $metrics,
+            'summary' => $summary,
+            'raw_items' => [],
+        ]);
+
+        $source->update(['last_pulled_at' => now()]);
+
+        return $snapshot;
+    }
+
+    protected function formatKpiValue(?float $value, int $decimals, ?string $unit): string
+    {
+        if ($value === null) {
+            return '-';
+        }
+
+        $formatted = number_format($value, $decimals, ',', '.');
+
+        if ($unit) {
+            $formatted .= ' ' . $unit;
+        }
+
+        return $formatted;
     }
 
     public function fetchRss(OrganizationEnvironmentSource $source): array

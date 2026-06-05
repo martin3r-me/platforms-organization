@@ -20,7 +20,7 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /organization/environment_sources - Erstellt eine Umwelt-Datenquelle (RSS-Feed etc.) für VSM S4/S5 Diagnostik. Wird automatisch gepollt und per LLM analysiert.';
+        return 'POST /organization/environment_sources - Erstellt eine Umwelt-Datenquelle (RSS-Feed, KPI) für VSM S4/S5 Diagnostik. Wird automatisch gepollt und analysiert.';
     }
 
     public function getSchema(): array
@@ -38,8 +38,8 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
                 ],
                 'source_type' => [
                     'type' => 'string',
-                    'description' => 'ERFORDERLICH: Typ der Quelle (aktuell: rss).',
-                    'enum' => ['rss'],
+                    'description' => 'ERFORDERLICH: Typ der Quelle. rss = RSS/Atom-Feed, kpi = Datawarehouse-KPI.',
+                    'enum' => ['rss', 'kpi'],
                 ],
                 'category' => [
                     'type' => 'string',
@@ -53,7 +53,7 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
                 ],
                 'config' => [
                     'type' => 'object',
-                    'description' => 'ERFORDERLICH: Konfiguration. Bei RSS: {url: "https://...", extraction_prompt?: "Zusätzlicher Kontext für LLM"}.',
+                    'description' => 'ERFORDERLICH: Konfiguration. Bei RSS: {url: "https://...", extraction_prompt?: "..."}. Bei KPI: {kpi_id: <int>, summary_template?: "..."}.',
                 ],
                 'pull_interval_hours' => [
                     'type' => 'integer',
@@ -84,8 +84,8 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
             }
 
             $sourceType = $arguments['source_type'] ?? '';
-            if (! in_array($sourceType, ['rss'])) {
-                return ToolResult::error('VALIDATION_ERROR', 'source_type muss rss sein.');
+            if (! in_array($sourceType, ['rss', 'kpi'])) {
+                return ToolResult::error('VALIDATION_ERROR', 'source_type muss rss oder kpi sein.');
             }
 
             $validCategories = ['industry', 'technology', 'regulation', 'market', 'competition', 'talent', 'sustainability', 'macro', 'geopolitics', 'gastronomy', 'other'];
@@ -103,6 +103,19 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'config.url ist bei source_type=rss erforderlich.');
             }
 
+            if ($sourceType === 'kpi') {
+                if (empty($config['kpi_id']) || ! is_numeric($config['kpi_id'])) {
+                    return ToolResult::error('VALIDATION_ERROR', 'config.kpi_id (numerisch) ist bei source_type=kpi erforderlich.');
+                }
+
+                if (class_exists(\Platform\Datawarehouse\Models\DatawarehouseKpi::class)) {
+                    $kpi = \Platform\Datawarehouse\Models\DatawarehouseKpi::find((int) $config['kpi_id']);
+                    if (! $kpi) {
+                        return ToolResult::error('VALIDATION_ERROR', "KPI mit ID {$config['kpi_id']} nicht gefunden.");
+                    }
+                }
+            }
+
             $validClusters = ['dach', 'europa', 'global', 'tech_ai', 'strategic', 'society'];
             $cluster = $arguments['cluster'] ?? null;
             if ($cluster && ! in_array($cluster, $validClusters)) {
@@ -115,7 +128,7 @@ class CreateEnvironmentSourceTool implements ToolContract, ToolMetadataContract
                 'category' => $category,
                 'cluster' => $cluster,
                 'config' => $config,
-                'pull_interval_hours' => (int) ($arguments['pull_interval_hours'] ?? 24),
+                'pull_interval_hours' => (int) ($arguments['pull_interval_hours'] ?? ($sourceType === 'kpi' ? 12 : 24)),
                 'is_active' => (bool) ($arguments['is_active'] ?? true),
                 'team_id' => $rootTeamId,
                 'user_id' => $context->user?->id,

@@ -141,14 +141,24 @@ class Index extends Component
             $rootEntities = $entities->filter(fn($e) => $e->parent_entity_id === null || !in_array($e->parent_entity_id, $entityIds));
         }
 
-        // Group roots by type group, then sort by group name, within each group sort by name
+        // Group roots by type group. Group order: EntityTypeGroup.sort_order.
+        // Within group: EntityType.sort_order, then Name. Roots inside group already
+        // form a hierarchy via $childrenByParent — siblings get the same sort.
+        $sortSiblings = fn ($collection) => $collection->sortBy([
+            ['type.sort_order', 'asc'],
+            ['name', 'asc'],
+        ]);
+
         $rootsByGroup = $rootEntities
             ->groupBy(fn($e) => $e->type->group->id ?? 0)
-            ->sortBy(fn($group) => $group->first()->type->group->sort_order ?? $group->first()->type->group->name ?? '')
-            ->map(fn($group) => $group->sortBy('name'));
+            ->sortBy(fn($group) => $group->first()->type?->group?->sort_order ?? PHP_INT_MAX)
+            ->map($sortSiblings);
 
-        // Group children by parent_id from the loaded set
-        $childrenByParent = $entities->filter(fn($e) => $e->parent_entity_id !== null && in_array($e->parent_entity_id, $entityIds))->groupBy('parent_entity_id');
+        // Group children by parent_id and apply the same sibling sort
+        $childrenByParent = $entities
+            ->filter(fn($e) => $e->parent_entity_id !== null && in_array($e->parent_entity_id, $entityIds))
+            ->groupBy('parent_entity_id')
+            ->map($sortSiblings);
 
         return [
             'rootsByGroup' => $rootsByGroup,

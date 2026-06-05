@@ -132,33 +132,51 @@ class Index extends Component
         $entities = $query->orderBy('name')->get();
         $entityIds = $entities->pluck('id')->toArray();
 
-        // Build hierarchical tree: roots with nested children
-        if (!$resolver->isDefaultHierarchy($perspective)) {
-            $parentMap = $resolver->getParentMap($perspective, $teamId);
-            $rootEntities = $entities->filter(fn($e) => ($parentMap[$e->id] ?? null) === null);
-        } else {
-            // Root = no parent OR parent not in the current filtered result set
-            $rootEntities = $entities->filter(fn($e) => $e->parent_entity_id === null || !in_array($e->parent_entity_id, $entityIds));
-        }
-
-        // Group roots by type group. Group order: EntityTypeGroup.sort_order.
-        // Within group: EntityType.sort_order, then Name. Roots inside group already
-        // form a hierarchy via $childrenByParent — siblings get the same sort.
         $sortSiblings = fn ($collection) => $collection->sortBy([
             ['type.sort_order', 'asc'],
             ['name', 'asc'],
         ]);
 
-        $rootsByGroup = $rootEntities
-            ->groupBy(fn($e) => $e->type->group->id ?? 0)
-            ->sortBy(fn($group) => $group->first()->type?->group?->sort_order ?? PHP_INT_MAX)
-            ->map($sortSiblings);
+        // Each EntityTypeGroup gets its own section with its own roots.
+        // An entity is a "root" inside its group when its parent is not also in
+        // that group — this prevents Persons/Externals from rendering under a
+        // Business-Unit root just because they're its children in the global tree.
+        $entitiesByGroup = $entities->groupBy(fn($e) => $e->type->group->id ?? 0);
 
-        // Group children by parent_id and apply the same sibling sort
-        $childrenByParent = $entities
-            ->filter(fn($e) => $e->parent_entity_id !== null && in_array($e->parent_entity_id, $entityIds))
-            ->groupBy('parent_entity_id')
-            ->map($sortSiblings);
+        // Build a per-parent children map that ONLY contains same-group children.
+        $childrenByParent = collect();
+        foreach ($entitiesByGroup as $groupEntities) {
+            $groupIds = $groupEntities->pluck('id')->all();
+            $groupChildren = $groupEntities
+                ->filter(fn ($e) => $e->parent_entity_id !== null && in_array($e->parent_entity_id, $groupIds))
+                ->groupBy('parent_entity_id')
+                ->map($sortSiblings);
+            foreach ($groupChildren as $parentId => $children) {
+                $childrenByParent[$parentId] = $children;
+            }
+        }
+
+        // For non-default perspectives, use the perspective's parent map for root detection.
+        $usePerspectiveRoots = !$resolver->isDefaultHierarchy($perspective);
+        $perspectiveParentMap = $usePerspectiveRoots
+            ? $resolver->getParentMap($perspective, $teamId)
+            : [];
+
+        $rootsByGroup = $entitiesByGroup
+            ->map(function ($groupEntities) use ($sortSiblings, $usePerspectiveRoots, $perspectiveParentMap) {
+                $groupIds = $groupEntities->pluck('id')->all();
+
+                $roots = $groupEntities->filter(function ($e) use ($groupIds, $usePerspectiveRoots, $perspectiveParentMap) {
+                    if ($usePerspectiveRoots) {
+                        return ($perspectiveParentMap[$e->id] ?? null) === null;
+                    }
+                    return $e->parent_entity_id === null || !in_array($e->parent_entity_id, $groupIds);
+                });
+
+                return $sortSiblings($roots);
+            })
+            ->filter(fn ($group) => $group->isNotEmpty())
+            ->sortBy(fn ($group) => $group->first()->type?->group?->sort_order ?? PHP_INT_MAX);
 
         return [
             'rootsByGroup' => $rootsByGroup,

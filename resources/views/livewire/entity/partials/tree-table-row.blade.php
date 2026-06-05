@@ -125,7 +125,7 @@
 
 {{-- Recursively render children --}}
 @if($hasChildren)
-    @foreach($children->sortBy('name') as $childEntity)
+    @foreach($children as $childEntity)
         @include('organization::livewire.entity.partials.tree-table-row', [
             'entity' => $childEntity,
             'depth' => $depth + 1,

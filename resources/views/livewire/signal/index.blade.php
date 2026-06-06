@@ -156,8 +156,48 @@
             </div>
         @endif
 
+        @if($view === 'archive' && count($selectedIds) > 0)
+            <div class="mb-3 flex items-center justify-between gap-3 p-3 rounded-lg bg-red-50 border border-red-200">
+                <div class="flex items-center gap-2 text-sm text-red-900">
+                    @svg('heroicon-o-check-circle', 'w-4 h-4')
+                    <span class="font-medium">{{ count($selectedIds) }} {{ count($selectedIds) === 1 ? 'Signal' : 'Signale' }} ausgewählt</span>
+                </div>
+                <div class="flex items-center gap-2">
+                    <button
+                        type="button"
+                        wire:click="$set('selectedIds', [])"
+                        class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]"
+                    >
+                        Auswahl aufheben
+                    </button>
+                    <button
+                        type="button"
+                        wire:click="bulkDelete"
+                        wire:confirm="{{ count($selectedIds) }} archivierte Signale dauerhaft löschen? Diese Aktion kann nicht rückgängig gemacht werden."
+                        class="px-3 py-1.5 rounded-md text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition inline-flex items-center gap-1.5"
+                    >
+                        @svg('heroicon-o-trash', 'w-3.5 h-3.5')
+                        Dauerhaft löschen
+                    </button>
+                </div>
+            </div>
+        @endif
+
         <x-ui-table compact="true">
             <x-ui-table-header>
+                @if($view === 'archive')
+                    <x-ui-table-header-cell compact="true" class="w-8">
+                        @php($visibleIds = $this->signals->pluck('id')->all())
+                        @php($allSelected = ! empty($visibleIds) && count(array_intersect($visibleIds, $selectedIds)) === count($visibleIds))
+                        <input
+                            type="checkbox"
+                            wire:click="toggleSelectAll"
+                            @checked($allSelected)
+                            class="rounded border-gray-300 text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]"
+                            title="Alle sichtbaren auswählen"
+                        >
+                    </x-ui-table-header-cell>
+                @endif
                 <x-ui-table-header-cell compact="true" class="w-8"></x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Entity</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Schweregrad</x-ui-table-header-cell>
@@ -172,6 +212,16 @@
                 @forelse($this->signals as $signal)
                     @php($isFocused = in_array($signal->id, $focusedIds, true))
                     <x-ui-table-row compact="true">
+                        @if($view === 'archive')
+                            <x-ui-table-cell compact="true">
+                                <input
+                                    type="checkbox"
+                                    wire:model.live="selectedIds"
+                                    value="{{ $signal->id }}"
+                                    class="rounded border-gray-300 text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]"
+                                >
+                            </x-ui-table-cell>
+                        @endif
                         <x-ui-table-cell compact="true">
                             <button
                                 wire:click="toggleFocus({{ $signal->id }})"
@@ -213,6 +263,11 @@
                             <a href="{{ route('organization.signals.show', $signal) }}" class="link text-sm">
                                 {{ \Illuminate\Support\Str::limit($signal->message, 80) }}
                             </a>
+                            @if($view === 'archive' && $signal->status === 'dismissed' && $signal->dismissed_reason)
+                                <p class="text-xs text-[var(--ui-muted)] italic mt-0.5" title="{{ $signal->dismissed_reason }}">
+                                    „{{ \Illuminate\Support\Str::limit($signal->dismissed_reason, 90) }}"
+                                </p>
+                            @endif
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
                             <div class="flex items-center gap-1.5">
@@ -238,14 +293,19 @@
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
                             @php($dateColumn = $view === 'archive' ? ($signal->resolved_at ?? $signal->created_at) : $signal->created_at)
-                            <span class="text-sm text-[var(--ui-muted)]" title="{{ $dateColumn->format('d.m.Y H:i') }}">
+                            <div class="text-sm text-[var(--ui-muted)]" title="{{ $dateColumn->format('d.m.Y H:i') }}">
                                 {{ $dateColumn->diffForHumans() }}
-                            </span>
+                            </div>
+                            @if($view === 'archive' && $signal->resolvedByUser)
+                                <div class="text-[10px] text-[var(--ui-muted)] mt-0.5">
+                                    von {{ $signal->resolvedByUser->name }}
+                                </div>
+                            @endif
                         </x-ui-table-cell>
                     </x-ui-table-row>
                 @empty
                     <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="8">
+                        <x-ui-table-cell compact="true" colspan="{{ $view === 'archive' ? 9 : 8 }}">
                             <div class="text-center py-8">
                                 @svg('heroicon-o-bell-slash', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
                                 <p class="text-sm text-[var(--ui-muted)]">

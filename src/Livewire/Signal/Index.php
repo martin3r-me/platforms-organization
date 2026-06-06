@@ -18,6 +18,7 @@ class Index extends Component
     public $sourceFilter = '';
     public bool $focusOnly = false;
     public string $view = self::VIEW_ACTIVE;
+    public array $selectedIds = [];
 
     protected $queryString = [
         'search' => ['except' => ''],
@@ -37,7 +38,45 @@ class Index extends Component
         $this->view = $view;
         // Reset status filter when switching — it would conflict with the view's status set
         $this->statusFilter = '';
+        $this->selectedIds = [];
         unset($this->signals);
+    }
+
+    public function toggleSelectAll(): void
+    {
+        if ($this->view !== self::VIEW_ARCHIVE) {
+            return;
+        }
+
+        $visibleIds = $this->signals->pluck('id')->all();
+
+        // If all visible are already selected, clear; otherwise select all visible
+        if (! empty($visibleIds) && count(array_intersect($visibleIds, $this->selectedIds)) === count($visibleIds)) {
+            $this->selectedIds = array_values(array_diff($this->selectedIds, $visibleIds));
+        } else {
+            $this->selectedIds = array_values(array_unique(array_merge($this->selectedIds, $visibleIds)));
+        }
+    }
+
+    public function bulkDelete(): void
+    {
+        if ($this->view !== self::VIEW_ARCHIVE || empty($this->selectedIds)) {
+            return;
+        }
+
+        $teamId = auth()->user()?->currentTeamRelation?->id;
+        if (! $teamId) {
+            return;
+        }
+
+        // Constrain to team + archive-status set to prevent abuse
+        OrganizationSignal::forTeam($teamId)
+            ->whereIn('id', $this->selectedIds)
+            ->whereIn('status', $this->statusesForView(self::VIEW_ARCHIVE))
+            ->each(fn ($s) => $s->forceDelete());
+
+        $this->selectedIds = [];
+        unset($this->signals, $this->viewCounts);
     }
 
     protected function statusesForView(string $view): array
@@ -125,8 +164,13 @@ class Index extends Component
             return collect();
         }
 
+        $eagerLoad = ['entity', 'definition', 'inferencePrompt'];
+        if ($this->view === self::VIEW_ARCHIVE) {
+            $eagerLoad[] = 'resolvedByUser:id,name';
+        }
+
         $query = OrganizationSignal::forTeam($teamId)
-            ->with(['entity', 'definition', 'inferencePrompt'])
+            ->with($eagerLoad)
             ->withCount('comments');
 
         // Constrain to the current view's status set

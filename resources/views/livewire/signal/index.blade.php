@@ -31,11 +31,15 @@
                         <div>
                             <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Status</label>
                             <select wire:model.live="statusFilter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm">
-                                <option value="">Alle Status</option>
-                                <option value="open">Offen</option>
-                                <option value="acknowledged">Bestätigt</option>
-                                <option value="resolved">Gelöst</option>
-                                <option value="dismissed">Verworfen</option>
+                                @if($view === 'archive')
+                                    <option value="">Alle (gelöst + verworfen)</option>
+                                    <option value="resolved">Nur gelöst</option>
+                                    <option value="dismissed">Nur verworfen</option>
+                                @else
+                                    <option value="">Alle aktiven (offen + bestätigt)</option>
+                                    <option value="open">Nur offen</option>
+                                    <option value="acknowledged">Nur bestätigt</option>
+                                @endif
                             </select>
                         </div>
                         <div>
@@ -69,9 +73,42 @@
     </x-slot>
 
     <x-ui-page-container>
-        @php($focusedIds = $this->focusedIds)
+        @php
+            $focusedIds = $this->focusedIds;
+            $viewCounts = $this->viewCounts;
+        @endphp
 
-        @if(! $focusOnly && $this->focusedSignals->isNotEmpty())
+        {{-- View toggle: Active / Archive --}}
+        <div class="mb-4 inline-flex items-center gap-1 p-1 rounded-lg bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
+            <button
+                type="button"
+                wire:click="switchView('active')"
+                @class([
+                    'px-3 py-1.5 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5',
+                    'bg-white text-[var(--ui-secondary)] shadow-sm' => $view === 'active',
+                    'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' => $view !== 'active',
+                ])
+            >
+                @svg('heroicon-o-bolt', 'w-4 h-4')
+                Aktiv
+                <span class="text-xs text-[var(--ui-muted)] tabular-nums">{{ $viewCounts['active'] }}</span>
+            </button>
+            <button
+                type="button"
+                wire:click="switchView('archive')"
+                @class([
+                    'px-3 py-1.5 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5',
+                    'bg-white text-[var(--ui-secondary)] shadow-sm' => $view === 'archive',
+                    'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' => $view !== 'archive',
+                ])
+            >
+                @svg('heroicon-o-archive-box', 'w-4 h-4')
+                Archiv
+                <span class="text-xs text-[var(--ui-muted)] tabular-nums">{{ $viewCounts['archive'] }}</span>
+            </button>
+        </div>
+
+        @if($view !== 'archive' && ! $focusOnly && $this->focusedSignals->isNotEmpty())
             <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50/40 p-4">
                 <div class="flex items-center gap-2 mb-3">
                     @svg('heroicon-s-star', 'w-5 h-5 text-amber-500')
@@ -128,7 +165,7 @@
                 <x-ui-table-header-cell compact="true">Nachricht</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true" class="text-center">@svg('heroicon-o-chat-bubble-left', 'w-4 h-4 inline-block')</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Erstellt</x-ui-table-header-cell>
+                <x-ui-table-header-cell compact="true">{{ $view === 'archive' ? 'Abgeschlossen' : 'Erstellt' }}</x-ui-table-header-cell>
             </x-ui-table-header>
 
             <x-ui-table-body>
@@ -200,7 +237,10 @@
                             @endif
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
-                            <span class="text-sm text-[var(--ui-muted)]">{{ $signal->created_at->format('d.m.Y H:i') }}</span>
+                            @php($dateColumn = $view === 'archive' ? ($signal->resolved_at ?? $signal->created_at) : $signal->created_at)
+                            <span class="text-sm text-[var(--ui-muted)]" title="{{ $dateColumn->format('d.m.Y H:i') }}">
+                                {{ $dateColumn->diffForHumans() }}
+                            </span>
                         </x-ui-table-cell>
                     </x-ui-table-row>
                 @empty
@@ -208,7 +248,13 @@
                         <x-ui-table-cell compact="true" colspan="8">
                             <div class="text-center py-8">
                                 @svg('heroicon-o-bell-slash', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
-                                <p class="text-sm text-[var(--ui-muted)]">Keine Signale gefunden.</p>
+                                <p class="text-sm text-[var(--ui-muted)]">
+                                    @if($view === 'archive')
+                                        Noch keine archivierten Signale.
+                                    @else
+                                        Keine aktiven Signale.
+                                    @endif
+                                </p>
                             </div>
                         </x-ui-table-cell>
                     </x-ui-table-row>

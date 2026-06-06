@@ -9,6 +9,7 @@ use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationInferencePromptStat;
 use Platform\Organization\Models\OrganizationSignal;
+use Platform\Organization\Models\OrganizationSignalAction;
 use Platform\Organization\Models\OrganizationSignalInferencePrompt;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
@@ -204,6 +205,19 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
                 'affected_entity_ids' => $affectedEntityIds,
                 'assignee_entity_id' => $assigneeEntityId,
             ]);
+
+            // Materialize suggested_actions into rows for per-action feedback
+            if (! empty($suggestedActions)) {
+                foreach (array_values($suggestedActions) as $idx => $action) {
+                    OrganizationSignalAction::create([
+                        'signal_id' => $signal->id,
+                        'position' => $idx,
+                        'title' => mb_substr((string) $action['title'], 0, 255),
+                        'description' => $action['description'] ?? null,
+                        'status' => 'pending',
+                    ]);
+                }
+            }
 
             // Update prompt stats: signals_created
             try {

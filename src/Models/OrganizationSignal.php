@@ -89,9 +89,40 @@ class OrganizationSignal extends Model
         return $this->hasMany(OrganizationSignalComment::class, 'signal_id');
     }
 
+    public function actions(): HasMany
+    {
+        return $this->hasMany(OrganizationSignalAction::class, 'signal_id')->orderBy('position');
+    }
+
     public function assignee(): BelongsTo
     {
         return $this->belongsTo(OrganizationEntity::class, 'assignee_entity_id');
+    }
+
+    /**
+     * Leitet den Signal-Status aus den per-Action-Entscheidungen ab.
+     * Gibt null zurück, wenn das Signal keine Actions hat oder noch pending-Actions offen sind.
+     */
+    public function deriveStatusFromActions(): ?string
+    {
+        $actions = $this->actions;
+
+        if ($actions->isEmpty() || $actions->contains(fn ($a) => $a->status === 'pending')) {
+            return null;
+        }
+
+        $applied = $actions->where('status', 'applied')->count();
+        $dismissed = $actions->where('status', 'dismissed')->count();
+
+        if ($applied > 0 && $dismissed === 0) {
+            return 'resolved';
+        }
+
+        if ($dismissed > 0 && $applied === 0) {
+            return 'dismissed';
+        }
+
+        return 'acknowledged';
     }
 
     public function scopeAlgedonic($query)

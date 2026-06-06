@@ -7,6 +7,7 @@ use Livewire\Attributes\Computed;
 use Platform\Organization\Models\OrganizationInferencePromptStat;
 use Platform\Organization\Models\OrganizationMemoryEntry;
 use Platform\Organization\Models\OrganizationSignal;
+use Platform\Organization\Models\OrganizationSignalAction;
 use Platform\Organization\Models\OrganizationSignalComment;
 
 class Show extends Component
@@ -15,6 +16,11 @@ class Show extends Component
     public string $newNote = '';
     public string $actionReason = '';
     public string $pendingAction = '';
+
+    // Per-Action decisions
+    public ?int $activeActionId = null;
+    public string $activeActionDecision = '';
+    public string $activeActionReason = '';
 
     // Comments
     public string $newComment = '';
@@ -33,6 +39,7 @@ class Show extends Component
             'entity.type',
             'resolvedByUser:id,name',
             'assignee:id,name',
+            'actions.decidedByUser:id,name',
         ]);
     }
 
@@ -124,6 +131,167 @@ class Show extends Component
         $this->processSignalFeedback('dismiss', $reason);
         $this->signal->refresh();
         unset($this->signalActivities);
+    }
+
+    // --- Per-Action decisions ---
+
+    public function startActionDecision(int $actionId, string $decision): void
+    {
+        if (! in_array($decision, ['applied', 'dismissed'], true)) {
+            return;
+        }
+
+        $this->activeActionId = $actionId;
+        $this->activeActionDecision = $decision;
+        $this->activeActionReason = '';
+    }
+
+    public function cancelActionDecision(): void
+    {
+        $this->activeActionId = null;
+        $this->activeActionDecision = '';
+        $this->activeActionReason = '';
+    }
+
+    public function confirmActionDecision(): void
+    {
+        if (! $this->activeActionId || ! in_array($this->activeActionDecision, ['applied', 'dismissed'], true)) {
+            return;
+        }
+
+        $action = OrganizationSignalAction::where('id', $this->activeActionId)
+            ->where('signal_id', $this->signal->id)
+            ->first();
+
+        if (! $action || ! $action->isPending()) {
+            $this->cancelActionDecision();
+            return;
+        }
+
+        $reason = trim($this->activeActionReason);
+
+        // Dismiss requires a reason
+        if ($this->activeActionDecision === 'dismissed' && $reason === '') {
+            $this->addError('activeActionReason', 'Bitte gib eine Begründung an.');
+            return;
+        }
+
+        $action->update([
+            'status' => $this->activeActionDecision,
+            'decision_reason' => $reason ?: null,
+            'decided_by' => auth()->id(),
+            'decided_at' => now(),
+        ]);
+
+        $this->processActionFeedback($action);
+        $this->logActionSystemComment($action);
+        $this->cancelActionDecision();
+        $this->maybeDeriveSignalStatus();
+
+        $this->signal->load(['actions.decidedByUser:id,name']);
+        unset($this->signalActivities);
+        unset($this->signalComments);
+    }
+
+    protected function processActionFeedback(OrganizationSignalAction $action): void
+    {
+        if ($this->signal->source !== 'inference' || ! $this->signal->inference_prompt_id) {
+            return;
+        }
+
+        $reason = $action->decision_reason ?: '';
+        $verb = $action->status === 'applied' ? 'umgesetzt' : 'abgelehnt';
+        $content = "Handlungsempfehlung «{$action->title}» {$verb}"
+            . ($reason !== '' ? ": {$reason}" : '.');
+
+        try {
+            OrganizationMemoryEntry::create([
+                'team_id' => (int) $this->signal->team_id,
+                'entity_id' => $this->signal->entity_id,
+                'inference_prompt_id' => $this->signal->inference_prompt_id,
+                'memory_type' => 'prompt_experience',
+                'content' => mb_substr($content, 0, 800),
+                'structured_data' => [
+                    'signal_id' => $this->signal->id,
+                    'action_id' => $action->id,
+                    'action_position' => $action->position,
+                    'decision' => $action->status,
+                    'reason' => $reason ?: null,
+                ],
+                'confidence' => 0.85,
+                'source_type' => 'signal_feedback',
+                'source_id' => $action->id,
+                'valid_until' => null,
+                'is_active' => true,
+            ]);
+        } catch (\Throwable) {
+            // Memory should never block the decision
+        }
+    }
+
+    protected function logActionSystemComment(OrganizationSignalAction $action): void
+    {
+        $verb = $action->status === 'applied' ? 'umgesetzt' : 'verworfen';
+        $reason = $action->decision_reason ?: '';
+        $body = "Handlungsempfehlung «{$action->title}» {$verb}"
+            . ($reason !== '' ? ": {$reason}" : '.');
+
+        try {
+            OrganizationSignalComment::create([
+                'signal_id' => $this->signal->id,
+                'user_id' => auth()->id(),
+                'author_context' => 'system',
+                'content' => $body,
+            ]);
+        } catch (\Throwable) {
+            // System comment should never block the decision
+        }
+    }
+
+    protected function maybeDeriveSignalStatus(): void
+    {
+        $this->signal->load('actions');
+        $derived = $this->signal->deriveStatusFromActions();
+
+        if (! $derived) {
+            return;
+        }
+
+        // Don't re-derive if already in a terminal state matching
+        if ($this->signal->status === $derived) {
+            return;
+        }
+
+        $reasons = $this->signal->actions
+            ->whereIn('status', ['dismissed', 'applied'])
+            ->map(fn ($a) => trim((string) $a->decision_reason))
+            ->filter(fn ($r) => $r !== '')
+            ->values()
+            ->implode('; ');
+
+        match ($derived) {
+            'resolved' => $this->signal->update([
+                'status' => 'resolved',
+                'resolved_at' => now(),
+                'resolved_by' => auth()->id(),
+            ]),
+            'dismissed' => $this->signal->update([
+                'status' => 'dismissed',
+                'dismissed_reason' => $reasons ?: null,
+            ]),
+            'acknowledged' => $this->signal->update([
+                'status' => 'acknowledged',
+            ]),
+        };
+
+        $derivedFeedbackAction = match ($derived) {
+            'resolved' => 'resolve',
+            'dismissed' => 'dismiss',
+            'acknowledged' => 'acknowledge',
+        };
+
+        $this->processSignalFeedback($derivedFeedbackAction, $reasons);
+        $this->signal->refresh();
     }
 
     protected function processSignalFeedback(string $action, string $reason): void

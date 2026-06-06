@@ -78,6 +78,73 @@
         @endphp
 
         {{-- ============================================================ --}}
+        {{-- FOKUS-SIGNALE (persönlich, oberste Priorität)                --}}
+        {{-- ============================================================ --}}
+        @php($focusedSignals = $this->focusedSignals)
+        @if($focusedSignals->isNotEmpty())
+            <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50/40 p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <div class="flex items-center gap-2">
+                        @svg('heroicon-s-star', 'w-5 h-5 text-amber-500')
+                        <h2 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider">Fokus-Signale</h2>
+                        <span class="text-xs text-[var(--ui-muted)]">({{ $focusedSignals->count() }})</span>
+                    </div>
+                    <a href="{{ route('organization.signals.index', ['focusOnly' => 1]) }}" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-primary)] inline-flex items-center gap-1">
+                        Alle anzeigen
+                        @svg('heroicon-o-arrow-right', 'w-3 h-3')
+                    </a>
+                </div>
+                <div class="space-y-2">
+                    @foreach($focusedSignals as $signal)
+                        <div class="flex items-start gap-3 bg-white rounded-md border border-amber-200/60 p-3 hover:border-amber-400 transition">
+                            <button
+                                wire:click="unfocusSignal({{ $signal->id }})"
+                                type="button"
+                                class="flex-shrink-0 mt-0.5 text-amber-500 hover:text-amber-700 transition"
+                                title="Aus Fokus entfernen"
+                            >
+                                @svg('heroicon-s-star', 'w-4 h-4')
+                            </button>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                                    @if($signal->entity)
+                                        <a href="{{ route('organization.entities.show', $signal->entity) }}" class="link text-sm font-medium">
+                                            {{ $signal->entity->name }}
+                                        </a>
+                                    @endif
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium
+                                        @if($signal->severity === 'critical' || $signal->severity === 'algedonic') bg-red-100 text-red-800
+                                        @elseif($signal->severity === 'warning') bg-amber-100 text-amber-800
+                                        @else bg-blue-100 text-blue-800
+                                        @endif
+                                    ">{{ ucfirst($signal->severity) }}</span>
+                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium
+                                        @if($signal->status === 'open') bg-yellow-100 text-yellow-800
+                                        @elseif($signal->status === 'acknowledged') bg-blue-100 text-blue-800
+                                        @elseif($signal->status === 'resolved') bg-green-100 text-green-800
+                                        @else bg-gray-100 text-gray-600
+                                        @endif
+                                    ">
+                                        @switch($signal->status)
+                                            @case('open') Offen @break
+                                            @case('acknowledged') Bestätigt @break
+                                            @case('resolved') Gelöst @break
+                                            @case('dismissed') Verworfen @break
+                                        @endswitch
+                                    </span>
+                                </div>
+                                <a href="{{ route('organization.signals.show', $signal) }}" class="text-sm text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] block">
+                                    {{ \Illuminate\Support\Str::limit($signal->message, 140) }}
+                                </a>
+                                <p class="text-xs text-[var(--ui-muted)] mt-1">{{ $signal->created_at->diffForHumans() }}</p>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
+        {{-- ============================================================ --}}
         {{-- ALERT BAR: Handlungsbedarf (compact)                         --}}
         {{-- ============================================================ --}}
         @php

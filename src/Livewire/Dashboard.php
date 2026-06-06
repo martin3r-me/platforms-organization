@@ -37,6 +37,7 @@ class Dashboard extends Component
             $this->personOverview,
             $this->insightStatements,
             $this->signalOverview,
+            $this->focusedSignals,
             $this->environmentRadar,
         );
     }
@@ -636,6 +637,38 @@ class Dashboard extends Component
         }
 
         return array_slice($statements, 0, 5);
+    }
+
+    public function unfocusSignal(int $signalId): void
+    {
+        $userId = auth()->id();
+        if (! $userId) {
+            return;
+        }
+
+        \Platform\Organization\Models\OrganizationSignalFocus::where('signal_id', $signalId)
+            ->where('user_id', $userId)
+            ->delete();
+
+        unset($this->focusedSignals);
+    }
+
+    #[Computed]
+    public function focusedSignals()
+    {
+        $teamId = $this->getTeamId();
+        $userId = auth()->id();
+
+        if (! $teamId || ! $userId) {
+            return collect();
+        }
+
+        return OrganizationSignal::forTeam($teamId)
+            ->focusedBy($userId)
+            ->with(['entity:id,name', 'definition:id,name'])
+            ->orderByRaw("FIELD(severity, 'algedonic', 'critical', 'warning', 'info')")
+            ->orderByDesc('created_at')
+            ->get();
     }
 
     #[Computed]

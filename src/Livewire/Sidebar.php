@@ -6,12 +6,19 @@ use Livewire\Component;
 
 class Sidebar extends Component
 {
+    public array $sections = [];
+
+    public function mount(): void
+    {
+        $this->sections = $this->buildSections();
+    }
+
     /**
      * Sidebar navigation structure.
      * Each section has a label and a list of items.
      * Each item: route, label, icon, match (URL substring used for active highlighting).
      */
-    public function getSectionsProperty(): array
+    protected function buildSections(): array
     {
         return [
             [
@@ -67,7 +74,13 @@ class Sidebar extends Component
 
     public function render()
     {
-        return view('organization::livewire.sidebar')
-            ->layout('platform::layouts.app');
+        // Fallback in case mount() wasn't called (e.g. layout @include without Livewire lifecycle)
+        if (empty($this->sections)) {
+            $this->sections = $this->buildSections();
+        }
+
+        return view('organization::livewire.sidebar', [
+            'sections' => $this->sections,
+        ])->layout('platform::layouts.app');
     }
 }

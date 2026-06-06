@@ -62,21 +62,19 @@
                 @forelse($this->runs as $run)
                     <x-ui-table-row compact="true">
                         <x-ui-table-cell compact="true">
-                            <span class="text-xs font-mono text-[var(--ui-muted)]">{{ \Illuminate\Support\Str::limit($run->uuid, 8, '') }}</span>
+                            <a href="{{ route('organization.inference-runs.show', $run) }}" class="link text-xs font-mono">
+                                {{ \Illuminate\Support\Str::limit($run->uuid, 8, '') }}
+                            </a>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
                             <span class="text-sm text-[var(--ui-secondary)]">{{ $run->trigger?->name ?? $run->trigger_type ?? '–' }}</span>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
-                            @if($run->status === 'failed' && $run->error_message)
-                                <span title="{{ $run->error_message }}">
-                                    <x-ui-badge variant="danger">Failed</x-ui-badge>
-                                </span>
-                            @else
+                            <a href="{{ route('organization.inference-runs.show', $run) }}" class="inline-flex items-center" title="{{ $run->status === 'failed' && $run->error_message ? $run->error_message : '' }}">
                                 <x-ui-badge variant="{{ match($run->status) { 'running' => 'warning', 'completed' => 'success', 'failed' => 'danger', default => 'secondary' } }}">
                                     {{ ucfirst($run->status) }}
                                 </x-ui-badge>
-                            @endif
+                            </a>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
                             <span class="text-sm text-[var(--ui-secondary)]">{{ $run->prompts_evaluated ?? 0 }}</span>

@@ -4,6 +4,7 @@ namespace Platform\Organization\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Platform\Core\Models\Team;
 use Symfony\Component\Uid\UuidV7;
 
@@ -64,9 +65,35 @@ class OrganizationInferenceRun extends Model
         return $this->belongsTo(OrganizationInferenceTrigger::class, 'trigger_id');
     }
 
+    public function synthesisReports(): HasMany
+    {
+        return $this->hasMany(OrganizationSynthesisReport::class, 'inference_run_id');
+    }
+
+    public function inquiries(): HasMany
+    {
+        return $this->hasMany(OrganizationInquiry::class, 'inference_run_id');
+    }
+
     public function scopeForTeam($query, int $teamId)
     {
         return $query->where('team_id', $teamId);
+    }
+
+    public function isFailed(): bool
+    {
+        return $this->status === 'failed';
+    }
+
+    public function isRunning(): bool
+    {
+        return $this->status === 'running';
+    }
+
+    public function getTotalTokens(): int
+    {
+        $usage = $this->token_usage ?? [];
+        return (int) ($usage['input_tokens'] ?? 0) + (int) ($usage['output_tokens'] ?? 0);
     }
 
     public function markCompleted(array $stats = []): void

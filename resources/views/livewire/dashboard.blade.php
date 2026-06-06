@@ -75,12 +75,17 @@
             $topEntities = $this->topEntitiesByActivity;
             $personOverview = $this->personOverview;
             $signalOverview = $this->signalOverview;
+            $focusedSignals = $this->focusedSignals;
+
+            $hasSignals = ($signalOverview['total_open'] ?? 0) > 0;
+            $hasProblems = count($health['problems'] ?? []) > 0;
+            $hasPersonWarnings = count($personOverview['persons'] ?? []) > 0;
+            $hasHandlungsbedarf = $hasSignals || $hasProblems || $hasPersonWarnings;
         @endphp
 
         {{-- ============================================================ --}}
         {{-- FOKUS-SIGNALE (persönlich, oberste Priorität)                --}}
         {{-- ============================================================ --}}
-        @php($focusedSignals = $this->focusedSignals)
         @if($focusedSignals->isNotEmpty())
             <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50/40 p-4">
                 <div class="flex items-center justify-between mb-3">
@@ -147,13 +152,6 @@
         {{-- ============================================================ --}}
         {{-- ALERT BAR: Handlungsbedarf (compact)                         --}}
         {{-- ============================================================ --}}
-        @php
-            $hasSignals = $signalOverview['total_open'] > 0;
-            $hasProblems = count($health['problems']) > 0;
-            $hasPersonWarnings = count($personOverview['persons']) > 0;
-            $hasHandlungsbedarf = $hasSignals || $hasProblems || $hasPersonWarnings;
-        @endphp
-
         @if($hasHandlungsbedarf)
             <div class="mb-6 rounded-lg border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4" x-data="{ expanded: false }">
                 <div class="flex items-center justify-between cursor-pointer" @click="expanded = !expanded">

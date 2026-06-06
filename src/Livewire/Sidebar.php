@@ -66,6 +66,7 @@ class Sidebar extends Component
                     ['route' => 'organization.settings.entity-types.index', 'label' => 'Entity Types', 'icon' => 'cube', 'match' => '/settings/entity-types'],
                     ['route' => 'organization.settings.relation-types.index', 'label' => 'Relation Types', 'icon' => 'arrows-right-left', 'match' => '/settings/relation-types'],
                     ['route' => 'organization.settings.inference-prompts.index', 'label' => 'Inference Prompts', 'icon' => 'cpu-chip', 'match' => '/settings/inference-prompts'],
+                    ['route' => 'organization.settings.synthesis-prompts.index', 'label' => 'Synthesis Prompts', 'icon' => 'document-text', 'match' => '/settings/synthesis-prompts'],
                     ['route' => 'organization.settings.signal-definitions.index', 'label' => 'Signaldefinitionen', 'icon' => 'bell-alert', 'match' => '/settings/signal-definitions'],
                 ],
             ],

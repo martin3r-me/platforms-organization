@@ -10,6 +10,7 @@ use Platform\Core\Services\ClaudeToolLoopRunner;
 use Platform\Organization\Models\OrganizationInferenceRun;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Models\OrganizationSignalInferencePrompt;
+use Platform\Organization\Models\OrganizationSynthesisPromptDefinition;
 use Platform\Organization\Models\OrganizationSynthesisReport;
 use Platform\Organization\Tools\EvaluateSignalInferenceTool;
 
@@ -173,23 +174,33 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
             default => [now()->subWeek()->startOfWeek(), now()->subWeek()->endOfWeek()],
         };
 
+        // Resolve definition: first active match in DB, otherwise hardcoded fallback
+        $definition = OrganizationSynthesisPromptDefinition::forTeam($teamId)
+            ->forReportType($reportType)
+            ->active()
+            ->orderBy('id')
+            ->first();
+
+        $usingFallback = ! $definition;
+
+        if ($usingFallback) {
+            Log::info('[InferencePromptService] No active synthesis prompt definition; using hardcoded fallback', [
+                'team_id' => $teamId,
+                'report_type' => $reportType,
+            ]);
+        }
+
+        $maxSignals = $definition?->max_signals ?? 100;
+
         // Load signals for the period
         $signals = OrganizationSignal::forTeam($teamId)
             ->whereBetween('created_at', [$periodStart, $periodEnd])
             ->with(['entity:id,name', 'inferencePrompt:id,name,vsm_system'])
             ->latest()
-            ->limit(100)
+            ->limit($maxSignals)
             ->get();
 
         $algedonicSignals = $signals->where('severity', 'algedonic');
-
-        // Build synthesis prompt
-        $systemPrompt = 'Du bist ein strategischer Analyst der einen Synthese-Report für die Organisationsleitung erstellt. '
-            . 'Dein Report verdichtet alle diagnostischen Erkenntnisse einer Periode in eine strukturierte Zusammenfassung. '
-            . 'Format: Markdown. Sprache: Deutsch. '
-            . 'Abschnitte: 1) Executive Summary, 2) Algedonic Signals (existenzielle Bedrohungen, separat hervorgehoben), '
-            . '3) S3-Steuerungsbefunde, 4) S3*-Audit-Befunde, 5) S2-Cross-Entity-Muster, '
-            . '6) Empfehlungen, 7) Offene Inquiries.';
 
         $signalSummary = $signals->map(fn ($s) => [
             'entity' => $s->entity?->name,
@@ -200,9 +211,28 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
             'date' => $s->created_at?->format('Y-m-d'),
         ])->toArray();
 
-        $userMessage = "Erstelle einen {$reportType} Synthese-Report für den Zeitraum {$periodStart->format('d.m.Y')} bis {$periodEnd->format('d.m.Y')}.\n\n"
-            . "Signale der Periode (" . count($signalSummary) . "):\n"
-            . json_encode($signalSummary, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT);
+        $systemPrompt = $definition?->system_prompt
+            ?? OrganizationSynthesisPromptDefinition::DEFAULT_SYSTEM_PROMPT;
+
+        $templateValues = [
+            'report_type' => $reportType,
+            'period_start' => $periodStart->format('d.m.Y'),
+            'period_end' => $periodEnd->format('d.m.Y'),
+            'signals_count' => count($signalSummary),
+            'signals_json' => json_encode($signalSummary, JSON_UNESCAPED_UNICODE | JSON_PRETTY_PRINT),
+        ];
+
+        if ($definition) {
+            $userMessage = $definition->renderUserMessage($templateValues);
+        } else {
+            $userMessage = strtr(OrganizationSynthesisPromptDefinition::DEFAULT_USER_TEMPLATE, [
+                '{report_type}' => $templateValues['report_type'],
+                '{period_start}' => $templateValues['period_start'],
+                '{period_end}' => $templateValues['period_end'],
+                '{signals_count}' => (string) $templateValues['signals_count'],
+                '{signals_json}' => $templateValues['signals_json'],
+            ]);
+        }
 
         $runner = ClaudeToolLoopRunner::make();
 
@@ -213,14 +243,15 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
             $context,
             [
                 'system' => $systemPrompt,
-                'model' => config('ai.anthropic.inference_model', 'claude-sonnet-4-6'),
-                'max_tokens' => 8192,
+                'model' => $definition?->model ?: config('ai.anthropic.inference_model', 'claude-sonnet-4-6'),
+                'max_tokens' => $definition?->max_tokens ?? 8192,
                 'max_iterations' => 5,
                 // meta-tools (discover + execute) are included by default
             ]
         );
 
-        $title = ucfirst($reportType) . '-Report ' . $periodStart->format('d.m.Y') . ' – ' . $periodEnd->format('d.m.Y');
+        $title = ($definition?->name ? $definition->name . ' · ' : ucfirst($reportType) . '-Report ')
+            . $periodStart->format('d.m.Y') . ' – ' . $periodEnd->format('d.m.Y');
 
         // Save synthesis report
         $report = OrganizationSynthesisReport::create([
@@ -239,6 +270,8 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
         return [
             'report_id' => $report->id,
             'title' => $title,
+            'definition_id' => $definition?->id,
+            'using_fallback' => $usingFallback,
         ];
     }
 

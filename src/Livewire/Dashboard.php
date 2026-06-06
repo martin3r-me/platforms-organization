@@ -663,8 +663,10 @@ class Dashboard extends Component
             return collect();
         }
 
+        // Only show actively-relevant focused signals — resolved/dismissed shouldn't surface here
         return OrganizationSignal::forTeam($teamId)
             ->focusedBy($userId)
+            ->whereIn('status', ['open', 'acknowledged'])
             ->with(['entity:id,name', 'definition:id,name'])
             ->orderByRaw("FIELD(severity, 'algedonic', 'critical', 'warning', 'info')")
             ->orderByDesc('created_at')

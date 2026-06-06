@@ -21,6 +21,13 @@
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>
                     <div class="space-y-3">
+                        <label class="flex items-center gap-2 text-sm text-[var(--ui-secondary)] cursor-pointer select-none">
+                            <input type="checkbox" wire:model.live="focusOnly" class="rounded border-gray-300 text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]">
+                            <span class="inline-flex items-center gap-1">
+                                @svg('heroicon-s-star', 'w-4 h-4 text-amber-500')
+                                Nur Fokus-Signale
+                            </span>
+                        </label>
                         <div>
                             <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Status</label>
                             <select wire:model.live="statusFilter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm">
@@ -62,8 +69,59 @@
     </x-slot>
 
     <x-ui-page-container>
+        @php($focusedIds = $this->focusedIds)
+
+        @if(! $focusOnly && $this->focusedSignals->isNotEmpty())
+            <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50/40 p-4">
+                <div class="flex items-center gap-2 mb-3">
+                    @svg('heroicon-s-star', 'w-5 h-5 text-amber-500')
+                    <h2 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider">Fokus-Signale</h2>
+                    <span class="text-xs text-[var(--ui-muted)]">({{ $this->focusedSignals->count() }})</span>
+                </div>
+                <div class="space-y-2">
+                    @foreach($this->focusedSignals as $signal)
+                        <div class="flex items-start gap-3 bg-white rounded-md border border-amber-200/60 p-3 hover:border-amber-400 transition">
+                            <button
+                                wire:click="toggleFocus({{ $signal->id }})"
+                                type="button"
+                                class="flex-shrink-0 mt-0.5 text-amber-500 hover:text-amber-700 transition"
+                                title="Aus Fokus entfernen"
+                            >
+                                @svg('heroicon-s-star', 'w-4 h-4')
+                            </button>
+                            <div class="flex-1 min-w-0">
+                                <div class="flex items-center gap-2 mb-1 flex-wrap">
+                                    @if($signal->entity)
+                                        <a href="{{ route('organization.entities.show', $signal->entity) }}" class="link text-sm font-medium">
+                                            {{ $signal->entity->name }}
+                                        </a>
+                                    @endif
+                                    <x-ui-badge variant="{{ match($signal->severity) { 'critical' => 'danger', 'algedonic' => 'danger', 'warning' => 'warning', default => 'info' } }}">
+                                        {{ ucfirst($signal->severity) }}
+                                    </x-ui-badge>
+                                    <x-ui-badge variant="{{ match($signal->status) { 'open' => 'warning', 'acknowledged' => 'info', 'resolved' => 'success', 'dismissed' => 'muted', default => 'secondary' } }}">
+                                        @switch($signal->status)
+                                            @case('open') Offen @break
+                                            @case('acknowledged') Bestätigt @break
+                                            @case('resolved') Gelöst @break
+                                            @case('dismissed') Verworfen @break
+                                        @endswitch
+                                    </x-ui-badge>
+                                </div>
+                                <a href="{{ route('organization.signals.show', $signal) }}" class="text-sm text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] block">
+                                    {{ \Illuminate\Support\Str::limit($signal->message, 140) }}
+                                </a>
+                                <p class="text-xs text-[var(--ui-muted)] mt-1">{{ $signal->created_at->diffForHumans() }}</p>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
+
         <x-ui-table compact="true">
             <x-ui-table-header>
+                <x-ui-table-header-cell compact="true" class="w-8"></x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Entity</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Schweregrad</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Quelle</x-ui-table-header-cell>
@@ -75,7 +133,26 @@
 
             <x-ui-table-body>
                 @forelse($this->signals as $signal)
+                    @php($isFocused = in_array($signal->id, $focusedIds, true))
                     <x-ui-table-row compact="true">
+                        <x-ui-table-cell compact="true">
+                            <button
+                                wire:click="toggleFocus({{ $signal->id }})"
+                                type="button"
+                                @class([
+                                    'transition',
+                                    'text-amber-500 hover:text-amber-700' => $isFocused,
+                                    'text-gray-300 hover:text-amber-500' => ! $isFocused,
+                                ])
+                                title="{{ $isFocused ? 'Aus Fokus entfernen' : 'In Fokus aufnehmen' }}"
+                            >
+                                @if($isFocused)
+                                    @svg('heroicon-s-star', 'w-4 h-4')
+                                @else
+                                    @svg('heroicon-o-star', 'w-4 h-4')
+                                @endif
+                            </button>
+                        </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
                             @if($signal->entity)
                                 <a href="{{ route('organization.entities.show', $signal->entity) }}" class="link font-medium">
@@ -128,7 +205,7 @@
                     </x-ui-table-row>
                 @empty
                     <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="7">
+                        <x-ui-table-cell compact="true" colspan="8">
                             <div class="text-center py-8">
                                 @svg('heroicon-o-bell-slash', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
                                 <p class="text-sm text-[var(--ui-muted)]">Keine Signale gefunden.</p>

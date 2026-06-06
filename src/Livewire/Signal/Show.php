@@ -9,6 +9,7 @@ use Platform\Organization\Models\OrganizationMemoryEntry;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Models\OrganizationSignalAction;
 use Platform\Organization\Models\OrganizationSignalComment;
+use Platform\Organization\Models\OrganizationSignalFocus;
 
 class Show extends Component
 {
@@ -40,7 +41,39 @@ class Show extends Component
             'resolvedByUser:id,name',
             'assignee:id,name',
             'actions.decidedByUser:id,name',
+            'focuses',
         ]);
+    }
+
+    #[Computed]
+    public function isFocused(): bool
+    {
+        return $this->signal->isFocusedBy(auth()->user());
+    }
+
+    public function toggleFocus(): void
+    {
+        $userId = auth()->id();
+        if (! $userId) {
+            return;
+        }
+
+        $existing = OrganizationSignalFocus::where('signal_id', $this->signal->id)
+            ->where('user_id', $userId)
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+        } else {
+            OrganizationSignalFocus::create([
+                'signal_id' => $this->signal->id,
+                'user_id' => $userId,
+                'focused_at' => now(),
+            ]);
+        }
+
+        $this->signal->load('focuses');
+        unset($this->isFocused);
     }
 
     #[Computed]

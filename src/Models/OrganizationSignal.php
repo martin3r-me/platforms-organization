@@ -4,6 +4,7 @@ namespace Platform\Organization\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
@@ -92,6 +93,36 @@ class OrganizationSignal extends Model
     public function actions(): HasMany
     {
         return $this->hasMany(OrganizationSignalAction::class, 'signal_id')->orderBy('position');
+    }
+
+    public function focuses(): HasMany
+    {
+        return $this->hasMany(OrganizationSignalFocus::class, 'signal_id');
+    }
+
+    public function focusedBy(): BelongsToMany
+    {
+        return $this->belongsToMany(User::class, 'organization_signal_focuses', 'signal_id', 'user_id')
+            ->withTimestamps()
+            ->withPivot('focused_at');
+    }
+
+    public function isFocusedBy(?User $user): bool
+    {
+        if (! $user) {
+            return false;
+        }
+
+        if ($this->relationLoaded('focuses')) {
+            return $this->focuses->contains('user_id', $user->id);
+        }
+
+        return $this->focuses()->where('user_id', $user->id)->exists();
+    }
+
+    public function scopeFocusedBy($query, int $userId)
+    {
+        return $query->whereHas('focuses', fn ($q) => $q->where('user_id', $userId));
     }
 
     public function assignee(): BelongsTo

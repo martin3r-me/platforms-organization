@@ -10,6 +10,24 @@
             ['label' => 'Signale', 'href' => route('organization.signals.index')],
             ['label' => $signal->definition?->name ?? 'Signal'],
         ]">
+            <button
+                wire:click="toggleFocus"
+                type="button"
+                @class([
+                    'inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-sm font-medium transition',
+                    'bg-amber-100 text-amber-800 hover:bg-amber-200' => $this->isFocused,
+                    'bg-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-gray-100' => ! $this->isFocused,
+                ])
+                title="{{ $this->isFocused ? 'Aus Fokus entfernen' : 'In Fokus aufnehmen' }}"
+            >
+                @if($this->isFocused)
+                    @svg('heroicon-s-star', 'w-4 h-4')
+                    <span>Fokus</span>
+                @else
+                    @svg('heroicon-o-star', 'w-4 h-4')
+                    <span>Fokus</span>
+                @endif
+            </button>
             @php($hasActions = $signal->actions->isNotEmpty())
             @if($signal->status === 'open')
                 @unless($hasActions)

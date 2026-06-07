@@ -108,6 +108,12 @@ return [
         'default_interval_hours' => 72,
     ],
 
+    // Wie wird der Score einer Dimension berechnet?
+    //   'sum'     = Summe aller Metriken der Dimension (Legacy, mischt potenziell Einheiten)
+    //   'primary' = nur die als is_dimension_primary markierte Metrik (vergleichbarer Score)
+    //               Fallback auf 'sum', wenn keine Primary fuer die Dimension deklariert ist.
+    'dimension_score_method' => env('ORGANIZATION_DIMENSION_SCORE_METHOD', 'sum'),
+
     'billables' => [
         [
             'model' => \Platform\Organization\Models\OrganizationEntity::class,

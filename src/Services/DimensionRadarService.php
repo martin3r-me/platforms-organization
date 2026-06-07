@@ -10,18 +10,37 @@ class DimensionRadarService
 {
     protected static ?array $teamMaximaCache = null;
     protected static ?int $teamMaximaCacheTeamId = null;
+    protected static ?string $teamMaximaCacheMethod = null;
 
     public function __construct(protected EntityLinkRegistry $registry) {}
 
     /**
      * Berechnet Radar-Scores für eine Entity im Team-Kontext.
      *
-     * @return array<string, array{score: float, label: string, type: string, delta: float, metrics: array}>
+     * Scoring-Methode wird ueber config('organization.dimension_score_method') gesteuert:
+     *   'sum'     = Summe aller Dimension-Metriken (Legacy, einheitsblind)
+     *   'primary' = nur is_dimension_primary-Metrik (vergleichbarer Score),
+     *               Fallback auf 'sum' wenn keine Primary deklariert ist
+     *
+     * @return array<string, array{
+     *   score: float,
+     *   raw: float,
+     *   label: string,
+     *   type: string,
+     *   delta: float,
+     *   has_data: bool,
+     *   metrics: array,
+     *   score_method: string,
+     *   primary_metric: string|null,
+     *   benchmark_type: string,
+     *   benchmark_value: float,
+     * }>
      */
     public function computeRadar(int $entityId, int $teamId): array
     {
         $dimensions = EntityLinkRegistry::allDimensions();
         $allDefs = $this->registry->allMetricDefinitions();
+        $method = $this->scoreMethod();
 
         // Load current + 7d-ago snapshots for this entity
         $current = $this->getLatestSnapshot($entityId);
@@ -34,8 +53,8 @@ class DimensionRadarService
 
         $radar = [];
         foreach ($dimensions as $dimKey => $dimConfig) {
-            $rawValue = $this->dimensionRawValue($dimKey, $currentMetrics, $allDefs);
-            $rawPrevious = $this->dimensionRawValue($dimKey, $previousMetrics, $allDefs);
+            [$rawValue, $effectiveMethod, $primaryKey] = $this->dimensionScore($dimKey, $currentMetrics, $allDefs, $method);
+            [$rawPrevious, , ] = $this->dimensionScore($dimKey, $previousMetrics, $allDefs, $method);
             $max = $maxima[$dimKey] ?? 0;
 
             $score = ($max > 0) ? round(($rawValue / $max) * 100, 1) : 0;
@@ -53,6 +72,7 @@ class DimensionRadarService
                     'value' => $val,
                     'unit' => $def['unit'],
                     'formatted' => $this->formatMetricValue($val, $def['unit']),
+                    'is_primary' => !empty($def['is_dimension_primary']),
                 ];
             }
 
@@ -67,6 +87,10 @@ class DimensionRadarService
                 'delta' => round($delta, 2),
                 'has_data' => $rawValue > 0 || $rawPrevious > 0,
                 'metrics' => array_slice($contributingMetrics, 0, 3),
+                'score_method' => $effectiveMethod,
+                'primary_metric' => $primaryKey,
+                'benchmark_type' => 'team_max',
+                'benchmark_value' => $max,
             ];
         }
 
@@ -74,13 +98,63 @@ class DimensionRadarService
     }
 
     /**
+     * Liest die aktive Scoring-Methode aus der Config.
+     * Default 'sum' bewahrt das Legacy-Verhalten.
+     */
+    protected function scoreMethod(): string
+    {
+        $method = config('organization.dimension_score_method', 'sum');
+        return in_array($method, ['sum', 'primary'], true) ? $method : 'sum';
+    }
+
+    /**
+     * Berechnet den Roh-Wert einer Dimension je nach Scoring-Methode.
+     *
+     * @return array{0: float, 1: string, 2: string|null} [rawValue, effectiveMethod, primaryKey]
+     */
+    protected function dimensionScore(string $dimension, array $metrics, array $allDefs, string $method): array
+    {
+        if ($method === 'primary') {
+            $primaryKey = $this->dimensionPrimaryKey($dimension, $allDefs);
+            if ($primaryKey !== null) {
+                $def = $allDefs[$primaryKey];
+                $val = $this->resolveMetricValue($primaryKey, $def, $metrics);
+                return [$this->normalizeToUnit($val, $def['unit']), 'primary', $primaryKey];
+            }
+            // Fallback: keine Primary deklariert → sum
+            return [$this->dimensionRawValue($dimension, $metrics, $allDefs), 'sum_fallback', null];
+        }
+
+        return [$this->dimensionRawValue($dimension, $metrics, $allDefs), 'sum', null];
+    }
+
+    /**
+     * Liefert den Key der is_dimension_primary-Metrik fuer eine Dimension, oder null.
+     */
+    protected function dimensionPrimaryKey(string $dimension, array $allDefs): ?string
+    {
+        foreach ($allDefs as $key => $def) {
+            if (($def['dimension'] ?? null) === $dimension && !empty($def['is_dimension_primary'])) {
+                return $key;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Team-Maxima für Normalisierung (cached per request).
+     *
+     * Verwendet dieselbe Scoring-Methode wie computeRadar(), damit Score und
+     * Benchmark in derselben Skala sind.
      *
      * @return array<string, float> [dimension => max_raw_value]
      */
     protected function teamMaxima(int $teamId): array
     {
-        if (static::$teamMaximaCacheTeamId === $teamId && static::$teamMaximaCache !== null) {
+        $method = $this->scoreMethod();
+        if (static::$teamMaximaCacheTeamId === $teamId
+            && static::$teamMaximaCacheMethod === $method
+            && static::$teamMaximaCache !== null) {
             return static::$teamMaximaCache;
         }
 
@@ -96,6 +170,7 @@ class DimensionRadarService
         if (empty($entityIds)) {
             static::$teamMaximaCache = array_fill_keys(array_keys($dimensions), 0);
             static::$teamMaximaCacheTeamId = $teamId;
+            static::$teamMaximaCacheMethod = $method;
             return static::$teamMaximaCache;
         }
 
@@ -106,7 +181,7 @@ class DimensionRadarService
         foreach ($snapshots as $snapshot) {
             $metrics = $snapshot->metrics ?? [];
             foreach ($dimensions as $dimKey => $dimConfig) {
-                $raw = $this->dimensionRawValue($dimKey, $metrics, $allDefs);
+                [$raw, , ] = $this->dimensionScore($dimKey, $metrics, $allDefs, $method);
                 if ($raw > $maxima[$dimKey]) {
                     $maxima[$dimKey] = $raw;
                 }
@@ -115,6 +190,7 @@ class DimensionRadarService
 
         static::$teamMaximaCache = $maxima;
         static::$teamMaximaCacheTeamId = $teamId;
+        static::$teamMaximaCacheMethod = $method;
 
         return $maxima;
     }

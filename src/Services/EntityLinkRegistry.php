@@ -249,8 +249,9 @@ class EntityLinkRegistry
      *
      * Rules:
      *   - subset_of must point to an existing metric key
+     *   - subset_of-Parent muss dieselbe basis haben (sonst messen sie auf
+     *     unterschiedlichen Zeitachsen — Subset-Beziehung waere bedeutungslos)
      *   - max one is_dimension_primary=true per dimension
-     *   - window_* basis incompatible with subset_of (semantically unclear)
      *
      * @throws \LogicException
      */
@@ -260,17 +261,21 @@ class EntityLinkRegistry
 
         foreach ($defs as $key => $def) {
             $subsetOf = $def['subset_of'] ?? null;
-            if ($subsetOf !== null && !isset($defs[$subsetOf])) {
-                throw new \LogicException(
-                    "Metric '{$key}' declares subset_of='{$subsetOf}', but '{$subsetOf}' is not registered."
-                );
-            }
+            if ($subsetOf !== null) {
+                if (!isset($defs[$subsetOf])) {
+                    throw new \LogicException(
+                        "Metric '{$key}' declares subset_of='{$subsetOf}', but '{$subsetOf}' is not registered."
+                    );
+                }
 
-            $basis = $def['basis'] ?? null;
-            if ($subsetOf !== null && is_string($basis) && str_starts_with($basis, 'window_')) {
-                throw new \LogicException(
-                    "Metric '{$key}' combines subset_of with windowed basis '{$basis}' — semantically unclear."
-                );
+                $childBasis = $def['basis'] ?? null;
+                $parentBasis = $defs[$subsetOf]['basis'] ?? null;
+                if ($childBasis !== null && $parentBasis !== null && $childBasis !== $parentBasis) {
+                    throw new \LogicException(
+                        "Metric '{$key}' (basis={$childBasis}) is subset_of '{$subsetOf}' (basis={$parentBasis}) — "
+                        . 'different bases measure different temporal slices, subset relation is undefined.'
+                    );
+                }
             }
 
             if (!empty($def['is_dimension_primary'])) {

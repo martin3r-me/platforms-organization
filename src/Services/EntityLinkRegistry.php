@@ -223,10 +223,71 @@ class EntityLinkRegistry
             if (!isset($def['roll_up_function'])) {
                 $def['roll_up_function'] = 'sum';
             }
+            if (!isset($def['basis'])) {
+                $def['basis'] = match ($def['type']) {
+                    self::TYPE_FLOW      => 'cumulative_since_start',
+                    self::TYPE_MODULATOR => 'modulator_factor',
+                    default              => 'stichtag',
+                };
+            }
+            if (!isset($def['is_dimension_primary'])) {
+                $def['is_dimension_primary'] = false;
+            }
+            if (!isset($def['subset_of'])) {
+                $def['subset_of'] = null;
+            }
         }
         unset($def);
 
+        $this->validateMetricDefinitions($defs);
+
         return $this->cachedMetricDefinitions = $defs;
+    }
+
+    /**
+     * Validates merged metric definitions. Throws on structural inconsistency.
+     *
+     * Rules:
+     *   - subset_of must point to an existing metric key
+     *   - max one is_dimension_primary=true per dimension
+     *   - window_* basis incompatible with subset_of (semantically unclear)
+     *
+     * @throws \LogicException
+     */
+    protected function validateMetricDefinitions(array $defs): void
+    {
+        $primaryByDimension = [];
+
+        foreach ($defs as $key => $def) {
+            $subsetOf = $def['subset_of'] ?? null;
+            if ($subsetOf !== null && !isset($defs[$subsetOf])) {
+                throw new \LogicException(
+                    "Metric '{$key}' declares subset_of='{$subsetOf}', but '{$subsetOf}' is not registered."
+                );
+            }
+
+            $basis = $def['basis'] ?? null;
+            if ($subsetOf !== null && is_string($basis) && str_starts_with($basis, 'window_')) {
+                throw new \LogicException(
+                    "Metric '{$key}' combines subset_of with windowed basis '{$basis}' — semantically unclear."
+                );
+            }
+
+            if (!empty($def['is_dimension_primary'])) {
+                $dim = $def['dimension'] ?? null;
+                if ($dim === null) {
+                    throw new \LogicException(
+                        "Metric '{$key}' is marked is_dimension_primary but has no dimension."
+                    );
+                }
+                if (isset($primaryByDimension[$dim])) {
+                    throw new \LogicException(
+                        "Dimension '{$dim}' has multiple primary metrics: '{$primaryByDimension[$dim]}' and '{$key}'."
+                    );
+                }
+                $primaryByDimension[$dim] = $key;
+            }
+        }
     }
 
     /**
@@ -316,6 +377,8 @@ class EntityLinkRegistry
                 'unit' => 'count',
                 'dimension' => self::DIMENSION_ORG_CAPITAL,
                 'type' => self::TYPE_STOCK,
+                'basis' => 'stichtag',
+                'is_dimension_primary' => true,
             ],
             'time_planned_minutes' => [
                 'label' => 'Soll-Zeit (geplant)',
@@ -325,6 +388,7 @@ class EntityLinkRegistry
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_STOCK,
                 'aggregation_mode' => 'rolled_up',
+                'basis' => 'stichtag',
             ],
             'time_total_minutes' => [
                 'label' => 'Zeiterfassung (gesamt)',
@@ -335,6 +399,8 @@ class EntityLinkRegistry
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_FLOW,
                 'aggregation_mode' => 'rolled_up',
+                'basis' => 'cumulative_since_start',
+                'is_dimension_primary' => true,
             ],
             'time_billed_minutes' => [
                 'label' => 'Zeiterfassung (abgerechnet)',
@@ -345,6 +411,8 @@ class EntityLinkRegistry
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_FLOW,
                 'aggregation_mode' => 'rolled_up',
+                'basis' => 'cumulative_since_start',
+                'subset_of' => 'time_total_minutes',
             ],
 
             'time_planned_days_remaining' => [
@@ -354,6 +422,7 @@ class EntityLinkRegistry
                 'unit' => 'days',
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_MODULATOR,
+                'basis' => 'modulator_factor',
             ],
 
             // Person-Entity Metriken
@@ -364,6 +433,7 @@ class EntityLinkRegistry
                 'unit' => 'count',
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_STOCK,
+                'basis' => 'stichtag',
             ],
             'person_completed_items' => [
                 'label' => 'Erledigte Items (Person)',
@@ -372,6 +442,7 @@ class EntityLinkRegistry
                 'unit' => 'count',
                 'dimension' => self::DIMENSION_THROUGHPUT,
                 'type' => self::TYPE_FLOW,
+                'basis' => 'cumulative_since_start',
             ],
             'person_story_points_total' => [
                 'label' => 'Story Points gesamt (Person)',
@@ -380,6 +451,7 @@ class EntityLinkRegistry
                 'unit' => 'points',
                 'dimension' => self::DIMENSION_COMPLEXITY,
                 'type' => self::TYPE_STOCK,
+                'basis' => 'stichtag',
             ],
             'person_story_points_done' => [
                 'label' => 'Story Points erledigt (Person)',
@@ -389,6 +461,7 @@ class EntityLinkRegistry
                 'pair' => 'person_story_points_total',
                 'dimension' => self::DIMENSION_THROUGHPUT,
                 'type' => self::TYPE_FLOW,
+                'basis' => 'cumulative_since_start',
             ],
             'person_time_total_minutes' => [
                 'label' => 'Zeiterfassung (Person)',
@@ -397,6 +470,7 @@ class EntityLinkRegistry
                 'unit' => 'minutes',
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_FLOW,
+                'basis' => 'cumulative_since_start',
             ],
 
             // Org-Entity Person-Rollup Metriken
@@ -408,6 +482,7 @@ class EntityLinkRegistry
                 'dimension' => self::DIMENSION_ORG_CAPITAL,
                 'type' => self::TYPE_STOCK,
                 'aggregation_mode' => 'rolled_up',
+                'basis' => 'stichtag',
             ],
             'persons_workload_total' => [
                 'label' => 'Workload (Personen)',
@@ -417,6 +492,7 @@ class EntityLinkRegistry
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_STOCK,
                 'aggregation_mode' => 'rolled_up',
+                'basis' => 'stichtag',
             ],
             'persons_completed_total' => [
                 'label' => 'Erledigte Items (Personen)',
@@ -426,6 +502,7 @@ class EntityLinkRegistry
                 'dimension' => self::DIMENSION_THROUGHPUT,
                 'type' => self::TYPE_FLOW,
                 'aggregation_mode' => 'rolled_up',
+                'basis' => 'cumulative_since_start',
             ],
             'persons_story_points_total' => [
                 'label' => 'Story Points gesamt (Personen)',
@@ -435,6 +512,7 @@ class EntityLinkRegistry
                 'dimension' => self::DIMENSION_COMPLEXITY,
                 'type' => self::TYPE_STOCK,
                 'aggregation_mode' => 'rolled_up',
+                'basis' => 'stichtag',
             ],
             'persons_story_points_done' => [
                 'label' => 'Story Points erledigt (Personen)',
@@ -445,6 +523,7 @@ class EntityLinkRegistry
                 'dimension' => self::DIMENSION_THROUGHPUT,
                 'type' => self::TYPE_FLOW,
                 'aggregation_mode' => 'rolled_up',
+                'basis' => 'cumulative_since_start',
             ],
             'persons_time_total_minutes' => [
                 'label' => 'Zeiterfassung (Personen)',
@@ -454,6 +533,8 @@ class EntityLinkRegistry
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_FLOW,
                 'aggregation_mode' => 'rolled_up',
+                'basis' => 'cumulative_since_start',
+                'subset_of' => 'time_total_minutes',
             ],
 
             // Terminal-Kommunikation
@@ -464,6 +545,7 @@ class EntityLinkRegistry
                 'unit' => 'count',
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_FLOW,
+                'basis' => 'window_7d',
             ],
             'terminal_messages_30d' => [
                 'label' => 'Nachrichten (30 Tage)',
@@ -472,6 +554,7 @@ class EntityLinkRegistry
                 'unit' => 'count',
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_FLOW,
+                'basis' => 'window_30d',
             ],
             'terminal_participants_7d' => [
                 'label' => 'Aktive Teilnehmer (7 Tage)',
@@ -480,6 +563,7 @@ class EntityLinkRegistry
                 'unit' => 'count',
                 'dimension' => self::DIMENSION_ORG_CAPITAL,
                 'type' => self::TYPE_STOCK,
+                'basis' => 'window_7d',
             ],
             'terminal_last_message_days' => [
                 'label' => 'Tage seit letzter Nachricht',
@@ -488,6 +572,7 @@ class EntityLinkRegistry
                 'unit' => 'days',
                 'dimension' => self::DIMENSION_ENERGY,
                 'type' => self::TYPE_MODULATOR,
+                'basis' => 'modulator_factor',
             ],
         ];
     }

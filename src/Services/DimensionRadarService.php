@@ -122,6 +122,10 @@ class DimensionRadarService
     /**
      * Raw-Wert einer Dimension aus Snapshot-Metrics.
      * Summiert alle Metriken der Dimension (einheitlich normalisiert).
+     *
+     * Metriken mit subset_of werden ausgeschlossen, wenn ihre Parent-Metrik in derselben
+     * Dimension ebenfalls beitraegt — verhindert Doppelzaehlung (z.B. time_billed_minutes
+     * fliesst nicht zusaetzlich zu time_total_minutes ein).
      */
     protected function dimensionRawValue(string $dimension, array $metrics, array $allDefs): float
     {
@@ -129,6 +133,11 @@ class DimensionRadarService
 
         $total = 0;
         foreach ($dimDefs as $key => $def) {
+            $subsetOf = $def['subset_of'] ?? null;
+            if ($subsetOf !== null && isset($dimDefs[$subsetOf])) {
+                continue;
+            }
+
             $value = $this->resolveMetricValue($key, $def, $metrics);
             $total += $this->normalizeToUnit($value, $def['unit']);
         }

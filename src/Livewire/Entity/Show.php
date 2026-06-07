@@ -64,7 +64,7 @@ class Show extends Component
     #[Computed]
     public function contextSummary(): array
     {
-        $links = $this->entity->entityLinks;
+        $links = EntityDimensionBridge::linksForEntity($this->entity->id);
         $morphMap = Relation::morphMap();
         $reverseMorphMap = array_flip($morphMap);
         $registry = resolve(EntityLinkRegistry::class);
@@ -143,7 +143,6 @@ class Show extends Component
             'team',
             'user',
             'linkedUser',
-            'entityLinks',
             'relationsFrom.toEntity.type',
             'relationsFrom.relationType',
             'relationsTo.fromEntity.type',

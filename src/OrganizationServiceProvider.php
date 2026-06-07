@@ -9,6 +9,8 @@ use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
 use Platform\Organization\Console\Commands\CleanupInferenceRunsCommand;
+use Platform\Organization\Console\Commands\DimensionCoverageCommand;
+use Platform\Organization\Console\Commands\DimensionScoreDiffCommand;
 use Platform\Organization\Console\Commands\EvaluateSignalsCommand;
 use Platform\Organization\Console\Commands\GenerateReportsCommand;
 use Platform\Organization\Console\Commands\ProcessInferenceTriggersCommand;
@@ -42,6 +44,8 @@ class OrganizationServiceProvider extends ServiceProvider
                 PullEnvironmentSourcesCommand::class,
                 DecayEnvironmentRelevanceCommand::class,
                 SeedEnvironmentSourcesCommand::class,
+                DimensionCoverageCommand::class,
+                DimensionScoreDiffCommand::class,
             ]);
         }
 

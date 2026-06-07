@@ -59,7 +59,9 @@ class DimensionLinker extends Component
 
     public function mount(?string $contextType = null, ?int $contextId = null, string $dimension = ''): void
     {
-        $this->contextType = $contextType;
+        $this->contextType = $contextType
+            ? \Platform\Organization\Services\DimensionLinkService::resolveContextType($contextType)
+            : null;
         $this->contextId = $contextId;
         $this->dimension = $dimension;
 

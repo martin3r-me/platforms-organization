@@ -291,6 +291,8 @@ class EntityDimensionBridge
             }
         }
 
+        $linkableType = DimensionLinkService::resolveContextType($linkableType);
+
         return OrganizationDimensionLink::create(array_merge([
             'dimension_definition_id' => $defId,
             'dimension_value_id' => $dvId,
@@ -316,6 +318,8 @@ class EntityDimensionBridge
             return false;
         }
 
+        $linkableType = DimensionLinkService::resolveContextType($linkableType);
+
         return OrganizationDimensionLink::where('dimension_definition_id', $defId)
             ->where('dimension_value_id', $dvId)
             ->where('linkable_type', $linkableType)
@@ -333,6 +337,8 @@ class EntityDimensionBridge
         if (!$defId) {
             return;
         }
+
+        $linkableType = DimensionLinkService::resolveContextType($linkableType);
 
         OrganizationDimensionLink::where('dimension_definition_id', $defId)
             ->where('linkable_type', $linkableType)

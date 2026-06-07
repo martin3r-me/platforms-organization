@@ -36,7 +36,17 @@ class DimensionLinkService
             return $alias;
         }
 
-        // 3. Short name fallback: find a unique morph alias ending with _<contextType>
+        // 3. Composite name where the suffix is itself a registered alias
+        //    e.g. "planner_project" → "project" (when the morph map registers "project")
+        if (str_contains($contextType, '_')) {
+            $parts = explode('_', $contextType);
+            $suffix = end($parts);
+            if (Relation::getMorphedModel($suffix)) {
+                return $suffix;
+            }
+        }
+
+        // 4. Short name fallback: find a unique morph alias ending with _<contextType>
         //    e.g. "process" matches "organization_process"
         $candidates = [];
         foreach ($morphMap as $a => $class) {

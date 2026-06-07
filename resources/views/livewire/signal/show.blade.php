@@ -278,6 +278,32 @@
                         <p class="text-sm text-[var(--ui-secondary)]">{{ $signal->message }}</p>
                     </div>
 
+                    @if($signal->status === 'resolved' && $signal->resolution_summary)
+                        <div class="rounded-lg border border-green-200 bg-green-50/50 p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                @svg('heroicon-o-check-circle', 'w-4 h-4 text-green-700')
+                                <h3 class="text-sm font-medium text-green-900">Was wurde getan</h3>
+                                @if($signal->resolvedByUser)
+                                    <span class="text-xs text-green-700">· {{ $signal->resolvedByUser->name }}</span>
+                                @endif
+                                @if($signal->resolved_at)
+                                    <span class="text-xs text-green-700" title="{{ $signal->resolved_at->format('d.m.Y H:i') }}">· {{ $signal->resolved_at->diffForHumans() }}</span>
+                                @endif
+                            </div>
+                            <p class="text-sm text-[var(--ui-secondary)] whitespace-pre-line">{{ $signal->resolution_summary }}</p>
+                        </div>
+                    @endif
+
+                    @if($signal->status === 'dismissed' && $signal->dismissed_reason)
+                        <div class="rounded-lg border border-gray-200 bg-gray-50/50 p-4">
+                            <div class="flex items-center gap-2 mb-2">
+                                @svg('heroicon-o-x-circle', 'w-4 h-4 text-gray-600')
+                                <h3 class="text-sm font-medium text-gray-700">Verworfen — Begründung</h3>
+                            </div>
+                            <p class="text-sm text-[var(--ui-secondary)] whitespace-pre-line">{{ $signal->dismissed_reason }}</p>
+                        </div>
+                    @endif
+
                     @if($signal->actions->isNotEmpty())
                         <div>
                             <h3 class="text-sm font-medium text-[var(--ui-muted)] mb-2">Handlungsoptionen</h3>
@@ -610,16 +636,16 @@
                 <p class="text-sm text-[var(--ui-muted)] mb-4">
                     @switch($pendingAction)
                         @case('acknowledge') Was macht dieses Signal relevant? @break
-                        @case('resolve') Was wurde unternommen? @break
+                        @case('resolve') Was wurde unternommen? Bleibt am Signal sichtbar — bullet-list ist OK. @break
                         @case('dismiss') Warum ist dieses Signal nicht relevant? @break
                     @endswitch
                 </p>
 
                 <textarea
                     wire:model="actionReason"
-                    rows="3"
+                    rows="{{ $pendingAction === 'resolve' ? 5 : 3 }}"
                     class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm mb-4"
-                    placeholder="{{ match($pendingAction) { 'acknowledge' => 'z.B. Bestätigt, prüfen wir im nächsten Weekly...', 'resolve' => 'z.B. Interlink angelegt, Zuständigkeit geklärt...', 'dismiss' => 'z.B. Entity bewusst inaktiv, kein Handlungsbedarf...' } }}"
+                    placeholder="{{ match($pendingAction) { 'acknowledge' => 'z.B. Bestätigt, prüfen wir im nächsten Weekly...', 'resolve' => "z.B.\n• Interlink zu Team B angelegt\n• Zuständigkeit mit C besprochen\n• Snapshot-Frequenz erhöht", 'dismiss' => 'z.B. Entity bewusst inaktiv, kein Handlungsbedarf...' } }}"
                     autofocus
                 ></textarea>
 

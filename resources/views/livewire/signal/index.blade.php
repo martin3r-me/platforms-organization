@@ -267,6 +267,11 @@
                                 <p class="text-xs text-[var(--ui-muted)] italic mt-0.5" title="{{ $signal->dismissed_reason }}">
                                     „{{ \Illuminate\Support\Str::limit($signal->dismissed_reason, 90) }}"
                                 </p>
+                            @elseif($view === 'archive' && $signal->status === 'resolved' && $signal->resolution_summary)
+                                <p class="text-xs text-green-700 mt-0.5" title="{{ $signal->resolution_summary }}">
+                                    @svg('heroicon-o-check', 'w-3 h-3 inline-block -mt-0.5')
+                                    {{ \Illuminate\Support\Str::limit(str_replace(["\n", '•'], [' · ', ''], $signal->resolution_summary), 100) }}
+                                </p>
                             @endif
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">

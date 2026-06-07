@@ -34,6 +34,7 @@ class OrganizationSignal extends Model
         'resolved_at',
         'resolved_by',
         'dismissed_reason',
+        'resolution_summary',
         'snooze_until',
         'affected_entity_ids',
         'assignee_entity_id',

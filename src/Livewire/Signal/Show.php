@@ -149,6 +149,7 @@ class Show extends Component
             'status' => 'resolved',
             'resolved_at' => now(),
             'resolved_by' => auth()->id(),
+            'resolution_summary' => $reason ?: null,
         ]);
         $this->processSignalFeedback('resolve', $reason);
         $this->signal->refresh();
@@ -302,11 +303,23 @@ class Show extends Component
             ->values()
             ->implode('; ');
 
+        // For resolved auto-derive: build a "what was done" summary from applied actions
+        $appliedSummary = $this->signal->actions
+            ->where('status', 'applied')
+            ->map(function ($a) {
+                $line = '• ' . $a->title;
+                $note = trim((string) $a->decision_reason);
+                return $note !== '' ? $line . ': ' . $note : $line;
+            })
+            ->values()
+            ->implode("\n");
+
         match ($derived) {
             'resolved' => $this->signal->update([
                 'status' => 'resolved',
                 'resolved_at' => now(),
                 'resolved_by' => auth()->id(),
+                'resolution_summary' => $appliedSummary ?: null,
             ]),
             'dismissed' => $this->signal->update([
                 'status' => 'dismissed',

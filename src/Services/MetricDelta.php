@@ -15,6 +15,7 @@ class MetricDelta
         public readonly string $unit,
         public readonly ?float $ratio,
         public readonly ?string $pairKey,
+        public readonly ?string $basis = null,
     ) {}
 
     public function toArray(): array
@@ -32,6 +33,7 @@ class MetricDelta
             'unit' => $this->unit,
             'ratio' => $this->ratio,
             'pair_key' => $this->pairKey,
+            'basis' => $this->basis,
         ];
     }
 

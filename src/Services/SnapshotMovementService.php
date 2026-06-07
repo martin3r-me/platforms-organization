@@ -126,6 +126,7 @@ class SnapshotMovementService
                 unit: $def['unit'],
                 ratio: $ratio,
                 pairKey: $def['pair'] ?? null,
+                basis: $def['basis'] ?? null,
             );
         }
 
@@ -152,6 +153,7 @@ class SnapshotMovementService
                 unit: $def['unit'],
                 ratio: null,
                 pairKey: null,
+                basis: $def['basis'] ?? null,
             );
         }
 

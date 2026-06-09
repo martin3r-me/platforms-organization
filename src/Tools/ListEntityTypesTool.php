@@ -23,7 +23,7 @@ class ListEntityTypesTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/entity-types - Listet Entity Types (global). WICHTIG: IDs nie raten — immer erst dieses Tool aufrufen. Filtere nach code für exakten Match oder entity_type_group_id für eine Gruppe.';
+        return 'GET /organization/entity-types - Listet Entity Types (global). WICHTIG: IDs nie raten — immer erst dieses Tool aufrufen. Filtere nach code, entity_type_group_id oder vsm_class (carrier/actor/observed).';
     }
 
     public function getSchema(): array
@@ -44,6 +44,15 @@ class ListEntityTypesTool implements ToolContract, ToolMetadataContract
                     'code' => [
                         'type' => 'string',
                         'description' => 'Direkter Filter: exakter Code-Match. Beispiel: code="department"',
+                    ],
+                    'vsm_class' => [
+                        'type' => 'string',
+                        'enum' => OrganizationEntityType::VSM_CLASSES,
+                        'description' => 'Optional: Filter nach VSM-Klasse (carrier/actor/observed).',
+                    ],
+                    'can_be_perspective' => [
+                        'type' => 'boolean',
+                        'description' => 'Optional: Nur Types deren Entities Perspektive sein duerfen (= carrier-Types).',
                     ],
                 ],
             ]
@@ -75,6 +84,17 @@ class ListEntityTypesTool implements ToolContract, ToolMetadataContract
                 $q->where('code', trim((string)$arguments['code']));
             }
 
+            if (!empty($arguments['vsm_class'])) {
+                $vc = (string) $arguments['vsm_class'];
+                if (in_array($vc, OrganizationEntityType::VSM_CLASSES, true)) {
+                    $q->where('vsm_class', $vc);
+                }
+            }
+
+            if (array_key_exists('can_be_perspective', $arguments)) {
+                $q->where('can_be_perspective', (bool) $arguments['can_be_perspective']);
+            }
+
             $this->applyStandardFilters($q, $arguments, ['created_at']);
             $this->applyStandardSearch($q, $arguments, ['name', 'code', 'description']);
             $this->applyStandardSort($q, $arguments, ['sort_order', 'name', 'code', 'id', 'created_at'], 'sort_order', 'asc');
@@ -95,6 +115,8 @@ class ListEntityTypesTool implements ToolContract, ToolMetadataContract
                 'is_active' => (bool)$et->is_active,
                 'entity_type_group_id' => $et->entity_type_group_id,
                 'group_name' => $et->group?->name,
+                'vsm_class' => $et->vsm_class,
+                'can_be_perspective' => (bool) $et->can_be_perspective,
                 'metadata' => $et->metadata,
             ])->values()->toArray();
 

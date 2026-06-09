@@ -21,7 +21,7 @@ class UpdateEntityTypeTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'PUT /organization/entity-types/{id} - Aktualisiert einen Entity Type. Parameter: entity_type_id (required).';
+        return 'PUT /organization/entity-types/{id} - Aktualisiert einen Entity Type. Parameter: entity_type_id (required). vsm_class (carrier/actor/observed) entscheidet ob Entities dieses Typs Perspektive sein duerfen — can_be_perspective wird automatisch aus vsm_class abgeleitet.';
     }
 
     public function getSchema(): array
@@ -59,6 +59,11 @@ class UpdateEntityTypeTool implements ToolContract, ToolMetadataContract
                 'entity_type_group_id' => [
                     'type' => 'integer',
                     'description' => 'Optional: ID der Entity Type Group (0/null zum Entfernen). Nutze organization.entity_type_groups.GET.',
+                ],
+                'vsm_class' => [
+                    'type' => 'string',
+                    'enum' => array_merge(OrganizationEntityType::VSM_CLASSES, ['', 'null']),
+                    'description' => 'Optional: VSM-Klasse (carrier/actor/observed; "" oder "null" zum Entfernen). can_be_perspective wird automatisch synchronisiert.',
                 ],
                 'metadata' => [
                     'type' => 'object',
@@ -141,6 +146,21 @@ class UpdateEntityTypeTool implements ToolContract, ToolMetadataContract
                     $update['entity_type_group_id'] = $groupId;
                 }
             }
+            if (array_key_exists('vsm_class', $arguments)) {
+                $vc = $arguments['vsm_class'];
+                if ($vc === null || $vc === '' || $vc === 'null') {
+                    $update['vsm_class'] = null;
+                } else {
+                    $vc = (string) $vc;
+                    if (!in_array($vc, OrganizationEntityType::VSM_CLASSES, true)) {
+                        return ToolResult::error(
+                            'VALIDATION_ERROR',
+                            "vsm_class muss einer von: " . implode(', ', OrganizationEntityType::VSM_CLASSES) . " (oder leer/null zum Entfernen)."
+                        );
+                    }
+                    $update['vsm_class'] = $vc;
+                }
+            }
             if (array_key_exists('metadata', $arguments)) {
                 $update['metadata'] = (isset($arguments['metadata']) && is_array($arguments['metadata'])) ? $arguments['metadata'] : null;
             }
@@ -159,6 +179,8 @@ class UpdateEntityTypeTool implements ToolContract, ToolMetadataContract
                 'sort_order' => $et->sort_order,
                 'is_active' => (bool)$et->is_active,
                 'entity_type_group_id' => $et->entity_type_group_id,
+                'vsm_class' => $et->vsm_class,
+                'can_be_perspective' => (bool) $et->can_be_perspective,
                 'metadata' => $et->metadata,
                 'message' => 'Entity Type erfolgreich aktualisiert.',
             ]);

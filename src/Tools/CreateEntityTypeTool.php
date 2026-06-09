@@ -18,7 +18,7 @@ class CreateEntityTypeTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /organization/entity-types - Erstellt einen Entity Type (global). Nutze organization.entity_types.GET um bestehende zu prüfen.';
+        return 'POST /organization/entity-types - Erstellt einen Entity Type (global). Nutze organization.entity_types.GET um bestehende zu prüfen. vsm_class (carrier/actor/observed) entscheidet ob Entities dieses Typs Perspektive sein duerfen (carrier) oder VSM-Zellen ausfuellen koennen (actor).';
     }
 
     public function getSchema(): array
@@ -54,6 +54,11 @@ class CreateEntityTypeTool implements ToolContract, ToolMetadataContract
                 'entity_type_group_id' => [
                     'type' => 'integer',
                     'description' => 'Optional: ID der Entity Type Group. Nutze organization.entity_type_groups.GET.',
+                ],
+                'vsm_class' => [
+                    'type' => 'string',
+                    'enum' => OrganizationEntityType::VSM_CLASSES,
+                    'description' => 'Optional: VSM-Klasse. carrier = lebensfaehiges System (kann Perspektive sein). actor = fuellt VSM-Funktionen aus (kann S1-S5 ausfuellen). observed = Umwelt (wird von S4 beobachtet). can_be_perspective wird automatisch aus vsm_class abgeleitet (true genau bei carrier).',
                 ],
                 'metadata' => [
                     'type' => 'object',
@@ -99,6 +104,18 @@ class CreateEntityTypeTool implements ToolContract, ToolMetadataContract
                 }
             }
 
+            // Validate vsm_class if provided
+            $vsmClass = null;
+            if (array_key_exists('vsm_class', $arguments) && $arguments['vsm_class'] !== null && $arguments['vsm_class'] !== '') {
+                $vsmClass = (string) $arguments['vsm_class'];
+                if (!in_array($vsmClass, OrganizationEntityType::VSM_CLASSES, true)) {
+                    return ToolResult::error(
+                        'VALIDATION_ERROR',
+                        "vsm_class muss einer von: " . implode(', ', OrganizationEntityType::VSM_CLASSES) . "."
+                    );
+                }
+            }
+
             $et = OrganizationEntityType::create([
                 'name' => $name,
                 'code' => $code,
@@ -107,6 +124,7 @@ class CreateEntityTypeTool implements ToolContract, ToolMetadataContract
                 'sort_order' => (int)($arguments['sort_order'] ?? 0),
                 'is_active' => (bool)($arguments['is_active'] ?? true),
                 'entity_type_group_id' => $groupId,
+                'vsm_class' => $vsmClass,
                 'metadata' => (isset($arguments['metadata']) && is_array($arguments['metadata'])) ? $arguments['metadata'] : null,
             ]);
 
@@ -119,6 +137,8 @@ class CreateEntityTypeTool implements ToolContract, ToolMetadataContract
                 'sort_order' => $et->sort_order,
                 'is_active' => (bool)$et->is_active,
                 'entity_type_group_id' => $et->entity_type_group_id,
+                'vsm_class' => $et->vsm_class,
+                'can_be_perspective' => (bool) $et->can_be_perspective,
                 'metadata' => $et->metadata,
                 'message' => 'Entity Type erfolgreich erstellt.',
             ]);

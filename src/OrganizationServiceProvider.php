@@ -125,6 +125,14 @@ class OrganizationServiceProvider extends ServiceProvider
         // Tools registrieren (loose gekoppelt - für AI/Chat)
         $this->registerTools();
 
+        // Algedonic-Kanal (Beer): Core dispatched, Organization erzeugt Signal
+        if (class_exists(\Platform\Core\Events\AlgedonicTriggered::class)) {
+            \Illuminate\Support\Facades\Event::listen(
+                \Platform\Core\Events\AlgedonicTriggered::class,
+                \Platform\Organization\Listeners\HandleAlgedonicTriggered::class,
+            );
+        }
+
         // Error Reporter Registration
         try {
             resolve(\Platform\Core\Services\ErrorReporterRegistry::class)

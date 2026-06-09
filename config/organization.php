@@ -136,4 +136,25 @@ return [
             'active' => true,
         ],
     ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Signal-Deadlines pro VSM-Ebene (in Stunden)
+    |--------------------------------------------------------------------------
+    |
+    | Wie lange darf ein Signal auf einer Ebene "offen" liegen, bevor der
+    | Eskalations-Cron es eine Stufe hoch zieht. Algedonic ist ein Sonderfall:
+    | extrem kurze Deadline, weil das Signal per Beer-Konvention sofort vom
+    | Top-Level wahrgenommen werden muss.
+    */
+    'signal_deadlines' => [
+        'default' => 168, // 7 Tage
+        's1' => 24,
+        's2' => 48,
+        's3' => 72,
+        's3_star' => 72,
+        's4' => 168,
+        's5' => 336, // 14 Tage — strategisch, langsamer Takt
+        'algedonic' => 1, // 1h — Schmerz-Kanal nach Beer
+    ],
 ];

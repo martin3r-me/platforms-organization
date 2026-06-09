@@ -209,6 +209,12 @@ class OrganizationServiceProvider extends ServiceProvider
             ->hourly()
             ->withoutOverlapping();
 
+        // Ops-Room Snapshot: einmal taeglich kurz vor Mitternacht,
+        // damit der Tag vollstaendig erfasst ist (Algedonics um 23:00 zaehlen mit).
+        Schedule::command('organization:snapshot-ops-room')
+            ->dailyAt('23:55')
+            ->withoutOverlapping();
+
         // Process inference triggers: every minute (cheap polling)
         Schedule::command('organization:process-inference-triggers')
             ->everyMinute()

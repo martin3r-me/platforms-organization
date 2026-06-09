@@ -13,14 +13,19 @@ use Illuminate\Support\Facades\Schema;
  * entity_vsm_assignments.perspective_entity_id) tragen ihre Sicht als FK auf
  * organization_entities, nicht auf eine eigene Perspektive-Tabelle.
  *
- * WICHTIG: Die Migration ist **maximal defensiv** und prueft pro DDL-Schritt
- * via information_schema, ob die jeweilige Struktur ueberhaupt noch existiert.
- * Damit ueberlebt sie beliebige Teil-Zustaende aus frueheren fehlgeschlagenen
- * Laeufen (FK weg + Indizes da, FK + Unique weg + separater Index da, …).
+ * **Backing-Index-Problem:** dim_link_unique (Composite-Unique mit
+ * dimension_definition_id als erste Spalte) wird von MySQL als Backing-Index
+ * fuer den FK auf dimension_definition_id genutzt. DROP des Composites
+ * scheitert daher mit 1553 "needed in a foreign key constraint", solange
+ * kein alternativer Index fuer dimension_definition_id existiert.
  *
- * Schema-Builder-try/catch greift nicht zuverlaessig, weil Befehle aus der
- * Closure heraus nur queued und erst spaeter ausgefuehrt werden — daher
- * gehen wir hier ueber DB::statement() mit explizitem Vorab-Check.
+ * Loesung: temporaeren Backup-Index auf dimension_definition_id anlegen,
+ * dann ist dim_link_unique freigegeben und kann gedroppt werden. Nach dem
+ * Anlegen des neuen 4-Spalten-Unique (der dimension_definition_id wieder
+ * als erste Spalte hat) ist der Backup obsolet und wird entfernt.
+ *
+ * Migration ist **idempotent**: pro DDL-Schritt wird via information_schema
+ * geprueft, ob die Struktur noch existiert / schon existiert.
  *
  * Voraussetzung: Default-Perspektive war die einzig genutzte. Falls benannte
  * Sub-Perspektiven oder alternative Hierarchien existierten, sind sie vor
@@ -34,24 +39,32 @@ return new class extends Migration
         $fkName = 'organization_dimension_links_perspective_id_foreign';
         $compositeUnique = 'dim_link_unique';
         $perspectiveIdx = 'organization_dimension_links_perspective_id_index';
+        $backupIdx = 'dim_link_def_backup_idx';
 
         if (Schema::hasColumn($table, 'perspective_id')) {
-            // 1. FK droppen — nur wenn er noch existiert.
+            // 1. Backup-Index auf dimension_definition_id anlegen — damit der FK auf
+            //    dimension_definition_id weiterhin ein Backing hat, wenn dim_link_unique
+            //    spaeter weggeht.
+            if (!$this->indexExists($table, $backupIdx)) {
+                DB::statement("ALTER TABLE `{$table}` ADD INDEX `{$backupIdx}` (`dimension_definition_id`)");
+            }
+
+            // 2. FK auf perspective_id droppen — nur wenn er noch existiert.
             if ($this->foreignKeyExists($table, $fkName)) {
                 DB::statement("ALTER TABLE `{$table}` DROP FOREIGN KEY `{$fkName}`");
             }
 
-            // 2. Composite-Unique droppen — nur wenn er noch existiert.
+            // 3. Composite-Unique droppen — jetzt freigegeben durch Backup-Index.
             if ($this->indexExists($table, $compositeUnique)) {
                 DB::statement("ALTER TABLE `{$table}` DROP INDEX `{$compositeUnique}`");
             }
 
-            // 3. Separater Index auf perspective_id droppen — nur wenn er noch existiert.
+            // 4. Separater Index auf perspective_id droppen — nur wenn er noch existiert.
             if ($this->indexExists($table, $perspectiveIdx)) {
                 DB::statement("ALTER TABLE `{$table}` DROP INDEX `{$perspectiveIdx}`");
             }
 
-            // 4. Duplikate bereinigen: pro logischem Schluessel
+            // 5. Duplikate bereinigen: pro logischem Schluessel
             //    (dimension_definition_id, linkable_type, linkable_id, dimension_value_id)
             //    bleibt die Row mit niedrigster id (= aelteste) erhalten.
             DB::statement(<<<'SQL'
@@ -64,17 +77,23 @@ return new class extends Migration
                     AND l1.id > l2.id
             SQL);
 
-            // 5. Spalte droppen — sicher, weil alle Referenzen weg sind.
+            // 6. perspective_id-Spalte droppen.
             Schema::table($table, function (Blueprint $blueprint) {
                 $blueprint->dropColumn('perspective_id');
             });
 
-            // 6. Neuen 4-Spalten-Unique anlegen — nur wenn er noch nicht existiert.
+            // 7. Neuen 4-Spalten-Unique anlegen — nur wenn er noch nicht existiert.
             if (!$this->indexExists($table, $compositeUnique)) {
                 DB::statement(
                     "ALTER TABLE `{$table}` ADD UNIQUE KEY `{$compositeUnique}` "
                     . "(`dimension_definition_id`, `linkable_type`, `linkable_id`, `dimension_value_id`)"
                 );
+            }
+
+            // 8. Backup-Index droppen — der neue Unique uebernimmt das Backing fuer
+            //    den FK auf dimension_definition_id.
+            if ($this->indexExists($table, $backupIdx)) {
+                DB::statement("ALTER TABLE `{$table}` DROP INDEX `{$backupIdx}`");
             }
         }
 
@@ -108,7 +127,7 @@ return new class extends Migration
     }
 
     /**
-     * Prueft via information_schema, ob ein Index (Unique oder Standard) existiert.
+     * Prueft via information_schema, ob ein Index existiert.
      */
     protected function indexExists(string $table, string $indexName): bool
     {

@@ -262,6 +262,7 @@
                             @php
                                 $vsmMatrix = $this->vsmMatrix;
                                 $vacancyCount = collect($vsmMatrix)->where('is_vacant', true)->count();
+                                $perspectiveTeamCount = count($this->perspectiveTeamAssignments);
                             @endphp
                             <button
                                 @click="tab = 'vsm'"
@@ -275,6 +276,20 @@
                                 VSM
                                 @if($vacancyCount > 0)
                                     <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-amber-700 bg-amber-100 ring-1 ring-inset ring-amber-600/20 rounded-full" title="{{ $vacancyCount }} unbesetzte Zellen">{{ $vacancyCount }}</span>
+                                @endif
+                            </button>
+                            <button
+                                @click="tab = 'perspective'"
+                                :class="tab === 'perspective'
+                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
+                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                                class="px-4 py-2.5 text-sm transition-colors flex items-center gap-1.5"
+                                title="Welche Plattform-Teams sehen diese Perspektive als Standard?"
+                            >
+                                @svg('heroicon-o-user-group', 'w-4 h-4 inline-block -mt-0.5')
+                                Teams
+                                @if($perspectiveTeamCount > 0)
+                                    <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold text-[var(--ui-muted)] bg-gray-100 ring-1 ring-inset ring-gray-300 rounded-full">{{ $perspectiveTeamCount }}</span>
                                 @endif
                             </button>
                         @endif
@@ -1574,6 +1589,87 @@
                                     @endif
                                 </div>
                             @endforeach
+                        </div>
+                    </div>
+
+                    {{-- Tab: Perspektive ↔ Teams --}}
+                    <div x-show="tab === 'perspective'" x-cloak>
+                        <div class="space-y-4">
+                            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-5">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div>
+                                        <h2 class="text-base font-semibold text-[var(--ui-secondary)]">Perspektive für Plattform-Teams</h2>
+                                        <p class="text-xs text-[var(--ui-muted)] mt-0.5 max-w-2xl">
+                                            Ordne dieser Carrier-Perspektive Plattform-Teams zu. Mitglieder eines Teams ohne explizite Wahl im Org-Modul (z.B. wenn sie das Algedonic-Signal nutzen) bekommen automatisch die hier als <span class="font-medium">Standard</span> markierte Sicht.
+                                        </p>
+                                    </div>
+                                </div>
+
+                                @php($perspectiveTeams = $this->perspectiveTeamAssignments)
+                                @php($availableTeams = $this->perspectiveAvailableTeams)
+
+                                @if(empty($perspectiveTeams))
+                                    <div class="rounded-md border border-dashed border-[var(--ui-border)] bg-gray-50/60 p-4 text-sm text-[var(--ui-muted)]">
+                                        Noch keine Teams zugeordnet. Wähle unten ein Team, um diese Perspektive für dessen Mitglieder verfügbar zu machen.
+                                    </div>
+                                @else
+                                    <div class="divide-y divide-[var(--ui-border)] rounded-md border border-[var(--ui-border)] overflow-hidden">
+                                        @foreach($perspectiveTeams as $pt)
+                                            <div class="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50/60 transition">
+                                                @svg('heroicon-o-user-group', 'w-4 h-4 text-[var(--ui-muted)]')
+                                                <div class="flex-1 min-w-0">
+                                                    <div class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $pt['team_name'] }}</div>
+                                                </div>
+                                                @if($pt['is_default'])
+                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800" title="Standard-Perspektive dieses Teams">
+                                                        @svg('heroicon-s-star', 'w-3 h-3')
+                                                        Standard
+                                                    </span>
+                                                @else
+                                                    <button
+                                                        type="button"
+                                                        wire:click="markPerspectiveTeamDefault({{ $pt['id'] }})"
+                                                        class="text-xs text-[var(--ui-muted)] hover:text-amber-700 hover:underline"
+                                                        title="Als Standard für dieses Team setzen">
+                                                        Als Standard setzen
+                                                    </button>
+                                                @endif
+                                                <button
+                                                    type="button"
+                                                    wire:click="detachTeamFromPerspective({{ $pt['id'] }})"
+                                                    wire:confirm="Team-Zuordnung wirklich entfernen?"
+                                                    class="text-[var(--ui-muted)] hover:text-red-600 transition"
+                                                    title="Zuordnung entfernen">
+                                                    @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                                </button>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+
+                                @if(! empty($availableTeams))
+                                    <div class="mt-4 flex items-center gap-2" x-data="{ pickTeamId: '' }">
+                                        <select
+                                            x-model="pickTeamId"
+                                            class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-[var(--ui-primary)] focus:ring focus:ring-[var(--ui-primary)]/30 text-sm">
+                                            <option value="">Team auswählen …</option>
+                                            @foreach($availableTeams as $t)
+                                                <option value="{{ $t['id'] }}">{{ $t['name'] }}</option>
+                                            @endforeach
+                                        </select>
+                                        <button
+                                            type="button"
+                                            x-bind:disabled="!pickTeamId"
+                                            @click="$wire.attachTeamToPerspective(parseInt(pickTeamId)); pickTeamId = ''"
+                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-[var(--ui-primary)] text-white hover:opacity-90 disabled:opacity-50 transition">
+                                            @svg('heroicon-o-plus', 'w-4 h-4')
+                                            Zuordnen
+                                        </button>
+                                    </div>
+                                @elseif(! empty($perspectiveTeams))
+                                    <p class="mt-3 text-xs text-[var(--ui-muted)]">Alle verfügbaren Teams sind bereits zugeordnet.</p>
+                                @endif
+                            </div>
                         </div>
                     </div>
                 @endif

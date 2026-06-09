@@ -7,6 +7,8 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityVsmAssignment;
+use Platform\Organization\Models\OrganizationPerspectiveTeam;
+use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Models\OrganizationInferenceRun;
 use Platform\Organization\Models\OrganizationSignalInferencePrompt;
 use Platform\Organization\Services\EntityDimensionBridge;
@@ -143,6 +145,110 @@ class Show extends Component
     public function isCarrierEntity(): bool
     {
         return $this->entity->type?->vsm_class === OrganizationEntityType::VSM_CLASS_CARRIER;
+    }
+
+    // ── Perspective ↔ Team Mapping ────────────────────────────
+
+    #[Computed]
+    public function perspectiveTeamAssignments(): array
+    {
+        if (! $this->isCarrierEntity) {
+            return [];
+        }
+        return OrganizationPerspectiveTeam::query()
+            ->where('perspective_entity_id', $this->entity->id)
+            ->with('team:id,name')
+            ->get()
+            ->map(fn ($pt) => [
+                'id' => $pt->id,
+                'team_id' => $pt->team_id,
+                'team_name' => $pt->team?->name ?? '#'.$pt->team_id,
+                'is_default' => (bool) $pt->is_default,
+            ])
+            ->sortByDesc('is_default')
+            ->values()
+            ->all();
+    }
+
+    #[Computed]
+    public function perspectiveAvailableTeams(): array
+    {
+        if (! $this->isCarrierEntity) {
+            return [];
+        }
+        $assigned = OrganizationPerspectiveTeam::query()
+            ->where('perspective_entity_id', $this->entity->id)
+            ->pluck('team_id')
+            ->all();
+
+        return Team::query()
+            ->whereNotIn('id', $assigned)
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->map(fn ($t) => ['id' => $t->id, 'name' => $t->name])
+            ->all();
+    }
+
+    public function attachTeamToPerspective(int $teamId): void
+    {
+        if (! $this->isCarrierEntity) {
+            return;
+        }
+        $team = Team::query()->find($teamId);
+        if (! $team) {
+            return;
+        }
+
+        // Wenn es noch keinen Default fuer dieses Team gibt, neue Zuordnung als Default.
+        $hasDefault = OrganizationPerspectiveTeam::query()
+            ->where('team_id', $teamId)
+            ->where('is_default', true)
+            ->exists();
+
+        OrganizationPerspectiveTeam::updateOrCreate(
+            ['perspective_entity_id' => $this->entity->id, 'team_id' => $teamId],
+            ['is_default' => ! $hasDefault],
+        );
+
+        unset($this->perspectiveTeamAssignments, $this->perspectiveAvailableTeams);
+        session()->flash('message', 'Team ' . $team->name . ' zugeordnet.');
+    }
+
+    public function detachTeamFromPerspective(int $perspectiveTeamId): void
+    {
+        if (! $this->isCarrierEntity) {
+            return;
+        }
+        $pt = OrganizationPerspectiveTeam::query()
+            ->where('id', $perspectiveTeamId)
+            ->where('perspective_entity_id', $this->entity->id)
+            ->first();
+        if (! $pt) {
+            return;
+        }
+        $pt->delete();
+
+        unset($this->perspectiveTeamAssignments, $this->perspectiveAvailableTeams);
+        session()->flash('message', 'Team-Zuordnung entfernt.');
+    }
+
+    public function markPerspectiveTeamDefault(int $perspectiveTeamId): void
+    {
+        if (! $this->isCarrierEntity) {
+            return;
+        }
+        $pt = OrganizationPerspectiveTeam::query()
+            ->where('id', $perspectiveTeamId)
+            ->where('perspective_entity_id', $this->entity->id)
+            ->first();
+        if (! $pt) {
+            return;
+        }
+
+        PerspectiveService::setTeamDefault($this->entity->id, (int) $pt->team_id);
+
+        unset($this->perspectiveTeamAssignments);
+        session()->flash('message', 'Als Standard-Perspektive für dieses Team gesetzt.');
     }
 
     /**

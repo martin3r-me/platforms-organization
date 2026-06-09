@@ -7,8 +7,6 @@ use Platform\Organization\Livewire\Entity\Mindmap as EntityMindmap;
 use Platform\Organization\Livewire\Entity\Board as EntityBoard;
 use Platform\Organization\Livewire\CostCenter\Index as CostCenterIndex;
 use Platform\Organization\Livewire\CostCenter\Show as CostCenterShow;
-use Platform\Organization\Livewire\Perspective\Index as PerspectiveIndex;
-use Platform\Organization\Livewire\Perspective\Show as PerspectiveShow;
 use Platform\Organization\Livewire\Settings\EntityType\Index as EntityTypeIndex;
 use Platform\Organization\Livewire\Settings\EntityType\Show as EntityTypeShow;
 use Platform\Organization\Livewire\Settings\EntityTypeGroup\Index as EntityTypeGroupIndex;
@@ -75,10 +73,6 @@ Route::get('/synthesis-reports/{report}', SynthesisShow::class)->name('organizat
 // Dimensionen: Kostenstellen
 Route::get('/cost-centers', CostCenterIndex::class)->name('organization.cost-centers.index');
 Route::get('/cost-centers/{costCenter}', CostCenterShow::class)->name('organization.cost-centers.show');
-
-// Dimensionen: Perspektiven
-Route::get('/perspectives', PerspectiveIndex::class)->name('organization.perspectives.index');
-Route::get('/perspectives/{perspective}', PerspectiveShow::class)->name('organization.perspectives.show');
 
 // Settings: Entity Types
 Route::get('/settings/entity-types', EntityTypeIndex::class)->name('organization.settings.entity-types.index');

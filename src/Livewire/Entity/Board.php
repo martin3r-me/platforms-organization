@@ -13,9 +13,7 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationSignal;
-use Platform\Organization\Services\EntityHierarchyResolver;
 use Platform\Organization\Services\EnvironmentMovementService;
-use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
 
 class Board extends Component
@@ -74,22 +72,12 @@ class Board extends Component
     #[Computed]
     public function boardData(): array
     {
-        $user = auth()->user();
         $teamId = $this->entity->team_id;
-        $perspective = PerspectiveService::getActive($teamId, $user->id);
-        $resolver = resolve(EntityHierarchyResolver::class);
 
-        // 1. Load entities (perspective-aware)
-        $query = OrganizationEntity::forTeam($teamId)
+        $entities = OrganizationEntity::forTeam($teamId)
             ->active()
-            ->with(['type.group']);
-
-        if (!$resolver->isDefaultHierarchy($perspective)) {
-            $perspectiveEntityIds = $resolver->entityIdsInPerspective($perspective, $teamId);
-            $query->whereIn('id', $perspectiveEntityIds);
-        }
-
-        $entities = $query->get();
+            ->with(['type.group'])
+            ->get();
         $entityIds = $entities->pluck('id')->all();
 
         // 2. VSM Dimension Links

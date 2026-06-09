@@ -300,55 +300,6 @@ class OrganizationEntity extends Model
     }
 
     /**
-     * All hierarchy entries across perspectives.
-     */
-    public function hierarchyEntries()
-    {
-        return $this->hasMany(OrganizationEntityHierarchy::class, 'entity_id');
-    }
-
-    /**
-     * Get the parent entity for a specific perspective.
-     * Default perspective: returns the standard parent relationship.
-     * Non-default: reads from hierarchy table.
-     */
-    public function perspectiveParent(OrganizationPerspective $perspective): ?self
-    {
-        if ($perspective->is_default) {
-            return $this->parent;
-        }
-
-        $hierarchy = OrganizationEntityHierarchy::where('perspective_id', $perspective->id)
-            ->where('entity_id', $this->id)
-            ->first();
-
-        if (!$hierarchy || !$hierarchy->parent_entity_id) {
-            return null;
-        }
-
-        return static::find($hierarchy->parent_entity_id);
-    }
-
-    /**
-     * Get child entities for a specific perspective.
-     * Default perspective: returns the standard children relationship.
-     * Non-default: reads from hierarchy table.
-     */
-    public function perspectiveChildren(OrganizationPerspective $perspective)
-    {
-        if ($perspective->is_default) {
-            return $this->children()->get();
-        }
-
-        $childIds = OrganizationEntityHierarchy::where('perspective_id', $perspective->id)
-            ->where('parent_entity_id', $this->id)
-            ->orderBy('sort_order')
-            ->pluck('entity_id');
-
-        return static::whereIn('id', $childIds)->orderBy('name')->get();
-    }
-
-    /**
      * Skills (Person ↔ Skill)
      */
     public function skills(): BelongsToMany

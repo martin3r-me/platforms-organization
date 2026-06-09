@@ -15,7 +15,6 @@ class OrganizationDimensionLink extends Model
         'dimension_value_id',
         'linkable_type',
         'linkable_id',
-        'perspective_id',
         'start_date',
         'end_date',
         'percentage',
@@ -53,11 +52,6 @@ class OrganizationDimensionLink extends Model
         return $this->belongsTo(OrganizationDimensionValue::class, 'dimension_value_id');
     }
 
-    public function perspective()
-    {
-        return $this->belongsTo(OrganizationPerspective::class, 'perspective_id');
-    }
-
     public function linkable()
     {
         return $this->morphTo();
@@ -66,29 +60,6 @@ class OrganizationDimensionLink extends Model
     public function team()
     {
         return $this->belongsTo(\Platform\Core\Models\Team::class);
-    }
-
-    /**
-     * Links without perspective = universal (gelten überall)
-     */
-    public function scopeUniversal($query)
-    {
-        return $query->whereNull('perspective_id');
-    }
-
-    /**
-     * Links for a specific perspective (including universal ones)
-     */
-    public function scopeForPerspective($query, ?int $perspectiveId)
-    {
-        if ($perspectiveId) {
-            return $query->where(function ($q) use ($perspectiveId) {
-                $q->where('perspective_id', $perspectiveId)
-                    ->orWhereNull('perspective_id');
-            });
-        }
-
-        return $query->whereNull('perspective_id');
     }
 
     public function scopeForDimension($query, string $dimensionKey)

@@ -4,7 +4,6 @@ namespace Platform\Organization\Services;
 
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
-use Platform\Organization\Models\OrganizationPerspective;
 
 class EntityHierarchyService
 {
@@ -26,18 +25,11 @@ class EntityHierarchyService
     /**
      * Batch-collect descendant entity IDs for multiple roots using a single recursive CTE.
      * Returns: [rootId => [descendantId, ...]]
-     *
-     * If a non-default perspective is provided, the CTE walks the hierarchy table instead.
      */
-    public function getAllDescendantMap(array $rootIds, ?OrganizationPerspective $perspective = null): array
+    public function getAllDescendantMap(array $rootIds): array
     {
         if (empty($rootIds)) {
             return [];
-        }
-
-        // Non-default perspective: delegate to EntityHierarchyResolver
-        if ($perspective && !$perspective->is_default) {
-            return resolve(EntityHierarchyResolver::class)->getAllDescendantMap($rootIds, $perspective);
         }
 
         $placeholders = implode(',', array_fill(0, count($rootIds), '?'));

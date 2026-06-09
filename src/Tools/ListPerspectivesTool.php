@@ -6,10 +6,12 @@ use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
-use Platform\Organization\Models\OrganizationDimensionLink;
-use Platform\Organization\Models\OrganizationPerspective;
 use Platform\Organization\Services\PerspectiveService;
 
+/**
+ * Perspektive = aus Sicht welcher Carrier-Entity wir lesen.
+ * Listet alle Carrier-Entities des Teams als waehlbare Perspektiven.
+ */
 class ListPerspectivesTool implements ToolContract, ToolMetadataContract
 {
     public function getName(): string
@@ -19,19 +21,14 @@ class ListPerspectivesTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/perspectives - Listet Perspektiven des Teams. Eine Perspektive ist ein benannter Blickwinkel auf die Organisation — bestimmt, welche VSM-Rollen Entities haben. Die aktive Perspektive beeinflusst VSM-Zuweisungen in allen Organization-Tools.';
+        return 'GET /organization/perspectives - Listet Carrier-Entities des Teams als waehlbare Perspektiven. Eine Perspektive ist die Carrier-Entity, aus deren Sicht VSM-Daten gelesen werden. Aktive Perspektive beeinflusst nachfolgende Organization-Tool-Aufrufe.';
     }
 
     public function getSchema(): array
     {
         return [
             'type' => 'object',
-            'properties' => [
-                'include_entity_count' => [
-                    'type' => 'boolean',
-                    'description' => 'Optional: Anzahl der Entities pro Perspektive mitzählen. Default: false.',
-                ],
-            ],
+            'properties' => [],
         ];
     }
 
@@ -41,35 +38,23 @@ class ListPerspectivesTool implements ToolContract, ToolMetadataContract
             $teamId = $context->getTeamId();
             $userId = $context->getUserId();
 
-            $perspectives = PerspectiveService::getForTeam($teamId);
-            $activePerspective = PerspectiveService::getActive($teamId, $userId);
-            $includeCount = (bool) ($arguments['include_entity_count'] ?? false);
+            $carriers = PerspectiveService::getCarriersForTeam($teamId);
+            $active = PerspectiveService::getActiveEntity($teamId, $userId);
 
-            $items = $perspectives->map(function ($p) use ($activePerspective, $includeCount) {
-                $item = [
-                    'id' => $p->id,
-                    'uuid' => $p->uuid,
-                    'name' => $p->name,
-                    'description' => $p->description,
-                    'is_default' => (bool) $p->is_default,
-                    'is_active' => $p->id === $activePerspective->id,
-                    'created_at' => $p->created_at?->toIso8601String(),
-                ];
-
-                if ($includeCount) {
-                    $item['entities_in_view'] = OrganizationDimensionLink::where('perspective_id', $p->id)
-                        ->where('linkable_type', 'organization_entity')
-                        ->distinct('linkable_id')
-                        ->count('linkable_id');
-                }
-
-                return $item;
-            })->values()->toArray();
+            $items = $carriers->map(fn ($e) => [
+                'entity_id' => $e->id,
+                'uuid' => $e->uuid,
+                'name' => $e->name,
+                'code' => $e->code,
+                'type' => $e->type?->name,
+                'is_root' => $e->parent_entity_id === null,
+                'is_active' => $active && $e->id === $active->id,
+            ])->values()->toArray();
 
             return ToolResult::success([
                 'data' => $items,
                 'count' => count($items),
-                'active_perspective_id' => $activePerspective->id,
+                'active_perspective_entity_id' => $active?->id,
             ]);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Laden der Perspektiven: ' . $e->getMessage());
@@ -80,7 +65,7 @@ class ListPerspectivesTool implements ToolContract, ToolMetadataContract
     {
         return [
             'category' => 'read',
-            'tags' => ['organization', 'perspectives', 'vsm', 'dimensions'],
+            'tags' => ['organization', 'perspectives', 'vsm', 'carrier'],
             'read_only' => true,
             'requires_auth' => true,
             'requires_team' => true,

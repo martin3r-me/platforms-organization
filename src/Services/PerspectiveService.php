@@ -3,103 +3,81 @@
 namespace Platform\Organization\Services;
 
 use Illuminate\Database\Eloquent\Collection;
-use Platform\Organization\Models\OrganizationDimensionLink;
 use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationPerspective;
+use Platform\Organization\Models\OrganizationEntityType;
 
+/**
+ * Perspektive = aus Sicht welcher Carrier-Entity wir gerade lesen.
+ *
+ * Reiner UI-State (Session). Keine DB-Persistenz noetig — datentechnisch
+ * Relevantes (entity_vsm_assignments.perspective_entity_id,
+ * signals.perspective_entity_id) traegt seine Sicht selbst.
+ */
 class PerspectiveService
 {
-    /**
-     * Get all entities that have at least one dimension assignment in this perspective.
-     * A perspective is a flat collection of dimension-links — an entity is "in view"
-     * if it has any dimension_link with this perspective_id.
-     */
-    public function entitiesInView(OrganizationPerspective $perspective): Collection
-    {
-        $entityIds = OrganizationDimensionLink::where('perspective_id', $perspective->id)
-            ->where('linkable_type', 'organization_entity')
-            ->pluck('linkable_id')
-            ->unique();
-
-        return OrganizationEntity::whereIn('id', $entityIds)
-            ->with(['type', 'parent'])
-            ->orderBy('name')
-            ->get();
-    }
+    public const SESSION_KEY = 'current_perspective_entity_id';
 
     /**
-     * Get dimension assignments for a specific entity within a perspective.
-     * Returns universal (perspective_id = null) + perspective-specific links.
+     * Aktive Perspektiv-Entity der Session. Fallback = Default = Root-Carrier des Teams.
      */
-    public function getDimensionsForEntity(int $entityId, OrganizationPerspective $perspective): \Illuminate\Support\Collection
+    public static function getActiveEntity(int $teamId, ?int $userId = null): ?OrganizationEntity
     {
-        return OrganizationDimensionLink::where('linkable_type', 'organization_entity')
-            ->where('linkable_id', $entityId)
-            ->forPerspective($perspective->id)
-            ->with(['definition', 'value'])
-            ->get()
-            ->groupBy(fn ($link) => $link->definition?->key);
-    }
-
-    /**
-     * Check if an entity is visible in a given perspective.
-     */
-    public function isEntityInView(int $entityId, OrganizationPerspective $perspective): bool
-    {
-        return OrganizationDimensionLink::where('perspective_id', $perspective->id)
-            ->where('linkable_type', 'organization_entity')
-            ->where('linkable_id', $entityId)
-            ->exists();
-    }
-
-    /**
-     * Get the active perspective for a user in a team.
-     * Priority: session override → team default → auto-create default.
-     */
-    public static function getActive(int $teamId, ?int $userId = null): OrganizationPerspective
-    {
-        // 1. Session override
-        $sessionPerspectiveId = session('current_perspective_id');
-        if ($sessionPerspectiveId) {
-            $perspective = OrganizationPerspective::where('id', $sessionPerspectiveId)
+        $sessionEntityId = session(self::SESSION_KEY);
+        if ($sessionEntityId) {
+            $entity = OrganizationEntity::with('type')
+                ->where('id', $sessionEntityId)
                 ->where('team_id', $teamId)
                 ->first();
-            if ($perspective) {
-                return $perspective;
+            if ($entity && $entity->type?->vsm_class === OrganizationEntityType::VSM_CLASS_CARRIER) {
+                return $entity;
             }
-            // Invalid session value — clear it
-            session()->forget('current_perspective_id');
+            session()->forget(self::SESSION_KEY);
         }
 
-        // 2. Team default (or auto-create)
-        return OrganizationPerspective::getOrCreateDefault($teamId, $userId);
+        return self::getDefaultEntity($teamId);
     }
 
     /**
-     * Switch the active perspective for the current session.
+     * Default-Perspektive = Root-Carrier des Teams (das oberste lebensfaehige System).
      */
-    public static function switchTo(int $perspectiveId, int $teamId): ?OrganizationPerspective
+    public static function getDefaultEntity(int $teamId): ?OrganizationEntity
     {
-        $perspective = OrganizationPerspective::where('id', $perspectiveId)
+        return OrganizationEntity::with('type')
+            ->forTeam($teamId)
+            ->whereNull('parent_entity_id')
+            ->whereHas('type', fn ($q) => $q->where('vsm_class', OrganizationEntityType::VSM_CLASS_CARRIER))
+            ->orderBy('id')
+            ->first();
+    }
+
+    /**
+     * Switch in Session. Lehnt Nicht-Carrier ab.
+     */
+    public static function setActiveEntity(int $entityId, int $teamId): ?OrganizationEntity
+    {
+        $entity = OrganizationEntity::with('type')
+            ->where('id', $entityId)
             ->where('team_id', $teamId)
             ->first();
 
-        if (!$perspective) {
+        if (!$entity || $entity->type?->vsm_class !== OrganizationEntityType::VSM_CLASS_CARRIER) {
             return null;
         }
 
-        session(['current_perspective_id' => $perspective->id]);
+        session([self::SESSION_KEY => $entity->id]);
 
-        return $perspective;
+        return $entity;
     }
 
     /**
-     * Get all available perspectives for a team.
+     * Alle Carrier-Entities eines Teams als waehlbare Perspektiven.
      */
-    public static function getForTeam(int $teamId): Collection
+    public static function getCarriersForTeam(int $teamId): Collection
     {
-        return OrganizationPerspective::where('team_id', $teamId)
-            ->orderByDesc('is_default')
+        return OrganizationEntity::with('type')
+            ->forTeam($teamId)
+            ->active()
+            ->whereHas('type', fn ($q) => $q->where('vsm_class', OrganizationEntityType::VSM_CLASS_CARRIER))
             ->orderBy('name')
             ->get();
     }

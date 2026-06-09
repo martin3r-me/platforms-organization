@@ -179,9 +179,6 @@ class DimensionLinkService
             ->where('linkable_type', $contextType)
             ->where('linkable_id', $contextId);
 
-        if ($perspectiveId) {
-            $query->forPerspective($perspectiveId);
-        }
 
         $links = $query->with('value')->get();
 
@@ -276,9 +273,6 @@ class DimensionLinkService
         $query = OrganizationDimensionLink::where('dimension_definition_id', $def->id)
             ->where('dimension_value_id', $dimensionValueId);
 
-        if ($perspectiveId) {
-            $query->forPerspective($perspectiveId);
-        }
 
         $links = $query->get();
         $grouped = $links->groupBy('linkable_type');

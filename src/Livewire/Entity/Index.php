@@ -11,8 +11,6 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntityTypeGroup;
 use Platform\Organization\Models\OrganizationSignal;
-use Platform\Organization\Services\EntityHierarchyResolver;
-use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
 
 class Index extends Component
@@ -66,18 +64,10 @@ class Index extends Component
         unset($this->entities, $this->stats, $this->parentEntities, $this->entityMovements, $this->vsmSystemMap, $this->signalCounts);
     }
 
-    protected function getActivePerspective()
-    {
-        $user = auth()->user();
-        return PerspectiveService::getActive($user->currentTeam->id, $user->id);
-    }
-
     #[Computed]
     public function entities()
     {
         $teamId = auth()->user()->currentTeam->id;
-        $perspective = $this->getActivePerspective();
-        $resolver = resolve(EntityHierarchyResolver::class);
 
         $query = OrganizationEntity::query()
             ->with([
@@ -92,12 +82,6 @@ class Index extends Component
                 'relationsTo.fromEntity.type'
             ])
             ->forTeam($teamId);
-
-        // Non-default perspective: restrict to entities in this perspective
-        if (!$resolver->isDefaultHierarchy($perspective)) {
-            $perspectiveEntityIds = $resolver->entityIdsInPerspective($perspective, $teamId);
-            $query->whereIn('id', $perspectiveEntityIds);
-        }
 
         // Suche
         if ($this->search) {
@@ -156,20 +140,11 @@ class Index extends Component
             }
         }
 
-        // For non-default perspectives, use the perspective's parent map for root detection.
-        $usePerspectiveRoots = !$resolver->isDefaultHierarchy($perspective);
-        $perspectiveParentMap = $usePerspectiveRoots
-            ? $resolver->getParentMap($perspective, $teamId)
-            : [];
-
         $rootsByGroup = $entitiesByGroup
-            ->map(function ($groupEntities) use ($sortSiblings, $usePerspectiveRoots, $perspectiveParentMap) {
+            ->map(function ($groupEntities) use ($sortSiblings) {
                 $groupIds = $groupEntities->pluck('id')->all();
 
-                $roots = $groupEntities->filter(function ($e) use ($groupIds, $usePerspectiveRoots, $perspectiveParentMap) {
-                    if ($usePerspectiveRoots) {
-                        return ($perspectiveParentMap[$e->id] ?? null) === null;
-                    }
+                $roots = $groupEntities->filter(function ($e) use ($groupIds) {
                     return $e->parent_entity_id === null || !in_array($e->parent_entity_id, $groupIds);
                 });
 
@@ -207,20 +182,12 @@ class Index extends Component
     public function parentEntities()
     {
         $teamId = auth()->user()->currentTeam->id;
-        $perspective = $this->getActivePerspective();
-        $resolver = resolve(EntityHierarchyResolver::class);
 
-        $query = OrganizationEntity::active()
+        return OrganizationEntity::active()
             ->forTeam($teamId)
             ->with('type')
-            ->orderBy('name');
-
-        if (!$resolver->isDefaultHierarchy($perspective)) {
-            $ids = $resolver->entityIdsInPerspective($perspective, $teamId);
-            $query->whereIn('id', $ids);
-        }
-
-        return $query->get();
+            ->orderBy('name')
+            ->get();
     }
 
     #[Computed]
@@ -279,16 +246,8 @@ class Index extends Component
     public function stats()
     {
         $teamId = auth()->user()->currentTeam->id;
-        $perspective = $this->getActivePerspective();
-        $resolver = resolve(EntityHierarchyResolver::class);
 
-        $baseQuery = OrganizationEntity::forTeam($teamId);
-        if (!$resolver->isDefaultHierarchy($perspective)) {
-            $ids = $resolver->entityIdsInPerspective($perspective, $teamId);
-            $baseQuery->whereIn('id', $ids);
-        }
-
-        $all = (clone $baseQuery)->get();
+        $all = OrganizationEntity::forTeam($teamId)->get();
 
         return [
             'total' => $all->count(),

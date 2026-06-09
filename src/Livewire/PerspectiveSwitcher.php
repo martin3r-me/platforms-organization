@@ -5,84 +5,74 @@ namespace Platform\Organization\Livewire;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\On;
 use Livewire\Component;
-use Platform\Organization\Models\OrganizationPerspective;
 use Platform\Organization\Services\PerspectiveService;
 
+/**
+ * Perspektive = aktive Carrier-Entity in der Session.
+ * Kein eigenes Perspective-Modell mehr.
+ */
 class PerspectiveSwitcher extends Component
 {
     public $show = false;
-    public $perspectives = [];
-    public $currentPerspective = null;
-    public ?int $currentPerspectiveId = null;
-    public ?string $currentPerspectiveName = null;
-    public int $entitiesInViewCount = 0;
+    public array $carriers = [];
+    public ?int $activeEntityId = null;
+    public ?string $activeEntityName = null;
 
     public function mount(): void
     {
-        $this->loadCurrentPerspective();
-        $this->loadPerspectives();
+        $this->load();
     }
 
     #[On('open-perspective-switcher')]
     public function openSwitcher(): void
     {
         $this->show = true;
-        $this->loadPerspectives();
+        $this->load();
     }
 
-    public function loadCurrentPerspective(): void
+    public function load(): void
     {
         $user = Auth::user();
         if (!$user?->currentTeam) {
             return;
         }
 
-        $perspective = PerspectiveService::getActive($user->currentTeam->id, $user->id);
-        $this->currentPerspectiveId = $perspective->id;
-        $this->currentPerspectiveName = $perspective->name;
+        $active = PerspectiveService::getActiveEntity($user->currentTeam->id, $user->id);
+        $this->activeEntityId = $active?->id;
+        $this->activeEntityName = $active?->name;
 
-        $service = new PerspectiveService();
-        $this->entitiesInViewCount = $service->entitiesInView($perspective)->count();
-    }
-
-    public function loadPerspectives(): void
-    {
-        $user = Auth::user();
-        if (!$user?->currentTeam) {
-            return;
-        }
-
-        $this->perspectives = PerspectiveService::getForTeam($user->currentTeam->id)
-            ->map(fn ($p) => [
-                'id' => $p->id,
-                'name' => $p->name,
-                'description' => $p->description,
-                'is_default' => $p->is_default,
-                'is_active' => $p->id === $this->currentPerspectiveId,
+        $this->carriers = PerspectiveService::getCarriersForTeam($user->currentTeam->id)
+            ->map(fn ($e) => [
+                'id' => $e->id,
+                'name' => $e->name,
+                'code' => $e->code,
+                'type_name' => $e->type?->name,
+                'is_active' => $e->id === $this->activeEntityId,
+                'is_root' => $e->parent_entity_id === null,
             ])
+            ->values()
             ->toArray();
     }
 
-    public function switchPerspective(int $perspectiveId): void
+    public function switchPerspective(int $entityId): void
     {
         $user = Auth::user();
         if (!$user?->currentTeam) {
             return;
         }
 
-        $perspective = PerspectiveService::switchTo($perspectiveId, $user->currentTeam->id);
-        if (!$perspective) {
+        $entity = PerspectiveService::setActiveEntity($entityId, $user->currentTeam->id);
+        if (!$entity) {
             return;
         }
 
-        $this->currentPerspectiveId = $perspective->id;
-        $this->currentPerspectiveName = $perspective->name;
+        $this->activeEntityId = $entity->id;
+        $this->activeEntityName = $entity->name;
         $this->show = false;
 
-        $service = new PerspectiveService();
-        $this->entitiesInViewCount = $service->entitiesInView($perspective)->count();
+        $this->load();
 
-        $this->dispatch('perspective-switched', perspectiveId: $perspectiveId);
+        $this->dispatch('perspective-switched', perspectiveEntityId: $entityId);
     }
 
     public function render()

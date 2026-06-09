@@ -14,9 +14,7 @@ use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationTeamSnapshot;
-use Platform\Organization\Services\EntityHierarchyResolver;
 use Platform\Organization\Services\EntityLinkRegistry;
-use Platform\Organization\Services\PerspectiveService;
 
 class Mindmap extends Component
 {
@@ -301,36 +299,19 @@ class Mindmap extends Component
 
     protected function graphDataLive(): array
     {
-        $user = auth()->user();
         $teamId = $this->entity->team_id;
-        $perspective = PerspectiveService::getActive($teamId, $user->id);
-        $resolver = resolve(EntityHierarchyResolver::class);
 
-        $query = OrganizationEntity::forTeam($teamId)
+        $entities = OrganizationEntity::forTeam($teamId)
             ->active()
-            ->with(['type.group']);
-
-        // Filter entities by perspective
-        if (!$resolver->isDefaultHierarchy($perspective)) {
-            $perspectiveEntityIds = $resolver->entityIdsInPerspective($perspective, $teamId);
-            $query->whereIn('id', $perspectiveEntityIds);
-        }
-
-        $entities = $query->get();
+            ->with(['type.group'])
+            ->get();
 
         $nodes = [];
         $links = [];
 
-        // Build depth map and parent set from hierarchy — perspective-aware
-        if (!$resolver->isDefaultHierarchy($perspective)) {
-            $parentMap = $resolver->getParentMap($perspective, $teamId);
-            $depthMap = $this->buildDepthMapFromParentMap($parentMap);
-            $parentIds = collect($parentMap)->filter()->unique()->flip();
-        } else {
-            $depthMap = $this->buildDepthMap($entities);
-            $parentIds = $entities->pluck('parent_entity_id')->filter()->unique()->flip();
-            $parentMap = null;
-        }
+        $depthMap = $this->buildDepthMap($entities);
+        $parentIds = $entities->pluck('parent_entity_id')->filter()->unique()->flip();
+        $parentMap = null;
 
         // Latest snapshots
         $latestSnapshots = OrganizationEntitySnapshot::query()

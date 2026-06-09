@@ -10,12 +10,11 @@ use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationMemoryEntry;
-use Platform\Organization\Models\OrganizationPerspective;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Models\OrganizationSignalInferencePrompt;
 use Platform\Organization\Models\OrganizationVsmFunction;
 use Platform\Organization\Services\EntityDimensionBridge;
-use Platform\Organization\Services\EntityHierarchyResolver;
+use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
@@ -50,9 +49,9 @@ class EvaluateSignalInferenceTool implements ToolContract, ToolMetadataContract
                     'type' => 'string',
                     'description' => 'Optional: Alle aktiven Prompts eines VSM-Systems evaluieren (s1, s2, s3, s3_star, s4, s5).',
                 ],
-                'perspective_id' => [
+                'perspective_entity_id' => [
                     'type' => 'integer',
-                    'description' => 'Optional: Spezifische Perspektive für Entity-Hierarchie. Default: Team-Default-Perspektive.',
+                    'description' => 'Optional: Carrier-Entity, aus deren Sicht evaluiert werden soll. Default: Root-Carrier des Teams.',
                 ],
             ],
             'required' => [],
@@ -77,10 +76,9 @@ class EvaluateSignalInferenceTool implements ToolContract, ToolMetadataContract
                 ]);
             }
 
-            // Resolve perspective
-            $perspective = $this->resolvePerspective($arguments, $rootTeamId, $context->user?->id);
+            // Resolve perspective (Carrier-Entity)
+            $perspectiveEntity = $this->resolvePerspectiveEntity($arguments, $rootTeamId, $context->user?->id);
 
-            $hierarchyResolver = resolve(EntityHierarchyResolver::class);
             $movementService = resolve(SnapshotMovementService::class);
 
             $evaluations = [];
@@ -193,10 +191,10 @@ class EvaluateSignalInferenceTool implements ToolContract, ToolMetadataContract
                         'dimension' => $prompt->dimension,
                         'default_severity' => $prompt->default_severity,
                     ],
-                    'perspective' => [
-                        'id' => $perspective->id,
-                        'name' => $perspective->name,
-                    ],
+                    'perspective' => $perspectiveEntity ? [
+                        'entity_id' => $perspectiveEntity->id,
+                        'name' => $perspectiveEntity->name,
+                    ] : null,
                     'entities' => $entityData,
                     'communication_summary' => $communicationSummary,
                     'existing_signals' => $existingSignals,
@@ -237,18 +235,16 @@ class EvaluateSignalInferenceTool implements ToolContract, ToolMetadataContract
         return $query->orderBy('created_at')->limit(10)->get();
     }
 
-    protected function resolvePerspective(array $arguments, int $rootTeamId, ?int $userId): OrganizationPerspective
+    protected function resolvePerspectiveEntity(array $arguments, int $rootTeamId, ?int $userId): ?OrganizationEntity
     {
-        if (! empty($arguments['perspective_id'])) {
-            $perspective = OrganizationPerspective::where('team_id', $rootTeamId)
-                ->where('id', (int) $arguments['perspective_id'])
-                ->first();
-            if ($perspective) {
-                return $perspective;
+        if (! empty($arguments['perspective_entity_id'])) {
+            $entity = PerspectiveService::setActiveEntity((int) $arguments['perspective_entity_id'], $rootTeamId);
+            if ($entity) {
+                return $entity;
             }
         }
 
-        return OrganizationPerspective::getOrCreateDefault($rootTeamId, $userId);
+        return PerspectiveService::getDefaultEntity($rootTeamId);
     }
 
     protected function resolveScope(OrganizationSignalInferencePrompt $prompt, int $teamId): array

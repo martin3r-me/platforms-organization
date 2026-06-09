@@ -187,8 +187,10 @@
             <x-ui-table-header>
                 @if($view === 'archive')
                     <x-ui-table-header-cell compact="true" class="w-8">
-                        @php($visibleIds = $this->signals->pluck('id')->all())
-                        @php($allSelected = ! empty($visibleIds) && count(array_intersect($visibleIds, $selectedIds)) === count($visibleIds))
+                        @php
+                            $visibleIds = $this->signals->pluck('id')->all();
+                            $allSelected = ! empty($visibleIds) && count(array_intersect($visibleIds, $selectedIds)) === count($visibleIds);
+                        @endphp
                         <input
                             type="checkbox"
                             wire:click="toggleSelectAll"
@@ -210,7 +212,9 @@
 
             <x-ui-table-body>
                 @forelse($this->signals as $signal)
-                    @php($isFocused = in_array($signal->id, $focusedIds, true))
+                    @php
+                        $isFocused = in_array($signal->id, $focusedIds, true);
+                    @endphp
                     <x-ui-table-row compact="true">
                         @if($view === 'archive')
                             <x-ui-table-cell compact="true">
@@ -334,7 +338,9 @@
                             @endif
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
-                            @php($dateColumn = $view === 'archive' ? ($signal->resolved_at ?? $signal->created_at) : $signal->created_at)
+                            @php
+                                $dateColumn = $view === 'archive' ? ($signal->resolved_at ?? $signal->created_at) : $signal->created_at;
+                            @endphp
                             <div class="text-sm text-[var(--ui-muted)]" title="{{ $dateColumn->format('d.m.Y H:i') }}">
                                 {{ $dateColumn->diffForHumans() }}
                             </div>

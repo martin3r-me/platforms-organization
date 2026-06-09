@@ -275,7 +275,9 @@
                             @endif
 
                             {{-- Routing-Mikrozeile: VSM, Owner, Deadline, Eskalation --}}
-                            @php($isOverdue = $signal->deadline_at && $signal->status === 'open' && $signal->deadline_at->isPast())
+                            @php
+                                $isOverdue = $signal->deadline_at && $signal->status === 'open' && $signal->deadline_at->isPast();
+                            @endphp
                             @if($signal->vsm_level || $signal->current_owner_entity_id || $signal->deadline_at || $signal->escalated_at)
                                 <div class="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
                                     @if($signal->vsm_level)

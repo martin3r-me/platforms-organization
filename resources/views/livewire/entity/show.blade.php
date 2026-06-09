@@ -1248,7 +1248,9 @@
                                                     @endif
 
                                                     {{-- Routing-Zeile: VSM-Level, Owner, Deadline, Eskalations-/Aggregations-Marker --}}
-                                                    @php($isOverdue = $signal->deadline_at && $signal->status === 'open' && $signal->deadline_at->isPast())
+                                                    @php
+                                                        $isOverdue = $signal->deadline_at && $signal->status === 'open' && $signal->deadline_at->isPast();
+                                                    @endphp
                                                     @if($signal->vsm_level || $signal->current_owner_entity_id || $signal->deadline_at || $signal->escalated_at || $signal->source_type === 'aggregation' || $signal->createdByAgent)
                                                         <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
                                                             @if($signal->vsm_level)

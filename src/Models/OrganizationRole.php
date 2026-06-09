@@ -30,8 +30,26 @@ class OrganizationRole extends Model
         'name',
         'slug',
         'description',
+        'vsm_system',
         'status',
         'owner_entity_id',
+    ];
+
+    /**
+     * Erlaubte VSM-Systeme — synchron mit OrganizationEntityVsmAssignment::VSM_SYSTEMS.
+     */
+    public const VSM_SYSTEMS = ['s1', 's2', 's3', 's3_star', 's4', 's5'];
+
+    /**
+     * Lesbare Labels fuer UI-Anzeige.
+     */
+    public const VSM_LABELS = [
+        's1' => 'S1 · Operation',
+        's2' => 'S2 · Koordination',
+        's3' => 'S3 · Kontrolle',
+        's3_star' => 'S3* · Audit',
+        's4' => 'S4 · Intelligenz',
+        's5' => 'S5 · Identität',
     ];
 
     protected static function booted(): void

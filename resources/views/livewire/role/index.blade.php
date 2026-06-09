@@ -67,6 +67,19 @@
 
             <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" rows="3" />
 
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-2">
+                    VSM-Funktion
+                    <span class="ml-1 text-xs font-normal text-gray-500">— wenn diese Rolle einer Beer'schen System-Funktion entspricht (z.B. GF → S3, Inhaber → S5)</span>
+                </label>
+                <select wire:model.live="form.vsm_system" class="w-full rounded-md border-gray-300 shadow-sm">
+                    <option value="">– keine VSM-Bedeutung –</option>
+                    @foreach(\Platform\Organization\Models\OrganizationRole::VSM_LABELS as $code => $label)
+                        <option value="{{ $code }}">{{ $label }}</option>
+                    @endforeach
+                </select>
+            </div>
+
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>

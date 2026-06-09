@@ -69,6 +69,7 @@ class ListRolesTool implements ToolContract, ToolMetadataContract
                 'name'        => $r->name,
                 'slug'        => $r->slug,
                 'description' => $r->description,
+                'vsm_system'  => $r->vsm_system,
                 'status'      => $r->status,
                 'team_id'     => $r->team_id,
             ])->values()->toArray();

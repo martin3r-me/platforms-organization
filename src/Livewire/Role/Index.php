@@ -31,6 +31,7 @@ class Index extends Component
         'name' => '',
         'slug' => '',
         'description' => '',
+        'vsm_system' => '',
         'status' => 'active',
         'owner_entity_id' => '',
     ];
@@ -46,6 +47,7 @@ class Index extends Component
             'form.name'        => ['required', 'string', 'max:255'],
             'form.slug'        => ['nullable', 'string', 'max:255'],
             'form.description' => ['nullable', 'string'],
+            'form.vsm_system'      => ['nullable', 'in:s1,s2,s3,s3_star,s4,s5'],
             'form.status'          => ['required', 'in:active,archived'],
             'form.owner_entity_id' => ['nullable', 'integer', 'exists:organization_entities,id'],
         ];
@@ -180,6 +182,7 @@ class Index extends Component
             'name'            => (string) $role->name,
             'slug'            => (string) ($role->slug ?? ''),
             'description'     => (string) ($role->description ?? ''),
+            'vsm_system'      => (string) ($role->vsm_system ?? ''),
             'status'          => (string) ($role->status ?? 'active'),
             'owner_entity_id' => (string) ($role->owner_entity_id ?? ''),
         ];
@@ -194,6 +197,7 @@ class Index extends Component
             'name'            => trim($data['name']),
             'slug'            => $data['slug'] !== '' ? $data['slug'] : null,
             'description'     => $data['description'] !== '' ? $data['description'] : null,
+            'vsm_system'      => $data['vsm_system'] !== '' ? $data['vsm_system'] : null,
             'status'          => $data['status'],
             'owner_entity_id' => $data['owner_entity_id'] !== '' ? (int) $data['owner_entity_id'] : null,
         ];

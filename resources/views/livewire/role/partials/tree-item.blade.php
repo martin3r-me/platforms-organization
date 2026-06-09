@@ -10,6 +10,12 @@
                 <x-ui-badge variant="{{ $item->status === 'active' ? 'success' : 'muted' }}" size="sm">
                     {{ ucfirst($item->status) }}
                 </x-ui-badge>
+                @if($item->vsm_system)
+                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold bg-indigo-100 text-indigo-700 tracking-wider"
+                          title="VSM-Funktion: {{ \Platform\Organization\Models\OrganizationRole::VSM_LABELS[$item->vsm_system] ?? $item->vsm_system }}">
+                        {{ strtoupper(str_replace('_', '', $item->vsm_system)) }}
+                    </span>
+                @endif
             </div>
             @if($item->description)
                 <div class="text-xs text-[var(--ui-muted)] ml-5.5 truncate">{{ \Illuminate\Support\Str::limit($item->description, 80) }}</div>

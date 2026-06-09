@@ -34,6 +34,7 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
                 'name'        => ['type' => 'string'],
                 'slug'        => ['type' => 'string'],
                 'description' => ['type' => 'string', 'description' => '"" zum Leeren.'],
+                'vsm_system'  => ['type' => 'string', 'description' => 'Optional: s1, s2, s3, s3_star, s4, s5. "" zum Loesen.', 'enum' => ['', 's1', 's2', 's3', 's3_star', 's4', 's5']],
                 'status'      => ['type' => 'string'],
             ],
             'required' => ['role_id'],
@@ -94,6 +95,16 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
                 $val = (string) ($arguments['description'] ?? '');
                 $update['description'] = $val === '' ? null : $val;
             }
+            if (array_key_exists('vsm_system', $arguments)) {
+                $val = (string) ($arguments['vsm_system'] ?? '');
+                if ($val === '') {
+                    $update['vsm_system'] = null;
+                } elseif (in_array($val, OrganizationRole::VSM_SYSTEMS, true)) {
+                    $update['vsm_system'] = $val;
+                } else {
+                    return ToolResult::error('VALIDATION_ERROR', 'vsm_system muss einer von ' . implode(', ', OrganizationRole::VSM_SYSTEMS) . ' oder "" sein.');
+                }
+            }
             if (array_key_exists('status', $arguments)) {
                 $update['status'] = (string) $arguments['status'];
             }
@@ -104,12 +115,13 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
             $role->refresh();
 
             return ToolResult::success([
-                'id'      => $role->id,
-                'name'    => $role->name,
-                'slug'    => $role->slug,
-                'status'  => $role->status,
-                'team_id' => $role->team_id,
-                'message' => 'Rolle erfolgreich aktualisiert.',
+                'id'         => $role->id,
+                'name'       => $role->name,
+                'slug'       => $role->slug,
+                'status'     => $role->status,
+                'vsm_system' => $role->vsm_system,
+                'team_id'    => $role->team_id,
+                'message'    => 'Rolle erfolgreich aktualisiert.',
             ]);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Aktualisieren der Rolle: '.$e->getMessage());

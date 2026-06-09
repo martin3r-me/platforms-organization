@@ -20,6 +20,13 @@ use Illuminate\Support\Facades\Schema;
  * -> Spalte droppen -> Index ohne perspective_id neu anlegen.
  * (MySQL verweigert sonst Fehler 1553 "needed in a foreign key constraint".)
  *
+ * Migration ist **idempotent** gegen Zwischenzustaende (Teil-Drops von
+ * vorherigen fehlgeschlagenen Migrations-Laeufen). Jeder DDL-Schritt wird
+ * eigenstaendig versucht und Fehler werden geschluckt, falls die jeweilige
+ * Struktur bereits weg ist. try/catch MUSS dabei UM den Schema::table()-Aufruf
+ * herum stehen — innerhalb der Closure queued der Builder nur, fuehrt aber
+ * erst nach Verlassen aus.
+ *
  * Voraussetzung: Default-Perspektive war die einzig genutzte. Falls benannte
  * Sub-Perspektiven oder alternative Hierarchien existierten, sind sie vor
  * diesem Migration-Lauf zu sichern — werden hier irreversibel verworfen.
@@ -29,33 +36,32 @@ return new class extends Migration
     public function up(): void
     {
         if (Schema::hasColumn('organization_dimension_links', 'perspective_id')) {
-            // 1. FK ZUERST droppen — MySQL verweigert sonst das Droppen jedes Index,
-            //    der die FK-Spalte abdeckt (Fehler 1553).
-            Schema::table('organization_dimension_links', function (Blueprint $table) {
-                try {
+            // 1. FK auf perspective_id droppen — falls noch vorhanden.
+            try {
+                Schema::table('organization_dimension_links', function (Blueprint $table) {
                     $table->dropForeign(['perspective_id']);
-                } catch (\Throwable $e) {
-                    // FK existiert ggf. nicht — weiter.
-                }
-            });
+                });
+            } catch (\Throwable $e) {
+                // FK existiert nicht (durch vorigen Teil-Lauf bereits entfernt).
+            }
 
-            // 2. Composite-Unique (enthielt perspective_id) abraeumen.
-            Schema::table('organization_dimension_links', function (Blueprint $table) {
-                try {
+            // 2. Composite-Unique (enthielt perspective_id) droppen — falls noch vorhanden.
+            try {
+                Schema::table('organization_dimension_links', function (Blueprint $table) {
                     $table->dropUnique('dim_link_unique');
-                } catch (\Throwable $e) {
-                    // Index ggf. anders benannt oder bereits weg — weiter.
-                }
-            });
+                });
+            } catch (\Throwable $e) {
+                // Index existiert nicht.
+            }
 
-            // 3. Separater Index auf perspective_id weg.
-            Schema::table('organization_dimension_links', function (Blueprint $table) {
-                try {
+            // 3. Separater Index auf perspective_id droppen — falls noch vorhanden.
+            try {
+                Schema::table('organization_dimension_links', function (Blueprint $table) {
                     $table->dropIndex(['perspective_id']);
-                } catch (\Throwable $e) {
-                    // Index existiert ggf. nicht — weiter.
-                }
-            });
+                });
+            } catch (\Throwable $e) {
+                // Index existiert nicht.
+            }
 
             // 4. Duplikate bereinigen: pro logischem Schluessel
             //    (dimension_definition_id, linkable_type, linkable_id, dimension_value_id)
@@ -75,13 +81,17 @@ return new class extends Migration
                 $table->dropColumn('perspective_id');
             });
 
-            // 6. Neuen Unique-Index ohne perspective_id anlegen.
-            Schema::table('organization_dimension_links', function (Blueprint $table) {
-                $table->unique(
-                    ['dimension_definition_id', 'linkable_type', 'linkable_id', 'dimension_value_id'],
-                    'dim_link_unique'
-                );
-            });
+            // 6. Neuen Unique-Index ohne perspective_id anlegen — falls noch nicht da.
+            try {
+                Schema::table('organization_dimension_links', function (Blueprint $table) {
+                    $table->unique(
+                        ['dimension_definition_id', 'linkable_type', 'linkable_id', 'dimension_value_id'],
+                        'dim_link_unique'
+                    );
+                });
+            } catch (\Throwable $e) {
+                // Index ggf. bereits angelegt durch vorheriges Re-Run.
+            }
         }
 
         Schema::dropIfExists('organization_entity_hierarchy');

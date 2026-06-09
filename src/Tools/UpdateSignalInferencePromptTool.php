@@ -82,6 +82,10 @@ class UpdateSignalInferencePromptTool implements ToolContract, ToolMetadataContr
                     'type' => 'integer',
                     'description' => 'Optional: Evaluierungs-Intervall in Stunden (24=täglich, 72=~2x/Woche, 168=wöchentlich). null = globaler Default.',
                 ],
+                'agent_entity_id' => [
+                    'type' => 'integer',
+                    'description' => 'Optional: ID einer system_agent-Entity, an die dieser Prompt gebunden wird. 0/null zum Loesen. Alle Prompts eines Agents muessen dasselbe vsm_system haben (Modell-Constraint).',
+                ],
             ],
             'required' => ['inference_prompt_id'],
         ]);
@@ -184,8 +188,22 @@ class UpdateSignalInferencePromptTool implements ToolContract, ToolMetadataContr
                     : null;
             }
 
+            if (array_key_exists('agent_entity_id', $arguments)) {
+                $aid = $arguments['agent_entity_id'];
+                if ($aid === null || $aid === '' || $aid === 0 || $aid === '0') {
+                    $update['agent_entity_id'] = null;
+                } else {
+                    $update['agent_entity_id'] = (int) $aid;
+                }
+            }
+
             if (! empty($update)) {
-                $prompt->update($update);
+                try {
+                    $prompt->update($update);
+                } catch (\InvalidArgumentException $e) {
+                    // Saving-Hook am Modell wirft bei Carrier/Actor- oder vsm_system-Constraint
+                    return ToolResult::error('VALIDATION_ERROR', $e->getMessage());
+                }
             }
             $prompt->refresh();
 

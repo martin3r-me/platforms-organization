@@ -82,6 +82,10 @@ class CreateSignalInferencePromptTool implements ToolContract, ToolMetadataContr
                     'type' => 'integer',
                     'description' => 'Optional: Wie oft der Prompt evaluiert wird (in Stunden). Beispiele: 24 = täglich, 72 = ~2x/Woche, 168 = wöchentlich. Default: globaler Wert (72h).',
                 ],
+                'agent_entity_id' => [
+                    'type' => 'integer',
+                    'description' => 'Optional: ID einer system_agent-Entity, an die dieser Prompt gebunden wird (N:1). Alle Prompts eines Agents muessen dasselbe vsm_system haben.',
+                ],
             ],
             'required' => ['name', 'vsm_system', 'prompt_template'],
         ];
@@ -121,21 +125,31 @@ class CreateSignalInferencePromptTool implements ToolContract, ToolMetadataContr
                 return ToolResult::error('VALIDATION_ERROR', 'scope_type muss all, entity_type oder subtree sein.');
             }
 
-            $prompt = OrganizationSignalInferencePrompt::create([
-                'name' => $name,
-                'description' => (array_key_exists('description', $arguments) && $arguments['description'] !== '') ? (string) $arguments['description'] : null,
-                'vsm_system' => $vsmSystem,
-                'prompt_template' => $promptTemplate,
-                'data_sources' => $arguments['data_sources'] ?? ['snapshots', 'movement'],
-                'dimension' => $arguments['dimension'] ?? null,
-                'default_severity' => $defaultSeverity,
-                'scope_type' => $scopeType,
-                'scope_value' => $arguments['scope_value'] ?? null,
-                'is_active' => (bool) ($arguments['is_active'] ?? true),
-                'schedule_interval_hours' => isset($arguments['schedule_interval_hours']) ? (int) $arguments['schedule_interval_hours'] : null,
-                'team_id' => $rootTeamId,
-                'user_id' => $context->user?->id,
-            ]);
+            $agentEntityId = null;
+            if (array_key_exists('agent_entity_id', $arguments) && $arguments['agent_entity_id']) {
+                $agentEntityId = (int) $arguments['agent_entity_id'];
+            }
+
+            try {
+                $prompt = OrganizationSignalInferencePrompt::create([
+                    'name' => $name,
+                    'description' => (array_key_exists('description', $arguments) && $arguments['description'] !== '') ? (string) $arguments['description'] : null,
+                    'vsm_system' => $vsmSystem,
+                    'prompt_template' => $promptTemplate,
+                    'data_sources' => $arguments['data_sources'] ?? ['snapshots', 'movement'],
+                    'dimension' => $arguments['dimension'] ?? null,
+                    'default_severity' => $defaultSeverity,
+                    'scope_type' => $scopeType,
+                    'scope_value' => $arguments['scope_value'] ?? null,
+                    'is_active' => (bool) ($arguments['is_active'] ?? true),
+                    'schedule_interval_hours' => isset($arguments['schedule_interval_hours']) ? (int) $arguments['schedule_interval_hours'] : null,
+                    'agent_entity_id' => $agentEntityId,
+                    'team_id' => $rootTeamId,
+                    'user_id' => $context->user?->id,
+                ]);
+            } catch (\InvalidArgumentException $e) {
+                return ToolResult::error('VALIDATION_ERROR', $e->getMessage());
+            }
 
             return ToolResult::success([
                 'id' => $prompt->id,

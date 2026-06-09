@@ -1306,19 +1306,40 @@
                 @if($this->isSystemAgent)
                     <div x-show="tab === 'agent'" x-cloak>
                         <div class="space-y-6">
-                            @if(!$entity->is_active)
-                                <div class="bg-red-50 border border-red-200 rounded-lg p-4 flex items-start gap-3">
-                                    @svg('heroicon-o-pause-circle', 'w-5 h-5 text-red-600 flex-shrink-0 mt-0.5')
-                                    <div class="flex-1">
-                                        <div class="text-sm font-semibold text-red-900">Agent inaktiv</div>
-                                        <p class="text-xs text-red-800 mt-0.5">
-                                            Dieser System-Agent ist deaktiviert (<code class="text-[10px] font-mono px-1 py-0.5 bg-red-100 rounded">is_active = false</code>).
-                                            Seine Inference-Prompts werden vom Worker uebersprungen, auch wenn sie selbst aktiv sind.
-                                            Aktiviere die Entity, um die Prompts wieder laufen zu lassen.
-                                        </p>
+                            {{-- Agent-Status + Toggle --}}
+                            <div class="bg-white rounded-lg border {{ $entity->is_active ? 'border-[var(--ui-border)]' : 'border-red-200' }} p-4">
+                                <div class="flex items-center justify-between gap-4">
+                                    <div class="flex items-center gap-3 min-w-0">
+                                        @if($entity->is_active)
+                                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" title="Aktiv"></span>
+                                            <div class="min-w-0">
+                                                <div class="text-sm font-semibold text-[var(--ui-secondary)]">Agent aktiv</div>
+                                                <p class="text-xs text-[var(--ui-muted)] mt-0.5">Inference-Prompts laufen gemaess ihrem Schedule.</p>
+                                            </div>
+                                        @else
+                                            @svg('heroicon-o-pause-circle', 'w-5 h-5 text-red-600 flex-shrink-0')
+                                            <div class="min-w-0">
+                                                <div class="text-sm font-semibold text-red-900">Agent inaktiv</div>
+                                                <p class="text-xs text-red-800 mt-0.5">Inference-Prompts werden vom Worker uebersprungen, auch wenn sie selbst aktiv sind.</p>
+                                            </div>
+                                        @endif
                                     </div>
+                                    <x-ui-button
+                                        variant="{{ $entity->is_active ? 'danger-outline' : 'success' }}"
+                                        size="sm"
+                                        wire:click="toggleEntityActive"
+                                        wire:confirm="{{ $entity->is_active ? 'Agent wirklich deaktivieren? Seine Prompts laufen dann nicht mehr.' : 'Agent wieder aktivieren?' }}"
+                                    >
+                                        @if($entity->is_active)
+                                            @svg('heroicon-o-pause', 'w-4 h-4')
+                                            <span>Deaktivieren</span>
+                                        @else
+                                            @svg('heroicon-o-play', 'w-4 h-4')
+                                            <span>Aktivieren</span>
+                                        @endif
+                                    </x-ui-button>
                                 </div>
-                            @endif
+                            </div>
                             {{-- Inference-Prompts --}}
                             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                                 <div class="flex items-center justify-between mb-4">

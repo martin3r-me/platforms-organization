@@ -44,6 +44,8 @@ class OrganizationSignal extends Model
         'escalated_at',
         'deadline_at',
         'acknowledged_at',
+        'aggregated_at',
+        'aggregated_to_signal_id',
         'affected_entity_ids',
         'assignee_entity_id',
     ];
@@ -56,6 +58,7 @@ class OrganizationSignal extends Model
         'escalated_at' => 'datetime',
         'deadline_at' => 'datetime',
         'acknowledged_at' => 'datetime',
+        'aggregated_at' => 'datetime',
         'affected_entity_ids' => 'array',
     ];
 
@@ -111,6 +114,11 @@ class OrganizationSignal extends Model
     public function currentOwner(): BelongsTo
     {
         return $this->belongsTo(OrganizationEntity::class, 'current_owner_entity_id');
+    }
+
+    public function aggregatedTo(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationSignal::class, 'aggregated_to_signal_id');
     }
 
     /**

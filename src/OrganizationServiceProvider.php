@@ -46,6 +46,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 SeedEnvironmentSourcesCommand::class,
                 DimensionCoverageCommand::class,
                 DimensionScoreDiffCommand::class,
+                \Platform\Organization\Console\Commands\EscalateSignalsCommand::class,
             ]);
         }
 
@@ -192,6 +193,12 @@ class OrganizationServiceProvider extends ServiceProvider
         // Inference scheduling: daily poll, individual prompt intervals decide what's due
         Schedule::command('organization:schedule-inference')
             ->dailyAt('08:05')
+            ->withoutOverlapping();
+
+        // Signal-Eskalation: stuendlich pruefen ob Deadlines ueberschritten sind
+        // und ggf. VSM-Ebene hochsetzen oder in aeussere Perspektive aggregieren.
+        Schedule::command('organization:escalate-signals')
+            ->hourly()
             ->withoutOverlapping();
 
         // Process inference triggers: every minute (cheap polling)

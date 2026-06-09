@@ -313,6 +313,16 @@ class Show extends Component
             ->get();
     }
 
+    public function toggleEntityActive(): void
+    {
+        $this->entity->update(['is_active' => !$this->entity->is_active]);
+        $this->entity->refresh();
+        unset($this->agentPrompts, $this->agentRecentRuns);
+        session()->flash('message', $this->entity->is_active
+            ? 'Entity aktiviert.'
+            : 'Entity deaktiviert.');
+    }
+
     public function removeVsmAssignment(int $assignmentId): void
     {
         $assignment = OrganizationEntityVsmAssignment::query()

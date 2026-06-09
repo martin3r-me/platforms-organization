@@ -258,6 +258,26 @@
                             @svg('heroicon-o-link', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
                             Relations
                         </button>
+                        @if($this->isCarrierEntity)
+                            @php
+                                $vsmMatrix = $this->vsmMatrix;
+                                $vacancyCount = collect($vsmMatrix)->where('is_vacant', true)->count();
+                            @endphp
+                            <button
+                                @click="tab = 'vsm'"
+                                :class="tab === 'vsm'
+                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
+                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                                class="px-4 py-2.5 text-sm transition-colors flex items-center gap-1.5"
+                                title="VSM-Zellen-Besetzung aus Sicht dieser Carrier-Entity"
+                            >
+                                @svg('heroicon-o-squares-2x2', 'w-4 h-4 inline-block -mt-0.5')
+                                VSM
+                                @if($vacancyCount > 0)
+                                    <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-amber-700 bg-amber-100 ring-1 ring-inset ring-amber-600/20 rounded-full" title="{{ $vacancyCount }} unbesetzte Zellen">{{ $vacancyCount }}</span>
+                                @endif
+                            </button>
+                        @endif
                         @if($this->hasLinkedUser)
                             <button
                                 @click="tab = 'person'"
@@ -1285,6 +1305,84 @@
                         @endif
                     </div>
                 </div>
+
+                {{-- Tab: VSM-Matrix --}}
+                @if($this->isCarrierEntity)
+                    <div x-show="tab === 'vsm'" x-cloak>
+                        <div class="space-y-4">
+                            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-5">
+                                <div class="flex items-start justify-between mb-3">
+                                    <div>
+                                        <h2 class="text-base font-semibold text-[var(--ui-secondary)]">VSM-Zellen-Besetzung</h2>
+                                        <p class="text-xs text-[var(--ui-muted)] mt-0.5">
+                                            Aus Sicht <span class="font-medium text-[var(--ui-secondary)]">{{ $entity->name }}</span> — wer fuellt welche System-Funktion aus?
+                                            Mehrfachbesetzung pro Zelle erlaubt.
+                                        </p>
+                                    </div>
+                                    @php
+                                        $matrix = $this->vsmMatrix;
+                                        $occupied = collect($matrix)->where('is_vacant', false)->count();
+                                        $total = count($matrix);
+                                    @endphp
+                                    <div class="text-right shrink-0">
+                                        <div class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $occupied }}/{{ $total }}</div>
+                                        <div class="text-[10px] text-[var(--ui-muted)] uppercase tracking-wider">besetzt</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            @foreach($matrix as $code => $cell)
+                                <div class="bg-white rounded-lg border {{ $cell['is_vacant'] ? 'border-amber-200' : 'border-[var(--ui-border)]' }} p-4">
+                                    <div class="flex items-center justify-between mb-3">
+                                        <div class="flex items-center gap-3 min-w-0">
+                                            <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/10 shrink-0">
+                                                @svg('heroicon-o-' . $cell['icon'], 'w-5 h-5')
+                                            </span>
+                                            <div class="min-w-0">
+                                                <div class="text-sm font-semibold text-[var(--ui-secondary)]">{{ $cell['label'] }}</div>
+                                                <div class="text-xs text-[var(--ui-muted)] truncate">{{ $cell['description'] }}</div>
+                                            </div>
+                                        </div>
+                                        <x-ui-button variant="ghost" size="sm" wire:click="openVsmAssignmentModal('{{ $code }}')">
+                                            @svg('heroicon-o-plus', 'w-4 h-4')
+                                            <span>Zuweisen</span>
+                                        </x-ui-button>
+                                    </div>
+
+                                    @if($cell['is_vacant'])
+                                        <div class="px-3 py-2 bg-amber-50 text-amber-800 text-xs rounded-md ring-1 ring-inset ring-amber-600/15">
+                                            Vakant — diese Zelle ist unbesetzt.
+                                        </div>
+                                    @else
+                                        <div class="flex flex-wrap gap-2">
+                                            @foreach($cell['assignments'] as $a)
+                                                <div class="inline-flex items-center gap-2 pl-2.5 pr-1 py-1 rounded-full bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40 {{ $a['is_active_today'] ? '' : 'opacity-50' }}">
+                                                    @svg('heroicon-o-user-circle', 'w-3.5 h-3.5 text-[var(--ui-muted)]')
+                                                    <a href="{{ route('organization.entities.show', $a['assigned_entity_id']) }}" class="text-xs font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline">{{ $a['assigned_name'] }}</a>
+                                                    @if($a['scope'])
+                                                        <span class="text-[10px] text-[var(--ui-muted)]" title="Scope">· {{ $a['scope'] }}</span>
+                                                    @endif
+                                                    @if(!$a['is_active_today'])
+                                                        <span class="text-[10px] text-amber-700" title="Auserhalb des Gueltigkeits-Zeitraums">inaktiv</span>
+                                                    @endif
+                                                    <button
+                                                        type="button"
+                                                        wire:click="removeVsmAssignment({{ $a['id'] }})"
+                                                        wire:confirm="Zuordnung {{ $a['assigned_name'] }} entfernen?"
+                                                        class="ml-0.5 w-5 h-5 inline-flex items-center justify-center rounded-full text-[var(--ui-muted)] hover:text-red-600 hover:bg-red-50 transition-colors"
+                                                        title="Entfernen"
+                                                    >
+                                                        @svg('heroicon-o-x-mark', 'w-3 h-3')
+                                                    </button>
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endif
             </div>
         </div>
     <!-- Create Team Modal -->
@@ -1331,6 +1429,62 @@
                 <x-ui-button type="button" variant="primary" wire:click="createTeam">
                     @svg('heroicon-o-user-group', 'w-4 h-4 mr-2')
                     Team erstellen
+                </x-ui-button>
+            </div>
+        </x-slot>
+    </x-ui-modal>
+
+    {{-- VSM-Assignment Modal --}}
+    <x-ui-modal wire:model="vsmAssignmentModalShow" size="md">
+        <x-slot name="header">
+            @php
+                $sysCode = $vsmAssignmentForm['vsm_system'] ?? '';
+                $sysLabel = \Platform\Organization\Livewire\Entity\Show::VSM_DEFINITIONS[$sysCode]['label'] ?? $sysCode;
+            @endphp
+            Zuordnung für {{ $sysLabel }}
+        </x-slot>
+
+        <form wire:submit.prevent="addVsmAssignment" class="space-y-4">
+            <p class="text-xs text-[var(--ui-muted)]">
+                Aus Sicht <span class="font-medium text-[var(--ui-secondary)]">{{ $entity->name }}</span> — wer füllt {{ $sysLabel }} aus?
+            </p>
+
+            <x-ui-input-select
+                name="assigned_entity_id"
+                label="Actor-Entity"
+                :options="$this->vsmActorEntities"
+                optionValue="id"
+                optionLabel="name"
+                :nullable="true"
+                nullLabel="– Actor auswählen –"
+                wire:model.live="vsmAssignmentForm.assigned_entity_id"
+                required
+            />
+
+            <x-ui-input-text
+                name="scope"
+                label="Scope (optional)"
+                wire:model.live="vsmAssignmentForm.scope"
+                placeholder='z.B. "Cashflow", "Backend"'
+            />
+
+            <x-ui-input-textarea
+                name="notes"
+                label="Notiz (optional)"
+                wire:model.live="vsmAssignmentForm.notes"
+                placeholder="Warum diese Zuordnung?"
+                rows="3"
+            />
+        </form>
+
+        <x-slot name="footer">
+            <div class="d-flex justify-end gap-2">
+                <x-ui-button type="button" variant="secondary-outline" wire:click="closeVsmAssignmentModal">
+                    Abbrechen
+                </x-ui-button>
+                <x-ui-button type="button" variant="primary" wire:click="addVsmAssignment">
+                    @svg('heroicon-o-check', 'w-4 h-4 mr-2')
+                    Zuweisen
                 </x-ui-button>
             </div>
         </x-slot>

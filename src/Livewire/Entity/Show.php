@@ -6,6 +6,7 @@ use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityVsmAssignment;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationEntityType;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -48,6 +49,52 @@ class Show extends Component
 
     // Signals tab
     public string $signalStatusFilter = '';
+
+    // VSM tab
+    public bool $vsmAssignmentModalShow = false;
+    public array $vsmAssignmentForm = [
+        'vsm_system' => '',
+        'assigned_entity_id' => null,
+        'scope' => null,
+        'notes' => null,
+    ];
+
+    /**
+     * VSM-Systemdefinitionen in klassischer Top-Down-Reihenfolge (S5 oben).
+     * Quelle: Stafford Beer, Brain of the Firm (1972).
+     */
+    public const VSM_DEFINITIONS = [
+        OrganizationEntityVsmAssignment::VSM_S5 => [
+            'label' => 'S5 · Identität',
+            'description' => 'Werte, Policy, Vision. Letzte Instanz bei Konflikten zwischen S3 (Effizienz) und S4 (Anpassung).',
+            'icon' => 'sparkles',
+        ],
+        OrganizationEntityVsmAssignment::VSM_S4 => [
+            'label' => 'S4 · Intelligenz',
+            'description' => 'Beobachtet die Umwelt, erkennt Chancen und Bedrohungen, bringt Zukunftsperspektive ein.',
+            'icon' => 'eye',
+        ],
+        OrganizationEntityVsmAssignment::VSM_S3_STAR => [
+            'label' => 'S3* · Audit',
+            'description' => 'Sporadische, tiefere Prüfung ob S1 korrekt berichtet. Synthetisiert Daten.',
+            'icon' => 'magnifying-glass',
+        ],
+        OrganizationEntityVsmAssignment::VSM_S3 => [
+            'label' => 'S3 · Kontrolle',
+            'description' => 'Steuert Ressourcen, überwacht S1-Leistung, greift bei Soll-Abweichung ein.',
+            'icon' => 'adjustments-horizontal',
+        ],
+        OrganizationEntityVsmAssignment::VSM_S2 => [
+            'label' => 'S2 · Koordination',
+            'description' => 'Synchronisiert die S1-Einheiten untereinander. Verhindert Konflikte und Doppelarbeit.',
+            'icon' => 'arrows-right-left',
+        ],
+        OrganizationEntityVsmAssignment::VSM_S1 => [
+            'label' => 'S1 · Operation',
+            'description' => 'Die Wertschöpfung selbst. Produziert, liefert, arbeitet.',
+            'icon' => 'cog-6-tooth',
+        ],
+    ];
 
     public function loadAnalyseData(): void
     {
@@ -121,6 +168,160 @@ class Show extends Component
     public function linkTypeConfig(): array
     {
         return resolve(EntityLinkRegistry::class)->allLinkTypeConfig();
+    }
+
+    // ── VSM-Matrix Tab ────────────────────────────────────────
+
+    #[Computed]
+    public function isCarrierEntity(): bool
+    {
+        return $this->entity->type?->vsm_class === OrganizationEntityType::VSM_CLASS_CARRIER;
+    }
+
+    /**
+     * Liefert pro VSM-Ebene die Liste der Assignees fuer diese Carrier-Entity.
+     * Format: [systemCode => ['label' => ..., 'assignments' => [...]]]
+     */
+    #[Computed]
+    public function vsmMatrix(): array
+    {
+        if (!$this->isCarrierEntity) {
+            return [];
+        }
+
+        $assignments = OrganizationEntityVsmAssignment::query()
+            ->where('perspective_entity_id', $this->entity->id)
+            ->with(['assignedEntity:id,name,code', 'assignedEntity.type:id,name,code'])
+            ->orderBy('assigned_entity_id')
+            ->get()
+            ->groupBy('vsm_system');
+
+        $matrix = [];
+        foreach (self::VSM_DEFINITIONS as $code => $def) {
+            $cellAssignments = ($assignments[$code] ?? collect())->map(fn ($a) => [
+                'id' => $a->id,
+                'assigned_entity_id' => $a->assigned_entity_id,
+                'assigned_name' => $a->assignedEntity?->name,
+                'assigned_type' => $a->assignedEntity?->type?->name,
+                'scope' => $a->scope,
+                'valid_from' => $a->valid_from?->toDateString(),
+                'valid_until' => $a->valid_until?->toDateString(),
+                'notes' => $a->notes,
+                'is_active_today' => $a->isActiveAt(),
+            ])->values()->toArray();
+
+            $matrix[$code] = [
+                'code' => $code,
+                'label' => $def['label'],
+                'description' => $def['description'],
+                'icon' => $def['icon'],
+                'assignments' => $cellAssignments,
+                'is_vacant' => count($cellAssignments) === 0,
+            ];
+        }
+
+        return $matrix;
+    }
+
+    /**
+     * Alle Actor-Entities im Team — Auswahlliste fuer den Assignee-Picker.
+     * Bewusst team-weit (nicht subtree-only): cross-tree-Zuordnungen sind erlaubt.
+     */
+    #[Computed]
+    public function vsmActorEntities()
+    {
+        return OrganizationEntity::query()
+            ->where('team_id', $this->entity->team_id)
+            ->active()
+            ->whereHas('type', fn ($q) => $q->where('vsm_class', OrganizationEntityType::VSM_CLASS_ACTOR))
+            ->with('type:id,name,code')
+            ->orderBy('name')
+            ->get();
+    }
+
+    public function openVsmAssignmentModal(string $system): void
+    {
+        if (!$this->isCarrierEntity) {
+            return;
+        }
+        if (!in_array($system, OrganizationEntityVsmAssignment::VSM_SYSTEMS, true)) {
+            return;
+        }
+
+        $this->vsmAssignmentForm = [
+            'vsm_system' => $system,
+            'assigned_entity_id' => null,
+            'scope' => null,
+            'notes' => null,
+        ];
+        $this->vsmAssignmentModalShow = true;
+    }
+
+    public function closeVsmAssignmentModal(): void
+    {
+        $this->vsmAssignmentModalShow = false;
+        $this->reset('vsmAssignmentForm');
+    }
+
+    public function addVsmAssignment(): void
+    {
+        if (!$this->isCarrierEntity) {
+            return;
+        }
+
+        $data = $this->validate([
+            'vsmAssignmentForm.vsm_system' => 'required|string',
+            'vsmAssignmentForm.assigned_entity_id' => 'required|integer|exists:organization_entities,id',
+            'vsmAssignmentForm.scope' => 'nullable|string|max:255',
+            'vsmAssignmentForm.notes' => 'nullable|string',
+        ])['vsmAssignmentForm'];
+
+        // Duplikat-Check fuer freundlichere Fehlermeldung
+        $exists = OrganizationEntityVsmAssignment::query()
+            ->where('perspective_entity_id', $this->entity->id)
+            ->where('vsm_system', $data['vsm_system'])
+            ->where('assigned_entity_id', (int) $data['assigned_entity_id'])
+            ->exists();
+        if ($exists) {
+            session()->flash('error', 'Diese Zuordnung existiert bereits.');
+            return;
+        }
+
+        try {
+            OrganizationEntityVsmAssignment::create([
+                'team_id' => $this->entity->team_id,
+                'perspective_entity_id' => $this->entity->id,
+                'vsm_system' => $data['vsm_system'],
+                'assigned_entity_id' => (int) $data['assigned_entity_id'],
+                'scope' => $data['scope'] ?: null,
+                'notes' => $data['notes'] ?: null,
+                'created_by_user_id' => auth()->id(),
+            ]);
+
+            $this->closeVsmAssignmentModal();
+            unset($this->vsmMatrix);
+            session()->flash('message', 'VSM-Zuordnung angelegt.');
+        } catch (\InvalidArgumentException $e) {
+            session()->flash('error', 'Validierung: ' . $e->getMessage());
+        } catch (\Throwable $e) {
+            session()->flash('error', 'Fehler: ' . $e->getMessage());
+        }
+    }
+
+    public function removeVsmAssignment(int $assignmentId): void
+    {
+        $assignment = OrganizationEntityVsmAssignment::query()
+            ->where('id', $assignmentId)
+            ->where('perspective_entity_id', $this->entity->id)
+            ->first();
+
+        if (!$assignment) {
+            return;
+        }
+
+        $assignment->delete();
+        unset($this->vsmMatrix);
+        session()->flash('message', 'VSM-Zuordnung entfernt.');
     }
 
     public function mount(OrganizationEntity $entity)

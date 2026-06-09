@@ -3,8 +3,6 @@
 namespace Platform\Organization\Listeners;
 
 use Platform\Core\Events\AlgedonicTriggered;
-use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntityVsmAssignment;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\PerspectiveService;
@@ -27,11 +25,15 @@ class HandleAlgedonicTriggered
     {
         $isAnonymous = $event->userId === 0;
 
-        // Perspektive ermitteln: bei anonym kein PerspectiveService-Lookup
-        // (PerspectiveService liest pro User-Session). Direkt auf Root-Carrier.
+        // Perspektive ermitteln. Kaskade:
+        //  1. explizit in Event-Payload
+        //  2. User-Session-Wahl (nur wenn nicht anonym — sonst wuerde
+        //     PerspectiveService die Session des Users lesen)
+        //  3. PerspectiveService::getDefaultEntity — beruecksichtigt das
+        //     Team-Default-Mapping und faellt sonst auf Root-Carrier zurueck.
         $perspectiveEntityId = $event->perspectiveEntityId
             ?? (! $isAnonymous ? $this->resolveActivePerspective($event->teamId, $event->userId) : null)
-            ?? $this->resolveRootCarrier($event->teamId);
+            ?? PerspectiveService::getDefaultEntity($event->teamId)?->id;
 
         if (! $perspectiveEntityId) {
             return; // kein Carrier-Setup im Team — Algedonic landet im Nichts
@@ -69,18 +71,6 @@ class HandleAlgedonicTriggered
     {
         $entity = PerspectiveService::getActiveEntity($teamId, $userId);
         return $entity?->id;
-    }
-
-    protected function resolveRootCarrier(int $teamId): ?int
-    {
-        $id = OrganizationEntity::query()
-            ->where('team_id', $teamId)
-            ->whereNull('parent_entity_id')
-            ->whereHas('type', fn ($q) => $q->where('vsm_class', OrganizationEntityType::VSM_CLASS_CARRIER))
-            ->orderBy('id')
-            ->value('id');
-
-        return $id ? (int) $id : null;
     }
 
     protected function resolveS5Owner(int $perspectiveEntityId): ?int

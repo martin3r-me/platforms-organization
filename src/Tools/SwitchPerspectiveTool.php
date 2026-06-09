@@ -40,7 +40,10 @@ class SwitchPerspectiveTool implements ToolContract, ToolMetadataContract
     public function execute(array $arguments, ToolContext $context): ToolResult
     {
         try {
-            $teamId = $context->getTeamId();
+            $teamId = $context->team?->id;
+            if (!$teamId) {
+                return ToolResult::error('MISSING_TEAM', 'Kein Team im Kontext.');
+            }
             $entityId = (int) ($arguments['perspective_entity_id'] ?? 0);
 
             if (!$entityId) {

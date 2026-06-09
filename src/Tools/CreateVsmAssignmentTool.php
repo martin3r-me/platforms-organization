@@ -62,9 +62,9 @@ class CreateVsmAssignmentTool implements ToolContract, ToolMetadataContract
     public function execute(array $arguments, ToolContext $context): ToolResult
     {
         try {
-            $teamId = $context->getTeamId();
+            $teamId = $context->team?->id;
             if (!$teamId) {
-                return ToolResult::error('AUTH_ERROR', 'Kein Team im Kontext.');
+                return ToolResult::error('MISSING_TEAM', 'Kein Team im Kontext.');
             }
 
             $perspectiveId = (int) ($arguments['perspective_entity_id'] ?? 0);

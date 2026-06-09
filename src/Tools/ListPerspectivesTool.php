@@ -35,8 +35,11 @@ class ListPerspectivesTool implements ToolContract, ToolMetadataContract
     public function execute(array $arguments, ToolContext $context): ToolResult
     {
         try {
-            $teamId = $context->getTeamId();
-            $userId = $context->getUserId();
+            $teamId = $context->team?->id;
+            $userId = $context->user?->id;
+            if (!$teamId) {
+                return ToolResult::error('MISSING_TEAM', 'Kein Team im Kontext.');
+            }
 
             $carriers = PerspectiveService::getCarriersForTeam($teamId);
             $active = PerspectiveService::getActiveEntity($teamId, $userId);

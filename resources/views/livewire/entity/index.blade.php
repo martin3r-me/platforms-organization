@@ -70,6 +70,23 @@
             $childrenByParent = $this->entities['childrenByParent'];
         @endphp
 
+        {{-- VSM-Klasse Legende --}}
+        <div class="mb-4 flex items-center flex-wrap gap-3 px-3 py-2 bg-[var(--ui-muted-5)]/40 rounded-lg border border-[var(--ui-border)]/40">
+            <span class="text-[10px] font-bold text-[var(--ui-muted)] uppercase tracking-wider">VSM-Klasse:</span>
+            <div class="flex items-center gap-1.5" title="Carrier — lebensfähiges System, kann eigene Perspektive sein">
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20">C</span>
+                <span class="text-xs text-[var(--ui-secondary)]">Carrier · Perspektive möglich</span>
+            </div>
+            <div class="flex items-center gap-1.5" title="Actor — füllt VSM-Funktionen aus, empfängt Signale">
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-600/15">A</span>
+                <span class="text-xs text-[var(--ui-secondary)]">Actor · füllt Funktion aus</span>
+            </div>
+            <div class="flex items-center gap-1.5" title="Observed — Umwelt-Entity, wird beobachtet">
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20">O</span>
+                <span class="text-xs text-[var(--ui-secondary)]">Observed · Umwelt</span>
+            </div>
+        </div>
+
         @if($rootsByGroup->isEmpty())
             <div class="py-12 text-center">
                 @svg('heroicon-o-building-office', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-3')

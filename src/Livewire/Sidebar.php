@@ -46,7 +46,6 @@ class Sidebar extends Component
                     ['route' => 'organization.time-entries.index', 'label' => 'Ist-Zeiten', 'icon' => 'clock', 'match' => '/time-entries'],
                     ['route' => 'organization.planned-times.index', 'label' => 'Geplante Zeiten', 'icon' => 'calendar', 'match' => '/planned-times'],
                     ['route' => 'organization.cost-centers.index', 'label' => 'Kostenstellen', 'icon' => 'currency-dollar', 'match' => '/cost-centers'],
-                    ['route' => 'organization.perspectives.index', 'label' => 'Perspektiven', 'icon' => 'eye', 'match' => '/perspectives'],
                 ],
             ],
             [

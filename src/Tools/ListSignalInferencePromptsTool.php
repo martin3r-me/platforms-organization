@@ -92,6 +92,11 @@ class ListSignalInferencePromptsTool implements ToolContract, ToolMetadataContra
                 'default_severity' => $prompt->default_severity,
                 'scope_type' => $prompt->scope_type,
                 'is_active' => (bool) $prompt->is_active,
+                'agent_entity_id' => $prompt->agent_entity_id,
+                'schedule_interval_hours' => $prompt->schedule_interval_hours,
+                'run_count' => (int) ($prompt->run_count ?? 0),
+                'last_error' => $prompt->last_error,
+                'health_status' => $prompt->health_status,
                 'last_evaluated_at' => $prompt->last_evaluated_at?->toIso8601String(),
                 'created_at' => $prompt->created_at?->toIso8601String(),
             ])->values()->toArray();

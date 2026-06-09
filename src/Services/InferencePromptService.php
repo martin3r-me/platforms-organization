@@ -7,6 +7,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
 use Platform\Core\Services\ClaudeToolLoopRunner;
+use Platform\Organization\Models\OrganizationEntityVsmAssignment;
 use Platform\Organization\Models\OrganizationInferenceRun;
 use Platform\Organization\Models\OrganizationInferenceRunStep;
 use Platform\Organization\Models\OrganizationSignal;
@@ -459,6 +460,34 @@ PROMPT;
         $existingSignals = count($evaluation['existing_signals'] ?? []);
 
         $message = "## Diagnostische Frage\n\n{$prompt->prompt_template}\n\n";
+
+        // Perspective-Kontext: aus wessen Carrier-Sicht diagnostiziert wird.
+        $perspective = $evaluation['perspective'] ?? null;
+        if ($perspective && !empty($perspective['entity_id'])) {
+            $message .= "## Diagnostische Perspektive\n\n";
+            $message .= "Du diagnostizierst **aus Sicht der Carrier-Entity {$perspective['name']}** (perspective_entity_id={$perspective['entity_id']}).\n";
+            $message .= "Deine Signale werden automatisch mit dieser Perspektive versehen — du musst sie nicht selbst setzen, kannst aber `perspective_entity_id` mit angeben, falls du explizit eine andere Carrier-Sicht meinst.\n";
+            $message .= "Konzentriere dich auf Entities und Beziehungen, die fuer diese Carrier-Sicht relevant sind. Entities, die organisatorisch unter Sub-Carriern haengen, gehoeren in deren eigene Perspektive — nicht in diese.\n\n";
+
+            // VSM-Besetzung dieser Perspektive — wer fuellt welche Zelle aus?
+            // Hilft dem LLM, assignee_entity_id konkret zu setzen.
+            $vsmBesetzung = $this->buildVsmAssignmentsForPerspective((int) $perspective['entity_id']);
+            if ($vsmBesetzung !== '') {
+                $message .= "### VSM-Besetzung dieser Perspektive\n\n";
+                $message .= $vsmBesetzung;
+                $message .= "\nNutze diese Information, um `assignee_entity_id` beim Signal-Create auf die fuer das Thema passende Person/Rolle zu setzen.\n\n";
+            }
+        }
+
+        // Agent-Identitaet: wer bin ich?
+        if ($prompt->agent_entity_id) {
+            $agent = \Platform\Organization\Models\OrganizationEntity::find($prompt->agent_entity_id);
+            if ($agent) {
+                $message .= "## Deine Identitaet\n\n";
+                $message .= "Du bist als **{$agent->name}** eingesetzt — ein automatisierter Funktionstraeger fuer die VSM-Ebene **{$prompt->vsm_system}** aus oben genannter Perspektive. Dein Auftrag deckt sich mit dem Funktionsverstaendnis dieser Ebene (siehe System-Prompt).\n\n";
+            }
+        }
+
         $message .= "## Kontext\n\n";
         $message .= "- VSM-System: {$prompt->vsm_system}\n";
         $message .= "- Dimension: " . ($prompt->dimension ?: 'alle') . "\n";
@@ -536,6 +565,43 @@ PROMPT;
         $message .= "Für Details zu einzelnen Entities nutze execute_tool(tool=\"organization.entities.GET\", arguments={\"id\": <id>}).";
 
         return $message;
+    }
+
+    /**
+     * Build a compact summary of the VSM-Assignments aus Sicht einer Carrier-Entity.
+     * Reihenfolge: S5, S4, S3*, S3, S2, S1 (top-down). Leere Zellen werden markiert.
+     */
+    protected function buildVsmAssignmentsForPerspective(int $perspectiveEntityId): string
+    {
+        $assignments = OrganizationEntityVsmAssignment::query()
+            ->where('perspective_entity_id', $perspectiveEntityId)
+            ->activeAt()
+            ->with('assignedEntity:id,name,code')
+            ->get()
+            ->groupBy('vsm_system');
+
+        $defs = OrganizationEntityVsmAssignment::VSM_DEFINITIONS;
+        if (empty($defs)) {
+            return '';
+        }
+
+        $lines = [];
+        foreach ($defs as $sys => $def) {
+            $rows = $assignments[$sys] ?? collect();
+            $display = $def['code_display'] ?? strtoupper($sys);
+            if ($rows->isEmpty()) {
+                $lines[] = "- **{$display}**: _vakant_";
+                continue;
+            }
+            $names = $rows->map(function ($a) {
+                $name = $a->assignedEntity?->name ?? "Entity #{$a->assigned_entity_id}";
+                $scope = $a->scope ? " (Scope: {$a->scope})" : '';
+                return "{$name} (ID {$a->assigned_entity_id}){$scope}";
+            })->implode(', ');
+            $lines[] = "- **{$display}**: {$names}";
+        }
+
+        return implode("\n", $lines) . "\n";
     }
 
     /**

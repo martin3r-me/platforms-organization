@@ -20,65 +20,14 @@
         @php($s1Units = $this->s1Units)
         @php($availablePerspectives = $this->availablePerspectives)
 
-        {{-- ── Header-Bar (compact) ───────────────────────────────────────── --}}
-        <header class="flex-shrink-0 border-b border-zinc-800 px-6 py-3 flex items-center gap-6">
-            {{-- Heptagonal Mark (7 fiberglass-Stühle) --}}
-            <div class="flex items-center gap-3 flex-shrink-0">
-                <svg viewBox="0 0 100 100" class="w-8 h-8 text-orange-400" fill="none" stroke="currentColor" stroke-width="3">
-                    <polygon points="50,6 91,28 96,72 71,96 29,96 4,72 9,28" />
-                    <polygon points="50,22 78,38 81,66 65,82 35,82 19,66 22,38" stroke-width="1.2" opacity="0.4" />
-                    <circle cx="50" cy="56" r="2.5" fill="currentColor" stroke="none" />
-                </svg>
-                <div class="leading-tight">
-                    <div class="text-[9px] tracking-[0.35em] text-zinc-500 uppercase">Operations Room</div>
-                    <div class="text-sm font-medium tracking-[0.25em] uppercase text-zinc-100">Cybersyn 2.0</div>
-                </div>
-            </div>
+        @include('organization::livewire.partials.ops-room-header', ['breadcrumb' => null])
 
-            {{-- Perspektive-Wechsler --}}
-            <div class="flex items-center gap-3 min-w-0">
-                <div class="text-[9px] tracking-[0.3em] text-zinc-500 uppercase whitespace-nowrap">Perspective</div>
-                <div class="relative">
-                    <select
-                        wire:change="switchPerspective($event.target.value)"
-                        class="appearance-none bg-zinc-800 border border-zinc-700 text-zinc-100 text-xs uppercase tracking-wider pl-3 pr-8 py-1.5 focus:border-orange-400 focus:ring-0 cursor-pointer">
-                        @foreach($availablePerspectives as $persp)
-                            <option value="{{ $persp['id'] }}" @selected($persp['id'] === $perspectiveEntityId)>{{ $persp['name'] }}</option>
-                        @endforeach
-                    </select>
-                    <span class="absolute right-2 top-1/2 -translate-y-1/2 text-zinc-500 pointer-events-none text-[10px]">▼</span>
-                </div>
-            </div>
-
-            {{-- Totals (kompakt) --}}
-            <div class="flex-1 flex items-center justify-end gap-6 border-l border-zinc-800 pl-6">
-                <div class="text-right leading-tight">
-                    <div class="text-[9px] tracking-[0.3em] text-zinc-500 uppercase">Open</div>
-                    <div class="text-lg font-mono tabular-nums text-zinc-100">{{ str_pad((string) $totals['open'], 2, '0', STR_PAD_LEFT) }}</div>
-                </div>
-                <div class="text-right leading-tight">
-                    <div class="text-[9px] tracking-[0.3em] text-zinc-500 uppercase">Escalated</div>
-                    <div class="text-lg font-mono tabular-nums {{ $totals['escalated'] > 0 ? 'text-amber-400' : 'text-zinc-700' }}">{{ str_pad((string) $totals['escalated'], 2, '0', STR_PAD_LEFT) }}</div>
-                </div>
-                <div class="text-right leading-tight">
-                    <div class="text-[9px] tracking-[0.3em] uppercase {{ $totals['algedonic'] > 0 ? 'text-red-400' : 'text-zinc-500' }}">Algedonic</div>
-                    <div class="text-lg font-mono tabular-nums {{ $totals['algedonic'] > 0 ? 'text-red-500 animate-pulse' : 'text-zinc-700' }}">{{ str_pad((string) $totals['algedonic'], 2, '0', STR_PAD_LEFT) }}</div>
-                </div>
-                <div class="text-right leading-tight">
-                    <div class="text-[9px] tracking-[0.3em] text-zinc-500 uppercase">Vacant</div>
-                    <div class="text-lg font-mono tabular-nums {{ $totals['vacant_cells'] > 0 ? 'text-amber-400' : 'text-emerald-400' }}">{{ str_pad((string) $totals['vacant_cells'], 2, '0', STR_PAD_LEFT) }}</div>
-                </div>
-                <div class="text-right leading-tight border-l border-zinc-800 pl-6 tabular-nums">
-                    <div class="text-[9px] tracking-[0.3em] text-zinc-500 uppercase">{{ now()->locale('en')->isoFormat('ddd · DD MMM YYYY') }}</div>
-                    <div class="text-lg font-mono text-zinc-100">{{ now()->format('H:i') }}</div>
-                </div>
-            </div>
-        </header>
-
-        {{-- ── VSM-Ebenen S5 → S1 (flex-1, jede Ebene fluid) ───────────────── --}}
+        {{-- ── VSM-Ebenen S5 → S1 (flex-1, jede Ebene fluid, klickbar) ───── --}}
         <main class="flex-1 min-h-0 flex flex-col divide-y divide-zinc-800">
             @foreach($levels as $level)
-                <section class="flex-1 min-h-0 px-6 py-2 flex items-center gap-6 transition hover:bg-zinc-800/30 group">
+                <a href="{{ route('organization.ops-room.level', ['perspective' => $perspectiveEntityId, 'vsm' => $level['code']]) }}"
+                   class="flex-1 min-h-0 px-6 py-2 flex items-center gap-6 transition hover:bg-zinc-800/40 group cursor-pointer"
+                   title="Ebene {{ $level['display'] }} im Detail">
                     {{-- Level-Code XXL --}}
                     <div class="w-16 flex-shrink-0">
                         <div class="text-3xl font-light tracking-tighter tabular-nums leading-none {{ $level['vacant'] ? 'text-zinc-700' : 'text-orange-400' }}">
@@ -120,8 +69,9 @@
                             <div class="text-[9px] tracking-[0.3em] uppercase {{ $level['algedonic'] > 0 ? 'text-red-400' : 'text-zinc-500' }}">Alg</div>
                             <div class="text-2xl font-mono tabular-nums {{ $level['algedonic'] > 0 ? 'text-red-500 animate-pulse' : 'text-zinc-700' }}">{{ str_pad((string) $level['algedonic'], 2, '0', STR_PAD_LEFT) }}</div>
                         </div>
+                        <span class="text-zinc-700 group-hover:text-orange-400 transition text-xl font-light">›</span>
                     </div>
-                </section>
+                </a>
             @endforeach
         </main>
 
@@ -147,19 +97,6 @@
             </section>
         @endif
 
-        {{-- ── Cybersyn Footer-Strip ──────────────────────────────────────── --}}
-        <footer class="flex-shrink-0 border-t border-zinc-800 px-6 py-1.5 flex items-center justify-between text-[9px] tracking-[0.35em] text-zinc-600 uppercase">
-            <div class="flex items-center gap-3">
-                <span>Stafford Beer · Santiago de Chile · 1972</span>
-                <span class="text-zinc-700">—</span>
-                <span class="text-zinc-500">{{ $p?->name ?? '—' }} · 2026</span>
-            </div>
-            <div class="flex items-center gap-2 font-mono">
-                <span class="w-1.5 h-1.5 bg-emerald-500 animate-pulse rounded-full"></span>
-                <span class="text-zinc-500">Live</span>
-                <span class="text-zinc-700">·</span>
-                <span class="text-zinc-600">Persp/{{ str_pad((string) ($perspectiveEntityId ?? 0), 4, '0', STR_PAD_LEFT) }}</span>
-            </div>
-        </footer>
+        @include('organization::livewire.partials.ops-room-footer')
     </div>
 </x-ui-page>

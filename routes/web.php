@@ -50,7 +50,9 @@ Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organiza
 
 // Operations Room — Hommage an Stafford Beer, Santiago 1972
 Route::get('/ops-room', \Platform\Organization\Livewire\OpsRoom::class)->name('organization.ops-room');
-Route::get('/ops-room/{perspective}', \Platform\Organization\Livewire\OpsRoom::class)->name('organization.ops-room.perspective');
+Route::get('/ops-room/perspective/{perspective}', \Platform\Organization\Livewire\OpsRoom::class)->name('organization.ops-room.perspective');
+Route::get('/ops-room/perspective/{perspective}/level/{vsm}', \Platform\Organization\Livewire\OpsRoomLevel::class)->name('organization.ops-room.level');
+Route::get('/ops-room/signal/{signal}', \Platform\Organization\Livewire\OpsRoomSignal::class)->name('organization.ops-room.signal');
 
 Route::get('/entities', EntityIndex::class)->name('organization.entities.index');
 Route::get('/entities/{entity}', EntityShow::class)->name('organization.entities.show');

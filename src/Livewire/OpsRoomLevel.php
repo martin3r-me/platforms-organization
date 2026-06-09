@@ -82,20 +82,39 @@ class OpsRoomLevel extends Component
     #[Computed]
     public function assignees(): array
     {
-        return OrganizationEntityVsmAssignment::query()
+        $assignments = OrganizationEntityVsmAssignment::query()
             ->where('perspective_entity_id', $this->perspectiveEntityId)
             ->where('vsm_system', $this->vsmLevel)
             ->activeAt()
-            ->with('assignedEntity:id,name')
-            ->get()
-            ->map(fn ($a) => [
+            ->with(['assignedEntity:id,name,entity_type_id', 'assignedEntity.type:id,code'])
+            ->get();
+
+        $personIds = $assignments->pluck('assigned_entity_id')->unique()->all();
+        $rolesByPerson = collect();
+        if (! empty($personIds)) {
+            $rolesByPerson = \Platform\Organization\Models\OrganizationRoleAssignment::query()
+                ->whereIn('person_entity_id', $personIds)
+                ->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', now()->toDateString()))
+                ->where(fn ($q) => $q->whereNull('valid_from')->orWhere('valid_from', '<=', now()->toDateString()))
+                ->with('role:id,name,vsm_system')
+                ->get()
+                ->filter(fn ($ra) => $ra->role && $ra->role->vsm_system === $this->vsmLevel)
+                ->groupBy('person_entity_id');
+        }
+
+        return $assignments->map(function ($a) use ($rolesByPerson) {
+            $e = $a->assignedEntity;
+            $matchingRole = ($rolesByPerson[$a->assigned_entity_id] ?? collect())->first();
+            return [
                 'id' => $a->id,
                 'entity_id' => $a->assigned_entity_id,
-                'name' => $a->assignedEntity?->name ?? '#'.$a->assigned_entity_id,
+                'name' => $e?->name ?? '#'.$a->assigned_entity_id,
+                'is_agent' => $e?->type?->code === 'system_agent',
+                'role' => $matchingRole?->role?->name,
                 'scope' => $a->scope,
                 'notes' => $a->notes,
-            ])
-            ->all();
+            ];
+        })->all();
     }
 
     #[Computed]

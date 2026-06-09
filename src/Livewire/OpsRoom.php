@@ -7,6 +7,7 @@ use Livewire\Component;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntityVsmAssignment;
+use Platform\Organization\Models\OrganizationRoleAssignment;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\PerspectiveService;
 
@@ -81,11 +82,11 @@ class OpsRoom extends Component
             return [];
         }
 
-        // Assignees pro Ebene
+        // Assignees pro Ebene — mit EntityType (fuer Agent-Marker)
         $assignmentsByLevel = OrganizationEntityVsmAssignment::query()
             ->where('perspective_entity_id', $this->perspectiveEntityId)
             ->activeAt()
-            ->with('assignedEntity:id,name')
+            ->with(['assignedEntity:id,name,entity_type_id', 'assignedEntity.type:id,code'])
             ->get()
             ->groupBy('vsm_system');
 
@@ -98,10 +99,43 @@ class OpsRoom extends Component
             ->get()
             ->keyBy('vsm_level');
 
+        // Rollen-Lookup: alle aktiven RoleAssignments fuer die assignee-Personen,
+        // gruppiert nach person_entity_id, nur Rollen mit vsm_system.
+        $assigneeIds = $assignmentsByLevel
+            ->flatMap(fn ($coll) => $coll->pluck('assigned_entity_id'))
+            ->unique()
+            ->all();
+
+        $rolesByPerson = collect();
+        if (! empty($assigneeIds)) {
+            $rolesByPerson = OrganizationRoleAssignment::query()
+                ->whereIn('person_entity_id', $assigneeIds)
+                ->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', now()->toDateString()))
+                ->where(fn ($q) => $q->whereNull('valid_from')->orWhere('valid_from', '<=', now()->toDateString()))
+                ->with('role:id,name,vsm_system')
+                ->get()
+                ->filter(fn ($ra) => $ra->role && $ra->role->vsm_system)
+                ->groupBy('person_entity_id');
+        }
+
         $rows = [];
         foreach (OrganizationEntityVsmAssignment::VSM_DEFINITIONS as $code => $def) {
             $assignees = ($assignmentsByLevel[$code] ?? collect())
-                ->map(fn ($a) => $a->assignedEntity?->name)
+                ->map(function ($a) use ($code, $rolesByPerson) {
+                    $e = $a->assignedEntity;
+                    if (! $e) return null;
+                    $isAgent = $e->type?->code === 'system_agent';
+
+                    // Rolle der Person, die zur aktuellen VSM-Ebene passt.
+                    $personRoles = $rolesByPerson[$e->id] ?? collect();
+                    $matchingRole = $personRoles->first(fn ($ra) => $ra->role?->vsm_system === $code);
+
+                    return [
+                        'name' => $e->name,
+                        'is_agent' => $isAgent,
+                        'role' => $matchingRole?->role?->name,
+                    ];
+                })
                 ->filter()
                 ->values()
                 ->all();

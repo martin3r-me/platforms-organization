@@ -46,6 +46,19 @@ class OrganizationEntityVsmAssignment extends Model
      * code_display ist die UI-Repraesentation (z.B. "S3*" statt "s3_star").
      * Array-Reihenfolge = Sort-Reihenfolge fuer Anzeige.
      */
+    /**
+     * VSM-Eskalations-Reihenfolge: was kommt nach dieser Ebene, wenn niemand reagiert?
+     * S3* steht zwischen S3 und S4. S5 ist letzte Instanz innerhalb einer Perspektive.
+     */
+    public const NEXT_LEVEL = [
+        's1' => 's2',
+        's2' => 's3',
+        's3' => 's3_star',
+        's3_star' => 's4',
+        's4' => 's5',
+        's5' => null,
+    ];
+
     public const VSM_DEFINITIONS = [
         self::VSM_S5 => [
             'code_display' => 'S5',

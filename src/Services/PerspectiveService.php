@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
+use Platform\Organization\Models\OrganizationEntityVsmAssignment;
 use Platform\Organization\Models\OrganizationPerspectiveTeam;
 
 /**
@@ -100,6 +101,44 @@ class PerspectiveService
                 ['is_default' => true],
             );
         });
+    }
+
+    /**
+     * Sucht den ersten *menschlichen* Owner (= keine system_agent-Entity) entlang
+     * der VSM-Eskalations-Reihenfolge ab der gegebenen Ebene aufwaerts.
+     *
+     * Beer-Argument: Agenten erfuellen VSM-Funktionen, aber sie tragen keine
+     * Verantwortung. Owner eines Signals muss jemand sein, der bearbeiten kann.
+     * Findet sich auf der Ausgangs-Ebene nur ein Agent, springt der Lookup auf
+     * die naechsthoehere Ebene (S1→S2→S3→S3*→S4→S5).
+     *
+     * Gibt NULL zurueck, wenn entlang der Kette niemand Menschliches sitzt — der
+     * Caller faellt dann typischerweise auf den Carrier-Root selbst zurueck
+     * (das ist die normative Letzt-Instanz der Perspektive).
+     */
+    public static function resolveHumanOwner(?int $perspectiveEntityId, ?string $vsmLevel): ?int
+    {
+        if (! $perspectiveEntityId || ! $vsmLevel) {
+            return null;
+        }
+
+        $level = $vsmLevel;
+        // Begrenzte Schritte als Backstop gegen kaputte NEXT_LEVEL-Konfig.
+        for ($i = 0; $i < 8 && $level !== null; $i++) {
+            $id = OrganizationEntityVsmAssignment::query()
+                ->where('perspective_entity_id', $perspectiveEntityId)
+                ->where('vsm_system', $level)
+                ->activeAt()
+                ->whereHas('assignedEntity.type', fn ($q) => $q->where('code', '!=', 'system_agent'))
+                ->orderBy('id')
+                ->value('assigned_entity_id');
+
+            if ($id) {
+                return (int) $id;
+            }
+            $level = OrganizationEntityVsmAssignment::NEXT_LEVEL[$level] ?? null;
+        }
+        return null;
     }
 
     /**

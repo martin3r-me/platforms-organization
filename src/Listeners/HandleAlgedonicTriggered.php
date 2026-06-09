@@ -3,7 +3,6 @@
 namespace Platform\Organization\Listeners;
 
 use Platform\Core\Events\AlgedonicTriggered;
-use Platform\Organization\Models\OrganizationEntityVsmAssignment;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\PerspectiveService;
 
@@ -75,13 +74,10 @@ class HandleAlgedonicTriggered
 
     protected function resolveS5Owner(int $perspectiveEntityId): ?int
     {
-        $id = OrganizationEntityVsmAssignment::query()
-            ->where('perspective_entity_id', $perspectiveEntityId)
-            ->where('vsm_system', 's5')
-            ->activeAt()
-            ->orderBy('id')
-            ->value('assigned_entity_id');
-
-        return $id ? (int) $id : null;
+        // Algedonic zielt auf S5, aber wir wollen einen menschlichen Adressat.
+        // resolveHumanOwner sucht vertikal — wenn S5 nur Agenten hat, geht es...
+        // tja, S5 ist die hoechste Ebene. Findet er nichts, wird der Caller
+        // auf den Carrier-Root als letzte Instanz zurueckfallen.
+        return \Platform\Organization\Services\PerspectiveService::resolveHumanOwner($perspectiveEntityId, 's5');
     }
 }

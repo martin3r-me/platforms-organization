@@ -18,17 +18,10 @@ use Platform\Organization\Models\OrganizationSignal;
 class SignalEscalationService
 {
     /**
-     * VSM-Eskalationsreihenfolge: was kommt nach s1?
-     * S3-Star ist zwischen S3 und S4 — passt zur Reihenfolge im VSM_DEFINITIONS-Array.
+     * VSM-Eskalationsreihenfolge ist jetzt zentral am Modell.
+     * Aliase fuer kuerzeren Zugriff.
      */
-    protected const NEXT_LEVEL = [
-        's1' => 's2',
-        's2' => 's3',
-        's3' => 's3_star',
-        's3_star' => 's4',
-        's4' => 's5',
-        's5' => null, // s5 ist die hoechste Ebene innerhalb einer Perspektive
-    ];
+    protected const NEXT_LEVEL = \Platform\Organization\Models\OrganizationEntityVsmAssignment::NEXT_LEVEL;
 
     protected const SEVERITY_LADDER = [
         'info' => 'warning',

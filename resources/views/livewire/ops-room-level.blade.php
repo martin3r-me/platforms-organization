@@ -51,10 +51,19 @@
                     @else
                         <ul class="space-y-1.5">
                             @foreach($assignees as $a)
-                                <li class="px-2.5 py-1.5 border border-zinc-800 bg-zinc-900/40">
+                                <li class="px-2.5 py-1.5 border {{ $a['is_agent'] ? 'border-zinc-800 bg-zinc-950/40' : 'border-zinc-800 bg-zinc-900/40' }}">
                                     <a href="{{ route('organization.entities.show', $a['entity_id']) }}" class="block">
-                                        <div class="text-sm text-zinc-100 hover:text-orange-300 transition">{{ $a['name'] }}</div>
-                                        @if(!empty($a['scope']))
+                                        <div class="flex items-center gap-1.5">
+                                            @if($a['is_agent'])
+                                                <span class="w-1 h-1 bg-zinc-600"></span>
+                                            @endif
+                                            <span class="text-sm {{ $a['is_agent'] ? 'text-zinc-500' : 'text-zinc-100' }} hover:text-orange-300 transition">{{ $a['name'] }}</span>
+                                        </div>
+                                        @if($a['role'])
+                                            <div class="text-[10px] text-zinc-500 uppercase tracking-[0.2em] mt-0.5">{{ $a['role'] }}</div>
+                                        @elseif($a['is_agent'])
+                                            <div class="text-[10px] text-zinc-600 uppercase tracking-[0.2em] mt-0.5">Agent — keine Verantwortung</div>
+                                        @elseif(!empty($a['scope']))
                                             <div class="text-[10px] text-zinc-500 uppercase tracking-wider mt-0.5">{{ $a['scope'] }}</div>
                                         @endif
                                     </a>

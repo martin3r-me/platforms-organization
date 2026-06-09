@@ -317,22 +317,14 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
     }
 
     /**
-     * Aktueller Owner aus dem VSM-Assignment-Lookup:
-     * Erster Actor, der in (perspective_entity_id, vsm_level) eingetragen ist.
-     * NULL wenn keine Perspektive/Ebene bekannt oder Zelle vakant.
+     * Aktueller Owner: erster *menschlicher* Actor (kein system_agent) in der
+     * Cell oder eine Ebene hoeher, falls dort nur Agenten sitzen. Verhindert,
+     * dass Signale bei Agenten haengen bleiben (Agenten erfuellen Funktionen,
+     * tragen aber keine Verantwortung).
      */
     protected function resolveCurrentOwner(?int $perspectiveEntityId, ?string $vsmLevel): ?int
     {
-        if (!$perspectiveEntityId || !$vsmLevel) {
-            return null;
-        }
-
-        return OrganizationEntityVsmAssignment::query()
-            ->where('perspective_entity_id', $perspectiveEntityId)
-            ->where('vsm_system', $vsmLevel)
-            ->activeAt()
-            ->orderBy('id')
-            ->value('assigned_entity_id');
+        return \Platform\Organization\Services\PerspectiveService::resolveHumanOwner($perspectiveEntityId, $vsmLevel);
     }
 
     public function getMetadata(): array

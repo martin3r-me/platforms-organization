@@ -48,8 +48,20 @@
                                     Vakant
                                 </span>
                             @else
-                                @foreach($level['assignees'] as $name)
-                                    <span class="px-2 py-0.5 border border-zinc-700 text-zinc-200 text-[11px] tracking-wide font-medium bg-zinc-900/40 whitespace-nowrap">{{ $name }}</span>
+                                @foreach($level['assignees'] as $a)
+                                    <span class="inline-flex items-center gap-1.5 px-2 py-0.5 border text-[11px] tracking-wide font-medium whitespace-nowrap
+                                        {{ $a['is_agent']
+                                            ? 'border-zinc-800 bg-zinc-900/40 text-zinc-500'
+                                            : 'border-zinc-700 bg-zinc-900/40 text-zinc-200' }}"
+                                        title="{{ $a['is_agent'] ? 'Agent — erfüllt Funktion, traegt aber keine Verantwortung' : ($a['role'] ?? 'Person') }}">
+                                        @if($a['is_agent'])
+                                            <span class="w-1 h-1 bg-zinc-600"></span>
+                                        @endif
+                                        <span>{{ $a['name'] }}</span>
+                                        @if($a['role'])
+                                            <span class="text-[9px] tracking-[0.2em] uppercase text-zinc-500">· {{ $a['role'] }}</span>
+                                        @endif
+                                    </span>
                                 @endforeach
                             @endif
                         </div>

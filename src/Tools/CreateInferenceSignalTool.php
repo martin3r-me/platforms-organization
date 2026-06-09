@@ -7,6 +7,7 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationInferencePromptStat;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Models\OrganizationSignalAction;
@@ -78,6 +79,10 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
                 'assignee_entity_id' => [
                     'type' => 'integer',
                     'description' => 'Optional: ID der Entity, die für die Bearbeitung zuständig ist.',
+                ],
+                'perspective_entity_id' => [
+                    'type' => 'integer',
+                    'description' => 'Optional: Carrier-Entity, aus deren Sicht das Signal entsteht. Default: Parent-Carrier des Agents (= Carrier, dessen Kontext der Agent bedient). Muss ein vsm_class=carrier sein.',
                 ],
             ],
             'required' => ['inference_prompt_id', 'entity_id', 'message'],
@@ -191,12 +196,20 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
                 }
             }
 
+            // Resolve perspective_entity_id: arg > Agent-Parent > Root-Carrier
+            $perspectiveEntityId = $this->resolvePerspectiveEntityId(
+                $arguments['perspective_entity_id'] ?? null,
+                $prompt->agent_entity_id ?? null,
+                $rootTeamId
+            );
+
             // Create signal
             $signal = OrganizationSignal::create([
                 'team_id' => $rootTeamId,
                 'source' => 'inference',
                 'inference_prompt_id' => $promptId,
                 'entity_id' => $entityId,
+                'perspective_entity_id' => $perspectiveEntityId,
                 'status' => 'open',
                 'severity' => $severity,
                 'message' => $message,
@@ -242,6 +255,42 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Erstellen des Inference-Signals: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Aufloesungs-Kaskade fuer perspective_entity_id:
+     *  1. Explizites Argument (muss Carrier sein, sonst ignoriert)
+     *  2. Parent des Agent-Entitys des Prompts (Carrier, in dessen Kontext der Agent bedient)
+     *  3. Root-Carrier des Teams
+     *  4. NULL (Fallback, UI behandelt das als "in allen Perspektiven sichtbar")
+     */
+    protected function resolvePerspectiveEntityId(?int $argId, ?int $agentEntityId, int $teamId): ?int
+    {
+        if ($argId) {
+            $cand = OrganizationEntity::with('type')->find($argId);
+            if ($cand && $cand->team_id === $teamId
+                && $cand->type?->vsm_class === OrganizationEntityType::VSM_CLASS_CARRIER) {
+                return $cand->id;
+            }
+        }
+
+        if ($agentEntityId) {
+            $agent = OrganizationEntity::with('parent.type')->find($agentEntityId);
+            $parent = $agent?->parent;
+            if ($parent && $parent->team_id === $teamId
+                && $parent->type?->vsm_class === OrganizationEntityType::VSM_CLASS_CARRIER) {
+                return $parent->id;
+            }
+        }
+
+        $rootCarrier = OrganizationEntity::query()
+            ->where('team_id', $teamId)
+            ->whereNull('parent_entity_id')
+            ->whereHas('type', fn ($q) => $q->where('vsm_class', OrganizationEntityType::VSM_CLASS_CARRIER))
+            ->orderBy('id')
+            ->value('id');
+
+        return $rootCarrier ? (int) $rootCarrier : null;
     }
 
     public function getMetadata(): array

@@ -246,9 +246,17 @@ class Index extends Component
     public function signalCounts(): array
     {
         $teamId = auth()->user()->currentTeam->id;
+        $activeEntity = PerspectiveService::getActiveEntity($teamId, auth()->id());
 
-        return OrganizationSignal::where('team_id', $teamId)
-            ->whereIn('status', ['open', 'acknowledged'])
+        $query = OrganizationSignal::where('team_id', $teamId)
+            ->whereIn('status', ['open', 'acknowledged']);
+
+        // Perspektive-sensitive Anzeige: nur Signale aus aktiver Sicht (oder NULL = legacy / global).
+        if ($activeEntity) {
+            $query->forPerspective($activeEntity->id);
+        }
+
+        return $query
             ->selectRaw('entity_id, COUNT(*) as total,
                 SUM(CASE WHEN severity = "critical" THEN 1 ELSE 0 END) as critical_count,
                 SUM(CASE WHEN severity = "algedonic" THEN 1 ELSE 0 END) as algedonic_count,

@@ -26,6 +26,7 @@ class OrganizationSignal extends Model
         'signal_definition_id',
         'inference_prompt_id',
         'entity_id',
+        'perspective_entity_id',
         'status',
         'severity',
         'message',
@@ -74,6 +75,28 @@ class OrganizationSignal extends Model
     public function entity(): BelongsTo
     {
         return $this->belongsTo(OrganizationEntity::class, 'entity_id');
+    }
+
+    public function perspectiveEntity(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationEntity::class, 'perspective_entity_id');
+    }
+
+    /**
+     * Filtert Signale auf die aktive Perspektive. NULL-perspektivisch (Legacy
+     * oder unklar zugeordnet) wird wahlweise mit-einbezogen.
+     */
+    public function scopeForPerspective($query, ?int $perspectiveEntityId, bool $includeNull = true)
+    {
+        if ($perspectiveEntityId === null) {
+            return $query;
+        }
+        return $query->where(function ($q) use ($perspectiveEntityId, $includeNull) {
+            $q->where('perspective_entity_id', $perspectiveEntityId);
+            if ($includeNull) {
+                $q->orWhereNull('perspective_entity_id');
+            }
+        });
     }
 
     public function inferencePrompt(): BelongsTo

@@ -110,6 +110,8 @@ class Show extends Component
             $this->treeNodes,
             $this->totalDescendantCount,
             $this->totalLinkCount,
+            $this->entitySignals,
+            $this->vsmMatrix,
         );
     }
 
@@ -1512,11 +1514,19 @@ class Show extends Component
     #[Computed]
     public function entitySignals(): \Illuminate\Support\Collection
     {
+        $teamId = auth()->user()->currentTeam->id;
+        $activeEntity = \Platform\Organization\Services\PerspectiveService::getActiveEntity($teamId, auth()->id());
+
         $query = OrganizationSignal::query()
             ->where('entity_id', $this->entity->id)
-            ->with(['definition:id,name,pattern_type', 'resolvedByUser:id,name'])
+            ->with(['definition:id,name,pattern_type', 'resolvedByUser:id,name', 'perspectiveEntity:id,name'])
             ->orderByRaw("FIELD(status, 'open', 'acknowledged', 'resolved', 'dismissed')")
             ->orderByDesc('created_at');
+
+        // Perspektive-sensitive Anzeige: nur Signale aus aktiver Sicht (oder NULL = legacy / global).
+        if ($activeEntity) {
+            $query->forPerspective($activeEntity->id);
+        }
 
         if ($this->signalStatusFilter) {
             $query->where('status', $this->signalStatusFilter);

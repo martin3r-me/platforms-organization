@@ -122,6 +122,27 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
                     'tools' => $actionTools,
                     // include_meta_tools defaults to true → discover_tools + execute_tool
                     'temperature' => 0.3,
+                    'on_assistant_message' => function (int $iteration, string $text) use (&$stepIndex, $runId, $promptId) {
+                        // Reasoning-Log: pro Iteration wird der LLM-Text als Step persistiert.
+                        try {
+                            OrganizationInferenceRunStep::create([
+                                'inference_run_id' => $runId,
+                                'inference_prompt_id' => $promptId,
+                                'step_index' => $stepIndex++,
+                                'step_type' => OrganizationInferenceRunStep::TYPE_ASSISTANT_MESSAGE,
+                                'tool_name' => null,
+                                'arguments' => ['iteration' => $iteration],
+                                'result' => $this->truncateForStep(['text' => $text]),
+                                'result_ok' => true,
+                                'occurred_at' => now(),
+                            ]);
+                        } catch (\Throwable $e) {
+                            Log::warning('[InferencePromptService] Assistant-message logging failed', [
+                                'iteration' => $iteration,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+                    },
                     'on_tool_result' => function (string $toolName, array $args, array $result) use (&$stats, &$stepIndex, $runId, $promptId) {
                         // Step-Logging: jeder Tool-Call wird mit Argumenten und Result als Step persistiert.
                         try {

@@ -25,8 +25,12 @@ class HandleAlgedonicTriggered
 {
     public function handle(AlgedonicTriggered $event): void
     {
+        $isAnonymous = $event->userId === 0;
+
+        // Perspektive ermitteln: bei anonym kein PerspectiveService-Lookup
+        // (PerspectiveService liest pro User-Session). Direkt auf Root-Carrier.
         $perspectiveEntityId = $event->perspectiveEntityId
-            ?? $this->resolveActivePerspective($event->teamId, $event->userId)
+            ?? (! $isAnonymous ? $this->resolveActivePerspective($event->teamId, $event->userId) : null)
             ?? $this->resolveRootCarrier($event->teamId);
 
         if (! $perspectiveEntityId) {
@@ -51,11 +55,12 @@ class HandleAlgedonicTriggered
             'status' => 'open',
             'severity' => 'critical',
             'message' => $event->message,
-            'trigger_metrics' => [
+            'trigger_metrics' => array_filter([
                 'algedonic' => true,
-                'triggered_by_user_id' => $event->userId,
+                'anonymous' => $isAnonymous,
+                'triggered_by_user_id' => $isAnonymous ? null : $event->userId,
                 'triggered_at' => now()->toIso8601String(),
-            ],
+            ], fn ($v) => $v !== null),
             'deadline_at' => now()->copy()->addHours(max(1, $deadlineHours)),
         ]);
     }

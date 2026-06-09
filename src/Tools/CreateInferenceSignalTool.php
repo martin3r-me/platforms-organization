@@ -235,7 +235,7 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
                 'status' => 'open',
                 'severity' => $severity,
                 'message' => $message,
-                'trigger_metrics' => $arguments['evidence'] ?? null,
+                'trigger_metrics' => $arguments['evidence'] ?? [],
                 'suggested_actions' => $suggestedActions,
                 'deadline_at' => $deadlineAt,
                 'affected_entity_ids' => $affectedEntityIds,

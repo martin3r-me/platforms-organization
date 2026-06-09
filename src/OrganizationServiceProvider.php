@@ -379,6 +379,7 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\UpdateVsmAssignmentTool());
             $registry->register(new \Platform\Organization\Tools\DeleteVsmAssignmentTool());
             $registry->register(new \Platform\Organization\Tools\ListVsmVacanciesTool());
+            $registry->register(new \Platform\Organization\Tools\ListVsmActorCoverageTool());
 
             // Skill-Katalog Tools
             $registry->register(new \Platform\Organization\Tools\ListSkillsTool());

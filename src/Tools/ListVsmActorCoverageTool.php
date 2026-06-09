@@ -46,6 +46,10 @@ class ListVsmActorCoverageTool implements ToolContract, ToolMetadataContract
                     'enum' => ['subtree', 'team'],
                     'description' => 'Optional: subtree (Default) = Actors im Subtree der Perspektive. team = alle Actor-Entities im Team.',
                 ],
+                'stop_at_subcarriers' => [
+                    'type' => 'boolean',
+                    'description' => 'Optional: Nur bei scope=subtree relevant. Default: true. Wenn true, laeuft der Subtree-Walk nur durch Actor-Knoten (Personen, Boards, Capability-Areas) und stoppt an jedem Nicht-Actor-Kind (Sub-Carrier ODER observed). Strenger Beer: Actors unter Sub-Carriern gehoeren in deren Perspektive, Actors unter observed-Entities sind Umwelt.',
+                ],
                 'only_gaps' => [
                     'type' => 'boolean',
                     'description' => 'Optional: Nur Actors ohne jede VSM-Zuordnung in dieser Perspektive. Default: true.',
@@ -84,6 +88,7 @@ class ListVsmActorCoverageTool implements ToolContract, ToolMetadataContract
             }
 
             $scope = (string) ($arguments['scope'] ?? 'subtree');
+            $stopAtSubcarriers = (bool) ($arguments['stop_at_subcarriers'] ?? true);
             $onlyGaps = (bool) ($arguments['only_gaps'] ?? true);
             $activeOnly = (bool) ($arguments['active_only'] ?? true);
 
@@ -94,12 +99,14 @@ class ListVsmActorCoverageTool implements ToolContract, ToolMetadataContract
                 ->with('type:id,name,code,vsm_class');
 
             if ($scope === 'subtree') {
-                $descendantMap = resolve(EntityHierarchyService::class)
-                    ->getAllDescendantMap([$perspectiveEntity->id]);
-                $subtreeIds = array_merge(
-                    [$perspectiveEntity->id],
-                    $descendantMap[$perspectiveEntity->id] ?? []
-                );
+                $subtreeIds = $stopAtSubcarriers
+                    ? $this->walkSubtreeStoppingAtSubcarriers($perspectiveEntity->id, $teamId)
+                    : array_merge(
+                        [$perspectiveEntity->id],
+                        resolve(EntityHierarchyService::class)
+                            ->getAllDescendantMap([$perspectiveEntity->id])[$perspectiveEntity->id] ?? []
+                    );
+
                 $actorQuery->whereIn('id', $subtreeIds);
             }
 
@@ -189,6 +196,53 @@ class ListVsmActorCoverageTool implements ToolContract, ToolMetadataContract
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Actor-Coverage-Check: ' . $e->getMessage());
         }
+    }
+
+    /**
+     * Sammelt Entity-IDs im Subtree der Carrier-Perspektive.
+     * Walk laeuft nur durch Actor-Knoten (Capability-Areas, etc.) und stoppt
+     * an jedem Nicht-Actor-Kind: Sub-Carrier haben eigene Perspektive,
+     * observed-Entities sind Umwelt — beider Subbaum gehoert nicht hierher.
+     * Direkte Actor-Kinder werden eingesammelt; ihre weiteren Nachkommen
+     * werden nur erkundet, wenn sie selbst Actor sind.
+     */
+    protected function walkSubtreeStoppingAtSubcarriers(int $rootId, int $teamId): array
+    {
+        $allEntities = OrganizationEntity::query()
+            ->where('team_id', $teamId)
+            ->select('id', 'parent_entity_id', 'entity_type_id')
+            ->with('type:id,vsm_class')
+            ->get();
+
+        $childMap = [];
+        foreach ($allEntities as $e) {
+            if ($e->parent_entity_id !== null) {
+                $childMap[$e->parent_entity_id][] = $e->id;
+            }
+        }
+        $byId = $allEntities->keyBy('id');
+
+        $collected = [$rootId];
+        $stack = [$rootId];
+        while (!empty($stack)) {
+            $current = array_pop($stack);
+            $children = $childMap[$current] ?? [];
+            foreach ($children as $childId) {
+                $child = $byId->get($childId);
+                if (!$child) {
+                    continue;
+                }
+                $collected[] = $childId;
+                // Nur durch Actor-Knoten weitergehen — Sub-Carrier und observed
+                // beenden den Walk an dieser Stelle.
+                if ($child->type?->vsm_class !== OrganizationEntityType::VSM_CLASS_ACTOR) {
+                    continue;
+                }
+                $stack[] = $childId;
+            }
+        }
+
+        return $collected;
     }
 
     public function getMetadata(): array

@@ -13,19 +13,14 @@ use Illuminate\Support\Facades\Schema;
  * entity_vsm_assignments.perspective_entity_id) tragen ihre Sicht als FK auf
  * organization_entities, nicht auf eine eigene Perspektive-Tabelle.
  *
- * WICHTIG: dim_link_unique enthielt perspective_id als Teil des 5-Spalten-
- * Unique-Index. Beim Spalten-Drop kollabiert der Index auf 4 Spalten und
- * Rows, die sich nur durch perspective_id unterschieden, werden zu echten
- * Duplikaten. Reihenfolge daher: FK droppen -> Indizes droppen -> dedupe
- * -> Spalte droppen -> Index ohne perspective_id neu anlegen.
- * (MySQL verweigert sonst Fehler 1553 "needed in a foreign key constraint".)
+ * WICHTIG: Die Migration ist **maximal defensiv** und prueft pro DDL-Schritt
+ * via information_schema, ob die jeweilige Struktur ueberhaupt noch existiert.
+ * Damit ueberlebt sie beliebige Teil-Zustaende aus frueheren fehlgeschlagenen
+ * Laeufen (FK weg + Indizes da, FK + Unique weg + separater Index da, …).
  *
- * Migration ist **idempotent** gegen Zwischenzustaende (Teil-Drops von
- * vorherigen fehlgeschlagenen Migrations-Laeufen). Jeder DDL-Schritt wird
- * eigenstaendig versucht und Fehler werden geschluckt, falls die jeweilige
- * Struktur bereits weg ist. try/catch MUSS dabei UM den Schema::table()-Aufruf
- * herum stehen — innerhalb der Closure queued der Builder nur, fuehrt aber
- * erst nach Verlassen aus.
+ * Schema-Builder-try/catch greift nicht zuverlaessig, weil Befehle aus der
+ * Closure heraus nur queued und erst spaeter ausgefuehrt werden — daher
+ * gehen wir hier ueber DB::statement() mit explizitem Vorab-Check.
  *
  * Voraussetzung: Default-Perspektive war die einzig genutzte. Falls benannte
  * Sub-Perspektiven oder alternative Hierarchien existierten, sind sie vor
@@ -35,32 +30,25 @@ return new class extends Migration
 {
     public function up(): void
     {
-        if (Schema::hasColumn('organization_dimension_links', 'perspective_id')) {
-            // 1. FK auf perspective_id droppen — falls noch vorhanden.
-            try {
-                Schema::table('organization_dimension_links', function (Blueprint $table) {
-                    $table->dropForeign(['perspective_id']);
-                });
-            } catch (\Throwable $e) {
-                // FK existiert nicht (durch vorigen Teil-Lauf bereits entfernt).
+        $table = 'organization_dimension_links';
+        $fkName = 'organization_dimension_links_perspective_id_foreign';
+        $compositeUnique = 'dim_link_unique';
+        $perspectiveIdx = 'organization_dimension_links_perspective_id_index';
+
+        if (Schema::hasColumn($table, 'perspective_id')) {
+            // 1. FK droppen — nur wenn er noch existiert.
+            if ($this->foreignKeyExists($table, $fkName)) {
+                DB::statement("ALTER TABLE `{$table}` DROP FOREIGN KEY `{$fkName}`");
             }
 
-            // 2. Composite-Unique (enthielt perspective_id) droppen — falls noch vorhanden.
-            try {
-                Schema::table('organization_dimension_links', function (Blueprint $table) {
-                    $table->dropUnique('dim_link_unique');
-                });
-            } catch (\Throwable $e) {
-                // Index existiert nicht.
+            // 2. Composite-Unique droppen — nur wenn er noch existiert.
+            if ($this->indexExists($table, $compositeUnique)) {
+                DB::statement("ALTER TABLE `{$table}` DROP INDEX `{$compositeUnique}`");
             }
 
-            // 3. Separater Index auf perspective_id droppen — falls noch vorhanden.
-            try {
-                Schema::table('organization_dimension_links', function (Blueprint $table) {
-                    $table->dropIndex(['perspective_id']);
-                });
-            } catch (\Throwable $e) {
-                // Index existiert nicht.
+            // 3. Separater Index auf perspective_id droppen — nur wenn er noch existiert.
+            if ($this->indexExists($table, $perspectiveIdx)) {
+                DB::statement("ALTER TABLE `{$table}` DROP INDEX `{$perspectiveIdx}`");
             }
 
             // 4. Duplikate bereinigen: pro logischem Schluessel
@@ -76,21 +64,17 @@ return new class extends Migration
                     AND l1.id > l2.id
             SQL);
 
-            // 5. Spalte droppen.
-            Schema::table('organization_dimension_links', function (Blueprint $table) {
-                $table->dropColumn('perspective_id');
+            // 5. Spalte droppen — sicher, weil alle Referenzen weg sind.
+            Schema::table($table, function (Blueprint $blueprint) {
+                $blueprint->dropColumn('perspective_id');
             });
 
-            // 6. Neuen Unique-Index ohne perspective_id anlegen — falls noch nicht da.
-            try {
-                Schema::table('organization_dimension_links', function (Blueprint $table) {
-                    $table->unique(
-                        ['dimension_definition_id', 'linkable_type', 'linkable_id', 'dimension_value_id'],
-                        'dim_link_unique'
-                    );
-                });
-            } catch (\Throwable $e) {
-                // Index ggf. bereits angelegt durch vorheriges Re-Run.
+            // 6. Neuen 4-Spalten-Unique anlegen — nur wenn er noch nicht existiert.
+            if (!$this->indexExists($table, $compositeUnique)) {
+                DB::statement(
+                    "ALTER TABLE `{$table}` ADD UNIQUE KEY `{$compositeUnique}` "
+                    . "(`dimension_definition_id`, `linkable_type`, `linkable_id`, `dimension_value_id`)"
+                );
             }
         }
 
@@ -106,5 +90,34 @@ return new class extends Migration
             . '(2026_05_23_100002, 2026_05_24_100000) wiederherstellen und Spalte '
             . 'perspective_id zu organization_dimension_links zurueck-migrieren.'
         );
+    }
+
+    /**
+     * Prueft via information_schema, ob ein FK-Constraint existiert.
+     */
+    protected function foreignKeyExists(string $table, string $constraintName): bool
+    {
+        $row = DB::selectOne(
+            'SELECT COUNT(*) AS cnt FROM information_schema.TABLE_CONSTRAINTS '
+            . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? '
+            . 'AND CONSTRAINT_NAME = ? AND CONSTRAINT_TYPE = ?',
+            [$table, $constraintName, 'FOREIGN KEY']
+        );
+
+        return ((int) ($row->cnt ?? 0)) > 0;
+    }
+
+    /**
+     * Prueft via information_schema, ob ein Index (Unique oder Standard) existiert.
+     */
+    protected function indexExists(string $table, string $indexName): bool
+    {
+        $row = DB::selectOne(
+            'SELECT COUNT(*) AS cnt FROM information_schema.STATISTICS '
+            . 'WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME = ? AND INDEX_NAME = ?',
+            [$table, $indexName]
+        );
+
+        return ((int) ($row->cnt ?? 0)) > 0;
     }
 };

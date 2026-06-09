@@ -87,7 +87,15 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
 
             $q = OrganizationSignal::query()
                 ->where('team_id', $rootTeamId)
-                ->with(['entity:id,name', 'definition:id,name,pattern_type', 'inferencePrompt:id,name,vsm_system', 'assignee:id,name']);
+                ->with([
+                    'entity:id,name',
+                    'definition:id,name,pattern_type',
+                    'inferencePrompt:id,name,vsm_system',
+                    'assignee:id,name',
+                    'currentOwner:id,name',
+                    'createdByAgent:id,name',
+                    'perspectiveEntity:id,name',
+                ]);
 
             // Default: only actionable signals (exclude snoozed)
             if (empty($arguments['include_snoozed']) && empty($arguments['status'])) {
@@ -153,6 +161,20 @@ class ListSignalsTool implements ToolContract, ToolMetadataContract
                 'assignee_entity_id' => $signal->assignee_entity_id,
                 'assignee_name' => $signal->assignee?->name,
                 'affected_entity_ids' => $signal->affected_entity_ids,
+                // VSM-Routing (Phase 5b/5c)
+                'vsm_level' => $signal->vsm_level,
+                'source_type' => $signal->source_type,
+                'perspective_entity_id' => $signal->perspective_entity_id,
+                'perspective_entity_name' => $signal->perspectiveEntity?->name,
+                'current_owner_entity_id' => $signal->current_owner_entity_id,
+                'current_owner_name' => $signal->currentOwner?->name,
+                'created_by_agent_entity_id' => $signal->created_by_agent_entity_id,
+                'created_by_agent_name' => $signal->createdByAgent?->name,
+                'deadline_at' => $signal->deadline_at?->toIso8601String(),
+                'escalated_at' => $signal->escalated_at?->toIso8601String(),
+                'acknowledged_at' => $signal->acknowledged_at?->toIso8601String(),
+                'aggregated_at' => $signal->aggregated_at?->toIso8601String(),
+                'aggregated_to_signal_id' => $signal->aggregated_to_signal_id,
                 'resolved_at' => $signal->resolved_at?->toIso8601String(),
                 'created_at' => $signal->created_at?->toIso8601String(),
             ])->values()->toArray();

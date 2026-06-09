@@ -9,6 +9,16 @@ class OrganizationEntityType extends Model
 {
     use HasFactory;
 
+    public const VSM_CLASS_CARRIER = 'carrier';
+    public const VSM_CLASS_ACTOR = 'actor';
+    public const VSM_CLASS_OBSERVED = 'observed';
+
+    public const VSM_CLASSES = [
+        self::VSM_CLASS_CARRIER,
+        self::VSM_CLASS_ACTOR,
+        self::VSM_CLASS_OBSERVED,
+    ];
+
     protected $table = 'organization_entity_types';
 
     protected $fillable = [
@@ -19,14 +29,30 @@ class OrganizationEntityType extends Model
         'sort_order',
         'is_active',
         'entity_type_group_id',
+        'vsm_class',
+        'can_be_perspective',
         'metadata',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
+        'can_be_perspective' => 'boolean',
         'sort_order' => 'integer',
         'metadata' => 'array',
     ];
+
+    /**
+     * Invariant: can_be_perspective spiegelt vsm_class === 'carrier'.
+     * Verhindert Drift zwischen UI-Eingabe und systemischer Bedeutung.
+     */
+    protected static function booted(): void
+    {
+        static::saving(function (self $model) {
+            if ($model->isDirty('vsm_class')) {
+                $model->can_be_perspective = $model->vsm_class === self::VSM_CLASS_CARRIER;
+            }
+        });
+    }
 
     /**
      * Scope für aktive Entity Types
@@ -42,6 +68,38 @@ class OrganizationEntityType extends Model
     public function scopeOrdered($query)
     {
         return $query->orderBy('sort_order')->orderBy('name');
+    }
+
+    /**
+     * Scope: Carrier-Types (lebensfaehige Systeme, duerfen Perspektive sein).
+     */
+    public function scopeCarriers($query)
+    {
+        return $query->where('vsm_class', self::VSM_CLASS_CARRIER);
+    }
+
+    /**
+     * Scope: Actor-Types (fuellen VSM-Funktionen aus, empfangen Signale).
+     */
+    public function scopeActors($query)
+    {
+        return $query->where('vsm_class', self::VSM_CLASS_ACTOR);
+    }
+
+    /**
+     * Scope: Observed-Types (Umwelt; werden von S4 beobachtet).
+     */
+    public function scopeObserved($query)
+    {
+        return $query->where('vsm_class', self::VSM_CLASS_OBSERVED);
+    }
+
+    /**
+     * Scope: Types, deren Entities Perspektive sein duerfen.
+     */
+    public function scopePerspectiveCapable($query)
+    {
+        return $query->where('can_be_perspective', true);
     }
 
     /**

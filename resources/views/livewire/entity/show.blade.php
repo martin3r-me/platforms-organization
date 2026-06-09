@@ -98,6 +98,17 @@
                 <div class="flex items-center gap-3 flex-wrap">
                     <h1 class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $entity->name }}</h1>
                     <x-ui-badge variant="secondary" size="sm">{{ $entity->type->name }}</x-ui-badge>
+                    @php $vsmClass = $entity->type->vsm_class; @endphp
+                    @if($vsmClass === 'carrier')
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20" title="Carrier — lebensfähiges System (VSM). Kann eigene Perspektive sein.">
+                            @svg('heroicon-o-cube-transparent', 'w-3 h-3 mr-1')
+                            Carrier · Perspektive möglich
+                        </span>
+                    @elseif($vsmClass === 'actor')
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-600/20" title="Actor — füllt VSM-Funktionen aus, empfängt Signale. Keine eigene Perspektive.">Actor</span>
+                    @elseif($vsmClass === 'observed')
+                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20" title="Observed — Umwelt-Entity. Wird von S4 beobachtet, keine eigene Perspektive.">Observed</span>
+                    @endif
                     @if($entity->is_active)
                         <x-ui-badge variant="success" size="sm">Aktiv</x-ui-badge>
                     @else

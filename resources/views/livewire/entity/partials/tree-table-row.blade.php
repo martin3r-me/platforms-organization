@@ -37,7 +37,17 @@
 
     {{-- Typ --}}
     <x-ui-table-cell compact="true">
-        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $entity->type->name }}</span>
+        <div class="flex items-center gap-1">
+            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $entity->type->name }}</span>
+            @php $vc = $entity->type->vsm_class; @endphp
+            @if($vc === 'carrier')
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20" title="Carrier — kann eigene Perspektive sein">C</span>
+            @elseif($vc === 'actor')
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-600/15" title="Actor — füllt VSM-Funktion aus">A</span>
+            @elseif($vc === 'observed')
+                <span class="inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20" title="Observed — Umwelt, wird beobachtet">O</span>
+            @endif
+        </div>
     </x-ui-table-cell>
 
     {{-- Relationen --}}

@@ -249,6 +249,9 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\UpdateCostCenterTool());
             $registry->register(new \Platform\Organization\Tools\DeleteCostCenterTool());
 
+            // Perspective <-> Team Mapping
+            $registry->register(new \Platform\Organization\Tools\SetPerspectiveTeamTool());
+
             // VSM Function Tools
             $registry->register(new \Platform\Organization\Tools\ListVsmFunctionsTool());
             $registry->register(new \Platform\Organization\Tools\CreateVsmFunctionTool());

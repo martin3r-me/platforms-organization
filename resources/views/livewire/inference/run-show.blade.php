@@ -214,7 +214,7 @@
 
                     <div class="space-y-6">
                         @foreach($stepsByPrompt as $promptId => $promptSteps)
-                            @php $firstStep = $promptSteps->first(); @endphp
+                            @php($firstStep = $promptSteps->first())
                             <div>
                                 @if($firstStep->prompt)
                                     <div class="flex items-center gap-2 mb-2 pb-2 border-b border-[var(--ui-border)]/40">

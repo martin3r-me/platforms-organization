@@ -208,9 +208,7 @@
                         <span class="text-xs text-[var(--ui-muted)]">{{ $run->steps->count() }} Tool-Calls</span>
                     </div>
 
-                    @php
-                        $stepsByPrompt = $run->steps->groupBy('inference_prompt_id');
-                    @endphp
+                    @php($stepsByPrompt = $run->steps->groupBy('inference_prompt_id'))
 
                     <div class="space-y-6">
                         @foreach($stepsByPrompt as $promptId => $promptSteps)
@@ -226,10 +224,8 @@
 
                                 <div class="space-y-1.5" x-data="{ open: {} }">
                                     @foreach($promptSteps as $step)
-                                        @php
-                                            $isAssistant = $step->step_type === 'assistant_message';
-                                            $assistantText = $isAssistant ? ($step->result['text'] ?? '') : null;
-                                        @endphp
+                                        @php($isAssistant = $step->step_type === 'assistant_message')
+                                        @php($assistantText = $isAssistant ? ($step->result['text'] ?? '') : null)
                                         <div class="border {{ $isAssistant ? 'border-indigo-200 bg-indigo-50/30' : 'border-[var(--ui-border)]/40' }} rounded-md overflow-hidden">
                                             <button
                                                 type="button"

@@ -7,14 +7,14 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Facades\DB;
-use Platform\Organization\Models\OrganizationDimensionDefinition;
-use Platform\Organization\Models\OrganizationDimensionLink;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
+use Platform\Organization\Models\OrganizationEntityVsmAssignment;
 use Platform\Organization\Models\OrganizationTeamSnapshot;
 use Platform\Organization\Services\EntityLinkRegistry;
+use Platform\Organization\Services\PerspectiveService;
 
 class Mindmap extends Component
 {
@@ -323,19 +323,32 @@ class Mindmap extends Component
             ->unique('entity_id')
             ->keyBy('entity_id');
 
-        // VSM dimension data for live mode
+        // VSM-Zuordnung aus Sicht der aktiven Perspektive (Carrier-Entity).
+        // Mindmap-Node zeigt die *hoechste* zugewiesene Ebene (Top-Down: S5 > S4 > S3* > S3 > S2 > S1).
         $vsmMap = [];
-        $vsmDef = OrganizationDimensionDefinition::findByKey('vsm-system');
-        if ($vsmDef) {
-            $vsmMap = OrganizationDimensionLink::where('dimension_definition_id', $vsmDef->id)
-                ->where('linkable_type', 'organization_entity')
-                ->whereIn('linkable_id', $entities->pluck('id'))
-                ->with('value')
-                ->get()
-                ->keyBy('linkable_id')
-                ->map(fn ($link) => $link->value)
-                ->filter()
-                ->all();
+        $activeEntity = PerspectiveService::getActiveEntity($teamId, auth()->id());
+        if ($activeEntity) {
+            $vsmDefs = OrganizationEntityVsmAssignment::VSM_DEFINITIONS;
+            $sortOrder = array_flip(array_keys($vsmDefs));
+
+            $assignments = OrganizationEntityVsmAssignment::query()
+                ->where('perspective_entity_id', $activeEntity->id)
+                ->whereIn('assigned_entity_id', $entities->pluck('id'))
+                ->activeAt()
+                ->select('assigned_entity_id', 'vsm_system')
+                ->get();
+
+            foreach ($assignments as $a) {
+                $existing = $vsmMap[$a->assigned_entity_id] ?? null;
+                $newSort = $sortOrder[$a->vsm_system] ?? 99;
+                if (!$existing || $newSort < $existing['sort']) {
+                    $vsmMap[$a->assigned_entity_id] = [
+                        'code' => $vsmDefs[$a->vsm_system]['code_display'] ?? strtoupper($a->vsm_system),
+                        'name' => $vsmDefs[$a->vsm_system]['label'] ?? $a->vsm_system,
+                        'sort' => $newSort,
+                    ];
+                }
+            }
         }
 
         foreach ($entities as $e) {
@@ -363,15 +376,7 @@ class Mindmap extends Component
             $baseColor = $this->colorFor($groupName);
             $color = $this->lightenByDepth($baseColor, $depth);
 
-            $vsm = null;
-            $vsmValue = $vsmMap[$e->id] ?? null;
-            if ($vsmValue) {
-                $vsm = [
-                    'code' => $vsmValue->code,
-                    'name' => $vsmValue->name,
-                    'sort' => (int) $vsmValue->sort_order,
-                ];
-            }
+            $vsm = $vsmMap[$e->id] ?? null;
 
             $nodes[] = [
                 'id'       => 'e' . $e->id,

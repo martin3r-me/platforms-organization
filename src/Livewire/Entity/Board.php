@@ -7,13 +7,14 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
 use Illuminate\Support\Str;
-use Platform\Organization\Models\OrganizationDimensionDefinition;
-use Platform\Organization\Models\OrganizationDimensionLink;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
+use Platform\Organization\Models\OrganizationEntityType;
+use Platform\Organization\Models\OrganizationEntityVsmAssignment;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\EnvironmentMovementService;
+use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
 
 class Board extends Component
@@ -80,20 +81,22 @@ class Board extends Component
             ->get();
         $entityIds = $entities->pluck('id')->all();
 
-        // 2. VSM Dimension Links
-        $vsmMap = [];
-        $vsmDef = OrganizationDimensionDefinition::findByKey('vsm-system');
-        if ($vsmDef) {
-            $vsmMap = OrganizationDimensionLink::where('dimension_definition_id', $vsmDef->id)
-                ->where('linkable_type', 'organization_entity')
-                ->whereIn('linkable_id', $entityIds)
-                ->with('value')
+        // 2. VSM-Zuordnungen aus Sicht der aktiven Perspektive (Carrier-Entity).
+        //    Eine Entity kann in mehreren Zellen sitzen (Multi-Membership).
+        $activeEntity = PerspectiveService::getActiveEntity($teamId, auth()->id());
+        $vsmAssignmentMap = [];
+        if ($activeEntity) {
+            $vsmAssignmentMap = OrganizationEntityVsmAssignment::query()
+                ->where('perspective_entity_id', $activeEntity->id)
+                ->whereIn('assigned_entity_id', $entityIds)
+                ->activeAt()
+                ->select('assigned_entity_id', 'vsm_system')
                 ->get()
-                ->keyBy('linkable_id')
-                ->map(fn ($link) => $link->value)
-                ->filter()
-                ->all();
+                ->groupBy('assigned_entity_id')
+                ->map(fn ($rows) => $rows->pluck('vsm_system')->unique()->values()->toArray())
+                ->toArray();
         }
+        $vsmDefs = OrganizationEntityVsmAssignment::VSM_DEFINITIONS;
 
         // 3. Latest Snapshots
         $latestSnapshots = OrganizationEntitySnapshot::query()
@@ -118,33 +121,27 @@ class Board extends Component
             ->with('relationType')
             ->get();
 
-        // 6. Group entities into bands
+        // 6. Group entities into bands (Top-Down nach Beer).
         $vsmColors = [
-            'S1' => '#10b981',
-            'S2' => '#06b6d4',
-            'S3' => '#3b82f6',
-            'S4' => '#8b5cf6',
             'S5' => '#ec4899',
+            'S4' => '#8b5cf6',
+            'S3*' => '#a78bfa',
+            'S3' => '#3b82f6',
+            'S2' => '#06b6d4',
+            'S1' => '#10b981',
             'ENV' => '#64748b',
         ];
 
-        $vsmLabels = [
-            'S1' => 'Operations',
-            'S2' => 'Coordination',
-            'S3' => 'Control',
-            'S4' => 'Intelligence',
-            'S5' => 'Policy',
-            'ENV' => 'Environment',
-        ];
-
-        $bands = [
-            'S5' => ['label' => 'S5 · Policy', 'color' => $vsmColors['S5'], 'entities' => []],
-            'S4' => ['label' => 'S4 · Intelligence', 'color' => $vsmColors['S4'], 'entities' => []],
-            'S3' => ['label' => 'S3 · Control', 'color' => $vsmColors['S3'], 'entities' => []],
-            'S2' => ['label' => 'S2 · Coordination', 'color' => $vsmColors['S2'], 'entities' => []],
-            'S1' => ['label' => 'S1 · Operations', 'color' => $vsmColors['S1'], 'entities' => []],
-        ];
-        $envBand = ['label' => 'ENV · Environment', 'color' => $vsmColors['ENV'], 'entities' => []];
+        $bands = [];
+        foreach ($vsmDefs as $sysCode => $def) {
+            $displayCode = $def['code_display'];
+            $bands[$displayCode] = [
+                'label' => $def['label'],
+                'color' => $vsmColors[$displayCode] ?? '#94a3b8',
+                'entities' => [],
+            ];
+        }
+        $envBand = ['label' => 'ENV · Umwelt', 'color' => $vsmColors['ENV'], 'entities' => []];
         $unassigned = [];
 
         foreach ($entities as $e) {
@@ -167,10 +164,22 @@ class Board extends Component
                 'movement' => $movement,
             ];
 
-            $vsmValue = $vsmMap[$e->id] ?? null;
-            if ($vsmValue && isset($bands[$vsmValue->code])) {
-                $bands[$vsmValue->code]['entities'][] = $entityData;
-            } elseif ($vsmValue && $vsmValue->code === 'ENV') {
+            $entitySystems = $vsmAssignmentMap[$e->id] ?? [];
+            $isObserved = $e->type?->vsm_class === OrganizationEntityType::VSM_CLASS_OBSERVED;
+
+            if (!empty($entitySystems)) {
+                $placedAnywhere = false;
+                foreach ($entitySystems as $sys) {
+                    $displayCode = $vsmDefs[$sys]['code_display'] ?? null;
+                    if ($displayCode !== null && isset($bands[$displayCode])) {
+                        $bands[$displayCode]['entities'][] = $entityData;
+                        $placedAnywhere = true;
+                    }
+                }
+                if (!$placedAnywhere) {
+                    $unassigned[] = $entityData;
+                }
+            } elseif ($isObserved) {
                 $envBand['entities'][] = $entityData;
             } else {
                 $unassigned[] = $entityData;
@@ -184,7 +193,7 @@ class Board extends Component
         }
         $balance['ENV'] = count($envBand['entities']);
 
-        $systemCodes = ['S1', 'S2', 'S3', 'S4', 'S5'];
+        $systemCodes = ['S1', 'S2', 'S3', 'S3*', 'S4', 'S5'];
         $emptyCodes = array_filter($systemCodes, fn ($c) => $balance[$c] === 0);
         $diagnosis = '';
         if (count($emptyCodes) >= 3) {

@@ -1246,6 +1246,58 @@
                                                             </div>
                                                         </div>
                                                     @endif
+
+                                                    {{-- Routing-Zeile: VSM-Level, Owner, Deadline, Eskalations-/Aggregations-Marker --}}
+                                                    @php($isOverdue = $signal->deadline_at && $signal->status === 'open' && $signal->deadline_at->isPast())
+                                                    @if($signal->vsm_level || $signal->current_owner_entity_id || $signal->deadline_at || $signal->escalated_at || $signal->source_type === 'aggregation' || $signal->createdByAgent)
+                                                        <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
+                                                            @if($signal->vsm_level)
+                                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded font-medium bg-indigo-100 text-indigo-700" title="VSM-Ebene">
+                                                                    {{ strtoupper(str_replace('_', '', $signal->vsm_level)) }}
+                                                                </span>
+                                                            @endif
+
+                                                            @if($signal->current_owner_entity_id)
+                                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 text-gray-700" title="Aktueller Owner">
+                                                                    @svg('heroicon-o-user-circle', 'w-3 h-3')
+                                                                    {{ $signal->currentOwner?->name ?? '#'.$signal->current_owner_entity_id }}
+                                                                </span>
+                                                            @elseif($signal->status === 'open')
+                                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700" title="Kein Owner zugewiesen">
+                                                                    @svg('heroicon-o-user-circle', 'w-3 h-3')
+                                                                    vakant
+                                                                </span>
+                                                            @endif
+
+                                                            @if($signal->deadline_at)
+                                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded {{ $isOverdue ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-700' }}" title="Deadline {{ $signal->deadline_at->format('d.m.Y H:i') }}">
+                                                                    @svg('heroicon-o-clock', 'w-3 h-3')
+                                                                    {{ $isOverdue ? 'überfällig' : 'fällig' }} {{ $signal->deadline_at->diffForHumans() }}
+                                                                </span>
+                                                            @endif
+
+                                                            @if($signal->escalated_at)
+                                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-100 text-orange-800" title="Zuletzt eskaliert {{ $signal->escalated_at->format('d.m.Y H:i') }}">
+                                                                    @svg('heroicon-o-arrow-trending-up', 'w-3 h-3')
+                                                                    eskaliert
+                                                                </span>
+                                                            @endif
+
+                                                            @if($signal->source_type === 'aggregation')
+                                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-100 text-purple-800" title="Aus Aggregation eingehender Perspektive">
+                                                                    @svg('heroicon-o-arrows-pointing-in', 'w-3 h-3')
+                                                                    aggregiert
+                                                                </span>
+                                                            @endif
+
+                                                            @if($signal->createdByAgent)
+                                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-50 text-sky-700" title="Erzeugt durch Agent">
+                                                                    @svg('heroicon-o-cpu-chip', 'w-3 h-3')
+                                                                    {{ $signal->createdByAgent->name }}
+                                                                </span>
+                                                            @endif
+                                                        </div>
+                                                    @endif
                                                 </div>
                                             </div>
 

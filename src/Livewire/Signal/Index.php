@@ -164,7 +164,7 @@ class Index extends Component
             return collect();
         }
 
-        $eagerLoad = ['entity', 'definition', 'inferencePrompt'];
+        $eagerLoad = ['entity', 'definition', 'inferencePrompt', 'currentOwner:id,name'];
         if ($this->view === self::VIEW_ARCHIVE) {
             $eagerLoad[] = 'resolvedByUser:id,name';
         }

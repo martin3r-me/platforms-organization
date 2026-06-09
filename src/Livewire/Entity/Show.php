@@ -1529,7 +1529,13 @@ class Show extends Component
 
         $query = OrganizationSignal::query()
             ->where('entity_id', $this->entity->id)
-            ->with(['definition:id,name,pattern_type', 'resolvedByUser:id,name', 'perspectiveEntity:id,name'])
+            ->with([
+                'definition:id,name,pattern_type',
+                'resolvedByUser:id,name',
+                'perspectiveEntity:id,name',
+                'currentOwner:id,name',
+                'createdByAgent:id,name',
+            ])
             ->orderByRaw("FIELD(status, 'open', 'acknowledged', 'resolved', 'dismissed')")
             ->orderByDesc('created_at');
 

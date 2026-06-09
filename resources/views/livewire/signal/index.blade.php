@@ -273,6 +273,41 @@
                                     {{ \Illuminate\Support\Str::limit(str_replace(["\n", '•'], [' · ', ''], $signal->resolution_summary), 100) }}
                                 </p>
                             @endif
+
+                            {{-- Routing-Mikrozeile: VSM, Owner, Deadline, Eskalation --}}
+                            @php($isOverdue = $signal->deadline_at && $signal->status === 'open' && $signal->deadline_at->isPast())
+                            @if($signal->vsm_level || $signal->current_owner_entity_id || $signal->deadline_at || $signal->escalated_at)
+                                <div class="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
+                                    @if($signal->vsm_level)
+                                        <span class="inline-flex items-center px-1 py-0 rounded font-medium bg-indigo-100 text-indigo-700">
+                                            {{ strtoupper(str_replace('_', '', $signal->vsm_level)) }}
+                                        </span>
+                                    @endif
+                                    @if($signal->current_owner_entity_id)
+                                        <span class="inline-flex items-center gap-0.5 px-1 py-0 rounded bg-gray-100 text-gray-700" title="Owner">
+                                            @svg('heroicon-o-user-circle', 'w-2.5 h-2.5')
+                                            {{ $signal->currentOwner?->name ?? '#'.$signal->current_owner_entity_id }}
+                                        </span>
+                                    @elseif($signal->status === 'open')
+                                        <span class="inline-flex items-center gap-0.5 px-1 py-0 rounded bg-amber-50 text-amber-700" title="Kein Owner">
+                                            @svg('heroicon-o-user-circle', 'w-2.5 h-2.5')
+                                            vakant
+                                        </span>
+                                    @endif
+                                    @if($signal->deadline_at && $signal->status === 'open')
+                                        <span class="inline-flex items-center gap-0.5 px-1 py-0 rounded {{ $isOverdue ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-700' }}" title="Deadline {{ $signal->deadline_at->format('d.m.Y H:i') }}">
+                                            @svg('heroicon-o-clock', 'w-2.5 h-2.5')
+                                            {{ $isOverdue ? 'überfällig' : '' }} {{ $signal->deadline_at->diffForHumans() }}
+                                        </span>
+                                    @endif
+                                    @if($signal->escalated_at && $signal->status === 'open')
+                                        <span class="inline-flex items-center gap-0.5 px-1 py-0 rounded bg-orange-100 text-orange-800" title="Eskaliert {{ $signal->escalated_at->format('d.m.Y H:i') }}">
+                                            @svg('heroicon-o-arrow-trending-up', 'w-2.5 h-2.5')
+                                            eskaliert
+                                        </span>
+                                    @endif
+                                </div>
+                            @endif
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
                             <div class="flex items-center gap-1.5">

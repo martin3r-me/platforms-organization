@@ -5,12 +5,12 @@ namespace Platform\Organization\Livewire\Entity;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
-use Platform\Organization\Models\OrganizationDimensionDefinition;
-use Platform\Organization\Models\OrganizationDimensionLink;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntityTypeGroup;
+use Platform\Organization\Models\OrganizationEntityVsmAssignment;
 use Platform\Organization\Models\OrganizationSignal;
+use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
 
 class Index extends Component
@@ -203,25 +203,42 @@ class Index extends Component
     }
 
     /**
-     * VSM-System dimension values per entity: [entity_id => Collection of value objects]
+     * VSM-Besetzungen aus Sicht der aktiven Perspektive:
+     * [actor_entity_id => [['code' => 'S5', 'name' => 'S5 · Identität'], ...]]
+     *
+     * Pro Actor werden alle ihm zugewiesenen VSM-Zellen in Top-Down-Reihenfolge
+     * (S5 → S1) geliefert. Wenn keine Perspektive aktiv ist, leer.
      */
     #[Computed]
     public function vsmSystemMap(): array
     {
         $teamId = auth()->user()->currentTeam->id;
-        $definition = OrganizationDimensionDefinition::findByKey('vsm-system');
+        $activeEntity = PerspectiveService::getActiveEntity($teamId, auth()->id());
 
-        if (!$definition) {
+        if (!$activeEntity) {
             return [];
         }
 
-        return OrganizationDimensionLink::where('dimension_definition_id', $definition->id)
-            ->where('linkable_type', 'organization_entity')
-            ->whereIn('linkable_id', OrganizationEntity::forTeam($teamId)->pluck('id'))
-            ->with('value')
+        $defs = OrganizationEntityVsmAssignment::VSM_DEFINITIONS;
+        $sortOrder = array_flip(array_keys($defs));
+
+        return OrganizationEntityVsmAssignment::query()
+            ->where('perspective_entity_id', $activeEntity->id)
+            ->activeAt()
+            ->select('assigned_entity_id', 'vsm_system')
             ->get()
-            ->groupBy('linkable_id')
-            ->map(fn ($links) => $links->pluck('value')->filter()->sortBy('sort_order')->values())
+            ->groupBy('assigned_entity_id')
+            ->map(function ($rows) use ($defs, $sortOrder) {
+                return $rows->pluck('vsm_system')
+                    ->unique()
+                    ->sortBy(fn ($code) => $sortOrder[$code] ?? 99)
+                    ->map(fn ($code) => [
+                        'code' => $defs[$code]['code_display'] ?? strtoupper($code),
+                        'name' => $defs[$code]['label'] ?? $code,
+                    ])
+                    ->values()
+                    ->toArray();
+            })
             ->toArray();
     }
 

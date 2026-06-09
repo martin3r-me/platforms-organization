@@ -59,42 +59,6 @@ class Show extends Component
         'notes' => null,
     ];
 
-    /**
-     * VSM-Systemdefinitionen in klassischer Top-Down-Reihenfolge (S5 oben).
-     * Quelle: Stafford Beer, Brain of the Firm (1972).
-     */
-    public const VSM_DEFINITIONS = [
-        OrganizationEntityVsmAssignment::VSM_S5 => [
-            'label' => 'S5 · Identität',
-            'description' => 'Werte, Policy, Vision. Letzte Instanz bei Konflikten zwischen S3 (Effizienz) und S4 (Anpassung).',
-            'icon' => 'sparkles',
-        ],
-        OrganizationEntityVsmAssignment::VSM_S4 => [
-            'label' => 'S4 · Intelligenz',
-            'description' => 'Beobachtet die Umwelt, erkennt Chancen und Bedrohungen, bringt Zukunftsperspektive ein.',
-            'icon' => 'eye',
-        ],
-        OrganizationEntityVsmAssignment::VSM_S3_STAR => [
-            'label' => 'S3* · Audit',
-            'description' => 'Sporadische, tiefere Prüfung ob S1 korrekt berichtet. Synthetisiert Daten.',
-            'icon' => 'magnifying-glass',
-        ],
-        OrganizationEntityVsmAssignment::VSM_S3 => [
-            'label' => 'S3 · Kontrolle',
-            'description' => 'Steuert Ressourcen, überwacht S1-Leistung, greift bei Soll-Abweichung ein.',
-            'icon' => 'adjustments-horizontal',
-        ],
-        OrganizationEntityVsmAssignment::VSM_S2 => [
-            'label' => 'S2 · Koordination',
-            'description' => 'Synchronisiert die S1-Einheiten untereinander. Verhindert Konflikte und Doppelarbeit.',
-            'icon' => 'arrows-right-left',
-        ],
-        OrganizationEntityVsmAssignment::VSM_S1 => [
-            'label' => 'S1 · Operation',
-            'description' => 'Die Wertschöpfung selbst. Produziert, liefert, arbeitet.',
-            'icon' => 'cog-6-tooth',
-        ],
-    ];
 
     public function loadAnalyseData(): void
     {
@@ -197,7 +161,7 @@ class Show extends Component
             ->groupBy('vsm_system');
 
         $matrix = [];
-        foreach (self::VSM_DEFINITIONS as $code => $def) {
+        foreach (OrganizationEntityVsmAssignment::VSM_DEFINITIONS as $code => $def) {
             $cellAssignments = ($assignments[$code] ?? collect())->map(fn ($a) => [
                 'id' => $a->id,
                 'assigned_entity_id' => $a->assigned_entity_id,

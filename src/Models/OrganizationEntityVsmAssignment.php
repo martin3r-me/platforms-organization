@@ -39,6 +39,52 @@ class OrganizationEntityVsmAssignment extends Model
         self::VSM_S5,
     ];
 
+    /**
+     * VSM-Systemdefinitionen in klassischer Top-Down-Reihenfolge (S5 oben).
+     * Quelle: Stafford Beer, Brain of the Firm (1972).
+     *
+     * code_display ist die UI-Repraesentation (z.B. "S3*" statt "s3_star").
+     * Array-Reihenfolge = Sort-Reihenfolge fuer Anzeige.
+     */
+    public const VSM_DEFINITIONS = [
+        self::VSM_S5 => [
+            'code_display' => 'S5',
+            'label' => 'S5 · Identität',
+            'description' => 'Werte, Policy, Vision. Letzte Instanz bei Konflikten zwischen S3 (Effizienz) und S4 (Anpassung).',
+            'icon' => 'sparkles',
+        ],
+        self::VSM_S4 => [
+            'code_display' => 'S4',
+            'label' => 'S4 · Intelligenz',
+            'description' => 'Beobachtet die Umwelt, erkennt Chancen und Bedrohungen, bringt Zukunftsperspektive ein.',
+            'icon' => 'eye',
+        ],
+        self::VSM_S3_STAR => [
+            'code_display' => 'S3*',
+            'label' => 'S3* · Audit',
+            'description' => 'Sporadische, tiefere Prüfung ob S1 korrekt berichtet. Synthetisiert Daten.',
+            'icon' => 'magnifying-glass',
+        ],
+        self::VSM_S3 => [
+            'code_display' => 'S3',
+            'label' => 'S3 · Kontrolle',
+            'description' => 'Steuert Ressourcen, überwacht S1-Leistung, greift bei Soll-Abweichung ein.',
+            'icon' => 'adjustments-horizontal',
+        ],
+        self::VSM_S2 => [
+            'code_display' => 'S2',
+            'label' => 'S2 · Koordination',
+            'description' => 'Synchronisiert die S1-Einheiten untereinander. Verhindert Konflikte und Doppelarbeit.',
+            'icon' => 'arrows-right-left',
+        ],
+        self::VSM_S1 => [
+            'code_display' => 'S1',
+            'label' => 'S1 · Operation',
+            'description' => 'Die Wertschöpfung selbst. Produziert, liefert, arbeitet.',
+            'icon' => 'cog-6-tooth',
+        ],
+    ];
+
     protected $table = 'organization_entity_vsm_assignments';
 
     protected $fillable = [

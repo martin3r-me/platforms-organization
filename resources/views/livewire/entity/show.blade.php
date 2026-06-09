@@ -1439,7 +1439,7 @@
         <x-slot name="header">
             @php
                 $sysCode = $vsmAssignmentForm['vsm_system'] ?? '';
-                $sysLabel = \Platform\Organization\Livewire\Entity\Show::VSM_DEFINITIONS[$sysCode]['label'] ?? $sysCode;
+                $sysLabel = \Platform\Organization\Models\OrganizationEntityVsmAssignment::VSM_DEFINITIONS[$sysCode]['label'] ?? $sysCode;
             @endphp
             Zuordnung für {{ $sysLabel }}
         </x-slot>

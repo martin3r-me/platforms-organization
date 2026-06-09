@@ -1550,8 +1550,12 @@ class Show extends Component
         $signal = OrganizationSignal::where('id', $signalId)
             ->where('entity_id', $this->entity->id)
             ->firstOrFail();
-        $signal->update(['status' => 'acknowledged']);
+        $signal->update([
+            'status' => 'acknowledged',
+            'acknowledged_at' => $signal->acknowledged_at ?? now(),
+        ]);
         unset($this->entitySignals);
+        session()->flash('message', 'Signal bestaetigt.');
     }
 
     public function resolveSignal(int $signalId): void
@@ -1563,8 +1567,10 @@ class Show extends Component
             'status' => 'resolved',
             'resolved_at' => now(),
             'resolved_by' => auth()->id(),
+            'acknowledged_at' => $signal->acknowledged_at ?? now(),
         ]);
         unset($this->entitySignals);
+        session()->flash('message', 'Signal geloest.');
     }
 
     public function dismissSignal(int $signalId): void
@@ -1572,8 +1578,12 @@ class Show extends Component
         $signal = OrganizationSignal::where('id', $signalId)
             ->where('entity_id', $this->entity->id)
             ->firstOrFail();
-        $signal->update(['status' => 'dismissed']);
+        $signal->update([
+            'status' => 'dismissed',
+            'acknowledged_at' => $signal->acknowledged_at ?? now(),
+        ]);
         unset($this->entitySignals);
+        session()->flash('message', 'Signal verworfen.');
     }
 
     public function render()

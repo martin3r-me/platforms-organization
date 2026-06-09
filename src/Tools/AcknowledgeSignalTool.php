@@ -93,16 +93,25 @@ class AcknowledgeSignalTool implements ToolContract, ToolMetadataContract
 
             $reason = trim((string) ($arguments['reason'] ?? ''));
 
+            // acknowledged_at wird bei jeder Endstatus-Aenderung gesetzt — stoppt
+            // den Eskalations-Cron, der ueber whereNull('acknowledged_at') filtert.
+            $ackAt = $signal->acknowledged_at ?? now();
+
             $update = match ($action) {
-                'acknowledge' => ['status' => 'acknowledged'],
+                'acknowledge' => [
+                    'status' => 'acknowledged',
+                    'acknowledged_at' => $ackAt,
+                ],
                 'resolve' => [
                     'status' => 'resolved',
                     'resolved_at' => now(),
                     'resolved_by' => $context->user?->id,
+                    'acknowledged_at' => $ackAt,
                 ],
                 'dismiss' => [
                     'status' => 'dismissed',
                     'dismissed_reason' => $reason ?: null,
+                    'acknowledged_at' => $ackAt,
                 ],
             };
 

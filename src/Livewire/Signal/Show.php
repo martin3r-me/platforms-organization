@@ -137,7 +137,10 @@ class Show extends Component
 
     protected function executeAcknowledge(string $reason): void
     {
-        $this->signal->update(['status' => 'acknowledged']);
+        $this->signal->update([
+            'status' => 'acknowledged',
+            'acknowledged_at' => $this->signal->acknowledged_at ?? now(),
+        ]);
         $this->processSignalFeedback('acknowledge', $reason);
         $this->signal->refresh();
         unset($this->signalActivities);
@@ -150,6 +153,7 @@ class Show extends Component
             'resolved_at' => now(),
             'resolved_by' => auth()->id(),
             'resolution_summary' => $reason ?: null,
+            'acknowledged_at' => $this->signal->acknowledged_at ?? now(),
         ]);
         $this->processSignalFeedback('resolve', $reason);
         $this->signal->refresh();
@@ -161,6 +165,7 @@ class Show extends Component
         $this->signal->update([
             'status' => 'dismissed',
             'dismissed_reason' => $reason ?: null,
+            'acknowledged_at' => $this->signal->acknowledged_at ?? now(),
         ]);
         $this->processSignalFeedback('dismiss', $reason);
         $this->signal->refresh();
@@ -314,19 +319,24 @@ class Show extends Component
             ->values()
             ->implode("\n");
 
+        $ackAt = $this->signal->acknowledged_at ?? now();
+
         match ($derived) {
             'resolved' => $this->signal->update([
                 'status' => 'resolved',
                 'resolved_at' => now(),
                 'resolved_by' => auth()->id(),
                 'resolution_summary' => $appliedSummary ?: null,
+                'acknowledged_at' => $ackAt,
             ]),
             'dismissed' => $this->signal->update([
                 'status' => 'dismissed',
                 'dismissed_reason' => $reasons ?: null,
+                'acknowledged_at' => $ackAt,
             ]),
             'acknowledged' => $this->signal->update([
                 'status' => 'acknowledged',
+                'acknowledged_at' => $ackAt,
             ]),
         };
 

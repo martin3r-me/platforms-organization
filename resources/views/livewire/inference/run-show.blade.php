@@ -254,7 +254,9 @@
                                                 @if($step->occurred_at)
                                                     <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0 mt-0.5">{{ $step->occurred_at->format('H:i:s') }}</span>
                                                 @endif
-                                                @svg('heroicon-o-chevron-down', 'w-3.5 h-3.5 text-[var(--ui-muted)] flex-shrink-0 transition-transform mt-0.5', ['x-bind:class' => "open[{$step->id}] ? 'rotate-180' : ''"])
+                                                <span class="inline-block transition-transform mt-0.5" :class="open[{{ $step->id }}] ? 'rotate-180' : ''">
+                                                    @svg('heroicon-o-chevron-down', 'w-3.5 h-3.5 text-[var(--ui-muted)] flex-shrink-0')
+                                                </span>
                                             </button>
 
                                             <div x-show="open[{{ $step->id }}]" x-cloak class="border-t {{ $isAssistant ? 'border-indigo-200' : 'border-[var(--ui-border)]/40' }}">

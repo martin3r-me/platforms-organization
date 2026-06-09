@@ -7,6 +7,8 @@ use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityVsmAssignment;
+use Platform\Organization\Models\OrganizationInferenceRun;
+use Platform\Organization\Models\OrganizationSignalInferencePrompt;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationEntityType;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -269,6 +271,44 @@ class Show extends Component
         } catch (\Throwable $e) {
             session()->flash('error', 'Fehler: ' . $e->getMessage());
         }
+    }
+
+    // ── System-Agent Tab ──────────────────────────────────────
+
+    #[Computed]
+    public function isSystemAgent(): bool
+    {
+        return $this->entity->type?->code === 'system_agent';
+    }
+
+    #[Computed]
+    public function agentPrompts()
+    {
+        if (!$this->isSystemAgent) {
+            return collect();
+        }
+        return OrganizationSignalInferencePrompt::query()
+            ->where('agent_entity_id', $this->entity->id)
+            ->orderBy('name')
+            ->get();
+    }
+
+    #[Computed]
+    public function agentRecentRuns()
+    {
+        if (!$this->isSystemAgent) {
+            return collect();
+        }
+        $promptIds = $this->agentPrompts->pluck('id');
+        if ($promptIds->isEmpty()) {
+            return collect();
+        }
+
+        return OrganizationInferenceRun::query()
+            ->whereHas('steps', fn ($q) => $q->whereIn('inference_prompt_id', $promptIds))
+            ->latest()
+            ->limit(15)
+            ->get();
     }
 
     public function removeVsmAssignment(int $assignmentId): void

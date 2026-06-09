@@ -75,6 +75,12 @@ class OrganizationInferenceRun extends Model
         return $this->hasMany(OrganizationInquiry::class, 'inference_run_id');
     }
 
+    public function steps(): HasMany
+    {
+        return $this->hasMany(OrganizationInferenceRunStep::class, 'inference_run_id')
+            ->orderBy('step_index');
+    }
+
     public function scopeForTeam($query, int $teamId)
     {
         return $query->where('team_id', $teamId);

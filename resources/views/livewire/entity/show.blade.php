@@ -278,6 +278,26 @@
                                 @endif
                             </button>
                         @endif
+                        @if($this->isSystemAgent)
+                            @php
+                                $agentPrompts = $this->agentPrompts;
+                                $unhealthyCount = $agentPrompts->filter(fn ($p) => in_array($p->health_status, ['stale', 'error']))->count();
+                            @endphp
+                            <button
+                                @click="tab = 'agent'"
+                                :class="tab === 'agent'
+                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
+                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                                class="px-4 py-2.5 text-sm transition-colors flex items-center gap-1.5"
+                                title="System-Agent: Inference-Prompts und letzte Runs"
+                            >
+                                @svg('heroicon-o-cpu-chip', 'w-4 h-4 inline-block -mt-0.5')
+                                Agent
+                                @if($unhealthyCount > 0)
+                                    <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-red-700 bg-red-100 ring-1 ring-inset ring-red-600/20 rounded-full" title="{{ $unhealthyCount }} Prompts unhealthy">{{ $unhealthyCount }}</span>
+                                @endif
+                            </button>
+                        @endif
                         @if($this->hasLinkedUser)
                             <button
                                 @click="tab = 'person'"
@@ -1281,6 +1301,116 @@
                         @endif
                     </div>
                 </div>
+
+                {{-- Tab: System-Agent --}}
+                @if($this->isSystemAgent)
+                    <div x-show="tab === 'agent'" x-cloak>
+                        <div class="space-y-6">
+                            {{-- Inference-Prompts --}}
+                            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h2 class="text-base font-semibold text-[var(--ui-secondary)]">Inference-Prompts</h2>
+                                    <span class="text-xs text-[var(--ui-muted)]">{{ $this->agentPrompts->count() }} Prompts</span>
+                                </div>
+
+                                @if($this->agentPrompts->isEmpty())
+                                    <div class="text-sm text-[var(--ui-muted)] py-3">
+                                        Diesem Agent ist noch kein Prompt zugewiesen. Verbinde via
+                                        <code class="text-[10px] font-mono px-1 py-0.5 bg-[var(--ui-muted-5)] rounded">organization.signal_inference_prompts.PUT</code>
+                                        mit <code class="text-[10px] font-mono px-1 py-0.5 bg-[var(--ui-muted-5)] rounded">agent_entity_id={{ $entity->id }}</code>.
+                                    </div>
+                                @else
+                                    <div class="space-y-2">
+                                        @foreach($this->agentPrompts as $prompt)
+                                            @php
+                                                $health = $prompt->health_status;
+                                                $healthVariant = match($health) {
+                                                    'healthy' => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-700', 'ring' => 'ring-emerald-600/20', 'dot' => 'bg-emerald-500'],
+                                                    'stale' => ['bg' => 'bg-amber-50', 'text' => 'text-amber-700', 'ring' => 'ring-amber-600/20', 'dot' => 'bg-amber-500'],
+                                                    'error' => ['bg' => 'bg-red-50', 'text' => 'text-red-700', 'ring' => 'ring-red-600/20', 'dot' => 'bg-red-500'],
+                                                    default => ['bg' => 'bg-slate-50', 'text' => 'text-slate-600', 'ring' => 'ring-slate-600/15', 'dot' => 'bg-slate-400'],
+                                                };
+                                            @endphp
+                                            <div class="border border-[var(--ui-border)]/40 rounded-md p-3">
+                                                <div class="flex items-start justify-between gap-3">
+                                                    <div class="min-w-0 flex-1">
+                                                        <div class="flex items-center gap-2 mb-1">
+                                                            <span class="w-2 h-2 rounded-full {{ $healthVariant['dot'] }}"></span>
+                                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/10">{{ strtoupper(str_replace('_star', '*', $prompt->vsm_system)) }}</span>
+                                                            <span class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $prompt->name }}</span>
+                                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium {{ $healthVariant['bg'] }} {{ $healthVariant['text'] }} ring-1 ring-inset {{ $healthVariant['ring'] }}">{{ $health }}</span>
+                                                        </div>
+                                                        <div class="flex items-center gap-3 text-[11px] text-[var(--ui-muted)] flex-wrap">
+                                                            <span>Interval: {{ $prompt->schedule_interval_hours ?? 72 }}h</span>
+                                                            @if($prompt->last_evaluated_at)
+                                                                <span title="{{ $prompt->last_evaluated_at->format('d.m.Y H:i:s') }}">Letzter Run: {{ $prompt->last_evaluated_at->diffForHumans() }}</span>
+                                                            @else
+                                                                <span class="text-amber-700">Noch nie gelaufen</span>
+                                                            @endif
+                                                            <span>Runs: {{ $prompt->run_count ?? 0 }}</span>
+                                                            <span>Severity: {{ $prompt->default_severity }}</span>
+                                                        </div>
+                                                        @if($prompt->description)
+                                                            <p class="text-xs text-[var(--ui-muted)] mt-1.5 line-clamp-2">{{ $prompt->description }}</p>
+                                                        @endif
+                                                        @if($prompt->last_error)
+                                                            <div class="mt-2 p-2 bg-red-50 border border-red-200 rounded">
+                                                                <div class="text-[10px] font-bold text-red-900 uppercase tracking-wider mb-0.5">Letzter Fehler</div>
+                                                                <pre class="text-[11px] text-red-900 font-mono whitespace-pre-wrap break-words">{{ $prompt->last_error }}</pre>
+                                                            </div>
+                                                        @endif
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+
+                            {{-- Letzte Runs --}}
+                            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                                <div class="flex items-center justify-between mb-4">
+                                    <h2 class="text-base font-semibold text-[var(--ui-secondary)]">Letzte Runs</h2>
+                                    <a href="{{ route('organization.inference-runs.index') }}" class="text-xs text-[var(--ui-primary)] hover:underline">Alle Runs →</a>
+                                </div>
+
+                                @if($this->agentRecentRuns->isEmpty())
+                                    <div class="text-sm text-[var(--ui-muted)] py-3">
+                                        Noch keine Runs für diesen Agent.
+                                    </div>
+                                @else
+                                    <div class="space-y-1.5">
+                                        @foreach($this->agentRecentRuns as $run)
+                                            @php
+                                                $runVariant = match($run->status) {
+                                                    'completed' => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-700', 'ring' => 'ring-emerald-600/20'],
+                                                    'failed' => ['bg' => 'bg-red-50', 'text' => 'text-red-700', 'ring' => 'ring-red-600/20'],
+                                                    'running' => ['bg' => 'bg-amber-50', 'text' => 'text-amber-700', 'ring' => 'ring-amber-600/20'],
+                                                    default => ['bg' => 'bg-slate-50', 'text' => 'text-slate-600', 'ring' => 'ring-slate-600/15'],
+                                                };
+                                            @endphp
+                                            <a href="{{ route('organization.inference-runs.show', $run) }}" class="block border border-[var(--ui-border)]/40 rounded-md p-2.5 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition">
+                                                <div class="flex items-center gap-3">
+                                                    <span class="text-xs font-mono text-[var(--ui-muted)] tabular-nums w-12">#{{ $run->id }}</span>
+                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium {{ $runVariant['bg'] }} {{ $runVariant['text'] }} ring-1 ring-inset {{ $runVariant['ring'] }}">{{ $run->status }}</span>
+                                                    <span class="text-xs text-[var(--ui-muted)]" title="{{ $run->created_at->format('d.m.Y H:i:s') }}">{{ $run->created_at->diffForHumans() }}</span>
+                                                    <div class="flex items-center gap-3 ml-auto text-[11px] text-[var(--ui-muted)]">
+                                                        <span title="Signale">{{ $run->signals_created ?? 0 }} sig</span>
+                                                        <span title="Entities">{{ $run->entities_analyzed ?? 0 }} ent</span>
+                                                        @if($run->duration_ms > 0)
+                                                            <span class="tabular-nums">{{ $run->duration_ms < 1000 ? $run->duration_ms.'ms' : number_format($run->duration_ms / 1000, 1, ',', '').'s' }}</span>
+                                                        @endif
+                                                    </div>
+                                                    @svg('heroicon-o-chevron-right', 'w-3.5 h-3.5 text-[var(--ui-muted)]')
+                                                </div>
+                                            </a>
+                                        @endforeach
+                                    </div>
+                                @endif
+                            </div>
+                        </div>
+                    </div>
+                @endif
 
                 {{-- Tab: VSM-Matrix --}}
                 @if($this->isCarrierEntity)

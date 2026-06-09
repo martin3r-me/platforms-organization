@@ -8,6 +8,7 @@ use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
 use Platform\Core\Services\ClaudeToolLoopRunner;
 use Platform\Organization\Models\OrganizationInferenceRun;
+use Platform\Organization\Models\OrganizationInferenceRunStep;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Models\OrganizationSignalInferencePrompt;
 use Platform\Organization\Models\OrganizationSynthesisPromptDefinition;
@@ -104,6 +105,10 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
             // 5. Run via ClaudeToolLoopRunner
             $runner = ClaudeToolLoopRunner::make();
 
+            $stepIndex = 0;
+            $promptId = $prompt->id;
+            $runId = $run->id;
+
             $result = $runner->run(
                 [
                     ['role' => 'user', 'content' => $userMessage],
@@ -117,7 +122,31 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
                     'tools' => $actionTools,
                     // include_meta_tools defaults to true → discover_tools + execute_tool
                     'temperature' => 0.3,
-                    'on_tool_result' => function (string $toolName, array $args, array $result) use (&$stats) {
+                    'on_tool_result' => function (string $toolName, array $args, array $result) use (&$stats, &$stepIndex, $runId, $promptId) {
+                        // Step-Logging: jeder Tool-Call wird mit Argumenten und Result als Step persistiert.
+                        try {
+                            $resultOk = empty($result['error']) && empty($result['_error']);
+                            $errorMsg = $result['error'] ?? ($result['_error'] ?? null);
+
+                            OrganizationInferenceRunStep::create([
+                                'inference_run_id' => $runId,
+                                'inference_prompt_id' => $promptId,
+                                'step_index' => $stepIndex++,
+                                'step_type' => OrganizationInferenceRunStep::TYPE_TOOL_CALL,
+                                'tool_name' => $toolName,
+                                'arguments' => $this->truncateForStep($args),
+                                'result' => $this->truncateForStep($result),
+                                'result_ok' => $resultOk,
+                                'error_message' => is_string($errorMsg) ? $errorMsg : null,
+                                'occurred_at' => now(),
+                            ]);
+                        } catch (\Throwable $e) {
+                            Log::warning('[InferencePromptService] Step logging failed', [
+                                'tool_name' => $toolName,
+                                'error' => $e->getMessage(),
+                            ]);
+                        }
+
                         if ($toolName === 'organization.signal_inference.create_signal') {
                             if (! empty($result['data']['id']) && empty($result['data']['skipped'])) {
                                 $stats['signals_created']++;
@@ -139,8 +168,12 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
             $stats['token_usage'] = $result['token_usage'] ?? null;
             $stats['llm_model'] = $result['model'] ?? 'claude-sonnet-4-6';
 
-            // Update last_evaluated_at
-            $prompt->update(['last_evaluated_at' => now()]);
+            // Update last_evaluated_at + run_count, clear last_error
+            $prompt->update([
+                'last_evaluated_at' => now(),
+                'last_error' => null,
+                'run_count' => ($prompt->run_count ?? 0) + 1,
+            ]);
 
             Log::info('[InferencePromptService] Prompt executed', [
                 'prompt_id' => $prompt->id,
@@ -150,6 +183,17 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
             ]);
 
         } catch (\Throwable $e) {
+            // Persistiere Fehler am Prompt fuer Health-Status.
+            try {
+                $prompt->update([
+                    'last_error' => substr($e->getMessage(), 0, 1000),
+                    'last_evaluated_at' => now(),
+                    'run_count' => ($prompt->run_count ?? 0) + 1,
+                ]);
+            } catch (\Throwable) {
+                // ignore
+            }
+
             Log::error('[InferencePromptService] Prompt execution failed', [
                 'prompt_id' => $prompt->id,
                 'error' => $e->getMessage(),
@@ -158,6 +202,27 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
         }
 
         return $stats;
+    }
+
+    /**
+     * Komprimiert grosse Tool-Argumente/-Results fuer die Step-Tabelle:
+     * Bei >8KB JSON wird nur ein Auszug gespeichert.
+     */
+    protected function truncateForStep(?array $data, int $maxBytes = 8192): ?array
+    {
+        if ($data === null) {
+            return null;
+        }
+        $json = json_encode($data, JSON_UNESCAPED_UNICODE);
+        if ($json === false || strlen($json) <= $maxBytes) {
+            return $data;
+        }
+
+        return [
+            '_truncated' => true,
+            '_original_bytes' => strlen($json),
+            '_excerpt' => substr($json, 0, $maxBytes),
+        ];
     }
 
     /**

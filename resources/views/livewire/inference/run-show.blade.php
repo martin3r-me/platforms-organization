@@ -199,6 +199,87 @@
                     </div>
                 </div>
             @endif
+
+            {{-- Step-Drilldown: jeder Tool-Call mit Argumenten und Ergebnis --}}
+            @if($run->steps->isNotEmpty())
+                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                    <div class="flex items-center justify-between mb-4">
+                        <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Steps</h2>
+                        <span class="text-xs text-[var(--ui-muted)]">{{ $run->steps->count() }} Tool-Calls</span>
+                    </div>
+
+                    @php
+                        $stepsByPrompt = $run->steps->groupBy('inference_prompt_id');
+                    @endphp
+
+                    <div class="space-y-6">
+                        @foreach($stepsByPrompt as $promptId => $promptSteps)
+                            @php $firstStep = $promptSteps->first(); @endphp
+                            <div>
+                                @if($firstStep->prompt)
+                                    <div class="flex items-center gap-2 mb-2 pb-2 border-b border-[var(--ui-border)]/40">
+                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/10">{{ strtoupper(str_replace('_star', '*', $firstStep->prompt->vsm_system)) }}</span>
+                                        <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $firstStep->prompt->name }}</span>
+                                        <span class="text-xs text-[var(--ui-muted)]">· {{ $promptSteps->count() }} Steps</span>
+                                    </div>
+                                @endif
+
+                                <div class="space-y-1.5" x-data="{ open: {} }">
+                                    @foreach($promptSteps as $step)
+                                        <div class="border border-[var(--ui-border)]/40 rounded-md overflow-hidden">
+                                            <button
+                                                type="button"
+                                                @click="open[{{ $step->id }}] = !open[{{ $step->id }}]"
+                                                class="w-full flex items-center gap-2.5 px-3 py-2 hover:bg-[var(--ui-muted-5)]/40 transition-colors text-left"
+                                            >
+                                                <span class="text-[10px] font-mono text-[var(--ui-muted)] w-6 tabular-nums">#{{ $step->step_index }}</span>
+                                                @if($step->result_ok)
+                                                    <span class="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" title="OK"></span>
+                                                @else
+                                                    <span class="w-2 h-2 rounded-full bg-red-500 flex-shrink-0" title="Fehler"></span>
+                                                @endif
+                                                <span class="text-xs font-mono text-[var(--ui-secondary)] truncate flex-1" title="{{ $step->tool_name }}">{{ $step->tool_name }}</span>
+                                                @if($step->occurred_at)
+                                                    <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0">{{ $step->occurred_at->format('H:i:s') }}</span>
+                                                @endif
+                                                @svg('heroicon-o-chevron-down', 'w-3.5 h-3.5 text-[var(--ui-muted)] flex-shrink-0 transition-transform', ['x-bind:class' => "open[{$step->id}] ? 'rotate-180' : ''"])
+                                            </button>
+
+                                            <div x-show="open[{{ $step->id }}]" x-cloak class="border-t border-[var(--ui-border)]/40">
+                                                @if($step->error_message)
+                                                    <div class="p-3 bg-red-50 border-b border-red-200">
+                                                        <div class="text-[10px] font-bold text-red-900 uppercase tracking-wider mb-1">Fehler</div>
+                                                        <pre class="text-xs text-red-900 font-mono whitespace-pre-wrap break-words">{{ $step->error_message }}</pre>
+                                                    </div>
+                                                @endif
+
+                                                @if(!empty($step->arguments))
+                                                    <div class="p-3 border-b border-[var(--ui-border)]/30">
+                                                        <div class="text-[10px] font-bold text-[var(--ui-muted)] uppercase tracking-wider mb-1">Arguments</div>
+                                                        <pre class="text-xs text-[var(--ui-secondary)] bg-[var(--ui-muted-5)]/40 rounded p-2 overflow-x-auto font-mono whitespace-pre-wrap break-words">{{ json_encode($step->arguments, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+                                                    </div>
+                                                @endif
+
+                                                @if(!empty($step->result))
+                                                    <div class="p-3">
+                                                        <div class="text-[10px] font-bold text-[var(--ui-muted)] uppercase tracking-wider mb-1">
+                                                            Result
+                                                            @if(($step->result['_truncated'] ?? false))
+                                                                <span class="text-amber-700 ml-1">(gekuerzt — original {{ number_format($step->result['_original_bytes'] ?? 0, 0, ',', '.') }} Bytes)</span>
+                                                            @endif
+                                                        </div>
+                                                        <pre class="text-xs text-[var(--ui-secondary)] bg-[var(--ui-muted-5)]/40 rounded p-2 overflow-x-auto font-mono whitespace-pre-wrap break-words">{{ json_encode($step->result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+                                                    </div>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </div>
+            @endif
         </div>
     </x-ui-page-container>
 </x-ui-page>

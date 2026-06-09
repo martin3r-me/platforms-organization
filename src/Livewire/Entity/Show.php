@@ -10,7 +10,6 @@ use Platform\Organization\Models\OrganizationEntityVsmAssignment;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationEntityType;
 use Illuminate\Database\Eloquent\Relations\Relation;
-use Platform\Organization\Models\OrganizationVsmFunction;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntityRelationType;
 use Platform\Organization\Models\OrganizationEntityRelationshipInterlink;
@@ -365,14 +364,6 @@ class Show extends Component
             ->with('group')
             ->get()
             ->groupBy('group.name');
-    }
-
-    public function getAvailableVsmFunctionsProperty()
-    {
-        return OrganizationVsmFunction::getForEntityWithHierarchy(
-            auth()->user()->currentTeam->id,
-            $this->entity->id
-        );
     }
 
     public function getParentEntitiesProperty()

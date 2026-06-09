@@ -1371,7 +1371,7 @@
                                                         <div class="flex items-center gap-2 mb-1">
                                                             <span class="w-2 h-2 rounded-full {{ $healthVariant['dot'] }}"></span>
                                                             <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/10">{{ strtoupper(str_replace('_star', '*', $prompt->vsm_system)) }}</span>
-                                                            <span class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $prompt->name }}</span>
+                                                            <a href="{{ route('organization.settings.inference-prompts.show', $prompt) }}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate">{{ $prompt->name }}</a>
                                                             <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium {{ $healthVariant['bg'] }} {{ $healthVariant['text'] }} ring-1 ring-inset {{ $healthVariant['ring'] }}">{{ $health }}</span>
                                                         </div>
                                                         <div class="flex items-center gap-3 text-[11px] text-[var(--ui-muted)] flex-wrap">

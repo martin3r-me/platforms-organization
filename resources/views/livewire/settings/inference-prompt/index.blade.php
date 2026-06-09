@@ -66,7 +66,7 @@
                 @forelse($this->inferencePrompts as $prompt)
                     <x-ui-table-row compact="true">
                         <x-ui-table-cell compact="true">
-                            <span class="font-medium text-[var(--ui-secondary)]">{{ $prompt->name }}</span>
+                            <a href="{{ route('organization.settings.inference-prompts.show', $prompt) }}" class="font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline">{{ $prompt->name }}</a>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
                             <x-ui-badge variant="info">{{ $prompt->vsm_system ?? '–' }}</x-ui-badge>

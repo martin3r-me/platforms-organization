@@ -59,6 +59,7 @@ Route::get('/signals/{signal}', SignalShow::class)->name('organization.signals.s
 
 // Inference
 Route::get('/settings/inference-prompts', InferencePromptIndex::class)->name('organization.settings.inference-prompts.index');
+Route::get('/settings/inference-prompts/{prompt}', \Platform\Organization\Livewire\Settings\InferencePrompt\Show::class)->name('organization.settings.inference-prompts.show');
 Route::get('/settings/synthesis-prompts', SynthesisPromptIndex::class)->name('organization.settings.synthesis-prompts.index');
 Route::get('/settings/synthesis-prompts/{definition}', SynthesisPromptShow::class)->name('organization.settings.synthesis-prompts.show');
 Route::get('/inference-runs', InferenceRunIndex::class)->name('organization.inference-runs.index');

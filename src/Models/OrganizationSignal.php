@@ -23,10 +23,14 @@ class OrganizationSignal extends Model
         'uuid',
         'team_id',
         'source',
+        'source_type',
         'signal_definition_id',
         'inference_prompt_id',
         'entity_id',
         'perspective_entity_id',
+        'created_by_agent_entity_id',
+        'current_owner_entity_id',
+        'vsm_level',
         'status',
         'severity',
         'message',
@@ -37,6 +41,9 @@ class OrganizationSignal extends Model
         'dismissed_reason',
         'resolution_summary',
         'snooze_until',
+        'escalated_at',
+        'deadline_at',
+        'acknowledged_at',
         'affected_entity_ids',
         'assignee_entity_id',
     ];
@@ -46,8 +53,22 @@ class OrganizationSignal extends Model
         'suggested_actions' => 'array',
         'resolved_at' => 'datetime',
         'snooze_until' => 'datetime',
+        'escalated_at' => 'datetime',
+        'deadline_at' => 'datetime',
+        'acknowledged_at' => 'datetime',
         'affected_entity_ids' => 'array',
     ];
+
+    public const SOURCE_TYPE_INFERENCE = 'inference';
+    public const SOURCE_TYPE_INFERENCE_S3STAR = 'inference_s3star';
+    public const SOURCE_TYPE_RULE_CRON = 'rule_cron';
+    public const SOURCE_TYPE_HUMAN_ALGEDONIC = 'human_algedonic';
+    public const SOURCE_TYPE_S4_ENVIRONMENTAL = 's4_environmental';
+    public const SOURCE_TYPE_CROSS_ENTITY = 'cross_entity';
+    public const SOURCE_TYPE_SYSTEM_HEALTH = 'system_health';
+    public const SOURCE_TYPE_AGGREGATION = 'aggregation';
+
+    public const VSM_LEVELS = ['s1', 's2', 's3', 's3_star', 's4', 's5'];
 
     protected static function booted(): void
     {
@@ -80,6 +101,16 @@ class OrganizationSignal extends Model
     public function perspectiveEntity(): BelongsTo
     {
         return $this->belongsTo(OrganizationEntity::class, 'perspective_entity_id');
+    }
+
+    public function createdByAgent(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationEntity::class, 'created_by_agent_entity_id');
+    }
+
+    public function currentOwner(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationEntity::class, 'current_owner_entity_id');
     }
 
     /**
@@ -213,5 +244,27 @@ class OrganizationSignal extends Model
     {
         return $query->whereNotNull('snooze_until')
             ->where('snooze_until', '>', now());
+    }
+
+    /**
+     * Signale, deren Deadline ueberschritten ist und die nicht acknowledged sind.
+     */
+    public function scopeDueForEscalation($query)
+    {
+        return $query->whereIn('status', ['open', 'acknowledged'])
+            ->whereNull('acknowledged_at')
+            ->whereNotNull('deadline_at')
+            ->where('deadline_at', '<', now());
+    }
+
+    public function acknowledge(): void
+    {
+        if ($this->acknowledged_at) {
+            return;
+        }
+        $this->update([
+            'acknowledged_at' => now(),
+            'status' => 'acknowledged',
+        ]);
     }
 }

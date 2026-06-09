@@ -174,7 +174,14 @@ class InferenceWorkerJob implements ShouldQueue
 
     protected function resolvePrompts(OrganizationInferenceTrigger $trigger)
     {
-        $query = OrganizationSignalInferencePrompt::forTeam($trigger->team_id)->active();
+        $query = OrganizationSignalInferencePrompt::forTeam($trigger->team_id)
+            ->active()
+            // Agent-Offline-Logik: Prompts mit inaktivem Agent werden skip.
+            // Prompts ohne Agent (Legacy) laufen weiter.
+            ->where(function ($q) {
+                $q->whereNull('agent_entity_id')
+                    ->orWhereHas('agentEntity', fn ($a) => $a->where('is_active', true));
+            });
 
         $promptFilter = $trigger->prompt_filter ?? [];
 

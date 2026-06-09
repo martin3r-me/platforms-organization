@@ -8,6 +8,7 @@ use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
+use Platform\Organization\Models\OrganizationEntityVsmAssignment;
 use Platform\Organization\Models\OrganizationInferencePromptStat;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Models\OrganizationSignalAction;
@@ -203,18 +204,40 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
                 $rootTeamId
             );
 
+            // Routing: vsm_level + source_type aus Prompt ableiten
+            $vsmLevel = $prompt->vsm_system ?: null;
+            $sourceType = $vsmLevel === 's3_star'
+                ? OrganizationSignal::SOURCE_TYPE_INFERENCE_S3STAR
+                : OrganizationSignal::SOURCE_TYPE_INFERENCE;
+
+            // Current owner: 1) assignee_entity_id (explizit) 2) VSM-Assignment-Lookup
+            $currentOwnerId = $assigneeEntityId
+                ?? $this->resolveCurrentOwner($perspectiveEntityId, $vsmLevel);
+
+            // Deadline: konfigurierbar pro VSM-Ebene, default 7 Tage
+            $deadlineHours = (int) config(
+                "organization.signal_deadlines.{$vsmLevel}",
+                config('organization.signal_deadlines.default', 168) // 7 Tage
+            );
+            $deadlineAt = now()->copy()->addHours($deadlineHours);
+
             // Create signal
             $signal = OrganizationSignal::create([
                 'team_id' => $rootTeamId,
                 'source' => 'inference',
+                'source_type' => $sourceType,
                 'inference_prompt_id' => $promptId,
                 'entity_id' => $entityId,
                 'perspective_entity_id' => $perspectiveEntityId,
+                'created_by_agent_entity_id' => $prompt->agent_entity_id ?? null,
+                'current_owner_entity_id' => $currentOwnerId,
+                'vsm_level' => $vsmLevel,
                 'status' => 'open',
                 'severity' => $severity,
                 'message' => $message,
                 'trigger_metrics' => $arguments['evidence'] ?? null,
                 'suggested_actions' => $suggestedActions,
+                'deadline_at' => $deadlineAt,
                 'affected_entity_ids' => $affectedEntityIds,
                 'assignee_entity_id' => $assigneeEntityId,
             ]);
@@ -291,6 +314,25 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
             ->value('id');
 
         return $rootCarrier ? (int) $rootCarrier : null;
+    }
+
+    /**
+     * Aktueller Owner aus dem VSM-Assignment-Lookup:
+     * Erster Actor, der in (perspective_entity_id, vsm_level) eingetragen ist.
+     * NULL wenn keine Perspektive/Ebene bekannt oder Zelle vakant.
+     */
+    protected function resolveCurrentOwner(?int $perspectiveEntityId, ?string $vsmLevel): ?int
+    {
+        if (!$perspectiveEntityId || !$vsmLevel) {
+            return null;
+        }
+
+        return OrganizationEntityVsmAssignment::query()
+            ->where('perspective_entity_id', $perspectiveEntityId)
+            ->where('vsm_system', $vsmLevel)
+            ->activeAt()
+            ->orderBy('id')
+            ->value('assigned_entity_id');
     }
 
     public function getMetadata(): array

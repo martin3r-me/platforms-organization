@@ -48,6 +48,10 @@ use Platform\Organization\Livewire\EnvironmentSnapshot\Show as EnvironmentSnapsh
 
 Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organization.dashboard');
 
+// Operations Room — Hommage an Stafford Beer, Santiago 1972
+Route::get('/ops-room', \Platform\Organization\Livewire\OpsRoom::class)->name('organization.ops-room');
+Route::get('/ops-room/{perspective}', \Platform\Organization\Livewire\OpsRoom::class)->name('organization.ops-room.perspective');
+
 Route::get('/entities', EntityIndex::class)->name('organization.entities.index');
 Route::get('/entities/{entity}', EntityShow::class)->name('organization.entities.show');
 Route::get('/entities/{entity}/mindmap', EntityMindmap::class)->name('organization.entities.mindmap');

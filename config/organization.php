@@ -62,6 +62,11 @@ return [
                     'route' => 'organization.dashboard',
                     'icon' => 'heroicon-o-home',
                 ],
+                'ops-room' => [
+                    'title' => 'Ops-Room',
+                    'route' => 'organization.ops-room',
+                    'icon' => 'heroicon-o-command-line',
+                ],
                 'settings' => [
                     'title' => 'Einstellungen',
                     'icon' => 'heroicon-o-cog-6-tooth',

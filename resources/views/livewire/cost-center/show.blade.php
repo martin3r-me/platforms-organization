@@ -50,7 +50,7 @@
                         <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                             <span class="text-xs text-[var(--ui-muted)]">Entität</span>
                             <div class="text-sm font-medium text-[var(--ui-secondary)]">
-                                @if($costCenter->root_entity_id)
+                                @if($costCenter->scope_entity_id)
                                     <x-ui-badge variant="info" size="sm">Entitätsspezifisch</x-ui-badge>
                                 @else
                                     <x-ui-badge variant="secondary" size="sm">Global</x-ui-badge>
@@ -101,8 +101,8 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Entität (Parent)</label>
                         <select 
-                            name="root_entity_id"
-                            wire:model.live="form.root_entity_id"
+                            name="scope_entity_id"
+                            wire:model.live="form.scope_entity_id"
                             class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
                         >
                             <option value="">Global (für alle Entitäten)</option>

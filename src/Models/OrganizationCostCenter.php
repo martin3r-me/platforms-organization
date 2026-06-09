@@ -19,7 +19,7 @@ class OrganizationCostCenter extends Model
         'name',
         'team_id',
         'user_id',
-        'root_entity_id',
+        'scope_entity_id',
         'description',
         'is_active',
         'metadata',
@@ -63,20 +63,20 @@ class OrganizationCostCenter extends Model
     /**
      * Get all cost centers for a team (global + entity-specific)
      */
-    public static function getForTeam(int $teamId, ?int $rootEntityId = null): \Illuminate\Database\Eloquent\Collection
+    public static function getForTeam(int $teamId, ?int $scopeEntityId = null): \Illuminate\Database\Eloquent\Collection
     {
         $query = self::where('team_id', $teamId)
             ->where('is_active', true);
 
-        if ($rootEntityId) {
-            // Get global (root_entity_id = NULL) + entity-specific (root_entity_id = X)
-            $query->where(function ($q) use ($rootEntityId) {
-                $q->whereNull('root_entity_id')
-                  ->orWhere('root_entity_id', $rootEntityId);
+        if ($scopeEntityId) {
+            // Get global (scope_entity_id = NULL) + entity-specific (scope_entity_id = X)
+            $query->where(function ($q) use ($scopeEntityId) {
+                $q->whereNull('scope_entity_id')
+                  ->orWhere('scope_entity_id', $scopeEntityId);
             });
         } else {
             // Only global cost centers
-            $query->whereNull('root_entity_id');
+            $query->whereNull('scope_entity_id');
         }
 
         return $query->orderBy('name')->get();
@@ -109,7 +109,7 @@ class OrganizationCostCenter extends Model
         foreach ($hierarchy as $entityIdInPath) {
             $entitySpecific = self::where('team_id', $teamId)
                 ->where('is_active', true)
-                ->where('root_entity_id', $entityIdInPath)
+                ->where('scope_entity_id', $entityIdInPath)
                 ->get();
 
             foreach ($entitySpecific as $costCenter) {
@@ -123,7 +123,7 @@ class OrganizationCostCenter extends Model
         // Second: Add global cost centers for codes not found in hierarchy
         $globalCostCenters = self::where('team_id', $teamId)
             ->where('is_active', true)
-            ->whereNull('root_entity_id')
+            ->whereNull('scope_entity_id')
             ->get();
 
         foreach ($globalCostCenters as $costCenter) {
@@ -142,7 +142,7 @@ class OrganizationCostCenter extends Model
      */
     public function isGlobal(): bool
     {
-        return is_null($this->root_entity_id);
+        return is_null($this->scope_entity_id);
     }
 
     /**
@@ -150,7 +150,7 @@ class OrganizationCostCenter extends Model
      */
     public function isEntitySpecific(): bool
     {
-        return !is_null($this->root_entity_id);
+        return !is_null($this->scope_entity_id);
     }
 
     /**

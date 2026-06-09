@@ -44,9 +44,9 @@ class CreateCostCenterTool implements ToolContract, ToolMetadataContract
                     'type' => 'string',
                     'description' => 'Optional: Beschreibung.',
                 ],
-                'root_entity_id' => [
+                'scope_entity_id' => [
                     'type' => 'integer',
-                    'description' => 'Optional: root_entity_id (NULL = global, X = entity-spezifisch).',
+                    'description' => 'Optional: scope_entity_id (NULL = global, X = entity-spezifisch).',
                 ],
                 'is_active' => [
                     'type' => 'boolean',
@@ -93,10 +93,10 @@ class CreateCostCenterTool implements ToolContract, ToolMetadataContract
                 }
             }
 
-            $rid = $arguments['root_entity_id'] ?? null;
-            $rootEntityId = null;
+            $rid = $arguments['scope_entity_id'] ?? null;
+            $scopeEntityId = null;
             if ($rid !== null && $rid !== '' && $rid !== 'null' && $rid !== 0 && $rid !== '0') {
-                $rootEntityId = (int)$rid;
+                $scopeEntityId = (int)$rid;
             }
 
             $cc = OrganizationCostCenter::create([
@@ -105,7 +105,7 @@ class CreateCostCenterTool implements ToolContract, ToolMetadataContract
                 'code' => $code,
                 'name' => $name,
                 'description' => (array_key_exists('description', $arguments) && $arguments['description'] !== '') ? (string)$arguments['description'] : null,
-                'root_entity_id' => $rootEntityId,
+                'scope_entity_id' => $scopeEntityId,
                 'is_active' => (bool)($arguments['is_active'] ?? true),
                 'metadata' => (isset($arguments['metadata']) && is_array($arguments['metadata'])) ? $arguments['metadata'] : null,
             ]);
@@ -115,7 +115,7 @@ class CreateCostCenterTool implements ToolContract, ToolMetadataContract
                 'code' => $cc->code,
                 'name' => $cc->name,
                 'team_id' => $cc->team_id,
-                'root_entity_id' => $cc->root_entity_id,
+                'scope_entity_id' => $cc->scope_entity_id,
                 'is_active' => (bool)$cc->is_active,
                 'message' => 'Kostenstelle erfolgreich erstellt.',
             ]);

@@ -49,9 +49,9 @@ class UpdateVsmFunctionTool implements ToolContract, ToolMetadataContract
                     'type' => 'string',
                     'description' => 'Optional: Neue Beschreibung ("" zum Leeren).',
                 ],
-                'root_entity_id' => [
+                'scope_entity_id' => [
                     'type' => 'integer',
-                    'description' => 'Optional: root_entity_id (0/null zum Globalisieren).',
+                    'description' => 'Optional: scope_entity_id (0/null zum Globalisieren).',
                 ],
                 'is_active' => [
                     'type' => 'boolean',
@@ -108,12 +108,12 @@ class UpdateVsmFunctionTool implements ToolContract, ToolMetadataContract
                 $d = (string) ($arguments['description'] ?? '');
                 $update['description'] = $d === '' ? null : $d;
             }
-            if (array_key_exists('root_entity_id', $arguments)) {
-                $rid = $arguments['root_entity_id'];
+            if (array_key_exists('scope_entity_id', $arguments)) {
+                $rid = $arguments['scope_entity_id'];
                 if ($rid === null || $rid === '' || $rid === 'null' || $rid === 0 || $rid === '0') {
-                    $update['root_entity_id'] = null;
+                    $update['scope_entity_id'] = null;
                 } else {
-                    $update['root_entity_id'] = (int) $rid;
+                    $update['scope_entity_id'] = (int) $rid;
                 }
             }
             if (array_key_exists('is_active', $arguments)) {
@@ -133,7 +133,7 @@ class UpdateVsmFunctionTool implements ToolContract, ToolMetadataContract
                 'code' => $fn->code,
                 'name' => $fn->name,
                 'team_id' => $fn->team_id,
-                'root_entity_id' => $fn->root_entity_id,
+                'scope_entity_id' => $fn->scope_entity_id,
                 'is_active' => (bool) $fn->is_active,
                 'message' => 'VSM-Funktion erfolgreich aktualisiert.',
             ]);

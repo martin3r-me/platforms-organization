@@ -33,7 +33,7 @@ class ListCostCentersTool implements ToolContract, ToolMetadataContract
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['team_id', 'is_active', 'code', 'root_entity_id']),
+            $this->getStandardGetSchema(['team_id', 'is_active', 'code', 'scope_entity_id']),
             [
                 'properties' => [
                     'team_id' => [
@@ -49,9 +49,9 @@ class ListCostCentersTool implements ToolContract, ToolMetadataContract
                         'type' => 'string',
                         'description' => 'Optional: Exakter code-Filter.',
                     ],
-                    'root_entity_id' => [
+                    'scope_entity_id' => [
                         'type' => 'integer',
-                        'description' => 'Optional: Filter nach root_entity_id (global = null; entity-spezifisch = id).',
+                        'description' => 'Optional: Filter nach scope_entity_id (global = null; entity-spezifisch = id).',
                     ],
                 ],
             ]
@@ -98,16 +98,16 @@ class ListCostCentersTool implements ToolContract, ToolMetadataContract
             if (array_key_exists('code', $arguments) && $arguments['code'] !== null && $arguments['code'] !== '') {
                 $q->where('code', trim((string)$arguments['code']));
             }
-            if (array_key_exists('root_entity_id', $arguments)) {
-                $rid = $arguments['root_entity_id'];
+            if (array_key_exists('scope_entity_id', $arguments)) {
+                $rid = $arguments['scope_entity_id'];
                 if ($rid === null || $rid === '' || $rid === 'null' || $rid === 0 || $rid === '0') {
-                    $q->whereNull('root_entity_id');
+                    $q->whereNull('scope_entity_id');
                 } else {
-                    $q->where('root_entity_id', (int)$rid);
+                    $q->where('scope_entity_id', (int)$rid);
                 }
             }
 
-            $this->applyStandardFilters($q, $arguments, ['team_id', 'is_active', 'code', 'root_entity_id', 'created_at']);
+            $this->applyStandardFilters($q, $arguments, ['team_id', 'is_active', 'code', 'scope_entity_id', 'created_at']);
             $this->applyStandardSearch($q, $arguments, ['code', 'name', 'description']);
             $this->applyStandardSort($q, $arguments, ['name', 'code', 'id', 'created_at'], 'name', 'asc');
 
@@ -117,7 +117,7 @@ class ListCostCentersTool implements ToolContract, ToolMetadataContract
                 'code' => $cc->code,
                 'name' => $cc->name,
                 'team_id' => $cc->team_id,
-                'root_entity_id' => $cc->root_entity_id,
+                'scope_entity_id' => $cc->scope_entity_id,
                 'is_active' => (bool)$cc->is_active,
             ])->values()->toArray();
 

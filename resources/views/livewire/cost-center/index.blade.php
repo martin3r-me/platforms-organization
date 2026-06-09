@@ -58,7 +58,7 @@
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">{{ $cc->name }}</x-ui-table-cell>
                         <x-ui-table-cell compact="true">
-                            @if($cc->root_entity_id)
+                            @if($cc->scope_entity_id)
                                 <x-ui-badge variant="info">Entitätsspezifisch</x-ui-badge>
                             @else
                                 <x-ui-badge variant="secondary">Global</x-ui-badge>
@@ -111,8 +111,8 @@
                     <div>
                         <label class="block text-sm font-medium text-gray-700 mb-2">Entität (Parent)</label>
                         <select 
-                            name="root_entity_id"
-                            wire:model.live="form.root_entity_id"
+                            name="scope_entity_id"
+                            wire:model.live="form.scope_entity_id"
                             class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50"
                         >
                             <option value="">Global (für alle Entitäten)</option>

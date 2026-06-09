@@ -26,7 +26,7 @@ class Show extends Component
             'code' => $this->costCenter->code,
             'name' => $this->costCenter->name,
             'description' => $this->costCenter->description,
-            'root_entity_id' => $this->costCenter->root_entity_id,
+            'scope_entity_id' => $this->costCenter->scope_entity_id,
             'is_active' => $this->costCenter->is_active,
         ];
     }
@@ -42,7 +42,7 @@ class Show extends Component
             'form.name' => 'required|string|max:255',
             'form.code' => 'nullable|string|max:50',
             'form.description' => 'nullable|string',
-            'form.root_entity_id' => 'nullable|exists:organization_entities,id',
+            'form.scope_entity_id' => 'nullable|exists:organization_entities,id',
             'form.is_active' => 'boolean',
         ]);
 
@@ -58,7 +58,7 @@ class Show extends Component
         return $this->form['name'] !== $this->costCenter->name ||
                $this->form['code'] !== $this->costCenter->code ||
                $this->form['description'] !== $this->costCenter->description ||
-               $this->form['root_entity_id'] != $this->costCenter->root_entity_id ||
+               $this->form['scope_entity_id'] != $this->costCenter->scope_entity_id ||
                $this->form['is_active'] !== $this->costCenter->is_active;
     }
 

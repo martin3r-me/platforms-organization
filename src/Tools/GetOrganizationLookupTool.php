@@ -34,7 +34,7 @@ class GetOrganizationLookupTool implements ToolContract, ToolMetadataContract
     public function getSchema(): array
     {
         return $this->mergeSchemas(
-            $this->getStandardGetSchema(['lookup', 'team_id', 'is_active', 'code', 'root_entity_id']),
+            $this->getStandardGetSchema(['lookup', 'team_id', 'is_active', 'code', 'scope_entity_id']),
             [
                 'properties' => [
                     'lookup' => [

@@ -20,7 +20,7 @@ class CreateVsmFunctionTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /organization/vsm-functions - Erstellt eine VSM-Funktion im Root/Elterteam. Kann global (root_entity_id=null) oder entity-spezifisch sein.';
+        return 'POST /organization/vsm-functions - Erstellt eine VSM-Funktion im Root/Elterteam. Kann global (scope_entity_id=null) oder entity-spezifisch sein.';
     }
 
     public function getSchema(): array
@@ -44,9 +44,9 @@ class CreateVsmFunctionTool implements ToolContract, ToolMetadataContract
                     'type' => 'string',
                     'description' => 'Optional: Beschreibung.',
                 ],
-                'root_entity_id' => [
+                'scope_entity_id' => [
                     'type' => 'integer',
-                    'description' => 'Optional: root_entity_id (NULL = global, X = entity-spezifisch).',
+                    'description' => 'Optional: scope_entity_id (NULL = global, X = entity-spezifisch).',
                 ],
                 'is_active' => [
                     'type' => 'boolean',
@@ -81,10 +81,10 @@ class CreateVsmFunctionTool implements ToolContract, ToolMetadataContract
                 $code = $code === '' ? null : $code;
             }
 
-            $rid = $arguments['root_entity_id'] ?? null;
-            $rootEntityId = null;
+            $rid = $arguments['scope_entity_id'] ?? null;
+            $scopeEntityId = null;
             if ($rid !== null && $rid !== '' && $rid !== 'null' && $rid !== 0 && $rid !== '0') {
-                $rootEntityId = (int) $rid;
+                $scopeEntityId = (int) $rid;
             }
 
             $fn = OrganizationVsmFunction::create([
@@ -93,7 +93,7 @@ class CreateVsmFunctionTool implements ToolContract, ToolMetadataContract
                 'code' => $code,
                 'name' => $name,
                 'description' => ($arguments['description'] ?? null) ?: null,
-                'root_entity_id' => $rootEntityId,
+                'scope_entity_id' => $scopeEntityId,
                 'is_active' => (bool) ($arguments['is_active'] ?? true),
                 'metadata' => (isset($arguments['metadata']) && is_array($arguments['metadata'])) ? $arguments['metadata'] : null,
             ]);
@@ -103,7 +103,7 @@ class CreateVsmFunctionTool implements ToolContract, ToolMetadataContract
                 'code' => $fn->code,
                 'name' => $fn->name,
                 'team_id' => $fn->team_id,
-                'root_entity_id' => $fn->root_entity_id,
+                'scope_entity_id' => $fn->scope_entity_id,
                 'is_active' => (bool) $fn->is_active,
                 'message' => 'VSM-Funktion erfolgreich erstellt.',
             ]);

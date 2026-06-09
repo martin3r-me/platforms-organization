@@ -373,6 +373,13 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\ListPerspectivesTool());
             $registry->register(new \Platform\Organization\Tools\SwitchPerspectiveTool());
 
+            // VSM-Assignments (S1-S5 Besetzung pro Carrier-Perspektive)
+            $registry->register(new \Platform\Organization\Tools\ListVsmAssignmentsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateVsmAssignmentTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateVsmAssignmentTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteVsmAssignmentTool());
+            $registry->register(new \Platform\Organization\Tools\ListVsmVacanciesTool());
+
             // Skill-Katalog Tools
             $registry->register(new \Platform\Organization\Tools\ListSkillsTool());
             $registry->register(new \Platform\Organization\Tools\CreateSkillTool());

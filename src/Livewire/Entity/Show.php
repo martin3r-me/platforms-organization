@@ -183,9 +183,10 @@ class Show extends Component
             ->all();
 
         // Personal-Teams ausfiltern — fuer VSM-Perspektiven nicht sinnvoll.
+        // Spalte heisst personal_team (Jetstream-Konvention), nicht is_personal.
         return Team::query()
             ->whereNotIn('id', $assigned)
-            ->where(fn ($q) => $q->where('is_personal', false)->orWhereNull('is_personal'))
+            ->where(fn ($q) => $q->where('personal_team', false)->orWhereNull('personal_team'))
             ->with('parentTeam:id,name')
             ->orderBy('name')
             ->get(['id', 'name', 'parent_team_id'])

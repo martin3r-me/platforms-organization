@@ -11,6 +11,10 @@ use Platform\Organization\Models\OrganizationEntityRelationType;
 
 /**
  * Listet Entity Relation Types (global, nicht team-scoped).
+ *
+ * Inklusive Beer-Channel-Properties — Filter nach affects_aggregation und
+ * channel_class moeglich, um z.B. nur operative Channels fuer Snapshot-Service
+ * abzurufen.
  */
 class ListRelationTypesTool implements ToolContract, ToolMetadataContract
 {
@@ -23,7 +27,7 @@ class ListRelationTypesTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/relation-types - Listet Entity Relation Types (global). WICHTIG: IDs nie raten — immer erst dieses Tool aufrufen. Filtere nach code für exakten Match, is_hierarchical=true für Hierarchie-Beziehungen.';
+        return 'GET /organization/relation-types - Listet Entity Relation Types (global). WICHTIG: IDs nie raten — immer erst dieses Tool aufrufen. Filtere nach code, is_hierarchical, affects_aggregation, channel_class.';
     }
 
     public function getSchema(): array
@@ -43,15 +47,24 @@ class ListRelationTypesTool implements ToolContract, ToolMetadataContract
                     ],
                     'is_directional' => [
                         'type' => 'boolean',
-                        'description' => 'Direkter Filter: true = nur gerichtete Beziehungen (A→B ≠ B→A).',
+                        'description' => 'Direkter Filter: true = nur gerichtete Beziehungen (A->B != B->A).',
                     ],
                     'is_hierarchical' => [
                         'type' => 'boolean',
-                        'description' => 'Direkter Filter: true = nur hierarchische Beziehungen (Über-/Unterordnung).',
+                        'description' => 'Direkter Filter: true = nur hierarchische Beziehungen (Ueber-/Unterordnung).',
                     ],
                     'is_reciprocal' => [
                         'type' => 'boolean',
-                        'description' => 'Direkter Filter: true = nur wechselseitige Beziehungen (A↔B).',
+                        'description' => 'Direkter Filter: true = nur wechselseitige Beziehungen (A<->B).',
+                    ],
+                    'affects_aggregation' => [
+                        'type' => 'boolean',
+                        'description' => 'Direkter Filter: true = nur Channels, die Snapshot/Movement-Aggregation triggern.',
+                    ],
+                    'channel_class' => [
+                        'type' => 'string',
+                        'enum' => ['operational', 'informational', 'structural', 'algedonic', 'environmental'],
+                        'description' => 'Direkter Filter: nach Beer-Channel-Klasse.',
                     ],
                 ],
             ]
@@ -79,10 +92,14 @@ class ListRelationTypesTool implements ToolContract, ToolMetadataContract
                 $q->where('code', trim((string)$arguments['code']));
             }
 
-            foreach (['is_directional', 'is_hierarchical', 'is_reciprocal'] as $boolField) {
+            foreach (['is_directional', 'is_hierarchical', 'is_reciprocal', 'affects_aggregation'] as $boolField) {
                 if (array_key_exists($boolField, $arguments) && $arguments[$boolField] !== null) {
                     $q->where($boolField, (bool)$arguments[$boolField]);
                 }
+            }
+
+            if (!empty($arguments['channel_class'])) {
+                $q->where('channel_class', (string)$arguments['channel_class']);
             }
 
             $this->applyStandardFilters($q, $arguments, ['created_at']);
@@ -105,6 +122,18 @@ class ListRelationTypesTool implements ToolContract, ToolMetadataContract
                 'is_directional' => (bool)$rt->is_directional,
                 'is_hierarchical' => (bool)$rt->is_hierarchical,
                 'is_reciprocal' => (bool)$rt->is_reciprocal,
+                'affects_aggregation' => (bool)$rt->affects_aggregation,
+                'is_recursive' => (bool)$rt->is_recursive,
+                'cascade_to_children' => (bool)$rt->cascade_to_children,
+                'aggregation_weight' => (float)$rt->aggregation_weight,
+                'traversal_direction' => $rt->traversal_direction,
+                'inverse_code' => $rt->inverse_code,
+                'allowed_from_types' => $rt->allowed_from_types,
+                'allowed_to_types' => $rt->allowed_to_types,
+                'cardinality' => $rt->cardinality,
+                'channel_class' => $rt->channel_class,
+                'variety_flow' => $rt->variety_flow,
+                'capabilities' => $rt->capabilities,
                 'metadata' => $rt->metadata,
             ])->values()->toArray();
 

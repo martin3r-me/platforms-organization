@@ -157,12 +157,13 @@ class Show extends Component
         }
         return OrganizationPerspectiveTeam::query()
             ->where('perspective_entity_id', $this->entity->id)
-            ->with('team:id,name')
+            ->with('team:id,name,parent_team_id', 'team.parentTeam:id,name')
             ->get()
             ->map(fn ($pt) => [
                 'id' => $pt->id,
                 'team_id' => $pt->team_id,
                 'team_name' => $pt->team?->name ?? '#'.$pt->team_id,
+                'parent_name' => $pt->team?->parentTeam?->name,
                 'is_default' => (bool) $pt->is_default,
             ])
             ->sortByDesc('is_default')
@@ -181,11 +182,18 @@ class Show extends Component
             ->pluck('team_id')
             ->all();
 
+        // Personal-Teams ausfiltern — fuer VSM-Perspektiven nicht sinnvoll.
         return Team::query()
             ->whereNotIn('id', $assigned)
+            ->where(fn ($q) => $q->where('is_personal', false)->orWhereNull('is_personal'))
+            ->with('parentTeam:id,name')
             ->orderBy('name')
-            ->get(['id', 'name'])
-            ->map(fn ($t) => ['id' => $t->id, 'name' => $t->name])
+            ->get(['id', 'name', 'parent_team_id'])
+            ->map(fn ($t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'parent_name' => $t->parentTeam?->name,
+            ])
             ->all();
     }
 

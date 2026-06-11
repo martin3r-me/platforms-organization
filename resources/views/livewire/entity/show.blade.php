@@ -1621,6 +1621,9 @@
                                                 @svg('heroicon-o-user-group', 'w-4 h-4 text-[var(--ui-muted)]')
                                                 <div class="flex-1 min-w-0">
                                                     <div class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $pt['team_name'] }}</div>
+                                                    @if(!empty($pt['parent_name']))
+                                                        <div class="text-[10px] text-[var(--ui-muted)] tracking-wider truncate">↳ {{ $pt['parent_name'] }}</div>
+                                                    @endif
                                                 </div>
                                                 @if($pt['is_default'])
                                                     <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800" title="Standard-Perspektive dieses Teams">
@@ -1656,7 +1659,9 @@
                                             class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-[var(--ui-primary)] focus:ring focus:ring-[var(--ui-primary)]/30 text-sm">
                                             <option value="">Team auswählen …</option>
                                             @foreach($availableTeams as $t)
-                                                <option value="{{ $t['id'] }}">{{ $t['name'] }}</option>
+                                                <option value="{{ $t['id'] }}">
+                                                    {{ $t['name'] }}{{ !empty($t['parent_name']) ? '   ·   ' . $t['parent_name'] : '   ·   (Root)' }}
+                                                </option>
                                             @endforeach
                                         </select>
                                         <button

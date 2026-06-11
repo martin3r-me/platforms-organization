@@ -374,6 +374,10 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\SyncJobProfileRolesTool());
             $registry->register(new \Platform\Organization\Tools\ListJobProfileRolesTool());
 
+            // PersonJobProfile ↔ Role Override + effektive Verteilung
+            $registry->register(new \Platform\Organization\Tools\SyncPersonJobProfileRolesTool());
+            $registry->register(new \Platform\Organization\Tools\GetPersonJobProfileEffectiveRolesTool());
+
             // Person ↔ JobProfile Tools
             $registry->register(new \Platform\Organization\Tools\ListPersonJobProfilesTool());
             $registry->register(new \Platform\Organization\Tools\CreatePersonJobProfileTool());

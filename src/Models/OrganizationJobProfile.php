@@ -105,6 +105,18 @@ class OrganizationJobProfile extends Model
             ->withPivot('level', 'is_required', 'sort_order');
     }
 
+    /**
+     * Rollen, die zu diesem JobProfile gehoeren — mit Anteil (percentage_share).
+     * Summe ueber alle Rollen pro Profil sollte typisch 100 ergeben.
+     */
+    public function roles(): BelongsToMany
+    {
+        return $this->belongsToMany(OrganizationRole::class, 'organization_job_profile_roles', 'job_profile_id', 'role_id')
+            ->withPivot('percentage_share', 'sort_order')
+            ->withTimestamps()
+            ->orderBy('organization_job_profile_roles.sort_order');
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');

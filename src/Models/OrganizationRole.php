@@ -5,6 +5,7 @@ namespace Platform\Organization\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Str;
@@ -109,6 +110,16 @@ class OrganizationRole extends Model
     public function assignments(): HasMany
     {
         return $this->hasMany(OrganizationRoleAssignment::class, 'role_id');
+    }
+
+    /**
+     * JobProfiles, die diese Rolle als Bestandteil enthalten — mit Anteil.
+     */
+    public function jobProfiles(): BelongsToMany
+    {
+        return $this->belongsToMany(OrganizationJobProfile::class, 'organization_job_profile_roles', 'role_id', 'job_profile_id')
+            ->withPivot('percentage_share', 'sort_order')
+            ->withTimestamps();
     }
 
     public function scopeActive($query)

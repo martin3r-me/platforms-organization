@@ -1725,12 +1725,12 @@
     </x-ui-modal>
 
     {{-- VSM-Assignment Modal --}}
+    @php
+        $sysCode = $vsmAssignmentForm['vsm_system'] ?? '';
+        $sysLabel = \Platform\Organization\Models\OrganizationEntityVsmAssignment::VSM_DEFINITIONS[$sysCode]['label'] ?? $sysCode;
+    @endphp
     <x-ui-modal wire:model="vsmAssignmentModalShow" size="md">
         <x-slot name="header">
-            @php
-                $sysCode = $vsmAssignmentForm['vsm_system'] ?? '';
-                $sysLabel = \Platform\Organization\Models\OrganizationEntityVsmAssignment::VSM_DEFINITIONS[$sysCode]['label'] ?? $sysCode;
-            @endphp
             Zuordnung für {{ $sysLabel }}
         </x-slot>
 

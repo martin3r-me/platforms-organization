@@ -370,6 +370,10 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\UpdateJobProfileTool());
             $registry->register(new \Platform\Organization\Tools\DeleteJobProfileTool());
 
+            // JobProfile ↔ Role Bundling
+            $registry->register(new \Platform\Organization\Tools\SyncJobProfileRolesTool());
+            $registry->register(new \Platform\Organization\Tools\ListJobProfileRolesTool());
+
             // Person ↔ JobProfile Tools
             $registry->register(new \Platform\Organization\Tools\ListPersonJobProfilesTool());
             $registry->register(new \Platform\Organization\Tools\CreatePersonJobProfileTool());

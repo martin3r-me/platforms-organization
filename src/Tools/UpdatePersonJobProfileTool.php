@@ -32,6 +32,7 @@ class UpdatePersonJobProfileTool implements ToolContract, ToolMetadataContract
             'properties' => [
                 'team_id'                 => ['type' => 'integer'],
                 'person_job_profile_id'   => ['type' => 'integer', 'description' => 'ERFORDERLICH: ID der Zuweisung.'],
+                'context_entity_id'       => ['type' => 'integer', 'description' => 'Optional: Linie/Carrier. 0/null = Bezug entfernen.'],
                 'percentage'              => ['type' => 'integer'],
                 'is_primary'              => ['type' => 'boolean'],
                 'valid_from'              => ['type' => 'string'],
@@ -79,6 +80,10 @@ class UpdatePersonJobProfileTool implements ToolContract, ToolMetadataContract
             }
             if (array_key_exists('is_primary', $arguments)) {
                 $update['is_primary'] = (bool) $arguments['is_primary'];
+            }
+            if (array_key_exists('context_entity_id', $arguments)) {
+                $cid = $arguments['context_entity_id'];
+                $update['context_entity_id'] = ($cid === null || $cid === '' || (int) $cid === 0) ? null : (int) $cid;
             }
             foreach (['valid_from', 'valid_to', 'note'] as $field) {
                 if (array_key_exists($field, $arguments)) {

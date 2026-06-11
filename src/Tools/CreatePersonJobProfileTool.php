@@ -32,6 +32,7 @@ class CreatePersonJobProfileTool implements ToolContract, ToolMetadataContract
                 'team_id'          => ['type' => 'integer'],
                 'person_entity_id' => ['type' => 'integer', 'description' => 'ERFORDERLICH: Entity-ID einer Person.'],
                 'job_profile_id'   => ['type' => 'integer', 'description' => 'ERFORDERLICH: ID des JobProfiles.'],
+                'context_entity_id'=> ['type' => 'integer', 'description' => 'Optional: Linie/Carrier in dem das Profile getragen wird (z.B. Esskultur.Digital). Null = ohne festen Linien-Bezug.'],
                 'percentage'       => ['type' => 'integer', 'description' => 'Optional: 0–100. Default: 100.'],
                 'is_primary'       => ['type' => 'boolean', 'description' => 'Optional: Ist das Hauptprofil der Person? Default: false.'],
                 'valid_from'       => ['type' => 'string', 'description' => 'Optional: YYYY-MM-DD.'],
@@ -62,24 +63,30 @@ class CreatePersonJobProfileTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'percentage muss zwischen 0 und 100 liegen.');
             }
 
+            $contextId = isset($arguments['context_entity_id']) && $arguments['context_entity_id']
+                ? (int) $arguments['context_entity_id']
+                : null;
+
             $assignment = OrganizationPersonJobProfile::create([
-                'team_id'          => $rootTeamId,
-                'person_entity_id' => $personId,
-                'job_profile_id'   => $jobProfileId,
-                'percentage'       => $percentage,
-                'is_primary'       => (bool) ($arguments['is_primary'] ?? false),
-                'valid_from'       => ($arguments['valid_from'] ?? null) ?: null,
-                'valid_to'         => ($arguments['valid_to'] ?? null) ?: null,
-                'note'             => ($arguments['note'] ?? null) ?: null,
+                'team_id'           => $rootTeamId,
+                'person_entity_id'  => $personId,
+                'job_profile_id'    => $jobProfileId,
+                'context_entity_id' => $contextId,
+                'percentage'        => $percentage,
+                'is_primary'        => (bool) ($arguments['is_primary'] ?? false),
+                'valid_from'        => ($arguments['valid_from'] ?? null) ?: null,
+                'valid_to'          => ($arguments['valid_to'] ?? null) ?: null,
+                'note'              => ($arguments['note'] ?? null) ?: null,
             ]);
 
             return ToolResult::success([
-                'id'               => $assignment->id,
-                'person_entity_id' => $assignment->person_entity_id,
-                'job_profile_id'   => $assignment->job_profile_id,
-                'percentage'       => $assignment->percentage,
-                'is_primary'       => (bool) $assignment->is_primary,
-                'message'          => 'JobProfile erfolgreich der Person zugewiesen.',
+                'id'                => $assignment->id,
+                'person_entity_id'  => $assignment->person_entity_id,
+                'job_profile_id'    => $assignment->job_profile_id,
+                'context_entity_id' => $assignment->context_entity_id,
+                'percentage'        => $assignment->percentage,
+                'is_primary'        => (bool) $assignment->is_primary,
+                'message'           => 'JobProfile erfolgreich der Person zugewiesen.',
             ]);
         } catch (ValidationException $e) {
             return ToolResult::error('VALIDATION_ERROR', collect($e->errors())->flatten()->first() ?? $e->getMessage());

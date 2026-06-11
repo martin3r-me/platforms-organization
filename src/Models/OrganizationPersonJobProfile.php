@@ -23,6 +23,7 @@ class OrganizationPersonJobProfile extends Model
         'team_id',
         'person_entity_id',
         'job_profile_id',
+        'context_entity_id',
         'percentage',
         'is_primary',
         'valid_from',

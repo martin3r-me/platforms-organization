@@ -63,65 +63,74 @@ class EntityHierarchyService
      */
     public function cascadeMetrics(array $ownMetrics, array $childMap, array $keys): array
     {
-        $memo = [];
-        $visiting = [];
+        $reachMemo = [];
+        $results = [];
 
-        // Get all entity IDs involved
         $allIds = array_keys($ownMetrics);
 
-        foreach ($allIds as $id) {
-            $this->computeCascaded($id, $ownMetrics, $childMap, $keys, $memo, $visiting);
+        foreach ($allIds as $rootId) {
+            // Erreichbare Entities inkl. Root selbst — visited-Set garantiert,
+            // dass jede Entity genau einmal in der Aggregation auftaucht,
+            // egal ueber wieviele Pfade sie erreichbar ist. Damit:
+            //  - keine Doppel-Zaehlung bei DAG mit Mehrfach-Pfaden
+            //  - Zyklen werden inherent absorbiert (Entity ist nur einmal im Set)
+            $reachable = $this->getReachableSet($rootId, $childMap, $reachMemo);
+
+            $sums = [];
+            foreach ($keys as $key) {
+                $sums[$key . '_cascaded'] = 0;
+            }
+
+            foreach (array_keys($reachable) as $entityId) {
+                foreach ($keys as $key) {
+                    $sums[$key . '_cascaded'] += $ownMetrics[$entityId][$key] ?? 0;
+                }
+            }
+
+            // Direkte Kinder zaehlen (Tree-Kinder + Channel-Kinder, falls vorhanden)
+            $sums['children_count'] = count($childMap[$rootId] ?? []);
+
+            $results[$rootId] = $sums;
         }
 
-        return $memo;
+        return $results;
     }
 
     /**
-     * Recursive memoized computation of cascaded metrics for one entity.
+     * Sammelt rekursiv ueber DFS alle vom Root aus erreichbaren Entity-IDs
+     * (inkl. Root selbst). Garantien:
      *
-     * Mit Cycle-Detection: wenn ein Knoten waehrend seiner eigenen Berechnung
-     * erneut angefragt wird (Channel-Map kann Zyklen erzeugen), liefern wir
-     * eine Zero-Kontribution zurueck und brechen die Rekursion ab. Damit ist
-     * der Cascade-Algorithmus auch fuer Tree+Channel-merged Maps gefahrlos.
+     *  - Visited-Set: jede Entity wird genau einmal besucht. Zyklen werden
+     *    durch isset()-Check inherent behandelt — kein Stack-Overflow, keine
+     *    Doppel-Zaehlung.
+     *  - Memoization: pro Root das Reachability-Set cachen. Selbst wenn
+     *    mehrere Roots ueberlappende Subtrees haben, wird der DFS pro Root
+     *    nur einmal ausgefuehrt. (Optimierung fuer wiederholte Calls.)
+     *
+     * @return array<int, true>  Map[entityId => true] — als Set verwendbar
      */
-    protected function computeCascaded(int $id, array &$ownMetrics, array &$childMap, array &$keys, array &$memo, array &$visiting): array
+    protected function getReachableSet(int $rootId, array &$childMap, array &$reachMemo): array
     {
-        if (isset($memo[$id])) {
-            return $memo[$id];
+        if (isset($reachMemo[$rootId])) {
+            return $reachMemo[$rootId];
         }
 
-        if (isset($visiting[$id])) {
-            // Cycle entdeckt — beitragslos zuruecksetzen, um den Pfad zu brechen.
-            $cycleStop = [];
-            foreach ($keys as $key) {
-                $cycleStop[$key . '_cascaded'] = 0;
-            }
-            $cycleStop['children_count'] = 0;
-            return $cycleStop;
-        }
+        $reachable = [$rootId => true];
+        $stack = [$rootId];
 
-        $visiting[$id] = true;
+        while (! empty($stack)) {
+            $current = array_pop($stack);
+            $children = $childMap[$current] ?? [];
 
-        // Start with own values
-        $cascaded = [];
-        foreach ($keys as $key) {
-            $cascaded[$key . '_cascaded'] = $ownMetrics[$id][$key] ?? 0;
-        }
-
-        // Add children's cascaded values
-        $children = $childMap[$id] ?? [];
-        foreach ($children as $childId) {
-            $childCascaded = $this->computeCascaded($childId, $ownMetrics, $childMap, $keys, $memo, $visiting);
-            foreach ($keys as $key) {
-                $cascaded[$key . '_cascaded'] += $childCascaded[$key . '_cascaded'] ?? 0;
+            foreach ($children as $child) {
+                if (! isset($reachable[$child])) {
+                    $reachable[$child] = true;
+                    $stack[] = $child;
+                }
             }
         }
 
-        // Count direct children
-        $cascaded['children_count'] = count($children);
-
-        $memo[$id] = $cascaded;
-        unset($visiting[$id]);
-        return $cascaded;
+        $reachMemo[$rootId] = $reachable;
+        return $reachable;
     }
 }

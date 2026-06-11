@@ -10,6 +10,7 @@ use Platform\Organization\Models\OrganizationDimensionValue;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationEntityRelationship;
+use Platform\Organization\Services\EntityChannelTraversalService;
 use Platform\Organization\Services\EntityLinkRegistry;
 use Platform\Organization\Services\EntityTimeResolver;
 use Platform\Organization\Services\EntityHierarchyService;
@@ -295,16 +296,34 @@ class SnapshotEntitiesCommand extends Command
         }
 
         $cascadeKeys = array_unique(array_merge($baseKeys, array_keys($allProviderKeys), $personRollupKeys));
+
+        // Tree-only cascade (existing behavior, persisted as <key>_cascaded)
         $cascadedMetrics = $hierarchyService->cascadeMetrics($ownMetricsMap, $childMap, $cascadeKeys);
+
+        // 6c. Channel-aware cascade: zusaetzlich ueber affects_aggregation-Relations
+        // aggregieren. Produziert <key>_cascaded_with_channels Keys parallel,
+        // damit Konsumenten den jeweiligen Aggregations-Pfad waehlen koennen.
+        $channelCascadedRenamed = $this->computeChannelAwareCascade(
+            $ownMetricsMap,
+            $childMap,
+            $cascadeKeys,
+            $entityIds,
+            $hierarchyService
+        );
 
         // 7. Upsert snapshots
         $upsertData = [];
         foreach ($entities as $entity) {
             $metrics = $ownMetricsMap[$entity->id];
 
-            // Merge cascaded values
+            // Merge cascaded values (Tree-only)
             if (isset($cascadedMetrics[$entity->id])) {
                 $metrics = array_merge($metrics, $cascadedMetrics[$entity->id]);
+            }
+
+            // Merge channel-aware cascaded values
+            if (isset($channelCascadedRenamed[$entity->id])) {
+                $metrics = array_merge($metrics, $channelCascadedRenamed[$entity->id]);
             }
 
             if (isset($personMetrics[$entity->id])) {
@@ -335,6 +354,63 @@ class SnapshotEntitiesCommand extends Command
         $this->createTeamStructureSnapshots($entities, $today, $period, $entityDef);
 
         return self::SUCCESS;
+    }
+
+    /**
+     * Channel-Aware Cascade: aggregiert Metriken zusaetzlich ueber Relations,
+     * deren Type affects_aggregation=true hat.
+     *
+     * Liefert Metriken mit Suffix _cascaded_with_channels, getrennt von der
+     * Tree-only _cascaded-Sicht. Damit bleibt Backward-Compat erhalten und
+     * Konsumenten koennen je nach Use Case waehlen.
+     *
+     * @return array<int, array<string, int|float>>
+     */
+    protected function computeChannelAwareCascade(
+        array $ownMetricsMap,
+        array $treeChildMap,
+        array $cascadeKeys,
+        array $entityIds,
+        EntityHierarchyService $hierarchyService,
+    ): array {
+        $channelService = new EntityChannelTraversalService();
+
+        // Channel-Children-Map inkl. cascade_to_children-Expansion
+        $channelChildMap = $channelService->buildChannelChildMapWithCascade(
+            $hierarchyService,
+            null, // alle aktiven Types mit affects_aggregation=true
+            $entityIds
+        );
+
+        if (empty($channelChildMap)) {
+            // Keine Relations vorhanden, die Aggregation triggern — kein
+            // Channel-Cascade noetig. Verhalten identisch zu Tree-only.
+            return [];
+        }
+
+        // Merged map = Tree + Channels, gleicher Cascade-Algorithmus
+        $mergedChildMap = $channelService->mergeWithTreeMap($treeChildMap, $channelChildMap);
+
+        $mergedCascaded = $hierarchyService->cascadeMetrics($ownMetricsMap, $mergedChildMap, $cascadeKeys);
+
+        // Keys umbenennen: <key>_cascaded -> <key>_cascaded_with_channels
+        $renamed = [];
+        foreach ($mergedCascaded as $entityId => $metricMap) {
+            foreach ($metricMap as $key => $value) {
+                if (str_ends_with($key, '_cascaded')) {
+                    $base = substr($key, 0, -strlen('_cascaded'));
+                    $renamed[$entityId][$base . '_cascaded_with_channels'] = $value;
+                } elseif ($key === 'children_count') {
+                    // children_count bleibt Tree-only — Channel-Children sind kein
+                    // direkter Kind-Begriff in der Beer-Recursion
+                    continue;
+                } else {
+                    $renamed[$entityId][$key] = $value;
+                }
+            }
+        }
+
+        return $renamed;
     }
 
     protected function createTeamStructureSnapshots($entities, $today, string $period, ?OrganizationDimensionDefinition $entityDef): void

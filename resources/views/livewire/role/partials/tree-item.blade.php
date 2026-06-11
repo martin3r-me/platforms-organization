@@ -20,6 +20,21 @@
             @if($item->description)
                 <div class="text-xs text-[var(--ui-muted)] ml-5.5 truncate">{{ \Illuminate\Support\Str::limit($item->description, 80) }}</div>
             @endif
+
+            {{-- Verknuepfte JobProfiles --}}
+            @if($item->jobProfiles && $item->jobProfiles->isNotEmpty())
+                <div class="ml-5.5 mt-1.5 flex flex-wrap items-center gap-1.5">
+                    <span class="text-[10px] uppercase tracking-wider text-[var(--ui-muted)]">in Profilen:</span>
+                    @foreach($item->jobProfiles as $jp)
+                        <a href="{{ route('organization.job-profiles.show', $jp) }}" wire:navigate
+                           class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-700 border border-gray-200 hover:border-[var(--ui-primary)] hover:text-[var(--ui-primary)] transition"
+                           title="{{ $jp->name }} ({{ $jp->level ?? 'level —' }}) · Anteil dieser Rolle: {{ $jp->pivot->percentage_share }}%">
+                            <span>{{ $jp->name }}</span>
+                            <span class="font-mono tabular-nums text-gray-500">{{ $jp->pivot->percentage_share }}%</span>
+                        </a>
+                    @endforeach
+                </div>
+            @endif
         </div>
 
         <button type="button" wire:click="toggleAssignments({{ $item->id }})" class="text-xs text-[var(--ui-primary)] hover:underline cursor-pointer flex-shrink-0">

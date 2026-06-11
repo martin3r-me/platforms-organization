@@ -70,7 +70,7 @@ class Index extends Component
     {
         $q = OrganizationJobProfile::query()
             ->withCount('assignments')
-            ->with('ownerEntity', 'assignments.person')
+            ->with('ownerEntity', 'assignments.person', 'roles')
             ->where('team_id', Auth::user()->currentTeam->id);
 
         if ($this->search !== '') {

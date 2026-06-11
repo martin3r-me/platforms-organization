@@ -58,7 +58,8 @@ class Index extends Component
     {
         $q = OrganizationRole::query()
             ->withCount('assignments')
-            ->with('ownerEntity', 'assignments.person', 'assignments.context')
+            ->withCount('jobProfiles')
+            ->with('ownerEntity', 'assignments.person', 'assignments.context', 'jobProfiles')
             ->where('team_id', Auth::user()->currentTeam->id);
 
         if ($this->search !== '') {

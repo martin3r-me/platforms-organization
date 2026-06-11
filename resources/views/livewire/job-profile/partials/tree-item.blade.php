@@ -17,6 +17,26 @@
             @if($item->description)
                 <div class="text-xs text-[var(--ui-muted)] ml-5.5 truncate">{{ \Illuminate\Support\Str::limit($item->description, 80) }}</div>
             @endif
+
+            {{-- Enthaltene Rollen mit Anteilen --}}
+            @if($item->roles && $item->roles->isNotEmpty())
+                @php($totalShare = $item->roles->sum(fn ($r) => (int) $r->pivot->percentage_share))
+                <div class="ml-5.5 mt-1.5 flex flex-wrap items-center gap-1.5">
+                    @foreach($item->roles as $role)
+                        @php($vsm = $role->vsm_system ? strtoupper(str_replace('_', '', $role->vsm_system)) : null)
+                        <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] bg-gray-100 text-gray-700 border border-gray-200" title="{{ $role->name }} · {{ $role->vsm_system ?? '—' }} · {{ $role->pivot->percentage_share }}%">
+                            @if($vsm)
+                                <span class="font-semibold text-indigo-700">{{ $vsm }}</span>
+                            @endif
+                            <span>{{ $role->name }}</span>
+                            <span class="font-mono tabular-nums text-[10px] text-gray-500">{{ $role->pivot->percentage_share }}%</span>
+                        </span>
+                    @endforeach
+                    <span class="text-[10px] text-[var(--ui-muted)] font-mono tabular-nums ml-1 {{ $totalShare !== 100 ? 'text-amber-700' : '' }}" title="Summe der Anteile">
+                        Σ {{ $totalShare }}%
+                    </span>
+                </div>
+            @endif
         </div>
 
         <button type="button" wire:click="toggleAssignments({{ $item->id }})" class="text-xs text-[var(--ui-primary)] hover:underline cursor-pointer flex-shrink-0">

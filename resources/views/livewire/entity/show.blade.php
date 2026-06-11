@@ -1598,9 +1598,9 @@
                             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-5">
                                 <div class="flex items-start justify-between mb-3">
                                     <div>
-                                        <h2 class="text-base font-semibold text-[var(--ui-secondary)]">Perspektive für Plattform-Teams</h2>
-                                        <p class="text-xs text-[var(--ui-muted)] mt-0.5 max-w-2xl">
-                                            Ordne dieser Carrier-Perspektive Plattform-Teams zu. Mitglieder eines Teams ohne explizite Wahl im Org-Modul (z.B. wenn sie das Algedonic-Signal nutzen) bekommen automatisch die hier als <span class="font-medium">Standard</span> markierte Sicht.
+                                        <h2 class="text-base font-semibold text-[var(--ui-secondary)]">Plattform-Teams, die diese Perspektive sehen</h2>
+                                        <p class="text-xs text-[var(--ui-muted)] mt-0.5 max-w-2xl leading-relaxed">
+                                            Mitglieder eines hier hinterlegten Plattform-Teams können <span class="font-medium text-[var(--ui-secondary)]">{{ $entity->name }}</span> als VSM-Sicht nutzen. Die Markierung <span class="font-medium text-amber-700">Standard für dieses Team</span> sagt, ob diese Perspektive für das jeweilige Team die Default-Sicht ist — wichtig z.B. fürs Algedonic-Routing, wenn ein Mitarbeiter nie explizit eine Perspektive gewählt hat.
                                         </p>
                                     </div>
                                 </div>
@@ -1626,17 +1626,17 @@
                                                     @endif
                                                 </div>
                                                 @if($pt['is_default'])
-                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800" title="Standard-Perspektive dieses Teams">
+                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap" title="Diese Perspektive ist die Default-Sicht des Teams {{ $pt['team_name'] }}">
                                                         @svg('heroicon-s-star', 'w-3 h-3')
-                                                        Standard
+                                                        Standard für dieses Team
                                                     </span>
                                                 @else
                                                     <button
                                                         type="button"
                                                         wire:click="markPerspectiveTeamDefault({{ $pt['id'] }})"
-                                                        class="text-xs text-[var(--ui-muted)] hover:text-amber-700 hover:underline"
-                                                        title="Als Standard für dieses Team setzen">
-                                                        Als Standard setzen
+                                                        class="text-xs text-[var(--ui-muted)] hover:text-amber-700 hover:underline whitespace-nowrap"
+                                                        title="Als Default-Sicht des Teams {{ $pt['team_name'] }} setzen">
+                                                        Als Standard für dieses Team
                                                     </button>
                                                 @endif
                                                 <button

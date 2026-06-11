@@ -1605,8 +1605,10 @@
                                     </div>
                                 </div>
 
-                                @php($perspectiveTeams = $this->perspectiveTeamAssignments)
-                                @php($availableTeams = $this->perspectiveAvailableTeams)
+                                @php
+                                    $perspectiveTeams = $this->perspectiveTeamAssignments;
+                                    $availableTeams = $this->perspectiveAvailableTeams;
+                                @endphp
 
                                 @if(empty($perspectiveTeams))
                                     <div class="rounded-md border border-dashed border-[var(--ui-border)] bg-gray-50/60 p-4 text-sm text-[var(--ui-muted)]">

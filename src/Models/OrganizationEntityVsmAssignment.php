@@ -150,10 +150,23 @@ class OrganizationEntityVsmAssignment extends Model
             if (!$assignee) {
                 throw new \InvalidArgumentException("assigned_entity_id {$model->assigned_entity_id} nicht gefunden.");
             }
-            if ($assignee->type?->vsm_class !== OrganizationEntityType::VSM_CLASS_ACTOR) {
+
+            // VSM-Recursion (Beer): S1-Einheiten sind autonome Sub-Systeme — sie sind
+            // gleichzeitig Carrier (eigene Sub-VSM-Struktur) und Actor in der uebergeordneten
+            // Perspektive. Daher darf S1 ein Carrier ODER Actor sein.
+            // S2-S5 sind dagegen Funktionen — die werden nur von Actors gefuellt.
+            $assigneeClass = $assignee->type?->vsm_class;
+            $allowedClasses = $model->vsm_system === self::VSM_S1
+                ? [OrganizationEntityType::VSM_CLASS_ACTOR, OrganizationEntityType::VSM_CLASS_CARRIER]
+                : [OrganizationEntityType::VSM_CLASS_ACTOR];
+
+            if (!in_array($assigneeClass, $allowedClasses, true)) {
+                $expected = $model->vsm_system === self::VSM_S1
+                    ? 'Actor oder Carrier (S1 erlaubt Recursion)'
+                    : 'Actor';
                 throw new \InvalidArgumentException(
-                    "assigned_entity_id muss ein Actor-Entity-Typ sein (Entity #{$model->assigned_entity_id} "
-                    . "ist '{$assignee->type?->code}' mit vsm_class '{$assignee->type?->vsm_class}')."
+                    "assigned_entity_id muss {$expected} sein (Entity #{$model->assigned_entity_id} "
+                    . "ist '{$assignee->type?->code}' mit vsm_class '{$assigneeClass}', vsm_system '{$model->vsm_system}')."
                 );
             }
 

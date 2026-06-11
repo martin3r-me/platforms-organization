@@ -5,7 +5,9 @@ namespace Platform\Organization\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
+use Illuminate\Support\Collection;
 use Illuminate\Validation\ValidationException;
 
 /**
@@ -80,5 +82,59 @@ class OrganizationPersonJobProfile extends Model
     public function jobProfile(): BelongsTo
     {
         return $this->belongsTo(OrganizationJobProfile::class, 'job_profile_id');
+    }
+
+    public function contextEntity(): BelongsTo
+    {
+        return $this->belongsTo(OrganizationEntity::class, 'context_entity_id');
+    }
+
+    /**
+     * Override-Rollen: individuelle Anteile pro Person-Profile-Zuweisung.
+     * Wenn leer, gelten die Default-Anteile aus dem JobProfile.
+     */
+    public function roleOverrides(): BelongsToMany
+    {
+        return $this->belongsToMany(OrganizationRole::class, 'organization_person_job_profile_roles', 'person_job_profile_id', 'role_id')
+            ->withPivot('percentage_share', 'sort_order')
+            ->withTimestamps()
+            ->orderBy('organization_person_job_profile_roles.sort_order');
+    }
+
+    /**
+     * Effektive Rollen-Verteilung dieser Zuweisung.
+     *
+     * Logik:
+     *  - Wenn Override-Eintraege existieren: nutze sie
+     *  - Sonst: nutze die JobProfile-Defaults
+     *  - Anteile werden bereits hier zurueckgegeben (NICHT mit der overall percentage
+     *    multipliziert) — der Caller muss bei Bedarf overall percentage anwenden.
+     *
+     * Rueckgabe: Collection von ['role_id', 'role', 'percentage_share', 'source' => 'override'|'default'].
+     */
+    public function effectiveRoleShares(): Collection
+    {
+        $this->loadMissing(['roleOverrides', 'jobProfile.roles']);
+
+        if ($this->roleOverrides->isNotEmpty()) {
+            return $this->roleOverrides->map(fn ($r) => [
+                'role_id' => $r->id,
+                'role' => $r,
+                'percentage_share' => (int) $r->pivot->percentage_share,
+                'source' => 'override',
+            ]);
+        }
+
+        $jp = $this->jobProfile;
+        if (! $jp) {
+            return collect();
+        }
+
+        return $jp->roles->map(fn ($r) => [
+            'role_id' => $r->id,
+            'role' => $r,
+            'percentage_share' => (int) $r->pivot->percentage_share,
+            'source' => 'default',
+        ]);
     }
 }

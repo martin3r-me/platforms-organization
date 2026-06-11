@@ -64,12 +64,13 @@ class EntityHierarchyService
     public function cascadeMetrics(array $ownMetrics, array $childMap, array $keys): array
     {
         $memo = [];
+        $visiting = [];
 
         // Get all entity IDs involved
         $allIds = array_keys($ownMetrics);
 
         foreach ($allIds as $id) {
-            $this->computeCascaded($id, $ownMetrics, $childMap, $keys, $memo);
+            $this->computeCascaded($id, $ownMetrics, $childMap, $keys, $memo, $visiting);
         }
 
         return $memo;
@@ -77,12 +78,29 @@ class EntityHierarchyService
 
     /**
      * Recursive memoized computation of cascaded metrics for one entity.
+     *
+     * Mit Cycle-Detection: wenn ein Knoten waehrend seiner eigenen Berechnung
+     * erneut angefragt wird (Channel-Map kann Zyklen erzeugen), liefern wir
+     * eine Zero-Kontribution zurueck und brechen die Rekursion ab. Damit ist
+     * der Cascade-Algorithmus auch fuer Tree+Channel-merged Maps gefahrlos.
      */
-    protected function computeCascaded(int $id, array &$ownMetrics, array &$childMap, array &$keys, array &$memo): array
+    protected function computeCascaded(int $id, array &$ownMetrics, array &$childMap, array &$keys, array &$memo, array &$visiting): array
     {
         if (isset($memo[$id])) {
             return $memo[$id];
         }
+
+        if (isset($visiting[$id])) {
+            // Cycle entdeckt — beitragslos zuruecksetzen, um den Pfad zu brechen.
+            $cycleStop = [];
+            foreach ($keys as $key) {
+                $cycleStop[$key . '_cascaded'] = 0;
+            }
+            $cycleStop['children_count'] = 0;
+            return $cycleStop;
+        }
+
+        $visiting[$id] = true;
 
         // Start with own values
         $cascaded = [];
@@ -93,7 +111,7 @@ class EntityHierarchyService
         // Add children's cascaded values
         $children = $childMap[$id] ?? [];
         foreach ($children as $childId) {
-            $childCascaded = $this->computeCascaded($childId, $ownMetrics, $childMap, $keys, $memo);
+            $childCascaded = $this->computeCascaded($childId, $ownMetrics, $childMap, $keys, $memo, $visiting);
             foreach ($keys as $key) {
                 $cascaded[$key . '_cascaded'] += $childCascaded[$key . '_cascaded'] ?? 0;
             }
@@ -103,6 +121,7 @@ class EntityHierarchyService
         $cascaded['children_count'] = count($children);
 
         $memo[$id] = $cascaded;
+        unset($visiting[$id]);
         return $cascaded;
     }
 }

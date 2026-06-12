@@ -29,7 +29,7 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /organization/dimension-links - Verknüpft ein Dimensions-Element mit einem Objekt. WICHTIG: cost-centers nur an Entities erlaubt (context_type="organization_entity"). Entities können an beliebige Objekte verknüpft werden.';
+        return 'POST /organization/dimension-links - Verknuepft ein Dimensions-Element mit einem Objekt. EMPFOHLEN bei entity-basierten Dimensionen: entity_id-Parameter (Organization-Entity-ID, sicher). ACHTUNG fuer LLMs: dim_value_id != entity_id — niemals dim_value_id raten oder aus Reverse-Query uebernehmen, immer entity_id-Shortcut nutzen. WICHTIG: cost-centers nur an Entities erlaubt (context_type=organization_entity).';
     }
 
     public function getSchema(): array
@@ -43,19 +43,19 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
                 ],
                 'context_type' => [
                     'type' => 'string',
-                    'description' => 'ERFORDERLICH: Vollständiger Model-Klassenname oder Morph-Alias des Ziel-Objekts.',
+                    'description' => 'ERFORDERLICH: Vollstaendiger Model-Klassenname oder Morph-Alias des Ziel-Objekts.',
                 ],
                 'context_id' => [
                     'type' => 'integer',
                     'description' => 'ERFORDERLICH: ID des Ziel-Objekts.',
                 ],
-                'dimension_item_id' => [
-                    'type' => 'integer',
-                    'description' => 'ID des Dimensions-Elements. Nutze organization.dimension_values.GET um IDs zu ermitteln. Alternativ bei dimension="entity": entity_id angeben.',
-                ],
                 'entity_id' => [
                     'type' => 'integer',
-                    'description' => 'Shortcut für entity-basierte Dimensionen (entity, cost-driver): Organization-Entity-ID. Wird automatisch in dimension_item_id aufgelöst.',
+                    'description' => 'EMPFOHLEN (entity-basierte Dimensionen wie entity, cost-driver): Organization-Entity-ID. Wird automatisch zur dim_value_id aufgeloest. Sicherer als dimension_item_id, weil dim_value_id != entity_id und LLMs sich sonst leicht vertun.',
+                ],
+                'dimension_item_id' => [
+                    'type' => 'integer',
+                    'description' => 'Power-User: dim_value_id direkt. WICHTIG: dies ist NICHT die entity_id. Bei entity-basierten Dimensionen ZWINGEND entity_id-Parameter verwenden — dann ist die Verwechslungs-Falle ausgeschlossen.',
                 ],
                 'percentage' => [
                     'type' => 'number',
@@ -158,14 +158,35 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
                 ? ' (single-Modus: vorheriger Link wurde ersetzt)'
                 : '';
 
-            return ToolResult::success([
+            // Resolved entity ausweisen — LLM sieht eindeutig, welche Entity
+            // wirklich verlinkt wurde (entity_id ist die natuerliche Referenz).
+            $resolvedEntityId = null;
+            $resolvedEntityName = null;
+            if ($def && $def->value_source === 'entity' && $item instanceof OrganizationDimensionValue) {
+                $meta = $item->metadata;
+                if (is_array($meta) && isset($meta['source_entity_id'])) {
+                    $resolvedEntityId = (int) $meta['source_entity_id'];
+                    $entity = \Platform\Organization\Models\OrganizationEntity::find($resolvedEntityId);
+                    $resolvedEntityName = $entity?->name;
+                }
+            }
+
+            $response = [
                 'dimension' => $dimension,
                 'dimension_item_id' => $dimensionItemId,
                 'dimension_item_name' => $item->name,
                 'context_type' => $contextType,
                 'context_id' => $contextId,
                 'message' => "{$label}-Link erfolgreich erstellt{$modeInfo}.",
-            ]);
+            ];
+
+            if ($resolvedEntityId !== null) {
+                $response['resolved_entity_id'] = $resolvedEntityId;
+                $response['resolved_entity_name'] = $resolvedEntityName;
+                $response['note'] = 'resolved_entity_id ist die Organization-Entity-ID — fuer Folge-Operationen verwenden, nicht dimension_item_id.';
+            }
+
+            return ToolResult::success($response);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler: ' . $e->getMessage());
         }

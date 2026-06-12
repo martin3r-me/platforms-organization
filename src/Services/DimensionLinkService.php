@@ -189,7 +189,6 @@ class DimensionLinkService
                 'name' => $link->value?->name,
                 'percentage' => $link->percentage ? (float) $link->percentage : null,
                 'is_primary' => (bool) $link->is_primary,
-                'perspective_id' => $link->perspective_id,
             ];
         });
     }
@@ -293,7 +292,6 @@ class DimensionLinkService
                         'name' => $model?->name ?? $model?->title ?? "#{$link->linkable_id}",
                         'percentage' => $link->percentage ? (float) $link->percentage : null,
                         'is_primary' => (bool) $link->is_primary,
-                        'perspective_id' => $link->perspective_id,
                     ];
                 }
             } else {
@@ -303,7 +301,6 @@ class DimensionLinkService
                         'name' => "#{$link->linkable_id}",
                         'percentage' => $link->percentage ? (float) $link->percentage : null,
                         'is_primary' => (bool) $link->is_primary,
-                        'perspective_id' => $link->perspective_id,
                     ];
                 }
             }
@@ -380,14 +377,14 @@ class DimensionLinkService
             return false;
         }
 
-        $perspectiveId = $meta['perspective_id'] ?? null;
-
-        // Single-Mode: remove previous link for this dimension+linkable+perspective
+        // Single-Mode: remove previous link for this dimension+linkable.
+        // perspective_id wurde am 2026-06-09 (drop_perspectives_and_hierarchy_tables)
+        // strukturell entfernt — Perspektive ergibt sich jetzt aus der aktiven
+        // Carrier-Entity in der Session, nicht aus einer separaten Spalte.
         if ($def->mode === 'single') {
             OrganizationDimensionLink::where('dimension_definition_id', $def->id)
                 ->where('linkable_type', $contextType)
                 ->where('linkable_id', $contextId)
-                ->where('perspective_id', $perspectiveId)
                 ->delete();
         }
 
@@ -396,7 +393,6 @@ class DimensionLinkService
             ->where('dimension_value_id', $dimensionValueId)
             ->where('linkable_type', $contextType)
             ->where('linkable_id', $contextId)
-            ->where('perspective_id', $perspectiveId)
             ->exists();
 
         if ($exists) {
@@ -408,7 +404,6 @@ class DimensionLinkService
             'dimension_value_id' => $dimensionValueId,
             'linkable_type' => $contextType,
             'linkable_id' => $contextId,
-            'perspective_id' => $perspectiveId,
             'percentage' => $meta['percentage'] ?? null,
             'is_primary' => $meta['is_primary'] ?? false,
             'start_date' => $meta['start_date'] ?? null,
@@ -458,15 +453,12 @@ class DimensionLinkService
             return false;
         }
 
-        $query = OrganizationDimensionLink::where('dimension_definition_id', $def->id)
+        // perspective_id-Spalte wurde 2026-06-09 entfernt — Perspective-Filter
+        // entfaellt entsprechend. Parameter bleibt fuer API-Backward-Compat.
+        return OrganizationDimensionLink::where('dimension_definition_id', $def->id)
             ->where('dimension_value_id', $dimensionValueId)
             ->where('linkable_type', $contextType)
-            ->where('linkable_id', $contextId);
-
-        if ($perspectiveId) {
-            $query->where('perspective_id', $perspectiveId);
-        }
-
-        return $query->delete() > 0;
+            ->where('linkable_id', $contextId)
+            ->delete() > 0;
     }
 }

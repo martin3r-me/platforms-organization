@@ -181,15 +181,31 @@ class DimensionLinkService
 
 
         $links = $query->with('value')->get();
+        $isEntityBased = ($def->value_source === 'entity');
 
-        return $links->map(function ($link) {
-            return [
+        return $links->map(function ($link) use ($isEntityBased) {
+            $entry = [
+                // LLM-Hinweis: 'id' = dimension_value_id (interne ID).
+                // Fuer entity-basierte Dimensionen ist 'entity_id' die natuerliche
+                // Referenz — IMMER fuer DELETE/POST/Bezugnahmen den entity_id
+                // benutzen, nicht 'id'.
                 'id' => $link->dimension_value_id,
+                'dim_value_id' => $link->dimension_value_id,
                 'code' => $link->value?->code,
                 'name' => $link->value?->name,
                 'percentage' => $link->percentage ? (float) $link->percentage : null,
                 'is_primary' => (bool) $link->is_primary,
             ];
+
+            if ($isEntityBased) {
+                $meta = $link->value?->metadata ?? [];
+                if (! is_array($meta)) {
+                    $meta = [];
+                }
+                $entry['entity_id'] = $meta['source_entity_id'] ?? null;
+            }
+
+            return $entry;
         });
     }
 

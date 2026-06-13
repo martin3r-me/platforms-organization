@@ -93,6 +93,8 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', "Unbekannte Dimension '{$dimension}'. Verfügbar: {$available}");
             }
 
+            $def = null;
+
             // entity_id shortcut: resolve Organization Entity ID → DimensionValue ID
             // Works for any dimension with value_source='entity' (entity, cost-driver, etc.)
             if ($entityId) {

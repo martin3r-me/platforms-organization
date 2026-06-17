@@ -1465,9 +1465,13 @@ class Show extends Component
                 $metadata['percentage'] = $pct;
             }
 
+            $linkableName = $linkable instanceof \Platform\Core\Contracts\HasDisplayName
+                ? ($linkable->getDisplayName() ?? $linkable->name ?? $linkable->title ?? '—')
+                : ($linkable->name ?? $linkable->title ?? '—');
+
             $byEntityAndType[$link->entity_id][$type]['items'][] = array_merge([
                 'id' => $link->id,
-                'name' => $linkable->name ?? $linkable->title ?? '—',
+                'name' => $linkableName,
                 'status' => $linkable->status ?? null,
                 'url' => $url,
             ], $metadata);

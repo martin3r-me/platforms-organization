@@ -107,7 +107,8 @@
         </x-ui-page-sidebar>
     </x-slot>
 
-    <div class="p-6 space-y-6" wire:poll.60s>
+    <x-ui-page-container>
+    <div wire:poll.60s class="space-y-6">
 
         {{-- ═══════════ Top-Tiles: globale Ampel-Summen ═══════════ --}}
         <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
@@ -267,4 +268,5 @@
         @endif
 
     </div>
+    </x-ui-page-container>
 </x-ui-page>

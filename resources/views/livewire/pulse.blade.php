@@ -107,6 +107,54 @@
         </x-ui-page-sidebar>
     </x-slot>
 
+    <x-slot name="activity">
+        <x-ui-page-sidebar title="Teams" width="w-80" :defaultOpen="true" storeKey="pulseTeamsOpen" side="right">
+            <div class="p-5 space-y-4">
+                @if($perTeam->isNotEmpty())
+                    <div class="space-y-3">
+                        @foreach($perTeam as $tm)
+                            <div class="p-3 rounded-md border border-[var(--ui-border)]/40 bg-white">
+                                <div class="flex items-center justify-between mb-2">
+                                    <div class="flex items-center gap-1.5 min-w-0">
+                                        @svg('heroicon-o-building-office-2', 'w-4 h-4 text-[var(--ui-secondary)] flex-shrink-0')
+                                        <span class="text-sm font-semibold text-[var(--ui-secondary)] truncate">{{ $tm['name'] }}</span>
+                                    </div>
+                                    <span class="text-xs text-[var(--ui-muted)] flex-shrink-0">{{ $tm['total'] }}</span>
+                                </div>
+                                @php
+                                    $tot = max(1, $tm['total']);
+                                    $rPct = round($tm['byColor']['red'] / $tot * 100);
+                                    $yPct = round($tm['byColor']['yellow'] / $tot * 100);
+                                    $gPct = round($tm['byColor']['green'] / $tot * 100);
+                                    $xPct = max(0, 100 - $rPct - $yPct - $gPct);
+                                @endphp
+                                <div class="flex h-2 rounded overflow-hidden">
+                                    @if($rPct > 0)<div class="bg-rose-500" style="width: {{ $rPct }}%"></div>@endif
+                                    @if($yPct > 0)<div class="bg-amber-400" style="width: {{ $yPct }}%"></div>@endif
+                                    @if($gPct > 0)<div class="bg-emerald-500" style="width: {{ $gPct }}%"></div>@endif
+                                    @if($xPct > 0)<div class="bg-zinc-300" style="width: {{ $xPct }}%"></div>@endif
+                                </div>
+                                <div class="flex items-center justify-between mt-2 text-[10px] text-[var(--ui-muted)]">
+                                    <div class="inline-flex items-center gap-2">
+                                        @if($tm['byColor']['red'])<span class="text-rose-600 font-semibold">{{ $tm['byColor']['red'] }} rot</span>@endif
+                                        @if($tm['byColor']['yellow'])<span class="text-amber-700 font-semibold">{{ $tm['byColor']['yellow'] }} gelb</span>@endif
+                                        @if($tm['byColor']['green'])<span class="text-emerald-700 font-semibold">{{ $tm['byColor']['green'] }} grün</span>@endif
+                                        @if($tm['byColor']['gray'])<span class="text-zinc-500">{{ $tm['byColor']['gray'] }} grau</span>@endif
+                                    </div>
+                                    @if($tm['avgScore'] !== null)
+                                        <span>Ø <span class="font-semibold text-[var(--ui-secondary)]">{{ $tm['avgScore'] }}</span></span>
+                                    @endif
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                @else
+                    <div class="text-center text-xs text-zinc-400 py-8">Keine Team-Daten</div>
+                @endif
+            </div>
+        </x-ui-page-sidebar>
+    </x-slot>
+
     <x-ui-page-container>
     <div wire:poll.60s class="space-y-6">
 
@@ -168,6 +216,79 @@
                                     <div class="text-[10px] text-rose-600 font-semibold">{{ $s->delta_health_score }}</div>
                                 @endif
                             </div>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        {{-- ═══════════ Achtung-Liste (gelb) ═══════════ --}}
+        @if($achtung->isNotEmpty())
+            <div class="rounded-lg border border-amber-200 bg-white">
+                <div class="px-5 py-3 border-b border-amber-100 bg-amber-50/50 flex items-center justify-between">
+                    <h2 class="text-sm font-bold text-amber-700 uppercase tracking-wider inline-flex items-center gap-2">
+                        @svg('heroicon-o-exclamation-triangle', 'w-4 h-4')
+                        Achtung
+                    </h2>
+                    <span class="text-xs text-amber-700/70">{{ $achtung->count() }} könnten kippen</span>
+                </div>
+                <ul class="divide-y divide-amber-100">
+                    @foreach($achtung as $s)
+                        <li class="px-5 py-3 hover:bg-amber-50/40 transition flex items-center gap-3">
+                            <span class="inline-flex items-center justify-center w-7 h-7 rounded bg-amber-100">
+                                @svg($moduleIcon[$s->module] ?? 'heroicon-o-cube', 'w-3.5 h-3.5 text-amber-700')
+                            </span>
+                            <div class="flex-1 min-w-0">
+                                <a href="{{ $s->container_id ? route($s->container_route, $s->container_id) : '#' }}"
+                                   wire:navigate
+                                   class="text-sm font-medium text-zinc-900 hover:text-amber-700 truncate">
+                                    {{ $s->container_name }}
+                                </a>
+                                <div class="text-[11px] text-zinc-500 mt-0.5">
+                                    {{ $s->module_label }}
+                                    @if($s->team_name) · <span class="text-zinc-600">{{ $s->team_name }}</span>@endif
+                                    @if($s->worst_axis) · schlimmste Achse: <span class="font-medium">{{ $s->worst_axis }}</span>@endif
+                                </div>
+                            </div>
+                            <div class="text-right">
+                                <div class="text-xl font-bold text-amber-700">{{ $s->health_score ?? '—' }}</div>
+                                @if($s->delta_health_score !== null && $s->delta_health_score < 0)
+                                    <div class="text-[10px] text-rose-600 font-semibold">{{ $s->delta_health_score }}</div>
+                                @elseif($s->delta_health_score !== null && $s->delta_health_score > 0)
+                                    <div class="text-[10px] text-emerald-600 font-semibold">+{{ $s->delta_health_score }}</div>
+                                @endif
+                            </div>
+                        </li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
+
+        {{-- ═══════════ Stabil (grün) — kompakt im 2-Spalten-Grid ═══════════ --}}
+        @if($stabil->isNotEmpty())
+            <div class="rounded-lg border border-emerald-200 bg-white">
+                <div class="px-5 py-3 border-b border-emerald-100 bg-emerald-50/50 flex items-center justify-between">
+                    <h2 class="text-sm font-bold text-emerald-700 uppercase tracking-wider inline-flex items-center gap-2">
+                        @svg('heroicon-o-check-badge', 'w-4 h-4')
+                        Stabil
+                    </h2>
+                    <span class="text-xs text-emerald-700/70">{{ $stabil->count() }} grün</span>
+                </div>
+                <ul class="grid grid-cols-1 md:grid-cols-2 divide-y md:divide-y-0 md:divide-x divide-emerald-50">
+                    @foreach($stabil as $s)
+                        <li class="px-5 py-2.5 flex items-center gap-3 border-b border-emerald-50">
+                            @svg($moduleIcon[$s->module] ?? 'heroicon-o-cube', 'w-4 h-4 text-emerald-600 flex-shrink-0')
+                            <div class="flex-1 min-w-0">
+                                <a href="{{ $s->container_id ? route($s->container_route, $s->container_id) : '#' }}"
+                                   wire:navigate
+                                   class="text-sm text-zinc-800 hover:text-emerald-700 truncate block">
+                                    {{ $s->container_name }}
+                                </a>
+                                <div class="text-[10px] text-zinc-400 truncate">
+                                    {{ $s->module_label }}@if($s->team_name) · {{ $s->team_name }}@endif
+                                </div>
+                            </div>
+                            <div class="text-sm font-semibold text-emerald-700">{{ $s->health_score ?? '—' }}</div>
                         </li>
                     @endforeach
                 </ul>

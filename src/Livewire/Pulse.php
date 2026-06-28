@@ -154,14 +154,44 @@ class Pulse extends Component
         $brennt = $all
             ->filter(fn ($s) => $s->health_color === 'red')
             ->sortBy(fn ($s) => (int) ($s->health_score ?? 999))
-            ->take(12)
+            ->values();
+
+        // Achtung — alle gelben, sortiert nach Score aufsteigend (knapp ueber rot zuerst)
+        $achtung = $all
+            ->filter(fn ($s) => $s->health_color === 'yellow')
+            ->sortBy(fn ($s) => (int) ($s->health_score ?? 999))
+            ->values();
+
+        // Stabil — alle gruenen, sortiert nach Score absteigend (beste zuerst)
+        $stabil = $all
+            ->filter(fn ($s) => $s->health_color === 'green')
+            ->sortByDesc(fn ($s) => (int) ($s->health_score ?? 0))
             ->values();
 
         // Karteileichen (Confidence <= 25 ueber alle Module)
         $karteileichen = $all
             ->filter(fn ($s) => (int) $s->confidence_score <= 25)
             ->sortBy('confidence_score')
-            ->take(8)
+            ->values();
+
+        // Per-Team-Aufschluesselung — fuer rechte Sidebar
+        $perTeam = $all
+            ->filter(fn ($s) => $s->team_name)
+            ->groupBy('team_name')
+            ->map(function ($items, $teamName) {
+                $byColor = ['red' => 0, 'yellow' => 0, 'green' => 0, 'gray' => 0];
+                foreach ($items as $s) {
+                    $byColor[$s->health_color ?: 'gray']++;
+                }
+                $scores = $items->filter(fn ($s) => $s->health_score !== null)->pluck('health_score');
+                return [
+                    'name' => $teamName,
+                    'total' => $items->count(),
+                    'byColor' => $byColor,
+                    'avgScore' => $scores->isNotEmpty() ? (int) round($scores->avg()) : null,
+                ];
+            })
+            ->sortByDesc('byColor.red')
             ->values();
 
         // Bewegung — top Gewinner / Verlierer cross-modul
@@ -188,10 +218,13 @@ class Pulse extends Component
             'totalAll' => $totalAll,
             'totalByColor' => $totalByColor,
             'brennt' => $brennt,
+            'achtung' => $achtung,
+            'stabil' => $stabil,
             'karteileichen' => $karteileichen,
             'gewinner' => $gewinner,
             'verlierer' => $verlierer,
             'byConfidence' => $byConfidence,
+            'perTeam' => $perTeam,
             'snapshotStand' => $snapshotStand,
         ]);
     }

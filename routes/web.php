@@ -48,11 +48,14 @@ use Platform\Organization\Livewire\EnvironmentSnapshot\Show as EnvironmentSnapsh
 
 Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organization.dashboard');
 
-// Operations Room — Hommage an Stafford Beer, Santiago 1972
+// Operations Room — Hommage an Stafford Beer, Santiago 1972 (VSM-Steuerung)
 Route::get('/ops-room', \Platform\Organization\Livewire\OpsRoom::class)->name('organization.ops-room');
 Route::get('/ops-room/perspective/{perspective}', \Platform\Organization\Livewire\OpsRoom::class)->name('organization.ops-room.perspective');
 Route::get('/ops-room/perspective/{perspective}/level/{vsm}', \Platform\Organization\Livewire\OpsRoomLevel::class)->name('organization.ops-room.level');
 Route::get('/ops-room/signal/{signal}', \Platform\Organization\Livewire\OpsRoomSignal::class)->name('organization.ops-room.signal');
+
+// Pulse — operative cross-modul Live-Lage (Health-Snapshots aller Module)
+Route::get('/pulse', \Platform\Organization\Livewire\Pulse::class)->name('organization.pulse');
 
 Route::get('/entities', EntityIndex::class)->name('organization.entities.index');
 Route::get('/entities/{entity}', EntityShow::class)->name('organization.entities.show');

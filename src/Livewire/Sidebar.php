@@ -31,6 +31,13 @@ class Sidebar extends Component
                 ],
             ],
             [
+                'label' => 'Steuerung',
+                'items' => [
+                    ['route' => 'organization.pulse', 'label' => 'Pulse', 'icon' => 'signal', 'match' => '/pulse'],
+                    ['route' => 'organization.ops-room', 'label' => 'Ops-Room (VSM)', 'icon' => 'squares-2x2', 'match' => '/ops-room'],
+                ],
+            ],
+            [
                 'label' => 'Struktur',
                 'items' => [
                     ['route' => 'organization.interlinks.index', 'label' => 'Interlinks', 'icon' => 'arrows-right-left', 'match' => '/interlinks'],

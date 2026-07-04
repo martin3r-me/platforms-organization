@@ -2108,14 +2108,6 @@ class Show extends Component
             }
             $flags[$k] = ['on' => (bool) $v, 'label' => $label, 'detail' => null];
         }
-        // descend separat, weil auf Recipe-Wurzel-Ebene und nicht "Source":
-        $flags['__descend'] = [
-            'on' => ($sources['descend'] ?? false) !== false && ($sources['descend'] ?? false) !== null,
-            'label' => 'Rekursion (Recipe)',
-            'detail' => $sources['descend'] === true
-                ? 'alle Ebenen'
-                : (is_int($sources['descend'] ?? null) ? 'max Tiefe ' . $sources['descend'] : null),
-        ];
         return $flags;
     }
 

@@ -517,6 +517,21 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\ListEnvironmentSnapshotsTool());
             $registry->register(new \Platform\Organization\Tools\RateEnvironmentSourceTool());
 
+            // Strategy Layer (Mission/Vision, Forecasts, FocusAreas, VisionImages, Obstacles, Milestones, MilestoneContributions)
+            $registry->register(new \Platform\Organization\Tools\ListStrategicDocumentsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateStrategicDocumentTool());
+            $registry->register(new \Platform\Organization\Tools\ListForecastsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateForecastTool());
+            $registry->register(new \Platform\Organization\Tools\ListFocusAreasTool());
+            $registry->register(new \Platform\Organization\Tools\CreateFocusAreaTool());
+            $registry->register(new \Platform\Organization\Tools\ListVisionImagesTool());
+            $registry->register(new \Platform\Organization\Tools\CreateVisionImageTool());
+            $registry->register(new \Platform\Organization\Tools\ListObstaclesTool());
+            $registry->register(new \Platform\Organization\Tools\CreateObstacleTool());
+            $registry->register(new \Platform\Organization\Tools\ListMilestonesTool());
+            $registry->register(new \Platform\Organization\Tools\CreateMilestoneTool());
+            $registry->register(new \Platform\Organization\Tools\CreateMilestoneContributionTool());
+
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);
         }

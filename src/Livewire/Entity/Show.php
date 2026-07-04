@@ -19,6 +19,7 @@ use Platform\Organization\Models\OrganizationEntityRelationType;
 use Platform\Organization\Models\OrganizationEntityRelationshipInterlink;
 use Platform\Organization\Models\OrganizationInterlink;
 use Platform\Organization\Models\OrganizationForecast;
+use Platform\Organization\Models\OrganizationStrategicDocument;
 use Platform\Core\Models\Team;
 use Platform\Core\Enums\TeamRole;
 use Platform\Organization\Services\EntityTimeResolver;
@@ -153,22 +154,30 @@ class Show extends Component
     // ── Strategy Tab ──────────────────────────────────────────
 
     /**
-     * Strategy artifacts (forecasts, focus_areas, milestones) attached to
-     * this carrier-entity. Milestones grouped per focus_area by year × quarter
-     * for the Transformations-Map render. `null` when there is nothing.
+     * Strategy artifacts attached to this carrier-entity for the Strategie-Tab.
      *
      * Shape:
      * [
-     *   'forecasts' => [
-     *     ['id', 'title', 'target_date', 'focus_areas' => [
-     *        ['id', 'title', 'description', 'order', 'milestones_total',
-     *         'grid' => [year => [quarter|'year' => [milestone, ...]]],
-     *         'years' => [int, ...] // sorted list of years used in this focus_area
-     *        ]
-     *     ]]
-     *   ],
+     *   'mission'         => ['title','content','version','valid_from'] | null,
+     *   'vision'          => ['title','content','version','valid_from'] | null,
+     *   'forecasts'       => [ ...see below ],
      *   'milestone_total' => int,
+     *   'has_any'         => bool,
      * ]
+     *
+     * A forecast has:
+     *   id, title, target_date, content, current_version_id,
+     *   focus_areas => [ ...per FA ],
+     *   transformation_map => [
+     *      'years' => [int, ...],  // sorted union of years across this forecast's milestones
+     *      'grid'  => [focus_area_id => [year => [milestone,...]]],
+     *      'no_year' => [focus_area_id => [milestone,...]],  // milestones without year
+     *   ]
+     *
+     * A focus_area has:
+     *   id, title, description, order,
+     *   vision_images => [{id,title}], obstacles => [{id,title}],
+     *   milestones => [{id,title,target_year,target_quarter,order}]
      */
     #[Computed]
     public function strategy(): ?array
@@ -177,62 +186,109 @@ class Show extends Component
             return null;
         }
 
+        $activeDoc = fn (string $type) => OrganizationStrategicDocument::query()
+            ->where('entity_id', $this->entity->id)
+            ->where('type', $type)
+            ->where('is_active', true)
+            ->whereNull('deleted_at')
+            ->orderByDesc('version')
+            ->first();
+
+        $formatDoc = function ($doc) {
+            if (!$doc) {
+                return null;
+            }
+            return [
+                'title'      => $doc->title,
+                'content'    => $doc->content,
+                'version'    => $doc->version,
+                'valid_from' => $doc->valid_from?->toDateString(),
+            ];
+        };
+
+        $mission = $formatDoc($activeDoc('mission'));
+        $vision  = $formatDoc($activeDoc('vision'));
+
         $forecasts = OrganizationForecast::query()
             ->where('entity_id', $this->entity->id)
             ->whereNull('deleted_at')
             ->with([
+                'currentVersion',
                 'focusAreas' => fn ($q) => $q->whereNull('deleted_at')->orderBy('order'),
+                'focusAreas.visionImages' => fn ($q) => $q->whereNull('deleted_at')->orderBy('order'),
+                'focusAreas.obstacles' => fn ($q) => $q->whereNull('deleted_at')->orderBy('order'),
                 'focusAreas.milestones' => fn ($q) => $q->whereNull('deleted_at')
                     ->orderBy('target_year')->orderBy('target_quarter')->orderBy('order'),
             ])
             ->orderBy('target_date')
             ->get();
 
-        if ($forecasts->isEmpty()) {
-            return null;
-        }
-
         $milestoneTotal = 0;
         $forecastData = $forecasts->map(function ($f) use (&$milestoneTotal) {
-            return [
-                'id' => $f->id,
-                'title' => $f->title,
-                'target_date' => $f->target_date?->toDateString(),
-                'focus_areas' => $f->focusAreas->map(function ($fa) use (&$milestoneTotal) {
-                    $grid = [];
-                    $years = [];
-                    foreach ($fa->milestones as $m) {
-                        $y = (int) ($m->target_year ?? 0);
-                        $q = $m->target_quarter !== null ? (int) $m->target_quarter : 'year';
-                        if ($y === 0) {
-                            $y = 0; // no year → sentinel bucket
-                        }
-                        $grid[$y] ??= ['year' => [], 1 => [], 2 => [], 3 => [], 4 => []];
-                        $grid[$y][$q][] = [
-                            'id' => $m->id,
-                            'title' => $m->title,
-                            'order' => $m->order,
-                        ];
-                        $years[$y] = true;
-                    }
-                    $milestoneTotal += $fa->milestones->count();
-                    ksort($years);
+            $years = [];
+            $grid = [];
+            $noYear = [];
+
+            $focusAreas = $f->focusAreas->map(function ($fa) use (&$milestoneTotal, &$years, &$grid, &$noYear) {
+                $milestones = $fa->milestones->map(function ($m) {
                     return [
-                        'id' => $fa->id,
-                        'title' => $fa->title,
-                        'description' => $fa->description,
-                        'order' => $fa->order,
-                        'milestones_total' => $fa->milestones->count(),
-                        'grid' => $grid,
-                        'years' => array_keys($years),
+                        'id'             => $m->id,
+                        'title'          => $m->title,
+                        'target_year'    => $m->target_year !== null ? (int) $m->target_year : null,
+                        'target_quarter' => $m->target_quarter !== null ? (int) $m->target_quarter : null,
+                        'order'          => (int) $m->order,
                     ];
-                })->values()->toArray(),
+                })->values()->toArray();
+
+                foreach ($milestones as $m) {
+                    if ($m['target_year']) {
+                        $years[$m['target_year']] = true;
+                        $grid[$fa->id][$m['target_year']][] = $m;
+                    } else {
+                        $noYear[$fa->id][] = $m;
+                    }
+                }
+                $milestoneTotal += count($milestones);
+
+                return [
+                    'id'            => $fa->id,
+                    'title'         => $fa->title,
+                    'description'   => $fa->description,
+                    'order'         => (int) $fa->order,
+                    'vision_images' => $fa->visionImages->map(fn ($vi) => ['id' => $vi->id, 'title' => $vi->title])->values()->toArray(),
+                    'obstacles'     => $fa->obstacles->map(fn ($ob) => ['id' => $ob->id, 'title' => $ob->title])->values()->toArray(),
+                    'milestones'    => $milestones,
+                ];
+            })->values()->toArray();
+
+            ksort($years);
+
+            return [
+                'id'                 => $f->id,
+                'title'              => $f->title,
+                'target_date'        => $f->target_date?->toDateString(),
+                'content'            => $f->currentVersion?->content ?? $f->content,
+                'current_version'    => $f->currentVersion?->version,
+                'focus_areas'        => $focusAreas,
+                'transformation_map' => [
+                    'years'   => array_keys($years),
+                    'grid'    => $grid,
+                    'no_year' => $noYear,
+                ],
             ];
         })->values()->toArray();
 
+        $hasAny = $mission || $vision || !empty($forecastData);
+        if (!$hasAny) {
+            return null;
+        }
+
         return [
-            'forecasts' => $forecastData,
+            'mission'         => $mission,
+            'vision'          => $vision,
+            'forecasts'       => $forecastData,
             'milestone_total' => $milestoneTotal,
+            'has_any'         => true,
         ];
     }
 
@@ -1801,22 +1857,70 @@ class Show extends Component
     }
 
     /**
-     * Alle Verbalization-Feeds, die auf diese Entity zeigen — direkt via subject_selector.
-     * Umfasst: mode=single mit id=$entityId (z.B. entity_pulse-Feed) und
-     *          mode=entity mit entity_id=$entityId (z.B. Detail-Feeds pro Projekt).
+     * Toggle im UI: ob der Berichte-Tab nur Feeds am direkten Knoten zeigt oder
+     * auch Feeds aus dem gesamten Sub-Baum. Default: inkl. Sub-Baum, weil an
+     * Root-Entities (z.B. BHG.DIGITAL) sonst fast nichts sichtbar waere — die
+     * meisten Feeds zeigen typischerweise auf Sub-Ebenen (Engagements, Projekte).
+     */
+    public bool $includeDescendantsInReports = true;
+
+    public function toggleReportsScope(): void
+    {
+        $this->includeDescendantsInReports = ! $this->includeDescendantsInReports;
+        unset($this->verbalizationFeeds);
+    }
+
+    /**
+     * Verbalization-Feeds, die diesen Knoten betreffen. Drei Faelle:
+     *   (a) mode=single mit id ∈ Scope UND subject_type ∈ {entity_pulse, organization_signals}
+     *   (b) mode=entity mit entity_id ∈ Scope
+     *   (c) mode=single auf ein Objekt (Projekt, Board, ...), das per DimensionLink
+     *       an einer Entity im Scope haengt
      *
-     * Fuer jeden Feed wird der juengste Output (Prosa + Zeitstempel) mitgeliefert.
+     * "Scope" = $entityId (nur direkt) oder $entityId + alle Descendants (rekursiv).
      */
     #[Computed]
     public function verbalizationFeeds(): array
     {
         $entityId = (int) $this->entity->id;
+        $scope = $this->includeDescendantsInReports
+            ? $this->collectEntityScopeForReports($entityId)
+            : [$entityId];
+
+        // Fall (c): pro linkable_type die IDs von Objekten, die per DimensionLink
+        // an einer Scope-Entity haengen. Feed-Query matcht subject_type +
+        // subject_selector.id gegen diese Mengen.
+        $linkableIdsByType = $this->linkableIdsByTypeForScope($scope);
 
         try {
             $feeds = VerbalizationFeed::query()
-                ->where(function ($q) use ($entityId) {
-                    $q->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(subject_selector, '$.mode')) = 'single' AND CAST(JSON_UNQUOTE(JSON_EXTRACT(subject_selector, '$.id')) AS UNSIGNED) = ?", [$entityId])
-                        ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(subject_selector, '$.mode')) = 'entity' AND CAST(JSON_UNQUOTE(JSON_EXTRACT(subject_selector, '$.entity_id')) AS UNSIGNED) = ?", [$entityId]);
+                ->where(function ($q) use ($scope, $linkableIdsByType) {
+                    // (a) mode=single + entity-basierte Types + ID im Scope
+                    $q->where(function ($qq) use ($scope) {
+                        $qq->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(subject_selector, '$.mode')) = 'single'")
+                            ->whereIn(DB::raw("CAST(JSON_UNQUOTE(JSON_EXTRACT(subject_selector, '$.id')) AS UNSIGNED)"), $scope)
+                            ->whereIn('subject_type', ['entity_pulse', 'organization_signals']);
+                    });
+                    // (b) mode=entity mit entity_id im Scope
+                    $q->orWhere(function ($qq) use ($scope) {
+                        $qq->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(subject_selector, '$.mode')) = 'entity'")
+                            ->whereIn(DB::raw("CAST(JSON_UNQUOTE(JSON_EXTRACT(subject_selector, '$.entity_id')) AS UNSIGNED)"), $scope);
+                    });
+                    // (c) mode=single auf ein Objekt aus dem Sub-Baum
+                    foreach ($linkableIdsByType as $type => $ids) {
+                        if (empty($ids)) {
+                            continue;
+                        }
+                        // Aliase 'project' und 'planner_project' beide akzeptieren.
+                        $candidateTypes = ($type === 'project' || $type === 'planner_project')
+                            ? ['project', 'planner_project']
+                            : [$type];
+                        $q->orWhere(function ($qq) use ($candidateTypes, $ids) {
+                            $qq->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(subject_selector, '$.mode')) = 'single'")
+                                ->whereIn('subject_type', $candidateTypes)
+                                ->whereIn(DB::raw("CAST(JSON_UNQUOTE(JSON_EXTRACT(subject_selector, '$.id')) AS UNSIGNED)"), $ids);
+                        });
+                    }
                 })
                 ->orderByDesc('last_refreshed_at')
                 ->orderByDesc('id')
@@ -1889,6 +1993,70 @@ class Show extends Component
             return $plain;
         }
         return mb_substr($plain, 0, $chars - 1) . '…';
+    }
+
+    /**
+     * Root + alle Descendants der Entity ueber parent_entity_id, breadth-first.
+     *
+     * @return int[]
+     */
+    protected function collectEntityScopeForReports(int $rootId): array
+    {
+        try {
+            $visited = [$rootId => true];
+            $result = [$rootId];
+            $queue = [$rootId];
+            while (! empty($queue)) {
+                $id = array_shift($queue);
+                $children = DB::table('organization_entities')
+                    ->where('parent_entity_id', $id)
+                    ->pluck('id')
+                    ->all();
+                foreach ($children as $cid) {
+                    $cid = (int) $cid;
+                    if (isset($visited[$cid])) {
+                        continue;
+                    }
+                    $visited[$cid] = true;
+                    $result[] = $cid;
+                    $queue[] = $cid;
+                }
+            }
+            return $result;
+        } catch (\Throwable $e) {
+            return [$rootId];
+        }
+    }
+
+    /**
+     * @param  int[] $entityIds
+     * @return array<string, int[]>  linkable_type → [linkable_ids]
+     */
+    protected function linkableIdsByTypeForScope(array $entityIds): array
+    {
+        if (empty($entityIds)
+            || ! \Schema::hasTable('organization_dimension_links')
+            || ! \Schema::hasTable('organization_dimension_values')) {
+            return [];
+        }
+        try {
+            $rows = DB::table('organization_dimension_links as l')
+                ->join('organization_dimension_values as v', 'v.id', '=', 'l.dimension_value_id')
+                ->whereIn(DB::raw("CAST(JSON_UNQUOTE(JSON_EXTRACT(v.metadata, '$.source_entity_id')) AS UNSIGNED)"), $entityIds)
+                ->select('l.linkable_type', 'l.linkable_id')
+                ->distinct()
+                ->get();
+            $out = [];
+            foreach ($rows as $row) {
+                $out[$row->linkable_type][] = (int) $row->linkable_id;
+            }
+            foreach ($out as $type => $ids) {
+                $out[$type] = array_values(array_unique($ids));
+            }
+            return $out;
+        } catch (\Throwable $e) {
+            return [];
+        }
     }
 
     public function render()

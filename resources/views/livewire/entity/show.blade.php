@@ -1799,10 +1799,30 @@
 
                 {{-- Tab: Berichte (Verbalization-Feeds) --}}
                 <div x-show="tab === 'reports'" x-cloak>
+                    <div class="mb-4 flex items-center justify-between gap-4">
+                        <p class="text-xs text-[var(--ui-muted)] leading-relaxed">
+                            @if($includeDescendantsInReports)
+                                Zeigt Berichte fuer <span class="font-medium text-[var(--ui-secondary)]">{{ $entity->name }}</span> inklusive aller Sub-Ebenen (Descendants und deren verlinkte Objekte).
+                            @else
+                                Zeigt nur Berichte, die direkt an <span class="font-medium text-[var(--ui-secondary)]">{{ $entity->name }}</span> haengen.
+                            @endif
+                        </p>
+                        <button
+                            type="button"
+                            wire:click="toggleReportsScope"
+                            class="shrink-0 text-xs px-3 py-1.5 rounded-md border border-[var(--ui-border)] text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-2)] transition-colors"
+                        >
+                            @if($includeDescendantsInReports)
+                                Nur direkter Knoten
+                            @else
+                                Inkl. Sub-Baum
+                            @endif
+                        </button>
+                    </div>
                     @php $feeds = $this->verbalizationFeeds; @endphp
                     @if(empty($feeds))
                         <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 text-center">
-                            <p class="text-sm text-[var(--ui-muted)]">Es sind keine Berichte fuer diese Entity konfiguriert.</p>
+                            <p class="text-sm text-[var(--ui-muted)]">Keine Berichte im gewaehlten Umfang.</p>
                             <p class="text-xs text-[var(--ui-muted)] mt-2">Neue Feeds werden per MCP-Tool <code class="text-[11px] bg-[var(--ui-surface-2)] px-1 py-0.5 rounded">core.verbalization.feeds.POST</code> angelegt.</p>
                         </div>
                     @else

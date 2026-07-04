@@ -29,6 +29,8 @@ use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationSkill;
 use Platform\Organization\Models\OrganizationSoftSkill;
 use Platform\Organization\Models\OrganizationSignal;
+use Platform\Core\Models\VerbalizationFeed;
+use Platform\Core\Models\VerbalizationOutput;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -1709,6 +1711,97 @@ class Show extends Component
         ]);
         unset($this->entitySignals);
         session()->flash('message', 'Signal verworfen.');
+    }
+
+    /**
+     * Alle Verbalization-Feeds, die auf diese Entity zeigen — direkt via subject_selector.
+     * Umfasst: mode=single mit id=$entityId (z.B. entity_pulse-Feed) und
+     *          mode=entity mit entity_id=$entityId (z.B. Detail-Feeds pro Projekt).
+     *
+     * Fuer jeden Feed wird der juengste Output (Prosa + Zeitstempel) mitgeliefert.
+     */
+    #[Computed]
+    public function verbalizationFeeds(): array
+    {
+        $entityId = (int) $this->entity->id;
+
+        try {
+            $feeds = VerbalizationFeed::query()
+                ->where(function ($q) use ($entityId) {
+                    $q->whereRaw("JSON_UNQUOTE(JSON_EXTRACT(subject_selector, '$.mode')) = 'single' AND CAST(JSON_UNQUOTE(JSON_EXTRACT(subject_selector, '$.id')) AS UNSIGNED) = ?", [$entityId])
+                        ->orWhereRaw("JSON_UNQUOTE(JSON_EXTRACT(subject_selector, '$.mode')) = 'entity' AND CAST(JSON_UNQUOTE(JSON_EXTRACT(subject_selector, '$.entity_id')) AS UNSIGNED) = ?", [$entityId]);
+                })
+                ->orderByDesc('last_refreshed_at')
+                ->orderByDesc('id')
+                ->get();
+        } catch (\Throwable $e) {
+            return [];
+        }
+
+        $baseUrl = rtrim((string) config('app.url'), '/');
+
+        return $feeds->map(function ($feed) use ($baseUrl) {
+            $latest = VerbalizationOutput::query()
+                ->where('feed_id', $feed->id)
+                ->orderByDesc('created_at')
+                ->first();
+
+            $recipeKeys = collect($feed->recipes ?? [])->values()->all();
+
+            return [
+                'id' => $feed->id,
+                'uuid' => $feed->uuid,
+                'title' => $feed->title,
+                'description' => $feed->description,
+                'subject_type' => $feed->subject_type,
+                'refresh_strategy' => $feed->refresh_strategy,
+                'is_active' => (bool) $feed->is_active,
+                'last_refreshed_at' => $feed->last_refreshed_at?->format('d.m.Y H:i'),
+                'recipes' => $recipeKeys,
+                'feed_url' => $baseUrl . '/feed/' . $feed->uuid . '.xml',
+                'latest' => $latest ? [
+                    'id' => $latest->id,
+                    'created_at' => $latest->created_at?->format('d.m.Y H:i'),
+                    'model' => $latest->llm_model,
+                    'provider' => $latest->llm_provider,
+                    'recipe_key' => $latest->recipe_key,
+                    'prose' => $latest->prose,
+                    'preview' => $this->prosePreview((string) ($latest->prose ?? ''), 240),
+                ] : null,
+            ];
+        })->all();
+    }
+
+    /**
+     * Vollstaendige Prosa-Historie eines Feeds (letzte N Outputs) — fuer das Modal.
+     */
+    public function verbalizationOutputsFor(int $feedId, int $limit = 5): array
+    {
+        return VerbalizationOutput::query()
+            ->where('feed_id', $feedId)
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get()
+            ->map(fn ($o) => [
+                'id' => $o->id,
+                'created_at' => $o->created_at?->format('d.m.Y H:i'),
+                'model' => $o->llm_model,
+                'recipe_key' => $o->recipe_key,
+                'prose' => $o->prose,
+            ])
+            ->all();
+    }
+
+    protected function prosePreview(string $prose, int $chars = 240): string
+    {
+        // Markdown-Rauschen fuer Preview grob entfernen.
+        $plain = preg_replace('/[*_#`>]+/', '', $prose) ?? $prose;
+        $plain = preg_replace('/\s+/', ' ', $plain) ?? $plain;
+        $plain = trim($plain);
+        if (mb_strlen($plain) <= $chars) {
+            return $plain;
+        }
+        return mb_substr($plain, 0, $chars - 1) . '…';
     }
 
     public function render()

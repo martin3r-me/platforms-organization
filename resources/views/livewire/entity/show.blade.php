@@ -353,6 +353,20 @@
                                 <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-white bg-red-500 rounded-full">{{ $openSignalCount }}</span>
                             @endif
                         </button>
+                        <button
+                            @click="tab = 'reports'"
+                            :class="tab === 'reports'
+                                ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
+                                : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                            class="px-4 py-2.5 text-sm transition-colors flex items-center gap-1.5"
+                        >
+                            @svg('heroicon-o-document-text', 'w-4 h-4 inline-block -mt-0.5')
+                            Berichte
+                            @php $reportsCount = count($this->verbalizationFeeds); @endphp
+                            @if($reportsCount > 0)
+                                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold text-[var(--ui-secondary)] bg-[var(--ui-surface-2)] rounded-full">{{ $reportsCount }}</span>
+                            @endif
+                        </button>
                     </nav>
                 </div>
 
@@ -1680,6 +1694,81 @@
                         </div>
                     </div>
                 @endif
+
+                {{-- Tab: Berichte (Verbalization-Feeds) --}}
+                <div x-show="tab === 'reports'" x-cloak>
+                    @php $feeds = $this->verbalizationFeeds; @endphp
+                    @if(empty($feeds))
+                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 text-center">
+                            <p class="text-sm text-[var(--ui-muted)]">Es sind keine Berichte fuer diese Entity konfiguriert.</p>
+                            <p class="text-xs text-[var(--ui-muted)] mt-2">Neue Feeds werden per MCP-Tool <code class="text-[11px] bg-[var(--ui-surface-2)] px-1 py-0.5 rounded">core.verbalization.feeds.POST</code> angelegt.</p>
+                        </div>
+                    @else
+                        <div class="space-y-4">
+                            @foreach($feeds as $feed)
+                                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-5">
+                                    <div class="flex items-start justify-between gap-4">
+                                        <div class="flex-1 min-w-0">
+                                            <div class="flex items-center gap-2 mb-1">
+                                                <h3 class="text-base font-semibold text-[var(--ui-secondary)] truncate">{{ $feed['title'] }}</h3>
+                                                @if(! $feed['is_active'])
+                                                    <span class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--ui-surface-2)] text-[var(--ui-muted)]">inaktiv</span>
+                                                @endif
+                                            </div>
+                                            @if($feed['description'])
+                                                <p class="text-xs text-[var(--ui-muted)] mb-3 leading-relaxed">{{ $feed['description'] }}</p>
+                                            @endif
+                                            <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--ui-muted)]">
+                                                <span><span class="font-medium text-[var(--ui-secondary)]">Recipe:</span> {{ implode(', ', $feed['recipes']) ?: '—' }}</span>
+                                                <span><span class="font-medium text-[var(--ui-secondary)]">Typ:</span> {{ $feed['subject_type'] }}</span>
+                                                <span><span class="font-medium text-[var(--ui-secondary)]">Frequenz:</span> {{ $feed['refresh_strategy'] }}</span>
+                                                @if($feed['last_refreshed_at'])
+                                                    <span><span class="font-medium text-[var(--ui-secondary)]">Zuletzt:</span> {{ $feed['last_refreshed_at'] }}</span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                        <a
+                                            href="{{ $feed['feed_url'] }}"
+                                            target="_blank"
+                                            rel="noopener"
+                                            class="shrink-0 text-xs text-[var(--ui-primary)] hover:underline flex items-center gap-1"
+                                            title="{{ $feed['feed_url'] }}"
+                                        >
+                                            @svg('heroicon-o-rss', 'w-3.5 h-3.5')
+                                            RSS
+                                        </a>
+                                    </div>
+
+                                    @if($feed['latest'])
+                                        <div class="mt-4 pt-4 border-t border-[var(--ui-border)]">
+                                            <div class="flex items-center justify-between mb-2">
+                                                <div class="text-xs text-[var(--ui-muted)]">
+                                                    <span class="font-medium text-[var(--ui-secondary)]">Letzter Bericht</span>
+                                                    &middot; {{ $feed['latest']['created_at'] }}
+                                                    @if($feed['latest']['model'])
+                                                        &middot; {{ $feed['latest']['model'] }}
+                                                    @endif
+                                                </div>
+                                            </div>
+                                            <p class="text-sm text-[var(--ui-secondary)] leading-relaxed">
+                                                {{ $feed['latest']['preview'] }}
+                                            </p>
+                                            <div class="mt-3 text-xs">
+                                                <a href="{{ $feed['feed_url'] }}" target="_blank" rel="noopener" class="text-[var(--ui-primary)] hover:underline">
+                                                    Vollstaendiger Feed und Historie im Reader &rarr;
+                                                </a>
+                                            </div>
+                                        </div>
+                                    @else
+                                        <div class="mt-4 pt-4 border-t border-[var(--ui-border)]">
+                                            <p class="text-xs text-[var(--ui-muted)]">Noch kein Bericht erzeugt.</p>
+                                        </div>
+                                    @endif
+                                </div>
+                            @endforeach
+                        </div>
+                    @endif
+                </div>
             </div>
         </div>
     <!-- Create Team Modal -->

@@ -53,6 +53,7 @@ class OrganizationServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Organization\Services\EntityLinkRegistry::class);
         $this->app->singleton(\Platform\Organization\Services\PersonActivityRegistry::class);
         $this->app->singleton(\Platform\Organization\Services\InferencePromptService::class);
+        $this->app->singleton(\Platform\Organization\Services\MilestoneContributorRegistry::class);
     }
 
     public function boot(): void

@@ -52,16 +52,31 @@ class OrganizationSignalsSubjectCollector implements SubjectCollectorInterface
         ?CollectionRecipe $recipe = null,
         ?\DateTimeInterface $since = null,
     ): Subject {
-        if (! $subject instanceof OrganizationEntity) {
-            $subject = OrganizationEntity::findOrFail($subject);
+        // $subject akzeptiert: OrganizationEntity, ID (int/string) oder Array von IDs
+        // (fuer rekursive Aufrufe aus entity_pulse ueber den Sub-Baum).
+        if (is_array($subject)) {
+            $entityIds = array_values(array_map('intval', $subject));
+            $rootId = $entityIds[0] ?? 0;
+            $rootEntity = OrganizationEntity::find($rootId);
+            $primaryName = $rootEntity?->name ?? ('Entity #' . $rootId);
+            $subjectId = (string) $rootId;
+            $slug = $rootEntity?->uuid ?? $subjectId;
+        } else {
+            if (! $subject instanceof OrganizationEntity) {
+                $subject = OrganizationEntity::findOrFail($subject);
+            }
+            $entityIds = [(int) $subject->id];
+            $primaryName = $subject->name ?? ('Entity #' . $subject->id);
+            $subjectId = (string) $subject->id;
+            $slug = $subject->uuid ?? $subjectId;
         }
 
         $isOn = $recipe
             ? fn (string $key) => $recipe->hasSource($key)
             : fn (string $key) => (bool) (self::DEFAULT_SOURCES[$key] ?? false);
 
-        // Live-Basis: alle nicht-terminalen Signale an dieser Entity.
-        $live = OrganizationSignal::where('entity_id', $subject->id)
+        // Live-Basis: alle nicht-terminalen Signale ueber alle Scope-Entities.
+        $live = OrganizationSignal::whereIn('entity_id', $entityIds)
             ->whereIn('status', ['open', 'acknowledged'])
             ->get();
 
@@ -69,22 +84,25 @@ class OrganizationSignalsSubjectCollector implements SubjectCollectorInterface
             $isOn('signal_load') ? $this->factsSignalLoad($live) : [],
             $isOn('vsm_distribution') ? $this->factsVsmDistribution($live) : [],
             $isOn('signal_headlines') ? $this->factsHeadlines($live) : [],
-            $isOn('new_signals') && $since ? $this->factsNewSignals($subject->id, $since) : [],
-            $isOn('resolved_signals') && $since ? $this->factsResolvedSignals($subject->id, $since) : [],
-            $isOn('aggregation_flow') && $since ? $this->factsAggregationFlow($subject->id, $since) : [],
+            $isOn('new_signals') && $since ? $this->factsNewSignals($entityIds, $since) : [],
+            $isOn('resolved_signals') && $since ? $this->factsResolvedSignals($entityIds, $since) : [],
+            $isOn('aggregation_flow') && $since ? $this->factsAggregationFlow($entityIds, $since) : [],
             $isOn('algedonic_alert') ? $this->factsAlgedonicAlert($live) : [],
             $isOn('vsm_focus') ? $this->factsVsmFocus($live) : [],
         );
 
         $now = new DateTimeImmutable();
+        $scopeLabel = count($entityIds) > 1
+            ? 'Signale zu ' . $primaryName . ' (inkl. ' . (count($entityIds) - 1) . ' Sub-Ebenen)'
+            : 'Signale zu ' . $primaryName;
         return new Subject(
             kind: SubjectKind::STATE,
             type: 'organization_signals',
-            id: (string) $subject->id,
+            id: $subjectId,
             identity: new Identity(
-                primaryName: 'Signale zu ' . ($subject->name ?? ('Entity #' . $subject->id)),
-                shortLabel: $subject->name ?? ('Entity #' . $subject->id),
-                slug: $subject->uuid ?? (string) $subject->id,
+                primaryName: $scopeLabel,
+                shortLabel: $primaryName,
+                slug: $slug,
             ),
             facts: $facts,
             edges: [],
@@ -174,10 +192,10 @@ class OrganizationSignalsSubjectCollector implements SubjectCollectorInterface
         )];
     }
 
-    /** @return Fact[] */
-    protected function factsNewSignals(int $entityId, \DateTimeInterface $since): array
+    /** @param int[] $entityIds  @return Fact[] */
+    protected function factsNewSignals(array $entityIds, \DateTimeInterface $since): array
     {
-        $new = OrganizationSignal::where('entity_id', $entityId)
+        $new = OrganizationSignal::whereIn('entity_id', $entityIds)
             ->where('created_at', '>=', $since)
             ->get();
         if ($new->isEmpty()) {
@@ -199,10 +217,10 @@ class OrganizationSignalsSubjectCollector implements SubjectCollectorInterface
         )];
     }
 
-    /** @return Fact[] */
-    protected function factsResolvedSignals(int $entityId, \DateTimeInterface $since): array
+    /** @param int[] $entityIds  @return Fact[] */
+    protected function factsResolvedSignals(array $entityIds, \DateTimeInterface $since): array
     {
-        $resolved = OrganizationSignal::where('entity_id', $entityId)
+        $resolved = OrganizationSignal::whereIn('entity_id', $entityIds)
             ->whereIn('status', ['resolved', 'dismissed'])
             ->where('resolved_at', '>=', $since)
             ->get();
@@ -218,10 +236,10 @@ class OrganizationSignalsSubjectCollector implements SubjectCollectorInterface
         )];
     }
 
-    /** @return Fact[] */
-    protected function factsAggregationFlow(int $entityId, \DateTimeInterface $since): array
+    /** @param int[] $entityIds  @return Fact[] */
+    protected function factsAggregationFlow(array $entityIds, \DateTimeInterface $since): array
     {
-        $aggregatedOut = OrganizationSignal::where('entity_id', $entityId)
+        $aggregatedOut = OrganizationSignal::whereIn('entity_id', $entityIds)
             ->whereNotNull('aggregated_at')
             ->where('aggregated_at', '>=', $since)
             ->count();

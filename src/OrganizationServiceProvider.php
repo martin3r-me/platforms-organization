@@ -139,6 +139,17 @@ class OrganizationServiceProvider extends ServiceProvider
                 ->register('organization', 'Platform\\Organization');
         } catch (\Throwable $e) {}
 
+        // Verbalization-Template + Subject-Collector fuer Signal-Feeds (VSM)
+        try {
+            resolve(\Platform\Core\Verbalization\Template\TemplateRegistry::class)
+                ->register(new \Platform\Organization\Verbalization\OrganizationSignalsTemplate());
+        } catch (\Throwable $e) {}
+
+        try {
+            resolve(\Platform\Core\Verbalization\SubjectCollector\SubjectCollectorRegistry::class)
+                ->register(new \Platform\Organization\Verbalization\OrganizationSignalsSubjectCollector());
+        } catch (\Throwable $e) {}
+
         // Scheduler registrieren
         $this->registerSchedule();
     }

@@ -69,6 +69,19 @@ class OrganizationSignalsSubjectCollector implements SubjectCollectorInterface
             $primaryName = $subject->name ?? ('Entity #' . $subject->id);
             $subjectId = (string) $subject->id;
             $slug = $subject->uuid ?? $subjectId;
+
+            // Recipe-Rekursion: sources.descend erweitert den Scope auf Descendants.
+            // Nur bei nicht-Array-Input relevant — Array-Input kommt schon vor-
+            // aufgeloest vom Pulse-Aggregator.
+            $descend = $recipe && is_array($recipe->sources)
+                ? ($recipe->sources['descend'] ?? false)
+                : false;
+            if ($descend !== false && $descend !== null) {
+                $entityIds = $this->collectDescendantScope((int) $subject->id, $descend);
+                if (count($entityIds) > 1) {
+                    $primaryName .= ' (inkl. ' . (count($entityIds) - 1) . ' Sub-Ebenen)';
+                }
+            }
         }
 
         $isOn = $recipe
@@ -300,5 +313,40 @@ class OrganizationSignalsSubjectCollector implements SubjectCollectorInterface
         if ($days <= 7) return 'in dieser Woche';
         if ($days <= 14) return 'in den letzten zwei Wochen';
         return 'seit dem ' . $sinceCarbon->format('d.m.');
+    }
+
+    /**
+     * Root + alle Descendants (parent_entity_id, breadth-first).
+     * $descend: true = alle Ebenen; int = maximale Tiefe.
+     *
+     * @return int[]
+     */
+    protected function collectDescendantScope(int $rootId, mixed $descend): array
+    {
+        $maxDepth = ($descend === true) ? null : max(0, (int) $descend);
+        $visited = [$rootId => true];
+        $result = [$rootId];
+        $queue = [[$rootId, 0]];
+
+        while (! empty($queue)) {
+            [$id, $depth] = array_shift($queue);
+            if ($maxDepth !== null && $depth >= $maxDepth) {
+                continue;
+            }
+            $children = \DB::table('organization_entities')
+                ->where('parent_entity_id', $id)
+                ->pluck('id')
+                ->all();
+            foreach ($children as $cid) {
+                $cid = (int) $cid;
+                if (isset($visited[$cid])) {
+                    continue;
+                }
+                $visited[$cid] = true;
+                $result[] = $cid;
+                $queue[] = [$cid, $depth + 1];
+            }
+        }
+        return $result;
     }
 }

@@ -38,6 +38,12 @@ class Sidebar extends Component
                 ],
             ],
             [
+                'label' => 'Berichte',
+                'items' => [
+                    ['route' => 'core.verbalization.factory', 'label' => 'Baukasten', 'icon' => 'squares-2x2', 'match' => '/verbalization/factory'],
+                ],
+            ],
+            [
                 'label' => 'Struktur',
                 'items' => [
                     ['route' => 'organization.interlinks.index', 'label' => 'Interlinks', 'icon' => 'arrows-right-left', 'match' => '/interlinks'],

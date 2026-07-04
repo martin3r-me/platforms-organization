@@ -78,9 +78,7 @@ class OrganizationSignalsSubjectCollector implements SubjectCollectorInterface
                 : false;
             if ($descend !== false && $descend !== null) {
                 $entityIds = $this->collectDescendantScope((int) $subject->id, $descend);
-                if (count($entityIds) > 1) {
-                    $primaryName .= ' (inkl. ' . (count($entityIds) - 1) . ' Sub-Ebenen)';
-                }
+                // Suffix wird unten in $scopeLabel einmal gesetzt — hier nicht doppeln.
             }
         }
 

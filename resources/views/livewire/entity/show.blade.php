@@ -292,6 +292,21 @@
                                     <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold text-[var(--ui-muted)] bg-gray-100 ring-1 ring-inset ring-gray-300 rounded-full">{{ $perspectiveTeamCount }}</span>
                                 @endif
                             </button>
+                            @php $strategyTabData = $this->strategy; @endphp
+                            <button
+                                @click="tab = 'strategy'"
+                                :class="tab === 'strategy'
+                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
+                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                                class="px-4 py-2.5 text-sm transition-colors flex items-center gap-1.5"
+                                title="Strategische Dokumente, Fokusraeume und Transformations-Map"
+                            >
+                                @svg('heroicon-o-flag', 'w-4 h-4 inline-block -mt-0.5')
+                                Strategie
+                                @if($strategyTabData && ($strategyTabData['milestone_total'] ?? 0) > 0)
+                                    <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold text-[var(--ui-muted)] bg-gray-100 ring-1 ring-inset ring-gray-300 rounded-full">{{ $strategyTabData['milestone_total'] }}</span>
+                                @endif
+                            </button>
                         @endif
                         @if($this->isSystemAgent)
                             @php
@@ -1604,6 +1619,93 @@
                                 </div>
                             @endforeach
                         </div>
+                    </div>
+
+                    {{-- Tab: Strategie (Forecasts + Fokusraeume + Transformations-Map) --}}
+                    <div x-show="tab === 'strategy'" x-cloak>
+                        @php $strategy = $this->strategy; @endphp
+                        @if($strategy === null || empty($strategy['forecasts']))
+                            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 text-center">
+                                <p class="text-sm text-[var(--ui-muted)]">Keine strategischen Dokumente an dieser Carrier-Entity hinterlegt.</p>
+                                <p class="text-xs text-[var(--ui-muted)] mt-2">
+                                    Anlegen per MCP-Tool
+                                    <code class="text-[11px] bg-[var(--ui-surface-2)] px-1 py-0.5 rounded">organization.forecasts.POST</code>
+                                    &middot;
+                                    <code class="text-[11px] bg-[var(--ui-surface-2)] px-1 py-0.5 rounded">organization.focus_areas.POST</code>
+                                    &middot;
+                                    <code class="text-[11px] bg-[var(--ui-surface-2)] px-1 py-0.5 rounded">organization.milestones.POST</code>
+                                </p>
+                            </div>
+                        @else
+                            <div class="space-y-6">
+                                @foreach($strategy['forecasts'] as $forecast)
+                                    <div class="bg-white rounded-lg border border-[var(--ui-border)] overflow-hidden">
+                                        <div class="px-5 py-4 border-b border-[var(--ui-border)] bg-[var(--ui-surface-2)]/50 flex items-baseline justify-between">
+                                            <div>
+                                                <h2 class="text-base font-semibold text-[var(--ui-secondary)]">{{ $forecast['title'] }}</h2>
+                                                @if($forecast['target_date'])
+                                                    <p class="text-xs text-[var(--ui-muted)] mt-0.5">Zieldatum: {{ $forecast['target_date'] }}</p>
+                                                @endif
+                                            </div>
+                                            <span class="text-xs text-[var(--ui-muted)]">{{ count($forecast['focus_areas']) }} Fokusraum/-raeume</span>
+                                        </div>
+
+                                        <div class="divide-y divide-[var(--ui-border)]">
+                                            @foreach($forecast['focus_areas'] as $fa)
+                                                <div class="p-5">
+                                                    <div class="flex items-baseline justify-between mb-3">
+                                                        <div>
+                                                            <h3 class="text-sm font-semibold text-[var(--ui-secondary)]">{{ $fa['title'] }}</h3>
+                                                            @if(!empty($fa['description']))
+                                                                <p class="text-xs text-[var(--ui-muted)] mt-0.5 max-w-3xl leading-relaxed">{{ $fa['description'] }}</p>
+                                                            @endif
+                                                        </div>
+                                                        <span class="text-xs text-[var(--ui-muted)] whitespace-nowrap ml-4">{{ $fa['milestones_total'] }} Meilensteine</span>
+                                                    </div>
+
+                                                    @if($fa['milestones_total'] === 0)
+                                                        <p class="text-xs text-[var(--ui-muted)] italic">Keine Meilensteine.</p>
+                                                    @else
+                                                        <div class="overflow-x-auto -mx-1">
+                                                            <table class="w-full text-xs border-separate border-spacing-1">
+                                                                <thead>
+                                                                    <tr>
+                                                                        <th class="text-left text-[var(--ui-muted)] font-medium pl-1 pr-3 py-1">Jahr</th>
+                                                                        <th class="text-left text-[var(--ui-muted)] font-medium px-2 py-1">Q1</th>
+                                                                        <th class="text-left text-[var(--ui-muted)] font-medium px-2 py-1">Q2</th>
+                                                                        <th class="text-left text-[var(--ui-muted)] font-medium px-2 py-1">Q3</th>
+                                                                        <th class="text-left text-[var(--ui-muted)] font-medium px-2 py-1">Q4</th>
+                                                                        <th class="text-left text-[var(--ui-muted)] font-medium px-2 py-1">nur Jahr</th>
+                                                                    </tr>
+                                                                </thead>
+                                                                <tbody>
+                                                                    @foreach($fa['years'] as $year)
+                                                                        <tr class="align-top">
+                                                                            <td class="font-semibold text-[var(--ui-secondary)] pl-1 pr-3 py-1 whitespace-nowrap">
+                                                                                {{ $year === 0 ? '—' : $year }}
+                                                                            </td>
+                                                                            @foreach([1,2,3,4,'year'] as $col)
+                                                                                <td class="px-2 py-1 min-w-[8rem]">
+                                                                                    @foreach(($fa['grid'][$year][$col] ?? []) as $m)
+                                                                                        <div class="mb-1 last:mb-0 rounded bg-[var(--ui-surface-2)] px-2 py-1 leading-snug text-[var(--ui-secondary)]" title="Meilenstein #{{ $m['id'] }}">
+                                                                                            {{ $m['title'] }}
+                                                                                        </div>
+                                                                                    @endforeach
+                                                                                </td>
+                                                                            @endforeach
+                                                                        </tr>
+                                                                    @endforeach
+                                                                </tbody>
+                                                            </table>
+                                                        </div>
+                                                    @endif
+                                                </div>
+                                            @endforeach
+                                        </div>
+                                    </div>
+                                @endforeach
+                            </div>
+                        @endif
                     </div>
 
                     {{-- Tab: Perspektive ↔ Teams --}}

@@ -18,6 +18,7 @@ use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntityRelationType;
 use Platform\Organization\Models\OrganizationEntityRelationshipInterlink;
 use Platform\Organization\Models\OrganizationInterlink;
+use Platform\Organization\Models\OrganizationForecast;
 use Platform\Core\Models\Team;
 use Platform\Core\Enums\TeamRole;
 use Platform\Organization\Services\EntityTimeResolver;
@@ -147,6 +148,92 @@ class Show extends Component
     public function isCarrierEntity(): bool
     {
         return $this->entity->type?->vsm_class === OrganizationEntityType::VSM_CLASS_CARRIER;
+    }
+
+    // ── Strategy Tab ──────────────────────────────────────────
+
+    /**
+     * Strategy artifacts (forecasts, focus_areas, milestones) attached to
+     * this carrier-entity. Milestones grouped per focus_area by year × quarter
+     * for the Transformations-Map render. `null` when there is nothing.
+     *
+     * Shape:
+     * [
+     *   'forecasts' => [
+     *     ['id', 'title', 'target_date', 'focus_areas' => [
+     *        ['id', 'title', 'description', 'order', 'milestones_total',
+     *         'grid' => [year => [quarter|'year' => [milestone, ...]]],
+     *         'years' => [int, ...] // sorted list of years used in this focus_area
+     *        ]
+     *     ]]
+     *   ],
+     *   'milestone_total' => int,
+     * ]
+     */
+    #[Computed]
+    public function strategy(): ?array
+    {
+        if (! $this->isCarrierEntity) {
+            return null;
+        }
+
+        $forecasts = OrganizationForecast::query()
+            ->where('entity_id', $this->entity->id)
+            ->whereNull('deleted_at')
+            ->with([
+                'focusAreas' => fn ($q) => $q->whereNull('deleted_at')->orderBy('order'),
+                'focusAreas.milestones' => fn ($q) => $q->whereNull('deleted_at')
+                    ->orderBy('target_year')->orderBy('target_quarter')->orderBy('order'),
+            ])
+            ->orderBy('target_date')
+            ->get();
+
+        if ($forecasts->isEmpty()) {
+            return null;
+        }
+
+        $milestoneTotal = 0;
+        $forecastData = $forecasts->map(function ($f) use (&$milestoneTotal) {
+            return [
+                'id' => $f->id,
+                'title' => $f->title,
+                'target_date' => $f->target_date?->toDateString(),
+                'focus_areas' => $f->focusAreas->map(function ($fa) use (&$milestoneTotal) {
+                    $grid = [];
+                    $years = [];
+                    foreach ($fa->milestones as $m) {
+                        $y = (int) ($m->target_year ?? 0);
+                        $q = $m->target_quarter !== null ? (int) $m->target_quarter : 'year';
+                        if ($y === 0) {
+                            $y = 0; // no year → sentinel bucket
+                        }
+                        $grid[$y] ??= ['year' => [], 1 => [], 2 => [], 3 => [], 4 => []];
+                        $grid[$y][$q][] = [
+                            'id' => $m->id,
+                            'title' => $m->title,
+                            'order' => $m->order,
+                        ];
+                        $years[$y] = true;
+                    }
+                    $milestoneTotal += $fa->milestones->count();
+                    ksort($years);
+                    return [
+                        'id' => $fa->id,
+                        'title' => $fa->title,
+                        'description' => $fa->description,
+                        'order' => $fa->order,
+                        'milestones_total' => $fa->milestones->count(),
+                        'grid' => $grid,
+                        'years' => array_keys($years),
+                    ];
+                })->values()->toArray(),
+            ];
+        })->values()->toArray();
+
+        return [
+            'forecasts' => $forecastData,
+            'milestone_total' => $milestoneTotal,
+        ];
     }
 
     // ── Perspective ↔ Team Mapping ────────────────────────────

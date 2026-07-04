@@ -2013,6 +2013,11 @@
                     @else
                         <div class="space-y-4">
                             @foreach($feeds as $feed)
+                                @php
+                                    $badgeOn = 'inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] font-medium';
+                                    $badgeMuted = 'inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-[var(--ui-surface-2)] text-[var(--ui-muted)]';
+                                    $badgeGhost = 'inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-dashed border-[var(--ui-border)] text-[var(--ui-muted)]/60';
+                                @endphp
                                 <div class="bg-white rounded-lg border border-[var(--ui-border)] p-5">
                                     <div class="flex items-start justify-between gap-4">
                                         <div class="flex-1 min-w-0">
@@ -2025,14 +2030,6 @@
                                             @if($feed['description'])
                                                 <p class="text-xs text-[var(--ui-muted)] mb-3 leading-relaxed">{{ $feed['description'] }}</p>
                                             @endif
-                                            <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs text-[var(--ui-muted)]">
-                                                <span><span class="font-medium text-[var(--ui-secondary)]">Recipe:</span> {{ implode(', ', $feed['recipes']) ?: '—' }}</span>
-                                                <span><span class="font-medium text-[var(--ui-secondary)]">Typ:</span> {{ $feed['subject_type'] }}</span>
-                                                <span><span class="font-medium text-[var(--ui-secondary)]">Frequenz:</span> {{ $feed['refresh_strategy'] }}</span>
-                                                @if($feed['last_refreshed_at'])
-                                                    <span><span class="font-medium text-[var(--ui-secondary)]">Zuletzt:</span> {{ $feed['last_refreshed_at'] }}</span>
-                                                @endif
-                                            </div>
                                         </div>
                                         <a
                                             href="{{ $feed['feed_url'] }}"
@@ -2044,6 +2041,114 @@
                                             @svg('heroicon-o-rss', 'w-3.5 h-3.5')
                                             RSS
                                         </a>
+                                    </div>
+
+                                    {{-- Bericht-Setup --}}
+                                    <div class="mt-3 flex flex-wrap items-center gap-1.5">
+                                        <span class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mr-1">Setup</span>
+                                        <span class="{{ $badgeOn }}">{{ $feed['subject_type'] }}</span>
+                                        <span class="{{ $badgeOn }}">{{ $feed['refresh_strategy'] }}</span>
+                                        <span class="{{ $feed['access'] === 'public' ? $badgeOn : $badgeMuted }}">Zugriff: {{ $feed['access'] }}</span>
+                                        <span class="{{ $badgeMuted }}">Verlauf: {{ $feed['item_strategy'] }} ({{ $feed['retention_items'] }})</span>
+                                        @if($feed['subject_selector_descend'] !== false && $feed['subject_selector_descend'] !== null)
+                                            <span class="{{ $badgeOn }}">Sub-Baum (Feed){{ $feed['subject_selector_descend'] === true ? '' : ' Tiefe ' . $feed['subject_selector_descend'] }}</span>
+                                        @else
+                                            <span class="{{ $badgeGhost }}">Sub-Baum (Feed)</span>
+                                        @endif
+                                    </div>
+
+                                    {{-- Recipe-Details pro subject_type --}}
+                                    @foreach($feed['recipe_details'] as $recipeKey => $rd)
+                                        <div class="mt-3 pl-2 border-l-2 border-[var(--ui-border)]">
+                                            <div class="flex flex-wrap items-center gap-1.5">
+                                                <span class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mr-1">Recipe</span>
+                                                <span class="{{ $badgeOn }} font-semibold">{{ $rd['key'] }}</span>
+                                                @if($rd['llm_model'])
+                                                    <span class="{{ $badgeMuted }}">{{ $rd['llm_provider'] }} / {{ $rd['llm_model'] }}</span>
+                                                @endif
+                                                @if(! empty($rd['style']['tone']))
+                                                    <span class="{{ $badgeMuted }}">Ton: {{ $rd['style']['tone'] }}</span>
+                                                @endif
+                                                @if(! empty($rd['style']['address']))
+                                                    <span class="{{ $badgeMuted }}">Anrede: {{ $rd['style']['address'] }}</span>
+                                                @endif
+                                                @if($rd['freshness_requirement'])
+                                                    <span class="{{ $badgeMuted }}">Frische: {{ $rd['freshness_requirement'] }}</span>
+                                                @endif
+                                            </div>
+
+                                            {{-- Nature-Filter --}}
+                                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                                <span class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mr-1">Naturen</span>
+                                                @php
+                                                    $activeN = $rd['include_natures'];
+                                                    $isFilter = is_array($activeN) && count($activeN) > 0;
+                                                @endphp
+                                                @foreach(['state' => 'State', 'movement' => 'Movement', 'derivation' => 'Derivation'] as $n => $nLabel)
+                                                    @if(! $isFilter || in_array($n, $activeN))
+                                                        <span class="{{ $badgeOn }}">{{ $nLabel }}</span>
+                                                    @else
+                                                        <span class="{{ $badgeGhost }}">{{ $nLabel }}</span>
+                                                    @endif
+                                                @endforeach
+                                                @if(! $isFilter)
+                                                    <span class="text-[10px] text-[var(--ui-muted)] italic">alle Naturen</span>
+                                                @endif
+                                            </div>
+
+                                            {{-- Rekursion Recipe-Ebene --}}
+                                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                                <span class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mr-1">Rekursion</span>
+                                                @if($rd['descend'] !== false && $rd['descend'] !== null)
+                                                    <span class="{{ $badgeOn }}">Sub-Baum (Recipe){{ $rd['descend'] === true ? '' : ' Tiefe ' . $rd['descend'] }}</span>
+                                                @else
+                                                    <span class="{{ $badgeGhost }}">Sub-Baum (Recipe)</span>
+                                                @endif
+                                            </div>
+
+                                            {{-- Sources --}}
+                                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                                                <span class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mr-1">Quellen</span>
+                                                @foreach($rd['source_flags'] as $sk => $sf)
+                                                    @if($sk === '__descend') @continue @endif
+                                                    <span class="{{ $sf['on'] ? $badgeOn : $badgeGhost }}" @if($sf['detail']) title="{{ $sf['detail'] }}" @endif>
+                                                        {{ $sf['label'] }}@if($sf['on'] && $sf['detail']) <span class="opacity-60">· {{ $sf['detail'] }}</span>@endif
+                                                    </span>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endforeach
+
+                                    {{-- Kanäle --}}
+                                    <div class="mt-3 pl-2 border-l-2 border-[var(--ui-border)]">
+                                        <div class="flex flex-wrap items-center gap-1.5">
+                                            <span class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mr-1">Kanäle</span>
+                                            @foreach($feed['available_channel_types'] as $ctype => $cmeta)
+                                                @php
+                                                    $activeChannel = collect($feed['channels'])->firstWhere('type', $ctype);
+                                                @endphp
+                                                @if($activeChannel && $activeChannel['is_active'])
+                                                    <span class="{{ $badgeOn }}" @if($activeChannel['summary']) title="{{ $activeChannel['summary'] }}" @endif>
+                                                        {{ $cmeta['label'] }}
+                                                        @if($activeChannel['summary'])
+                                                            <span class="opacity-70">· {{ $activeChannel['summary'] }}</span>
+                                                        @endif
+                                                    </span>
+                                                @elseif(! empty($cmeta['registered']))
+                                                    <span class="{{ $badgeGhost }}" title="Renderer registriert, kein Kanal konfiguriert">{{ $cmeta['label'] }}</span>
+                                                @else
+                                                    <span class="{{ $badgeGhost }}" title="Renderer noch nicht implementiert">{{ $cmeta['label'] }}</span>
+                                                @endif
+                                            @endforeach
+                                        </div>
+                                    </div>
+
+                                    {{-- Status --}}
+                                    <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--ui-muted)]">
+                                        @if($feed['last_refreshed_at'])
+                                            <span><span class="font-medium text-[var(--ui-secondary)]">Zuletzt:</span> {{ $feed['last_refreshed_at'] }}</span>
+                                        @endif
+                                        <span><span class="font-medium text-[var(--ui-secondary)]">Outputs:</span> {{ $feed['outputs_count'] }}</span>
                                     </div>
 
                                     @if($feed['latest'])

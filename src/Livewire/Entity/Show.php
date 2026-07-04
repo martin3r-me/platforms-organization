@@ -31,8 +31,10 @@ use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationSkill;
 use Platform\Organization\Models\OrganizationSoftSkill;
 use Platform\Organization\Models\OrganizationSignal;
+use Platform\Core\Models\VerbalizationChannel;
 use Platform\Core\Models\VerbalizationFeed;
 use Platform\Core\Models\VerbalizationOutput;
+use Platform\Core\Models\VerbalizationRecipe;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -1930,14 +1932,33 @@ class Show extends Component
         }
 
         $baseUrl = rtrim((string) config('app.url'), '/');
+        $availableChannelTypes = $this->availableChannelTypes();
 
-        return $feeds->map(function ($feed) use ($baseUrl) {
+        return $feeds->map(function ($feed) use ($baseUrl, $availableChannelTypes) {
             $latest = VerbalizationOutput::query()
                 ->where('feed_id', $feed->id)
                 ->orderByDesc('created_at')
                 ->first();
 
-            $recipeKeys = collect($feed->recipes ?? [])->values()->all();
+            $outputsCount = VerbalizationOutput::where('feed_id', $feed->id)->count();
+            $recipesMap = $feed->recipes ?? [];
+            $recipeDetails = $this->hydrateRecipes($recipesMap, $feed->team_id);
+            $selector = $feed->subject_selector ?? [];
+
+            // Aktive Kanaele des Feeds.
+            $channels = VerbalizationChannel::where('verbalization_feed_id', $feed->id)
+                ->orderByDesc('is_active')
+                ->orderBy('type')
+                ->get()
+                ->map(fn ($c) => [
+                    'id' => $c->id,
+                    'type' => $c->type,
+                    'is_active' => (bool) $c->is_active,
+                    'config' => $c->config,
+                    'last_delivered_at' => $c->last_delivered_at?->format('d.m.Y H:i'),
+                    'summary' => $this->summarizeChannelConfig($c->type, $c->config ?? []),
+                ])->all();
+            $activeChannelTypes = collect($channels)->pluck('type')->unique()->all();
 
             return [
                 'id' => $feed->id,
@@ -1945,10 +1966,21 @@ class Show extends Component
                 'title' => $feed->title,
                 'description' => $feed->description,
                 'subject_type' => $feed->subject_type,
+                'subject_selector' => $selector,
+                'subject_selector_mode' => $selector['mode'] ?? null,
+                'subject_selector_descend' => $selector['descend'] ?? false,
                 'refresh_strategy' => $feed->refresh_strategy,
+                'item_strategy' => $feed->item_strategy ?? 'history',
+                'retention_items' => (int) ($feed->retention_items ?? 0),
+                'access' => $feed->access ?? 'team',
                 'is_active' => (bool) $feed->is_active,
                 'last_refreshed_at' => $feed->last_refreshed_at?->format('d.m.Y H:i'),
-                'recipes' => $recipeKeys,
+                'outputs_count' => $outputsCount,
+                'recipes' => array_values(array_map(fn ($v) => $v, $recipesMap)),
+                'recipe_details' => $recipeDetails,
+                'channels' => $channels,
+                'active_channel_types' => $activeChannelTypes,
+                'available_channel_types' => $availableChannelTypes,
                 'feed_url' => $baseUrl . '/feed/' . $feed->uuid . '.xml',
                 'latest' => $latest ? [
                     'id' => $latest->id,
@@ -1961,6 +1993,176 @@ class Show extends Component
                 ] : null,
             ];
         })->all();
+    }
+
+    /**
+     * @param  array<string,string>  $recipesMap  subject_type → recipe_key
+     * @return array<string,array>  recipe_key → aufbereitete Metadaten
+     */
+    protected function hydrateRecipes(array $recipesMap, ?int $teamId): array
+    {
+        if (empty($recipesMap)) {
+            return [];
+        }
+        $keys = array_values($recipesMap);
+        $recipes = VerbalizationRecipe::query()
+            ->whereIn('key', $keys)
+            ->where(function ($q) use ($teamId) {
+                $q->whereNull('team_id');
+                if ($teamId) {
+                    $q->orWhere('team_id', $teamId);
+                }
+            })
+            ->get()
+            ->keyBy('key');
+
+        $out = [];
+        foreach ($recipes as $key => $r) {
+            $sources = $r->sources ?? [];
+            $out[$key] = [
+                'key' => $r->key,
+                'name' => $r->name,
+                'description' => $r->description,
+                'include_natures' => $r->include_natures,
+                'llm_provider' => $r->llm['provider'] ?? null,
+                'llm_model' => $r->llm['model'] ?? null,
+                'style' => $r->style ?? [],
+                'guards' => $r->guards,
+                'freshness_requirement' => $r->freshness_requirement,
+                'descend' => $sources['descend'] ?? false,
+                'sources' => $sources,
+                'source_flags' => $this->summarizeRecipeSources($sources),
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Verdichtet die Sources-JSON auf Flag/Anzeige-Struktur — pro bekannter Source:
+     *   [key => ['on' => bool, 'label' => string, 'detail' => string|null]]
+     */
+    protected function summarizeRecipeSources(array $sources): array
+    {
+        $flags = [];
+        $known = [
+            'signals' => 'Signale',
+            'planner_projects' => 'Planner-Projekte',
+            'entity_link_providers' => 'Registry-Metriken',
+            'verbose' => 'Verbose',
+            // Signal-Sources (organization_signals recipe):
+            'signal_load' => 'Signal-Last',
+            'vsm_distribution' => 'VSM-Verteilung',
+            'signal_headlines' => 'Headlines',
+            'new_signals' => 'Neue Signale',
+            'resolved_signals' => 'Resolved',
+            'aggregation_flow' => 'Eskaliert',
+            'algedonic_alert' => 'Algedonic',
+            'vsm_focus' => 'S4/S5-Fokus',
+            // Planner-Sources:
+            'description' => 'Beschreibung',
+            'lifetime' => 'Alter',
+            'core_health' => 'Health',
+            'canvas' => 'Canvas',
+            'movement_summary' => 'Movement',
+            'scope_fulfillment' => 'Scope',
+            'ball_position' => 'Ball-Position',
+            'open_by_owner' => 'Open per Owner',
+            'edges_owner' => 'Owner',
+            'edges_org_anchors' => 'Org-Anker',
+            'edges_team' => 'Team',
+            'termine' => 'Termine',
+            'confidence' => 'Konfidenz',
+            'frogs' => 'Froesche',
+            'slots' => 'Slots',
+            'people' => 'People',
+            'budget' => 'Budget',
+        ];
+        foreach ($known as $k => $label) {
+            if (! array_key_exists($k, $sources)) {
+                $flags[$k] = ['on' => false, 'label' => $label, 'detail' => null];
+                continue;
+            }
+            $v = $sources[$k];
+            if (is_bool($v)) {
+                $flags[$k] = ['on' => $v, 'label' => $label, 'detail' => null];
+                continue;
+            }
+            if (is_array($v)) {
+                $on = (bool) ($v['enabled'] ?? true);
+                $detailParts = [];
+                if (isset($v['top_n'])) $detailParts[] = 'top ' . $v['top_n'];
+                if (! empty($v['skip_if_no_movement'])) $detailParts[] = 'skip idle';
+                if (isset($v['include']) && ! empty($v['include'])) {
+                    $detailParts[] = 'nur ' . implode('/', (array) $v['include']);
+                }
+                if (isset($v['exclude']) && ! empty($v['exclude'])) {
+                    $detailParts[] = 'ohne ' . implode('/', (array) $v['exclude']);
+                }
+                if (! empty($v['skip_zero'])) $detailParts[] = 'skip 0';
+                $flags[$k] = [
+                    'on' => $on,
+                    'label' => $label,
+                    'detail' => $detailParts ? implode(', ', $detailParts) : null,
+                ];
+                continue;
+            }
+            $flags[$k] = ['on' => (bool) $v, 'label' => $label, 'detail' => null];
+        }
+        // descend separat, weil auf Recipe-Wurzel-Ebene und nicht "Source":
+        $flags['__descend'] = [
+            'on' => ($sources['descend'] ?? false) !== false && ($sources['descend'] ?? false) !== null,
+            'label' => 'Rekursion (Recipe)',
+            'detail' => $sources['descend'] === true
+                ? 'alle Ebenen'
+                : (is_int($sources['descend'] ?? null) ? 'max Tiefe ' . $sources['descend'] : null),
+        ];
+        return $flags;
+    }
+
+    protected function summarizeChannelConfig(string $type, array $config): ?string
+    {
+        return match ($type) {
+            'obsidian' => (function () use ($config) {
+                $parts = [];
+                if (isset($config['vault_id'])) $parts[] = 'Vault #' . $config['vault_id'];
+                if (! empty($config['folder'])) $parts[] = $config['folder'];
+                return $parts ? implode(' · ', $parts) : null;
+            })(),
+            'email' => ! empty($config['to']) ? implode(', ', (array) $config['to']) : null,
+            'slack' => $config['channel'] ?? null,
+            'webhook' => $config['url'] ?? null,
+            'rss', 'web' => null,
+            default => null,
+        };
+    }
+
+    /**
+     * @return array<string,array{label:string, icon:string}>
+     */
+    protected function availableChannelTypes(): array
+    {
+        // Kompakter Katalog. Registrierte Renderer werden hier gespiegelt — falls
+        // die Registry existiert wird gefiltert, sonst Fallback auf statischen Katalog.
+        $catalog = [
+            'rss'      => ['label' => 'RSS',      'icon' => 'rss'],
+            'web'      => ['label' => 'Web',      'icon' => 'globe-alt'],
+            'obsidian' => ['label' => 'Obsidian', 'icon' => 'document-text'],
+            'email'    => ['label' => 'Email',    'icon' => 'envelope'],
+            'pdf'      => ['label' => 'PDF',      'icon' => 'document'],
+            'slack'    => ['label' => 'Slack',    'icon' => 'chat-bubble-left'],
+            'webhook'  => ['label' => 'Webhook',  'icon' => 'link'],
+        ];
+        try {
+            $registry = app(\Platform\Core\Verbalization\Channel\ChannelRendererRegistry::class);
+            $registered = array_keys($registry->all());
+            $out = [];
+            foreach ($catalog as $type => $meta) {
+                $out[$type] = $meta + ['registered' => in_array($type, $registered, true)];
+            }
+            return $out;
+        } catch (\Throwable $e) {
+            return array_map(fn ($m) => $m + ['registered' => false], $catalog);
+        }
     }
 
     /**

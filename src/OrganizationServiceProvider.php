@@ -547,6 +547,7 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\DeleteMilestoneTool());
             $registry->register(new \Platform\Organization\Tools\CreateMilestoneContributionTool());
             $registry->register(new \Platform\Organization\Tools\DeleteMilestoneContributionTool());
+            $registry->register(new \Platform\Organization\Tools\GetEntityStrategyTool());
 
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);

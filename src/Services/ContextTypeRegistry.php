@@ -26,6 +26,7 @@ class ContextTypeRegistry
         'issue' => 'Platform\Dev\Models\DevIssue',
         'package' => 'Platform\Dev\Models\DevPackage',
         'board' => 'Platform\Dev\Models\DevBoard',
+        'okr' => 'Platform\Okr\Models\Okr',
     ];
 
     /**

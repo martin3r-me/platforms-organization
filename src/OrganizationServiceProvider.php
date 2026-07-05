@@ -21,6 +21,7 @@ use Platform\Organization\Console\Commands\DecayEnvironmentRelevanceCommand;
 use Platform\Organization\Console\Commands\SeedEnvironmentSourcesCommand;
 use Platform\Organization\Console\Commands\PullEnvironmentSourcesCommand;
 use Platform\Organization\Console\Commands\SnapshotEntitiesCommand;
+use Platform\Organization\Console\Commands\SyncEntityTypeCatalogCommand;
 use Platform\Core\PlatformCore;
 use Platform\Core\Routing\ModuleRouter;
 use RecursiveDirectoryIterator;
@@ -47,6 +48,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 DimensionCoverageCommand::class,
                 DimensionScoreDiffCommand::class,
                 \Platform\Organization\Console\Commands\EscalateSignalsCommand::class,
+                SyncEntityTypeCatalogCommand::class,
             ]);
         }
 

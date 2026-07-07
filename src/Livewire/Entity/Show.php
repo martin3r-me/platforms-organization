@@ -941,8 +941,8 @@ class Show extends Component
             'folder-kanban' => 'folder',
             'briefcase-globe' => 'briefcase',
             'server-cog' => 'server',
-            'package-check' => 'package',
-            'badge-check' => 'badge',
+            'package-check' => 'archive-box',
+            'badge-check' => 'check-badge',
             'target' => 'viewfinder-circle',
             'arrow-right-left' => 'arrows-right-left',
         ];
@@ -950,7 +950,11 @@ class Show extends Component
         $svgs = [];
         foreach ($this->linkTypeConfig as $type => $config) {
             $icon = $iconMap[$config['icon']] ?? $config['icon'];
-            $svgs[$type] = svg('heroicon-o-' . $icon, 'w-4 h-4 text-[var(--ui-muted)]')->toHtml();
+            try {
+                $svgs[$type] = svg('heroicon-o-' . $icon, 'w-4 h-4 text-[var(--ui-muted)]')->toHtml();
+            } catch (\Throwable $e) {
+                $svgs[$type] = svg('heroicon-o-link', 'w-4 h-4 text-[var(--ui-muted)]')->toHtml();
+            }
         }
         return $svgs;
     }

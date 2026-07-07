@@ -944,6 +944,7 @@ class Show extends Component
             'package-check' => 'package',
             'badge-check' => 'badge',
             'target' => 'viewfinder-circle',
+            'arrow-right-left' => 'arrows-right-left',
         ];
 
         $svgs = [];

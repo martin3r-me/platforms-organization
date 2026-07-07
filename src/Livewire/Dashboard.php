@@ -385,13 +385,42 @@ class Dashboard extends Component
             $result[] = [
                 'type' => $type,
                 'label' => $typeConfig['label'] ?? $labels[$type] ?? $type,
-                'icon' => $typeConfig['icon'] ?? 'link',
+                'icon' => $this->resolveHeroicon($typeConfig['icon'] ?? 'link'),
                 'count' => $count,
                 'percentage' => $totalLinks > 0 ? round(($count / $totalLinks) * 100, 1) : 0,
             ];
         }
 
         return $result;
+    }
+
+    /**
+     * Normalisiert einen (ggf. lucide-artigen) Icon-Namen auf einen gültigen
+     * heroicon-Namen und garantiert, dass das Icon existiert – sonst Fallback,
+     * damit @svg('heroicon-o-...') im Blade nie mit SvgNotFound crasht.
+     */
+    protected function resolveHeroicon(string $icon): string
+    {
+        $iconMap = [
+            'user-check' => 'user',
+            'user-voice' => 'user',
+            'folder-kanban' => 'folder',
+            'briefcase-globe' => 'briefcase',
+            'server-cog' => 'server',
+            'package-check' => 'archive-box',
+            'badge-check' => 'check-badge',
+            'target' => 'viewfinder-circle',
+            'arrow-right-left' => 'arrows-right-left',
+        ];
+
+        $icon = $iconMap[$icon] ?? $icon;
+
+        try {
+            app(\BladeUI\Icons\Factory::class)->svg('heroicon-o-' . $icon);
+            return $icon;
+        } catch (\Throwable $e) {
+            return 'link';
+        }
     }
 
     #[Computed]

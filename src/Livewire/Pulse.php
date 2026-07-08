@@ -98,8 +98,10 @@ class Pulse extends Component
             )", $teamIds)
             ->pluck('a.id');
 
+        // whereHas filtert Snapshots von soft-deleted Containern raus (Karteileichen-Geister).
         return $source['class']::with([$source['relation'] . ':id,name', 'team:id,name'])
             ->whereIn('id', $latestIds)
+            ->whereHas($source['relation'])
             ->get()
             ->map(function ($s) use ($key, $source) {
                 $container = $s->{$source['relation']};

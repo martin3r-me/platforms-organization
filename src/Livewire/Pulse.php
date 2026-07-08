@@ -25,7 +25,18 @@ use Platform\Core\Models\Team;
  */
 class Pulse extends Component
 {
-    /** @var array<string, array{class: string, table: string, fk: string, relation: string, label: string, route: ?string}> */
+    /**
+     * @var array<string, array{
+     *   class: string, table: string, fk: string, relation: string,
+     *   label: string, route: ?string,
+     *   live_column: ?string, live_value: ?string
+     * }>
+     *
+     * Pulse zeigt "Live-Lage" — abgeschlossene oder verworfene Container gehoeren
+     * nicht rein. Fuer Module mit einem Lebenszyklus-Feld kann per (live_column,
+     * live_value) gefiltert werden. Module ohne Lifecycle (heute Helpdesk, Dev)
+     * lassen die Felder leer und werden nicht extra gefiltert.
+     */
     protected array $sources = [
         'planner' => [
             'class' => \Platform\Planner\Models\PlannerProjectSnapshot::class,
@@ -34,6 +45,8 @@ class Pulse extends Component
             'relation' => 'project',
             'label' => 'Projekte',
             'route' => 'planner.projects.health',
+            'live_column' => 'lifecycle_state',
+            'live_value' => 'aktiv',
         ],
         'helpdesk' => [
             'class' => \Platform\Helpdesk\Models\HelpdeskBoardSnapshot::class,
@@ -42,6 +55,8 @@ class Pulse extends Component
             'relation' => 'board',
             'label' => 'Boards',
             'route' => 'helpdesk.boards.health',
+            'live_column' => null,
+            'live_value' => null,
         ],
         'dev' => [
             'class' => \Platform\Dev\Models\DevPackageSnapshot::class,
@@ -50,6 +65,8 @@ class Pulse extends Component
             'relation' => 'package',
             'label' => 'Packages',
             'route' => 'dev.packages.health',
+            'live_column' => null,
+            'live_value' => null,
         ],
     ];
 
@@ -99,9 +116,17 @@ class Pulse extends Component
             ->pluck('a.id');
 
         // whereHas filtert Snapshots von soft-deleted Containern raus (Karteileichen-Geister).
+        // Zusaetzlich: falls das Modul einen Lebenszyklus hat (z. B. Planner
+        // lifecycle_state), auf den Live-Zustand einschraenken.
+        $liveColumn = $source['live_column'] ?? null;
+        $liveValue = $source['live_value'] ?? null;
         return $source['class']::with([$source['relation'] . ':id,name', 'team:id,name'])
             ->whereIn('id', $latestIds)
-            ->whereHas($source['relation'])
+            ->whereHas($source['relation'], function ($q) use ($liveColumn, $liveValue) {
+                if ($liveColumn && $liveValue !== null) {
+                    $q->where($liveColumn, $liveValue);
+                }
+            })
             ->get()
             ->map(function ($s) use ($key, $source) {
                 $container = $s->{$source['relation']};

@@ -34,3 +34,6 @@ temp/
 *.sqlite
 *.sqlite3
 *.db
+
+# Local worker/agent state (assistant history etc.)
+.worker/

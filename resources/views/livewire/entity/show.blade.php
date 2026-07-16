@@ -2133,6 +2133,68 @@
 
                 {{-- Tab: Berichte (Verbalization-Feeds) --}}
                 <div x-show="tab === 'reports'" x-cloak>
+                    {{-- Puls-Widget: live gerechneter Zustand ohne LLM-Prosa --}}
+                    @php $pulse = $this->entityPulseSnapshot; @endphp
+                    @if($pulse)
+                        @php
+                            $signalColor = match($pulse['signal']) {
+                                'red' => 'bg-red-500',
+                                'yellow' => 'bg-amber-400',
+                                default => 'bg-emerald-500',
+                            };
+                            $signalRing = match($pulse['signal']) {
+                                'red' => 'ring-red-100',
+                                'yellow' => 'ring-amber-100',
+                                default => 'ring-emerald-100',
+                            };
+                        @endphp
+                        <div class="mb-6 bg-white rounded-lg border border-[var(--ui-border)] overflow-hidden">
+                            <div class="px-5 py-4 border-b border-[var(--ui-border)] flex items-center justify-between gap-4">
+                                <div class="flex items-center gap-3">
+                                    <div class="w-3 h-3 rounded-full ring-4 {{ $signalColor }} {{ $signalRing }}"></div>
+                                    <h3 class="text-base font-semibold text-[var(--ui-secondary)]">Puls</h3>
+                                    <span class="text-xs text-[var(--ui-muted)]">{{ $pulse['signal_reason'] }}</span>
+                                </div>
+                                <span class="text-[11px] text-[var(--ui-muted)] shrink-0">
+                                    berechnet {{ $pulse['computed_at'] }} · Fenster {{ $pulse['window_days'] }}d · {{ $pulse['total_facts'] }} Facts
+                                </span>
+                            </div>
+                            @if(! empty($pulse['derivations']))
+                                <div class="px-5 py-4 border-b border-[var(--ui-border)]">
+                                    <div class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mb-2">Aufmerksamkeit</div>
+                                    <ul class="space-y-1.5">
+                                        @foreach($pulse['derivations'] as $d)
+                                            <li class="text-sm text-[var(--ui-secondary)] flex items-start gap-2">
+                                                <span class="text-[var(--ui-muted)]">•</span>
+                                                <span>{{ $d['text'] }}</span>
+                                            </li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+                            @if(! empty($pulse['movements']))
+                                <div class="px-5 py-4 border-b border-[var(--ui-border)]">
+                                    <div class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mb-2">Bewegung (letzte {{ $pulse['window_days'] }}d)</div>
+                                    <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
+                                        @foreach($pulse['movements'] as $m)
+                                            <li class="text-sm text-[var(--ui-secondary)]">{{ $m['text'] }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+                            @if(! empty($pulse['states']))
+                                <div class="px-5 py-4">
+                                    <div class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mb-2">Zustand</div>
+                                    <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
+                                        @foreach($pulse['states'] as $s)
+                                            <li class="text-sm text-[var(--ui-secondary)]">{{ $s['text'] }}</li>
+                                        @endforeach
+                                    </ul>
+                                </div>
+                            @endif
+                        </div>
+                    @endif
+
                     <div class="mb-4 flex items-center justify-between gap-4">
                         <p class="text-xs text-[var(--ui-muted)] leading-relaxed">
                             @if($includeDescendantsInReports)

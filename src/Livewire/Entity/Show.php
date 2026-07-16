@@ -1864,6 +1864,96 @@ class Show extends Component
     }
 
     /**
+     * Live-Puls fuer den Berichte-Tab: ruft den entity_pulse-Collector mit
+     * pulse_full-Recipe (oder Ad-hoc) auf und gruppiert die Facts nach Nature.
+     * Rendering geschieht als Ampel + Aufmerksamkeit + Bewegung + Zustand
+     * direkt in Blade — kein LLM. Fix-Regeln fuer Ampel; wenn's mal
+     * kalibrierbar werden soll, wandert es in eine Recipe.
+     */
+    #[Computed]
+    public function entityPulseSnapshot(): ?array
+    {
+        try {
+            $registry = app(\Platform\Core\Verbalization\SubjectCollector\SubjectCollectorRegistry::class);
+            $collector = $registry->resolve('entity_pulse');
+            if (! $collector) {
+                return null;
+            }
+
+            $teamId = auth()->user()?->currentTeam?->id;
+            $recipeModel = VerbalizationRecipe::query()
+                ->where('key', 'pulse_full')
+                ->where(function ($q) use ($teamId) {
+                    $q->whereNull('team_id');
+                    if ($teamId) {
+                        $q->orWhere('team_id', $teamId);
+                    }
+                })
+                ->orderByDesc('team_id') // team-spezifisch schlaegt global
+                ->first();
+
+            $recipe = $recipeModel
+                ? \Platform\Core\Verbalization\Recipe\CollectionRecipe::fromModel($recipeModel)
+                : null;
+
+            $windowDays = $recipe?->sinceWindowDays() ?: 7;
+            $since = new \DateTimeImmutable('-' . $windowDays . ' days');
+
+            $subject = $collector->collectState((int) $this->entity->id, $recipe, $since);
+
+            $bucketDeriv = [];
+            $bucketMove = [];
+            $bucketState = [];
+            foreach ($subject->facts as $f) {
+                match ($f->nature) {
+                    \Platform\Core\Verbalization\Enums\FactNature::DERIVATION => $bucketDeriv[] = $f,
+                    \Platform\Core\Verbalization\Enums\FactNature::MOVEMENT => $bucketMove[] = $f,
+                    default => $bucketState[] = $f,
+                };
+            }
+
+            $prioSort = fn ($a, $b) => $a->priority->value <=> $b->priority->value;
+            usort($bucketDeriv, $prioSort);
+            usort($bucketMove, $prioSort);
+            usort($bucketState, $prioSort);
+
+            // Ampel: fix, heuristisch
+            $signal = 'green';
+            $signalReason = 'Alles im gruenen Bereich.';
+            foreach ($bucketDeriv as $f) {
+                if (str_contains(strtolower($f->text), 'algedonic')) {
+                    $signal = 'red';
+                    $signalReason = 'Algedonic-Signal(e) aktiv — sofortige Aufmerksamkeit.';
+                    break;
+                }
+            }
+            if ($signal === 'green' && ! empty($bucketDeriv)) {
+                $signal = 'yellow';
+                $signalReason = 'Aufmerksamkeit erforderlich.';
+            }
+
+            // Nur CORE + QUALIFYING States zeigen — Context waere zu viel Rauschen
+            $coreStates = array_values(array_filter(
+                $bucketState,
+                fn ($f) => $f->priority !== \Platform\Core\Verbalization\Enums\FactPriority::CONTEXT,
+            ));
+
+            return [
+                'signal' => $signal,
+                'signal_reason' => $signalReason,
+                'window_days' => $windowDays,
+                'computed_at' => now()->format('H:i'),
+                'derivations' => array_map(fn ($f) => ['text' => $f->text, 'priority' => $f->priority->value], array_slice($bucketDeriv, 0, 8)),
+                'movements' => array_map(fn ($f) => ['text' => $f->text, 'priority' => $f->priority->value], array_slice($bucketMove, 0, 12)),
+                'states' => array_map(fn ($f) => ['text' => $f->text, 'priority' => $f->priority->value], array_slice($coreStates, 0, 12)),
+                'total_facts' => count($subject->facts),
+            ];
+        } catch (\Throwable $e) {
+            return null;
+        }
+    }
+
+    /**
      * Toggle im UI: ob der Berichte-Tab nur Feeds am direkten Knoten zeigt oder
      * auch Feeds aus dem gesamten Sub-Baum. Default: inkl. Sub-Baum, weil an
      * Root-Entities (z.B. BHG.DIGITAL) sonst fast nichts sichtbar waere — die

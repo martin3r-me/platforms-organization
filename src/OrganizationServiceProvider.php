@@ -68,6 +68,16 @@ class OrganizationServiceProvider extends ServiceProvider
             'organization_role_assignment'    => \Platform\Organization\Models\OrganizationRoleAssignment::class,
         ]);
 
+        // Org-Knoten als Zuweisungs-Ziel bereitstellen (entkoppelt via Core-Registry).
+        // Damit können andere Module (z.B. Academy) an Org-Knoten delegieren, ohne
+        // das Organisation-Modul zu kennen.
+        try {
+            app(\Platform\Core\Registry\AudienceResolverRegistry::class)
+                ->register(new \Platform\Organization\Services\Audience\OrgEntityAudienceResolver());
+        } catch (\Throwable $e) {
+            // Registry (noch) nicht verfügbar (z.B. während Migrationen) — überspringen.
+        }
+
         // Schritt 1: Config laden
         $this->mergeConfigFrom(__DIR__.'/../config/organization.php', 'organization');
         

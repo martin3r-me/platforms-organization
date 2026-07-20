@@ -45,6 +45,10 @@ class UpdateEntityTool implements ToolContract, ToolMetadataContract
                     'type' => 'string',
                     'description' => 'Optional: Neuer Code ("" zum Leeren).',
                 ],
+                'cost_center' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Kostenstellen-Kürzel dieser Entity ("" zum Entfernen). Weitere Fremd-IDs via organization.entity_external_ids.POST.',
+                ],
                 'entity_type_id' => [
                     'type' => 'integer',
                     'description' => 'Optional: Neue Entity Type ID (0/null zum Leeren).',
@@ -150,11 +154,20 @@ class UpdateEntityTool implements ToolContract, ToolMetadataContract
             if (!empty($update)) {
                 $entity->update($update);
             }
+
+            if (array_key_exists('cost_center', $arguments)) {
+                $entity->setExternalId(
+                    \Platform\Organization\Models\OrganizationEntityExternalId::SYSTEM_COST_CENTER,
+                    (string) ($arguments['cost_center'] ?? '')
+                );
+            }
+
             $entity->refresh();
 
             return ToolResult::success([
                 'id' => $entity->id,
                 'code' => $entity->code,
+                'cost_center' => $entity->cost_center,
                 'name' => $entity->name,
                 'team_id' => $entity->team_id,
                 'entity_type_id' => $entity->entity_type_id,

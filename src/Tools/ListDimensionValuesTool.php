@@ -27,7 +27,7 @@ class ListDimensionValuesTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/dimension-values - Listet Werte einer Dimension. WICHTIG: Nutze dieses Tool um dimension_item_id für dimension_links.POST zu finden (IDs nie raten). Dimensionen: entity, vsm-system, vsm-function, cost-center. Filtere nach code für exakten Match.';
+        return 'GET /organization/dimension-values - Listet Werte einer Dimension. WICHTIG: Nutze dieses Tool um dimension_item_id für dimension_links.POST zu finden (IDs nie raten). Dimensionen: entity, vsm-system, vsm-function. Filtere nach code für exakten Match.';
     }
 
     public function getSchema(): array
@@ -38,7 +38,7 @@ class ListDimensionValuesTool implements ToolContract, ToolMetadataContract
                 'properties' => [
                     'dimension' => [
                         'type' => 'string',
-                        'description' => 'ERFORDERLICH: Dimensions-Key. Beispiel: "entity", "vsm-system", "vsm-function", "cost-center".',
+                        'description' => 'ERFORDERLICH: Dimensions-Key. Beispiel: "entity", "vsm-system", "vsm-function".',
                     ],
                     'code' => [
                         'type' => 'string',

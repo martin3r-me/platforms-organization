@@ -40,6 +40,10 @@ class CreateEntityTool implements ToolContract, ToolMetadataContract
                     'type' => 'string',
                     'description' => 'Optional: Eindeutiger Code.',
                 ],
+                'cost_center' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Kostenstellen-Kürzel dieser Entity (z.B. "KST-4200"). Jede Entity ist faktisch ihre eigene Kostenstelle; weitere Fremd-IDs (DATEV, Kreditor …) via organization.entity_external_ids.POST.',
+                ],
                 'entity_type_id' => [
                     'type' => 'integer',
                     'description' => 'Optional: Entity Type ID. Nutze organization.entity_types.GET.',
@@ -108,9 +112,17 @@ class CreateEntityTool implements ToolContract, ToolMetadataContract
                 'metadata' => (isset($arguments['metadata']) && is_array($arguments['metadata'])) ? $arguments['metadata'] : null,
             ]);
 
+            if (array_key_exists('cost_center', $arguments)) {
+                $entity->setExternalId(
+                    \Platform\Organization\Models\OrganizationEntityExternalId::SYSTEM_COST_CENTER,
+                    (string) ($arguments['cost_center'] ?? '')
+                );
+            }
+
             return ToolResult::success([
                 'id' => $entity->id,
                 'code' => $entity->code,
+                'cost_center' => $entity->cost_center,
                 'name' => $entity->name,
                 'team_id' => $entity->team_id,
                 'entity_type_id' => $entity->entity_type_id,

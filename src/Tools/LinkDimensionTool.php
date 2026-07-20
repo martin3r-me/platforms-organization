@@ -8,17 +8,16 @@ use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Models\OrganizationDimensionDefinition;
 use Platform\Organization\Models\OrganizationDimensionValue;
+use Platform\Organization\Models\OrganizationEntityExternalId;
 use Platform\Organization\Services\DimensionLinkService;
 
 /**
  * Verknüpft ein Dimensions-Element mit einem Objekt.
  *
- * Architektur: Kostenstellen (cost-centers) dürfen NUR an Entities verknüpft werden.
- * Entities (entities) können an beliebige externe Objekte verknüpft werden.
- *
- * Modi:
- * - multi_percent (cost-centers): Mehrere Links mit Prozent-Verteilung (nur an Entities)
- * - multi (entities): Mehrere Links erlaubt (an beliebige Objekte)
+ * Architektur: Verlinkt wird immer gegen eine Entity (entity-Dimension).
+ * Eine Kostenstelle ist kein eigenes Link-Ziel, sondern nur eine Fremd-ID-
+ * Adresse einer Entity: "hänge X an Kostenstelle KST-4200" wird über
+ * cost_center/external_* zur zugehörigen Entity aufgelöst und dann verlinkt.
  */
 class LinkDimensionTool implements ToolContract, ToolMetadataContract
 {
@@ -29,7 +28,7 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /organization/dimension-links - Verknuepft ein Dimensions-Element mit einem Objekt. EMPFOHLEN bei entity-basierten Dimensionen: entity_id-Parameter (Organization-Entity-ID, sicher). ACHTUNG fuer LLMs: dim_value_id != entity_id — niemals dim_value_id raten oder aus Reverse-Query uebernehmen, immer entity_id-Shortcut nutzen. WICHTIG: cost-centers nur an Entities erlaubt (context_type=organization_entity).';
+        return 'POST /organization/dimension-links - Verknuepft ein Objekt mit einer Entity (dimension="entity"). EMPFOHLEN: entity_id-Parameter (Organization-Entity-ID, sicher). Alternativ per Fremd-ID adressieren: cost_center="KST-4200" ODER external_system+external_value (z.B. datev/10001) — wird zur Entity aufgeloest, dimension wird dann automatisch "entity". ACHTUNG fuer LLMs: dim_value_id != entity_id — niemals dim_value_id raten, immer entity_id oder cost_center nutzen.';
     }
 
     public function getSchema(): array
@@ -39,7 +38,19 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
             'properties' => [
                 'dimension' => [
                     'type' => 'string',
-                    'description' => 'ERFORDERLICH: Dimensions-Key (z.B. "cost-centers", "entity", "vsm-system", "vsm-function", "cost-center").',
+                    'description' => 'ERFORDERLICH: Dimensions-Key (z.B. "entity", "vsm-system", "vsm-function"). Bei cost_center/external_* wird automatisch "entity" verwendet.',
+                ],
+                'cost_center' => [
+                    'type' => 'string',
+                    'description' => 'Optional: Kostenstellen-Kürzel (z.B. "KST-4200"). Wird zur zugehörigen Entity aufgelöst; dimension wird automatisch "entity".',
+                ],
+                'external_system' => [
+                    'type' => 'string',
+                    'description' => 'Optional (mit external_value): Fremd-System (z.B. "datev", "kreditor"). Adressiert die Entity per Fremd-ID.',
+                ],
+                'external_value' => [
+                    'type' => 'string',
+                    'description' => 'Optional (mit external_system): Wert der Fremd-ID (z.B. "10001").',
                 ],
                 'context_type' => [
                     'type' => 'string',
@@ -87,6 +98,27 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
             $dimensionItemId = (int) ($arguments['dimension_item_id'] ?? 0);
             $entityId = isset($arguments['entity_id']) ? (int) $arguments['entity_id'] : null;
 
+            // Fremd-ID-Resolver: "hänge X an Kostenstelle KST-4200" (oder DATEV/Kreditor …).
+            // Die Fremd-ID adressiert eine Entity → dimension wird "entity", entity_id gesetzt.
+            $externalSystem = null;
+            $externalValue = null;
+            if (!empty($arguments['cost_center'])) {
+                $externalSystem = OrganizationEntityExternalId::SYSTEM_COST_CENTER;
+                $externalValue = trim((string) $arguments['cost_center']);
+            } elseif (!empty($arguments['external_system']) && !empty($arguments['external_value'])) {
+                $externalSystem = trim((string) $arguments['external_system']);
+                $externalValue = trim((string) $arguments['external_value']);
+            }
+            if ($externalSystem !== null) {
+                $teamId = $context->team?->id ?? auth()->user()?->currentTeam?->id;
+                $resolved = OrganizationEntityExternalId::resolveEntity($externalSystem, $externalValue, $teamId);
+                if (!$resolved) {
+                    return ToolResult::error('NOT_FOUND', "Keine Entity mit {$externalSystem}='{$externalValue}' gefunden.");
+                }
+                $dimension = 'entity';
+                $entityId = $resolved->id;
+            }
+
             $cfg = DimensionLinkService::getDimension($dimension);
             if (!$cfg) {
                 $available = implode(', ', array_keys(DimensionLinkService::getDimensions()));
@@ -113,27 +145,13 @@ class LinkDimensionTool implements ToolContract, ToolMetadataContract
             }
 
             if (!$contextType || !$contextId || !$dimensionItemId) {
-                return ToolResult::error('VALIDATION_ERROR', 'context_type, context_id und dimension_item_id (oder entity_id bei dimension="entity") sind erforderlich.');
+                return ToolResult::error('VALIDATION_ERROR', 'context_type, context_id und dimension_item_id (oder entity_id/cost_center bei dimension="entity") sind erforderlich.');
             }
 
-            // Enforcement: Kostenstellen dürfen nur an Entities gehängt werden
-            if ($dimension === 'cost-centers') {
-                $allowedTypes = ['organization_entity', \Platform\Organization\Models\OrganizationEntity::class];
-                if (!in_array($contextType, $allowedTypes, true)) {
-                    return ToolResult::error('VALIDATION_ERROR', "Kostenstellen können nur an Organisationseinheiten (Entities) verknüpft werden. Nutze dimension='entities' um externe Objekte mit Entities zu verknüpfen, dann Kostenstellen an die Entity.");
-                }
-            }
-
-            // Prüfe ob das Dimensions-Element existiert
-            if (isset($cfg['model'])) {
-                // Legacy dimension (cost-centers)
-                $item = $cfg['model']::find($dimensionItemId);
-            } else {
-                // Generic dimension (entity, vsm-system, etc.)
-                $item = OrganizationDimensionValue::where('id', $dimensionItemId)
-                    ->where('dimension_definition_id', $cfg['definition_id'] ?? 0)
-                    ->first();
-            }
+            // Prüfe ob das Dimensions-Element existiert (generische Dimension)
+            $item = OrganizationDimensionValue::where('id', $dimensionItemId)
+                ->where('dimension_definition_id', $cfg['definition_id'] ?? 0)
+                ->first();
             if (!$item) {
                 return ToolResult::error('NOT_FOUND', "Dimensions-Element mit ID {$dimensionItemId} nicht gefunden.");
             }

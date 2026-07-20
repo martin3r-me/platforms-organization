@@ -14,8 +14,8 @@ use Platform\Organization\Services\DimensionLinkService;
 /**
  * Entfernt die Verknuepfung eines Dimensions-Elements von einem Objekt.
  *
- * Architektur: Kostenstellen (cost-centers) existieren nur an Entities.
- * Entities (entities) koennen an beliebige externe Objekte verknuepft sein.
+ * Architektur: Verlinkt wird gegen Entities (entity-Dimension) oder andere
+ * generische Dimensionen (vsm-system, vsm-function).
  *
  * WICHTIG fuer LLMs:
  *  - Empfohlener Pfad bei entity-basierten Dimensionen: entity_id
@@ -42,7 +42,7 @@ class UnlinkDimensionTool implements ToolContract, ToolMetadataContract
             'properties' => [
                 'dimension' => [
                     'type' => 'string',
-                    'description' => 'ERFORDERLICH: Dimensions-Key (z.B. entity, cost-centers).',
+                    'description' => 'ERFORDERLICH: Dimensions-Key (z.B. entity, vsm-system, vsm-function).',
                 ],
                 'context_type' => [
                     'type' => 'string',
@@ -98,14 +98,6 @@ class UnlinkDimensionTool implements ToolContract, ToolMetadataContract
 
             if (!$contextType || !$contextId || !$dimensionItemId) {
                 return ToolResult::error('VALIDATION_ERROR', 'context_type, context_id und entity_id ODER dimension_item_id sind erforderlich. Bei entity-Dimensionen: entity_id verwenden (sicher).');
-            }
-
-            // Enforcement: Kostenstellen duerfen nur an Entities gehaengt werden
-            if ($dimension === 'cost-centers') {
-                $allowedTypes = ['organization_entity', \Platform\Organization\Models\OrganizationEntity::class];
-                if (!in_array($contextType, $allowedTypes, true)) {
-                    return ToolResult::error('VALIDATION_ERROR', "Kostenstellen-Links koennen nur an Organisationseinheiten (Entities) existieren.");
-                }
             }
 
             $service = new DimensionLinkService();

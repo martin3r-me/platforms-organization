@@ -14,8 +14,8 @@ use Platform\Organization\Services\DimensionLinkService;
 /**
  * Listet alle verknüpften Dimensions-Einträge für ein beliebiges Objekt.
  *
- * Beispiel: "Welche Kostenstellen sind dem Projekt X zugeordnet?"
- * → organization.dimension_links.GET(dimension="cost-centers", context_type="App\\Models\\Project", context_id=42)
+ * Beispiel: "Welcher Organisationseinheit ist Projekt X zugeordnet?"
+ * → organization.dimension_links.GET(dimension="entity", context_type="App\\Models\\Project", context_id=42)
  *
  * WICHTIG fuer LLMs:
  *  - dimension_value_id != entity_id. Dim-Values sind interne IDs, Entity-IDs
@@ -44,7 +44,7 @@ class ListDimensionLinksTool implements ToolContract, ToolMetadataContract
             'properties' => [
                 'dimension' => [
                     'type' => 'string',
-                    'description' => 'ERFORDERLICH: Dimensions-Key (z.B. cost-centers, entity). Wird dynamisch aus verfuegbaren Dimensionen validiert.',
+                    'description' => 'ERFORDERLICH: Dimensions-Key (z.B. entity, vsm-system). Wird dynamisch aus verfuegbaren Dimensionen validiert.',
                 ],
                 'context_type' => [
                     'type' => 'string',

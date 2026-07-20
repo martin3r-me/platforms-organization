@@ -3,8 +3,6 @@
 namespace Platform\Organization\Livewire;
 
 use Livewire\Component;
-use Platform\Organization\Models\OrganizationCostCenter;
-use Platform\Organization\Models\OrganizationCostCenterLink;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationDimensionDefinition;
 use Platform\Organization\Models\OrganizationDimensionLink;
@@ -32,15 +30,6 @@ class DimensionLinker extends Component
     protected function getDimensionConfig(): array
     {
         return [
-            'cost-centers' => [
-                'model' => OrganizationCostCenter::class,
-                'link_model' => OrganizationCostCenterLink::class,
-                'fk' => 'cost_center_id',
-                'label' => 'Kostenstellen',
-                'icon' => 'heroicon-o-currency-dollar',
-                'mode' => 'multi_percent',
-                'generic' => false,
-            ],
             'entities' => [
                 'model' => OrganizationEntity::class,
                 'label' => 'Organisationseinheiten',

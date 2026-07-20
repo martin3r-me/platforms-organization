@@ -272,12 +272,13 @@ class OrganizationServiceProvider extends ServiceProvider
     {
         try {
             $registry = resolve(\Platform\Core\Tools\ToolRegistry::class);
-            $registry->register(new \Platform\Organization\Tools\ListCostCentersTool());
             $registry->register(new \Platform\Organization\Tools\OrganizationLookupsTool());
             $registry->register(new \Platform\Organization\Tools\GetOrganizationLookupTool());
-            $registry->register(new \Platform\Organization\Tools\CreateCostCenterTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateCostCenterTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteCostCenterTool());
+
+            // Entity Fremd-IDs (Kostenstelle, DATEV, Buchungskonto, Kreditor, …)
+            $registry->register(new \Platform\Organization\Tools\SetEntityExternalIdTool());
+            $registry->register(new \Platform\Organization\Tools\ListEntityExternalIdsTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteEntityExternalIdTool());
 
             // Perspective <-> Team Mapping
             $registry->register(new \Platform\Organization\Tools\SetPerspectiveTeamTool());

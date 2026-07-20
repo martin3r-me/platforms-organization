@@ -30,17 +30,6 @@ return [
             'title' => 'Organization',
             'icon' => 'heroicon-o-building-office',
             'items' => [
-                'dimensions' => [
-                    'title' => 'Dimensionen',
-                    'icon' => 'heroicon-o-adjustments-horizontal',
-                    'items' => [
-                        'cost-centers' => [
-                            'title' => 'Kostenstellen',
-                            'route' => 'organization.cost-centers.index',
-                            'icon' => 'heroicon-o-currency-dollar',
-                        ],
-                    ],
-                ],
                 'people' => [
                     'title' => 'Personen',
                     'icon' => 'heroicon-o-user-group',

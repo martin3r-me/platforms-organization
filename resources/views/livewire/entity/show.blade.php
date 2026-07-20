@@ -879,6 +879,7 @@
                             <div class="space-y-4">
                                 <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required />
                                 <x-ui-input-text name="code" label="Code" wire:model.live="form.code" placeholder="Optional: Code oder Nummer" />
+                                <x-ui-input-text name="cost_center" label="Kostenstelle" wire:model.live="form.cost_center" placeholder="z.B. KST-4200 — jede Einheit ist ihre eigene Kostenstelle" />
                                 <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" />
                                 <x-ui-input-select
                                     name="entity_type_id"
@@ -917,19 +918,6 @@
                             </div>
                         </div>
 
-                        {{-- Dimensionen --}}
-                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                            <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Dimensionen</h2>
-                            <div>
-                                <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Kostenstellen</h3>
-                                <livewire:organization.dimension-linker
-                                    dimension="cost-centers"
-                                    :contextType="$entity::class"
-                                    :contextId="$entity->id"
-                                    :key="'dim-cost-centers-'.$entity->id"
-                                />
-                            </div>
-                        </div>
                     </div>
                 </div>
 

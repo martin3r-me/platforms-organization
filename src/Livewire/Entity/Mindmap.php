@@ -163,14 +163,6 @@ class Mindmap extends Component
                     'sort' => (int) ($e->vsm_sort ?? 0),
                 ];
             }
-            $cc = null;
-            if (!empty($e->cost_center_name)) {
-                $cc = [
-                    'name'  => $e->cost_center_name,
-                    'color' => $this->colorFor('cc:' . $e->cost_center_name),
-                ];
-            }
-
             $nodes[] = [
                 'id'       => 'e' . $e->id,
                 'name'     => $e->name,
@@ -182,7 +174,6 @@ class Mindmap extends Component
                 'depth'    => $depth,
                 'isSun'    => $depth === 0 && $parentIds->has($e->id),
                 'vsm'         => $vsm,
-                'cost_center' => $cc,
                 'metrics'  => [
                     'items_total'   => $metrics['items_total'] ?? 0,
                     'items_done'    => $metrics['items_done'] ?? 0,

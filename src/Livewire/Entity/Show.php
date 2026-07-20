@@ -624,6 +624,7 @@ class Show extends Component
         $this->form = [
             'name' => $this->entity->name,
             'code' => $this->entity->code,
+            'cost_center' => $this->entity->cost_center,
             'description' => $this->entity->description,
             'entity_type_id' => $this->entity->entity_type_id,
             'parent_entity_id' => $this->entity->parent_entity_id,
@@ -642,6 +643,7 @@ class Show extends Component
         $this->validate([
             'form.name' => 'required|string|max:255',
             'form.code' => 'nullable|string|max:255',
+            'form.cost_center' => 'nullable|string|max:255',
             'form.description' => 'nullable|string',
             'form.entity_type_id' => 'required|exists:organization_entity_types,id',
             'form.parent_entity_id' => 'nullable|exists:organization_entities,id',
@@ -650,7 +652,16 @@ class Show extends Component
         ]);
 
         try {
-            $this->entity->update($this->form);
+            // cost_center ist eine Fremd-ID (kein Entity-Spaltenfeld) — separat behandeln.
+            $columns = $this->form;
+            $costCenter = $columns['cost_center'] ?? null;
+            unset($columns['cost_center']);
+
+            $this->entity->update($columns);
+            $this->entity->setExternalId(
+                \Platform\Organization\Models\OrganizationEntityExternalId::SYSTEM_COST_CENTER,
+                $costCenter
+            );
 
             $this->loadForm();
             session()->flash('message', 'Organisationseinheit erfolgreich aktualisiert.');
@@ -664,6 +675,7 @@ class Show extends Component
     {
         return $this->form['name'] !== $this->entity->name ||
                $this->form['code'] !== $this->entity->code ||
+               ($this->form['cost_center'] ?? null) !== $this->entity->cost_center ||
                $this->form['description'] !== $this->entity->description ||
                $this->form['entity_type_id'] != $this->entity->entity_type_id ||
                $this->form['parent_entity_id'] != $this->entity->parent_entity_id ||

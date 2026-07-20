@@ -147,8 +147,8 @@
         var groupFilters = {};
         Object.keys(entityGroups).forEach(function(k) { groupFilters[k] = true; });
 
-        // ─── Dimensions (VSM + Cost Centers) ───
-        var dimensions = { vsm: false, costCenter: false };
+        // ─── Dimensions (VSM) ───
+        var dimensions = { vsm: false };
         // VSM Y-layers — S1 (Operations) bottom, S5 (Policy) top, ENV outermost
         var VSM_Y = { S1: -360, S2: -180, S3: 0, S4: 180, S5: 360, ENV: -540 };
         var VSM_LABELS = { S1: 'S1 · Operations', S2: 'S2 · Coordination', S3: 'S3 · Control', S4: 'S4 · Intelligence', S5: 'S5 · Policy', ENV: 'ENV · Umwelt' };
@@ -281,7 +281,6 @@
 
             [
                 { key: 'vsm', label: 'VSM-Ebenen', color: '#60A5FA' },
-                { key: 'costCenter', label: 'Kostenstellen', color: '#F59E0B' },
             ].forEach(function(d) {
                 var row = document.createElement('label');
                 row.className = 'flex items-center gap-2 px-2 py-1 rounded hover:bg-white/5 cursor-pointer select-none';
@@ -302,7 +301,6 @@
                 cb.addEventListener('change', function() {
                     dimensions[cb.dataset.dim] = cb.checked;
                     if (cb.dataset.dim === 'vsm') toggleVsmLayers(cb.checked);
-                    if (cb.dataset.dim === 'costCenter') toggleCostCenterHalos(cb.checked);
                 });
             });
         }
@@ -509,24 +507,6 @@
                         new THREE.SphereGeometry(glowSize * 0.85, 12, 12),
                         new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: glowIntensity })
                     ));
-                }
-
-                // Cost center halo — soft additive sphere tinted by CC color
-                if (node.cost_center && node.cost_center.color) {
-                    var ccColor = new THREE.Color(node.cost_center.color);
-                    var ccHalo = new THREE.Mesh(
-                        new THREE.SphereGeometry(radius * 2.2, 16, 16),
-                        new THREE.MeshBasicMaterial({
-                            color: ccColor,
-                            transparent: true,
-                            opacity: 0.18,
-                            blending: THREE.AdditiveBlending,
-                            depthWrite: false,
-                        })
-                    );
-                    ccHalo.name = 'cc_halo';
-                    ccHalo.visible = dimensions.costCenter;
-                    group.add(ccHalo);
                 }
 
                 // OKR progress ring — visible when entity has OKR objectives
@@ -973,15 +953,6 @@
             }, 50);
 
             graph.d3ReheatSimulation();
-        }
-
-        function toggleCostCenterHalos(on) {
-            var data = graph.graphData();
-            data.nodes.forEach(function(n) {
-                if (!n.__threeObj) return;
-                var halo = n.__threeObj.getObjectByName('cc_halo');
-                if (halo) halo.visible = on;
-            });
         }
 
         // ─── Info panel ───

@@ -21,7 +21,7 @@ Optional:
 - **Beschreibung** — Was macht diese Einheit?
 - **Übergeordnete Einheit** — Wo hängt sie in der Hierarchie?
 - **VSM-System** — Welchem Wertstrom gehört sie an?
-- **Kostenstelle** — Für die Kostenrechnung
+- **Kostenstelle** — Kürzel/Nummer für die Kostenrechnung. Jede Einheit ist faktisch ihre eigene Kostenstelle; der Wert ist eine Fremd-ID der Entity (weitere: DATEV, Buchungskonto, Kreditor …)
 - **Verknüpfter User** — Wenn die Entity eine Person repräsentiert
 
 ---

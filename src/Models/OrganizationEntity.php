@@ -36,6 +36,48 @@ class OrganizationEntity extends Model
     ];
 
     /**
+     * Fremd-IDs dieser Entity (Kostenstelle, DATEV, Buchungskonto, Kreditor, …).
+     * Jede Entity IST faktisch ihre eigene Kostenstelle — die KST ist nur der
+     * erste `system`-Wert dieser Familie.
+     */
+    public function externalIds(): \Illuminate\Database\Eloquent\Relations\HasMany
+    {
+        return $this->hasMany(OrganizationEntityExternalId::class, 'entity_id');
+    }
+
+    /** Fremd-ID-Wert für ein System (z.B. 'datev'), oder null. */
+    public function externalId(string $system): ?string
+    {
+        return $this->externalIds->firstWhere('system', $system)?->value;
+    }
+
+    /**
+     * Setzt/aktualisiert (oder löscht bei null) die Fremd-ID für ein System.
+     */
+    public function setExternalId(string $system, ?string $value, ?string $label = null): void
+    {
+        $value = $value !== null ? trim($value) : null;
+
+        if ($value === null || $value === '') {
+            $this->externalIds()->where('system', $system)->delete();
+            $this->unsetRelation('externalIds');
+            return;
+        }
+
+        $this->externalIds()->updateOrCreate(
+            ['system' => $system, 'team_id' => $this->team_id],
+            ['value' => $value, 'label' => $label],
+        );
+        $this->unsetRelation('externalIds');
+    }
+
+    /** Kostenstellen-Kürzel dieser Entity (Alias auf die 'kostenstelle'-Fremd-ID). */
+    public function getCostCenterAttribute(): ?string
+    {
+        return $this->externalId(OrganizationEntityExternalId::SYSTEM_COST_CENTER);
+    }
+
+    /**
      * Scope für aktive Entities
      */
     public function scopeActive($query)

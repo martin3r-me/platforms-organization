@@ -10,16 +10,15 @@ use Platform\Core\Tools\Concerns\HasStandardGetOperations;
 use Platform\Organization\Services\ContextTypeRegistry;
 
 /**
- * Generisches Lookup-GET für Organization (derzeit: cost_centers, context_types).
+ * Generisches Lookup-GET für Organization (derzeit: context_types).
  *
- * Hinweis: Für cost_centers gibt es auch organization.cost_centers.GET.
  * Dieses Tool ist für ein konsistentes "lookups/lookup" Pattern gedacht.
  */
 class GetOrganizationLookupTool implements ToolContract, ToolMetadataContract
 {
     use HasStandardGetOperations;
 
-    private const LOOKUP_KEYS = ['cost_centers', 'context_types'];
+    private const LOOKUP_KEYS = ['context_types'];
 
     public function getName(): string
     {
@@ -28,7 +27,7 @@ class GetOrganizationLookupTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/lookup - Listet Einträge aus einer Organization-Lookup-Tabelle (z.B. cost_centers). Nutze organization.lookups.GET für Keys. Unterstützt Suche/Filter/Sort/Pagination.';
+        return 'GET /organization/lookup - Listet Einträge aus einer Organization-Lookup-Tabelle (z.B. context_types). Nutze organization.lookups.GET für Keys. Unterstützt Suche/Filter/Sort/Pagination.';
     }
 
     public function getSchema(): array
@@ -56,7 +55,6 @@ class GetOrganizationLookupTool implements ToolContract, ToolMetadataContract
         }
 
         return match ($lookup) {
-            'cost_centers' => (new ListCostCentersTool())->execute($arguments, $context),
             'context_types' => $this->lookupContextTypes(),
             default => ToolResult::error('VALIDATION_ERROR', 'Unbekannter lookup. Nutze organization.lookups.GET.'),
         };

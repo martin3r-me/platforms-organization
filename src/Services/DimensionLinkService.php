@@ -4,11 +4,8 @@ namespace Platform\Organization\Services;
 
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
-use Platform\Organization\Models\OrganizationCostCenter;
-use Platform\Organization\Models\OrganizationCostCenterLink;
 use Platform\Organization\Models\OrganizationDimensionDefinition;
 use Platform\Organization\Models\OrganizationDimensionLink;
-use Platform\Organization\Models\OrganizationDimensionValue;
 
 class DimensionLinkService
 {
@@ -63,41 +60,22 @@ class DimensionLinkService
     }
 
     /**
-     * Legacy registry — kept for backward compatibility with existing
-     * cost-center and entity link tables. New dimensions use the
-     * generic dimension_definitions/dimension_links tables exclusively.
-     */
-    private static function getLegacyDimensions(): array
-    {
-        return [
-            'cost-centers' => [
-                'model' => OrganizationCostCenter::class,
-                'link_model' => OrganizationCostCenterLink::class,
-                'fk' => 'cost_center_id',
-                'label' => 'Kostenstellen',
-                'mode' => 'multi_percent',
-            ],
-        ];
-    }
-
-    /**
-     * Get all available dimensions — legacy + generic.
+     * Alle verfügbaren Dimensionen (rein generisch über dimension_definitions).
+     * Kostenstellen sind keine eigene Dimension mehr — sie sind Fremd-IDs an
+     * Entities (organization_entity_external_ids) und werden über die
+     * entity-Dimension verlinkt.
      */
     public static function getDimensions(): array
     {
-        $dimensions = self::getLegacyDimensions();
+        $dimensions = [];
 
-        // Add all generic dimension definitions (excluding keys that overlap with legacy)
-        $definitions = OrganizationDimensionDefinition::active()->ordered()->get();
-        foreach ($definitions as $def) {
-            if (!isset($dimensions[$def->key])) {
-                $dimensions[$def->key] = [
-                    'definition_id' => $def->id,
-                    'label' => $def->name,
-                    'mode' => $def->mode,
-                    'generic' => true,
-                ];
-            }
+        foreach (OrganizationDimensionDefinition::active()->ordered()->get() as $def) {
+            $dimensions[$def->key] = [
+                'definition_id' => $def->id,
+                'label' => $def->name,
+                'mode' => $def->mode,
+                'generic' => true,
+            ];
         }
 
         return $dimensions;
@@ -109,78 +87,23 @@ class DimensionLinkService
     }
 
     /**
-     * Check if a dimension uses the generic (new) system.
-     */
-    private static function isGeneric(string $key): bool
-    {
-        $legacy = self::getLegacyDimensions();
-        if (isset($legacy[$key])) {
-            return false;
-        }
-
-        return OrganizationDimensionDefinition::where('key', $key)->exists();
-    }
-
-    /**
      * Linked Items für einen Kontext + Dimension holen.
-     * Supports optional perspective_id for perspective-aware lookups.
      */
     public function getLinked(string $dimension, string $contextType, int $contextId, ?int $perspectiveId = null): Collection
     {
         $contextType = self::resolveContextType($contextType);
 
-        if (self::isGeneric($dimension)) {
-            return $this->getLinkedGeneric($dimension, $contextType, $contextId, $perspectiveId);
-        }
-
-        // Legacy path
-        $cfg = self::getLegacyDimensions()[$dimension] ?? null;
-        if (!$cfg) {
-            return collect();
-        }
-
-        $linkModel = $cfg['link_model'];
-        $fk = $cfg['fk'];
-        $dimensionModel = $cfg['model'];
-
-        $links = $linkModel::where('linkable_type', $contextType)
-            ->where('linkable_id', $contextId)
-            ->get();
-
-        $linksByFk = $links->keyBy($fk);
-        $ids = $links->pluck($fk)->unique()->toArray();
-
-        return $dimensionModel::whereIn('id', $ids)
-            ->orderBy('name')
-            ->get()
-            ->map(function ($item) use ($linksByFk) {
-                $link = $linksByFk->get($item->id);
-                return [
-                    'id' => $item->id,
-                    'code' => $item->code,
-                    'name' => $item->name,
-                    'percentage' => $link?->percentage ? (float) $link->percentage : null,
-                    'is_primary' => (bool) ($link?->is_primary ?? false),
-                ];
-            });
-    }
-
-    /**
-     * Generic dimension lookup via dimension_links table.
-     */
-    private function getLinkedGeneric(string $dimensionKey, string $contextType, int $contextId, ?int $perspectiveId = null): Collection
-    {
-        $def = OrganizationDimensionDefinition::findByKey($dimensionKey);
+        $def = OrganizationDimensionDefinition::findByKey($dimension);
         if (!$def) {
             return collect();
         }
 
-        $query = OrganizationDimensionLink::where('dimension_definition_id', $def->id)
+        $links = OrganizationDimensionLink::where('dimension_definition_id', $def->id)
             ->where('linkable_type', $contextType)
-            ->where('linkable_id', $contextId);
+            ->where('linkable_id', $contextId)
+            ->with('value')
+            ->get();
 
-
-        $links = $query->with('value')->get();
         $isEntityBased = ($def->value_source === 'entity');
 
         return $links->map(function ($link) use ($isEntityBased) {
@@ -212,84 +135,17 @@ class DimensionLinkService
     /**
      * Reverse: Alle verknüpften Kontexte für ein Dimensions-Element holen.
      */
-    public function getLinkedContexts(string $dimension, int $dimensionItemId, ?int $perspectiveId = null): Collection
+    public function getLinkedContexts(string $dimension, int $dimensionValueId, ?int $perspectiveId = null): Collection
     {
-        // Note: no resolveContextType here — this is a reverse lookup that returns
-        // all linkable_types, not a query filtered by one.
-        if (self::isGeneric($dimension)) {
-            return $this->getLinkedContextsGeneric($dimension, $dimensionItemId, $perspectiveId);
-        }
-
-        // Legacy path
-        $cfg = self::getLegacyDimensions()[$dimension] ?? null;
-        if (!$cfg) {
-            return collect();
-        }
-
-        $linkModel = $cfg['link_model'];
-        $fk = $cfg['fk'];
-
-        $links = $linkModel::where($fk, $dimensionItemId)->get();
-
-        $grouped = $links->groupBy('linkable_type');
-
-        $results = [];
-        foreach ($grouped as $morphType => $typeLinks) {
-            $modelClass = Relation::getMorphedModel($morphType) ?? $morphType;
-            $ids = $typeLinks->pluck('linkable_id')->unique()->toArray();
-
-            $label = class_basename($modelClass);
-            $items = [];
-
-            if (class_exists($modelClass)) {
-                $models = $modelClass::whereIn('id', $ids)->get()->keyBy('id');
-                foreach ($typeLinks as $link) {
-                    $model = $models->get($link->linkable_id);
-                    $items[] = [
-                        'id' => $link->linkable_id,
-                        'name' => $model?->name ?? $model?->title ?? "#{$link->linkable_id}",
-                        'percentage' => $link->percentage ? (float) $link->percentage : null,
-                        'is_primary' => (bool) ($link->is_primary ?? false),
-                    ];
-                }
-            } else {
-                foreach ($typeLinks as $link) {
-                    $items[] = [
-                        'id' => $link->linkable_id,
-                        'name' => "#{$link->linkable_id}",
-                        'percentage' => $link->percentage ? (float) $link->percentage : null,
-                        'is_primary' => (bool) ($link->is_primary ?? false),
-                    ];
-                }
-            }
-
-            $results[] = [
-                'linkable_type' => $morphType,
-                'model_class' => $modelClass,
-                'label' => $label,
-                'items' => $items,
-                'count' => count($items),
-            ];
-        }
-
-        return collect($results);
-    }
-
-    /**
-     * Generic reverse lookup.
-     */
-    private function getLinkedContextsGeneric(string $dimensionKey, int $dimensionValueId, ?int $perspectiveId = null): Collection
-    {
-        $def = OrganizationDimensionDefinition::findByKey($dimensionKey);
+        $def = OrganizationDimensionDefinition::findByKey($dimension);
         if (!$def) {
             return collect();
         }
 
-        $query = OrganizationDimensionLink::where('dimension_definition_id', $def->id)
-            ->where('dimension_value_id', $dimensionValueId);
+        $links = OrganizationDimensionLink::where('dimension_definition_id', $def->id)
+            ->where('dimension_value_id', $dimensionValueId)
+            ->get();
 
-
-        $links = $query->get();
         $grouped = $links->groupBy('linkable_type');
 
         $results = [];
@@ -336,67 +192,16 @@ class DimensionLinkService
     /**
      * Link erstellen. Respektiert den Mode (single = ersetzt vorherigen).
      */
-    public function link(string $dimension, string $contextType, int $contextId, int $dimensionItemId, array $meta = []): bool
+    public function link(string $dimension, string $contextType, int $contextId, int $dimensionValueId, array $meta = []): bool
     {
         $contextType = self::resolveContextType($contextType);
 
-        if (self::isGeneric($dimension)) {
-            return $this->linkGeneric($dimension, $contextType, $contextId, $dimensionItemId, $meta);
-        }
-
-        // Legacy path
-        $cfg = self::getLegacyDimensions()[$dimension] ?? null;
-        if (!$cfg) {
-            return false;
-        }
-
-        $linkModel = $cfg['link_model'];
-        $fk = $cfg['fk'];
-
-        if ($cfg['mode'] === 'single') {
-            $linkModel::where('linkable_type', $contextType)
-                ->where('linkable_id', $contextId)
-                ->delete();
-        }
-
-        $exists = $linkModel::where($fk, $dimensionItemId)
-            ->where('linkable_type', $contextType)
-            ->where('linkable_id', $contextId)
-            ->exists();
-
-        if ($exists) {
-            return false;
-        }
-
-        $linkModel::create([
-            $fk => $dimensionItemId,
-            'linkable_type' => $contextType,
-            'linkable_id' => $contextId,
-            'percentage' => $meta['percentage'] ?? null,
-            'is_primary' => $meta['is_primary'] ?? false,
-            'start_date' => $meta['start_date'] ?? null,
-            'end_date' => $meta['end_date'] ?? null,
-            'team_id' => $meta['team_id'] ?? auth()->user()?->currentTeam?->id,
-            'created_by_user_id' => $meta['created_by_user_id'] ?? auth()->id(),
-        ]);
-
-        return true;
-    }
-
-    /**
-     * Generic link creation via dimension_links table.
-     */
-    private function linkGeneric(string $dimensionKey, string $contextType, int $contextId, int $dimensionValueId, array $meta = []): bool
-    {
-        $def = OrganizationDimensionDefinition::findByKey($dimensionKey);
+        $def = OrganizationDimensionDefinition::findByKey($dimension);
         if (!$def) {
             return false;
         }
 
-        // Single-Mode: remove previous link for this dimension+linkable.
-        // perspective_id wurde am 2026-06-09 (drop_perspectives_and_hierarchy_tables)
-        // strukturell entfernt — Perspektive ergibt sich jetzt aus der aktiven
-        // Carrier-Entity in der Session, nicht aus einer separaten Spalte.
+        // Single-Mode: vorherigen Link für diese Dimension+Linkable entfernen.
         if ($def->mode === 'single') {
             OrganizationDimensionLink::where('dimension_definition_id', $def->id)
                 ->where('linkable_type', $contextType)
@@ -404,7 +209,6 @@ class DimensionLinkService
                 ->delete();
         }
 
-        // Duplicate check
         $exists = OrganizationDimensionLink::where('dimension_definition_id', $def->id)
             ->where('dimension_value_id', $dimensionValueId)
             ->where('linkable_type', $contextType)
@@ -434,43 +238,15 @@ class DimensionLinkService
     /**
      * Link entfernen.
      */
-    public function unlink(string $dimension, string $contextType, int $contextId, int $dimensionItemId, ?int $perspectiveId = null): bool
+    public function unlink(string $dimension, string $contextType, int $contextId, int $dimensionValueId, ?int $perspectiveId = null): bool
     {
         $contextType = self::resolveContextType($contextType);
 
-        if (self::isGeneric($dimension)) {
-            return $this->unlinkGeneric($dimension, $contextType, $contextId, $dimensionItemId, $perspectiveId);
-        }
-
-        // Legacy path
-        $cfg = self::getLegacyDimensions()[$dimension] ?? null;
-        if (!$cfg) {
-            return false;
-        }
-
-        $linkModel = $cfg['link_model'];
-        $fk = $cfg['fk'];
-
-        $deleted = $linkModel::where($fk, $dimensionItemId)
-            ->where('linkable_type', $contextType)
-            ->where('linkable_id', $contextId)
-            ->delete();
-
-        return $deleted > 0;
-    }
-
-    /**
-     * Generic unlink.
-     */
-    private function unlinkGeneric(string $dimensionKey, string $contextType, int $contextId, int $dimensionValueId, ?int $perspectiveId = null): bool
-    {
-        $def = OrganizationDimensionDefinition::findByKey($dimensionKey);
+        $def = OrganizationDimensionDefinition::findByKey($dimension);
         if (!$def) {
             return false;
         }
 
-        // perspective_id-Spalte wurde 2026-06-09 entfernt — Perspective-Filter
-        // entfaellt entsprechend. Parameter bleibt fuer API-Backward-Compat.
         return OrganizationDimensionLink::where('dimension_definition_id', $def->id)
             ->where('dimension_value_id', $dimensionValueId)
             ->where('linkable_type', $contextType)

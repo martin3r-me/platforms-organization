@@ -5,7 +5,7 @@ order: 7
 
 # Dimensionen
 
-Entities können gleichzeitig in mehreren Dimensionen organisiert werden — neben der Hierarchie (Parent/Child) gibt es **VSM-Systeme** und **Kostenstellen**.
+Entities können gleichzeitig in mehreren Dimensionen organisiert werden — neben der Hierarchie (Parent/Child) gibt es **VSM-Systeme**. Die **Kostenstelle** ist keine eigene Dimension mehr, sondern eine Fremd-ID an der Entity (siehe unten).
 
 ---
 
@@ -23,19 +23,32 @@ Jede Entity kann einem VSM-System zugeordnet werden. Innerhalb eines VSM-Systems
 
 ---
 
-## Kostenstellen
+## Kostenstellen (als Fremd-ID)
 
-Kostenstellen bilden die **finanzielle Dimension** ab:
+Kostenstellen sind **keine eigene Struktur/Dimension** mehr. Grundgedanke:
 
-- Welcher Abteilung werden Kosten zugerechnet?
-- Wo entstehen Aufwände?
-- Wie verteilen sich Stunden auf Kostenstellen?
+> Jede Entity **ist** faktisch ihre eigene Kostenstelle — der Ort, an dem Zeit,
+> Links und Kinder hängen, ist genau das, dem man Kosten zurechnet.
 
-Kostenstellen können:
-- **Global** gelten (für alle Entities)
-- **Entityspezifisch** zugeordnet werden
+Die Kostenstelle ist deshalb nur ein **Kürzel/eine Nummer an der Entity** (z.B.
+`KST-4200`) — eine **Fremd-ID**: die Identität der Einheit im Rechnungswesen. Sie
+lebt in `organization_entity_external_ids` (`system = 'kostenstelle'`), zusammen
+mit weiteren Fremd-IDs derselben Familie:
 
-Auf der Entity-Detail-Seite im Tab "Daten" unter "Dimensionen" siehst du die zugewiesenen Kostenstellen und VSM-Funktionen.
+- `kostenstelle` — Controlling/Kostenrechnung
+- `datev` — DATEV-ID
+- `buchungskonto` — Sach-/Buchungskonto
+- `kreditor` — Kreditorennummer
+- … neue Typen brauchen nur einen neuen `system`-String, nie eine Migration
+
+Gesetzt wird der Wert auf der Entity-Detail-Seite im Tab "Daten" (Feld
+"Kostenstelle") oder per MCP (`organization.entity_external_ids.POST`).
+
+**Verlinkung/Zurechnung** läuft immer gegen die **Entity** (Baum + entity-
+Dimension). "Hänge X an Kostenstelle KST-4200" wird über die Fremd-ID zur
+zugehörigen Entity aufgelöst und dann verlinkt — ein Mechanismus für jede
+Fremd-ID. Die **Kosten-Aggregation** (Dimension 5) folgt dem Entity-Baum; die
+KST-Nummer ist das Export-/Kommunikations-Etikett obendrauf.
 
 ---
 
@@ -44,6 +57,6 @@ Auf der Entity-Detail-Seite im Tab "Daten" unter "Dimensionen" siehst du die zug
 Eine Entity kann gleichzeitig:
 - In der **Hierarchie** unter "IT-Abteilung" hängen
 - Dem **VSM-System** "Kundenservice" zugeordnet sein
-- Der **Kostenstelle** "KST-4200 IT" zugewiesen sein
+- Die **Kostenstelle** "KST-4200" als Fremd-ID tragen
 
 So entsteht eine mehrdimensionale Sicht auf die Organisation.

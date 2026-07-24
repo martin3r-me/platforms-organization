@@ -64,4 +64,75 @@ class PersonTimeSummary
             'billed_minutes' => $billed,
         ];
     }
+
+    /**
+     * Einzelne Zeit-Einträge eines Users im Zeitraum [$from, $to] (inkl.), plus Summen.
+     *
+     * @return array{
+     *   entries: array<int, array{id:int, date:string, minutes:int, is_billed:bool, note:string, context:?string, amount_cents:int}>,
+     *   total_minutes:int, billed_minutes:int, open_minutes:int, amount_cents:int
+     * }
+     */
+    public function range(int $userId, string $from, string $to): array
+    {
+        $rows = OrganizationTimeEntry::query()
+            ->where('user_id', $userId)
+            ->whereBetween('work_date', [$from, $to])
+            ->orderByDesc('work_date')
+            ->orderByDesc('id')
+            ->get();
+
+        $entries = [];
+        $total = 0;
+        $billed = 0;
+        $amount = 0;
+
+        foreach ($rows as $r) {
+            $m = (int) ($r->minutes ?? 0);
+            $total += $m;
+            if ($r->is_billed) {
+                $billed += $m;
+            }
+            $amount += (int) ($r->amount_cents ?? 0);
+
+            $entries[] = [
+                'id'           => (int) $r->id,
+                'date'         => Carbon::parse($r->work_date)->toDateString(),
+                'minutes'      => $m,
+                'is_billed'    => (bool) $r->is_billed,
+                'note'         => (string) ($r->note ?? ''),
+                'context'      => $this->contextLabel($r),
+                'amount_cents' => (int) ($r->amount_cents ?? 0),
+            ];
+        }
+
+        return [
+            'entries'        => $entries,
+            'total_minutes'  => $total,
+            'billed_minutes' => $billed,
+            'open_minutes'   => $total - $billed,
+            'amount_cents'   => $amount,
+        ];
+    }
+
+    /**
+     * Menschlich lesbares Label des Kontexts (worauf gebucht wurde), null-sicher.
+     */
+    protected function contextLabel(OrganizationTimeEntry $entry): ?string
+    {
+        try {
+            $ctx = $entry->context;
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        if (! $ctx) {
+            return null;
+        }
+
+        return $ctx->name
+            ?? $ctx->title
+            ?? $ctx->label
+            ?? class_basename($ctx);
+    }
 }

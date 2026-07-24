@@ -49,6 +49,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 DimensionScoreDiffCommand::class,
                 \Platform\Organization\Console\Commands\EscalateSignalsCommand::class,
                 SyncEntityTypeCatalogCommand::class,
+                \Platform\Organization\Console\Commands\AuthzMaterializeCommand::class,
             ]);
         }
 

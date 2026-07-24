@@ -18,8 +18,6 @@ use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntityRelationType;
 use Platform\Organization\Models\OrganizationEntityRelationshipInterlink;
 use Platform\Organization\Models\OrganizationInterlink;
-use Platform\Organization\Models\OrganizationForecast;
-use Platform\Organization\Models\OrganizationStrategicDocument;
 use Platform\Core\Models\Team;
 use Platform\Core\Enums\TeamRole;
 use Platform\Organization\Services\EntityTimeResolver;
@@ -188,110 +186,30 @@ class Show extends Component
             return null;
         }
 
-        $activeDoc = fn (string $type) => OrganizationStrategicDocument::query()
-            ->where('entity_id', $this->entity->id)
-            ->where('type', $type)
-            ->where('is_active', true)
-            ->whereNull('deleted_at')
-            ->orderByDesc('version')
-            ->first();
+        return \Platform\Organization\Services\EntityStrategyPresenter::forEntity($this->entity);
+    }
 
-        $formatDoc = function ($doc) {
-            if (!$doc) {
-                return null;
-            }
-            return [
-                'title'      => $doc->title,
-                'content'    => $doc->content,
-                'version'    => $doc->version,
-                'valid_from' => $doc->valid_from?->toDateString(),
-            ];
-        };
+    /** Öffentlich teilbare URL der Strategie-Ansicht (null, wenn kein gültiger Link). */
+    #[Computed]
+    public function publicStrategyUrl(): ?string
+    {
+        return $this->entity->isPublicAccessible() ? $this->entity->getPublicUrl() : null;
+    }
 
-        $mission = $formatDoc($activeDoc('mission'));
-        $vision  = $formatDoc($activeDoc('vision'));
+    /** Erzeugt (oder erneuert) den öffentlichen Strategie-Link. */
+    public function generatePublicLink(): void
+    {
+        $this->entity->generatePublicToken();
+        unset($this->publicStrategyUrl);
+        $this->dispatch('toast', message: 'Öffentlicher Strategie-Link erstellt');
+    }
 
-        $forecasts = OrganizationForecast::query()
-            ->where('entity_id', $this->entity->id)
-            ->whereNull('deleted_at')
-            ->with([
-                'currentVersion',
-                'focusAreas' => fn ($q) => $q->whereNull('deleted_at')->orderBy('order'),
-                'focusAreas.visionImages' => fn ($q) => $q->whereNull('deleted_at')->orderBy('order'),
-                'focusAreas.obstacles' => fn ($q) => $q->whereNull('deleted_at')->orderBy('order'),
-                'focusAreas.milestones' => fn ($q) => $q->whereNull('deleted_at')
-                    ->orderBy('target_year')->orderBy('target_quarter')->orderBy('order'),
-            ])
-            ->orderBy('target_date')
-            ->get();
-
-        $milestoneTotal = 0;
-        $forecastData = $forecasts->map(function ($f) use (&$milestoneTotal) {
-            $years = [];
-            $grid = [];
-            $noYear = [];
-
-            $focusAreas = $f->focusAreas->map(function ($fa) use (&$milestoneTotal, &$years, &$grid, &$noYear) {
-                $milestones = $fa->milestones->map(function ($m) {
-                    return [
-                        'id'             => $m->id,
-                        'title'          => $m->title,
-                        'target_year'    => $m->target_year !== null ? (int) $m->target_year : null,
-                        'target_quarter' => $m->target_quarter !== null ? (int) $m->target_quarter : null,
-                        'order'          => (int) $m->order,
-                    ];
-                })->values()->toArray();
-
-                foreach ($milestones as $m) {
-                    if ($m['target_year']) {
-                        $years[$m['target_year']] = true;
-                        $grid[$fa->id][$m['target_year']][] = $m;
-                    } else {
-                        $noYear[$fa->id][] = $m;
-                    }
-                }
-                $milestoneTotal += count($milestones);
-
-                return [
-                    'id'            => $fa->id,
-                    'title'         => $fa->title,
-                    'description'   => $fa->description,
-                    'order'         => (int) $fa->order,
-                    'vision_images' => $fa->visionImages->map(fn ($vi) => ['id' => $vi->id, 'title' => $vi->title])->values()->toArray(),
-                    'obstacles'     => $fa->obstacles->map(fn ($ob) => ['id' => $ob->id, 'title' => $ob->title])->values()->toArray(),
-                    'milestones'    => $milestones,
-                ];
-            })->values()->toArray();
-
-            ksort($years);
-
-            return [
-                'id'                 => $f->id,
-                'title'              => $f->title,
-                'target_date'        => $f->target_date?->toDateString(),
-                'content'            => $f->currentVersion?->content ?? $f->content,
-                'current_version'    => $f->currentVersion?->version,
-                'focus_areas'        => $focusAreas,
-                'transformation_map' => [
-                    'years'   => array_keys($years),
-                    'grid'    => $grid,
-                    'no_year' => $noYear,
-                ],
-            ];
-        })->values()->toArray();
-
-        $hasAny = $mission || $vision || !empty($forecastData);
-        if (!$hasAny) {
-            return null;
-        }
-
-        return [
-            'mission'         => $mission,
-            'vision'          => $vision,
-            'forecasts'       => $forecastData,
-            'milestone_total' => $milestoneTotal,
-            'has_any'         => true,
-        ];
+    /** Widerruft den öffentlichen Strategie-Link. */
+    public function revokePublicLink(): void
+    {
+        $this->entity->revokePublicToken();
+        unset($this->publicStrategyUrl);
+        $this->dispatch('toast', message: 'Öffentlicher Link widerrufen');
     }
 
     // ── Perspective ↔ Team Mapping ────────────────────────────

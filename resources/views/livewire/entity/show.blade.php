@@ -1685,6 +1685,53 @@
                                 </div>
                             </div>
 
+                            {{-- Öffentlich teilen: Link + PDF (Strategie-Onepager ohne Login) --}}
+                            @php $publicUrl = $this->publicStrategyUrl; @endphp
+                            <div class="mb-6 bg-white border border-[var(--ui-border)]/60 rounded-xl p-4">
+                                @if($publicUrl)
+                                    <div class="flex items-center justify-between gap-3 flex-wrap">
+                                        <div class="min-w-0 flex items-center gap-2">
+                                            <span class="inline-flex items-center gap-1 text-[10px] font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded-full px-2 py-0.5">
+                                                @svg('heroicon-o-globe-alt', 'w-3 h-3') öffentlich
+                                            </span>
+                                            <div x-data="{ copied: false }" class="flex items-center gap-1.5 min-w-0">
+                                                <input type="text" readonly value="{{ $publicUrl }}"
+                                                       x-ref="publicLink"
+                                                       class="text-xs text-[var(--ui-secondary)] bg-slate-50 border border-[var(--ui-border)]/60 rounded-md px-2 py-1 w-[280px] max-w-full font-mono truncate">
+                                                <button type="button"
+                                                        @click="navigator.clipboard.writeText($refs.publicLink.value); copied = true; setTimeout(() => copied = false, 1500)"
+                                                        class="text-xs px-2 py-1 rounded-md border border-[var(--ui-border)]/60 hover:bg-slate-50 text-[var(--ui-secondary)] whitespace-nowrap">
+                                                    <span x-show="!copied">Kopieren</span>
+                                                    <span x-show="copied" class="text-emerald-600">✓ Kopiert</span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                        <div class="flex items-center gap-2">
+                                            <a href="{{ $publicUrl }}/pdf" target="_blank"
+                                               class="inline-flex items-center gap-1 text-xs px-3 py-1.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white whitespace-nowrap">
+                                                @svg('heroicon-o-arrow-down-tray', 'w-3.5 h-3.5') PDF
+                                            </a>
+                                            <button type="button" wire:click="revokePublicLink"
+                                                    wire:confirm="Öffentlichen Link wirklich widerrufen? Bestehende Links werden ungültig."
+                                                    class="text-xs px-3 py-1.5 rounded-md border border-red-200 text-red-600 hover:bg-red-50 whitespace-nowrap">
+                                                Widerrufen
+                                            </button>
+                                        </div>
+                                    </div>
+                                @else
+                                    <div class="flex items-center justify-between gap-3 flex-wrap">
+                                        <div class="flex items-center gap-2 text-xs text-[var(--ui-muted)]">
+                                            @svg('heroicon-o-share', 'w-4 h-4 text-purple-500')
+                                            <span>Strategie extern teilen — als Link ohne Login oder als PDF.</span>
+                                        </div>
+                                        <button type="button" wire:click="generatePublicLink"
+                                                class="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-md bg-purple-600 hover:bg-purple-700 text-white whitespace-nowrap">
+                                            @svg('heroicon-o-globe-alt', 'w-3.5 h-3.5') Öffentlichen Link erstellen
+                                        </button>
+                                    </div>
+                                @endif
+                            </div>
+
                             {{-- Mission + Vision Side-by-Side --}}
                             @if(!empty($strategy['mission']) || !empty($strategy['vision']))
                                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">

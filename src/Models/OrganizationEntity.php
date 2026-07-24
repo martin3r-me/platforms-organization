@@ -28,12 +28,57 @@ class OrganizationEntity extends Model
         'parent_entity_id',
         'is_active',
         'metadata',
+        'public_token',
+        'public_token_expires_at',
     ];
 
     protected $casts = [
         'is_active' => 'boolean',
         'metadata' => 'array',
+        'public_token_expires_at' => 'datetime',
     ];
+
+    // ── Public Sharing (Strategie-Onepager) ────────────────────
+
+    /** Erzeugt einen öffentlichen Token für die Strategie-Ansicht (1 Jahr gültig). */
+    public function generatePublicToken(): void
+    {
+        $this->public_token = bin2hex(random_bytes(24));
+        $this->public_token_expires_at = now()->addYear();
+        $this->save();
+    }
+
+    /** Widerruft den öffentlichen Link. */
+    public function revokePublicToken(): void
+    {
+        $this->public_token = null;
+        $this->public_token_expires_at = null;
+        $this->save();
+    }
+
+    /** True, wenn ein gültiger (nicht abgelaufener) öffentlicher Token existiert. */
+    public function isPublicAccessible(): bool
+    {
+        if (! $this->public_token) {
+            return false;
+        }
+
+        if ($this->public_token_expires_at && $this->public_token_expires_at->isPast()) {
+            return false;
+        }
+
+        return true;
+    }
+
+    /** Teilbare URL der öffentlichen Strategie-Ansicht, oder null. */
+    public function getPublicUrl(): ?string
+    {
+        if (! $this->public_token) {
+            return null;
+        }
+
+        return route('organization.public.strategy', $this->public_token);
+    }
 
     /**
      * Fremd-IDs dieser Entity (Kostenstelle, DATEV, Buchungskonto, Kreditor, …).

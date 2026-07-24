@@ -275,6 +275,10 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\OrganizationLookupsTool());
             $registry->register(new \Platform\Organization\Tools\GetOrganizationLookupTool());
 
+            // Modul-Zugang pro Person (authz_grant scope=module) — spiegelt den "Module"-Tab.
+            $registry->register(new \Platform\Organization\Tools\ListPersonModuleAccessTool());
+            $registry->register(new \Platform\Organization\Tools\SetPersonModuleAccessTool());
+
             // Entity Fremd-IDs (Kostenstelle, DATEV, Buchungskonto, Kreditor, …)
             $registry->register(new \Platform\Organization\Tools\SetEntityExternalIdTool());
             $registry->register(new \Platform\Organization\Tools\ListEntityExternalIdsTool());

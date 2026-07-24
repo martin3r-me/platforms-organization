@@ -340,6 +340,18 @@
                                 Person
                             </button>
                         @endif
+                        @if($this->hasLinkedUser)
+                            <button
+                                @click="tab = 'modules'"
+                                :class="tab === 'modules'
+                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
+                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                                class="px-4 py-2.5 text-sm transition-colors"
+                            >
+                                @svg('heroicon-o-squares-2x2', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
+                                Module
+                            </button>
+                        @endif
                         @if($this->isPersonEntity)
                             <button
                                 @click="tab = 'skills'"
@@ -1200,6 +1212,58 @@
                                     @endif
                                 </div>
                             </div>
+                        </div>
+                    </div>
+                @endif
+
+                {{-- Tab: Module (an/aus pro Person) --}}
+                @if($this->hasLinkedUser)
+                    <div x-show="tab === 'modules'" x-cloak>
+                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                            <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1 flex items-center gap-2">
+                                @svg('heroicon-o-squares-2x2', 'w-4 h-4 text-[var(--ui-primary)]')
+                                Modul-Zugang
+                            </h3>
+                            <p class="text-xs text-[var(--ui-muted)] mb-4">
+                                Steuert, welche Module dieser Person zur Verfügung stehen (an/aus).
+                                Lese-/Schreibrechte auf Inhalte werden separat über die Organisationsstruktur geregelt.
+                            </p>
+
+                            @unless($this->canManageModuleAccess)
+                                <div class="mb-4 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
+                                    Nur Team-Admins können Modul-Zugänge ändern.
+                                </div>
+                            @endunless
+
+                            <table class="w-full text-sm">
+                                <thead>
+                                    <tr class="text-xs text-[var(--ui-muted)] uppercase">
+                                        <th class="text-left py-1 px-2">Modul</th>
+                                        <th class="text-right py-1 px-2 w-24">Zugang</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    @foreach($this->moduleAccessRows as $mod)
+                                        <tr class="border-t border-[var(--ui-border)]" wire:key="mod-access-{{ $mod['key'] }}">
+                                            <td class="py-2 px-2 font-medium text-[var(--ui-secondary)]">
+                                                {{ $mod['title'] }}
+                                                <span class="ml-1 text-xs font-normal text-[var(--ui-muted)]">{{ $mod['key'] }}</span>
+                                            </td>
+                                            <td class="py-2 px-2 text-right">
+                                                <button
+                                                    type="button"
+                                                    wire:click="toggleModule('{{ $mod['key'] }}')"
+                                                    @disabled(! $this->canManageModuleAccess)
+                                                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-40 {{ $mod['enabled'] ? 'bg-[var(--ui-primary)]' : 'bg-gray-300' }}"
+                                                    title="{{ $mod['enabled'] ? 'Deaktivieren' : 'Aktivieren' }}"
+                                                >
+                                                    <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {{ $mod['enabled'] ? 'translate-x-6' : 'translate-x-1' }}"></span>
+                                                </button>
+                                            </td>
+                                        </tr>
+                                    @endforeach
+                                </tbody>
+                            </table>
                         </div>
                     </div>
                 @endif

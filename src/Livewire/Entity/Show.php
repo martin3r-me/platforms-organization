@@ -626,6 +626,85 @@ class Show extends Component
         return !is_null($this->entity->linked_user_id);
     }
 
+    // ── Modul-Zugang (an/aus pro Person) ────────────────────────
+    // Schreibt/entfernt authz_grant(scope=module, capability='use') für dieses
+    // Person-Entity. Content-Rechte (read/write/owner) gehören bewusst NICHT
+    // hierher, sondern auf die Knoten-Ebene der Organisationsstruktur.
+
+    #[Computed]
+    public function moduleAccessRows()
+    {
+        // Defensiv: solange der Authz-Kernel nicht migriert ist, darf die
+        // Person-Seite nicht crashen — leere Liste statt Fehler.
+        if (! \Illuminate\Support\Facades\Schema::hasTable('authz_grant')) {
+            return collect();
+        }
+
+        $granted = \Platform\Core\Models\AuthzGrant::query()
+            ->where('subject_type', 'entity')
+            ->where('subject_id', $this->entity->id)
+            ->where('scope_type', 'module')
+            ->where('capability', 'use')
+            ->pluck('scope_key')
+            ->all();
+
+        return \Platform\Core\Models\Module::query()
+            ->orderBy('title')
+            ->get(['id', 'key', 'title'])
+            ->map(fn ($m) => [
+                'key'     => $m->key,
+                'title'   => $m->title ?: $m->key,
+                'enabled' => in_array($m->key, $granted, true),
+            ]);
+    }
+
+    #[Computed]
+    public function canManageModuleAccess(): bool
+    {
+        $user = auth()->user();
+        $team = $user?->currentTeam;
+        $role = $team
+            ? $user->teams()->where('teams.id', $team->id)->first()?->pivot?->role
+            : null;
+
+        return in_array($role, [TeamRole::OWNER->value, TeamRole::ADMIN->value], true);
+    }
+
+    public function toggleModule(string $moduleKey): void
+    {
+        if (! $this->canManageModuleAccess) {
+            abort(403, 'Nur Team-Admins dürfen Modul-Zugänge vergeben.');
+        }
+
+        $existing = \Platform\Core\Models\AuthzGrant::query()
+            ->where('subject_type', 'entity')
+            ->where('subject_id', $this->entity->id)
+            ->where('scope_type', 'module')
+            ->where('scope_key', $moduleKey)
+            ->where('capability', 'use')
+            ->first();
+
+        if ($existing) {
+            $existing->delete();
+            $message = 'Modul deaktiviert';
+        } else {
+            \Platform\Core\Models\AuthzGrant::create([
+                'subject_type' => 'entity',
+                'subject_id'   => $this->entity->id,
+                'capability'   => 'use',
+                'scope_type'   => 'module',
+                'scope_id'     => null,
+                'scope_key'    => $moduleKey,
+                'source'       => 'ui:person-module',
+                'team_id'      => $this->entity->team_id,
+            ]);
+            $message = 'Modul aktiviert';
+        }
+
+        unset($this->moduleAccessRows);
+        $this->dispatch('toast', message: $message);
+    }
+
     public function getTeamUsersProperty()
     {
         $team = auth()->user()->currentTeam;

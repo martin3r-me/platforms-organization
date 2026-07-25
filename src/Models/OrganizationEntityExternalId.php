@@ -21,6 +21,18 @@ class OrganizationEntityExternalId extends Model
     /** Kanonisches System für die Kostenstelle. */
     public const SYSTEM_COST_CENTER = 'kostenstelle';
 
+    /**
+     * Bekannte Fremd-ID-Systeme (system-key => Anzeigename).
+     * Als Vorschläge im UI genutzt; freie Werte bleiben erlaubt.
+     */
+    public const KNOWN_SYSTEMS = [
+        'kostenstelle'  => 'Kostenstelle',
+        'datev'         => 'DATEV',
+        'buchungskonto' => 'Buchungskonto',
+        'kreditor'      => 'Kreditor',
+        'debitor'       => 'Debitor',
+    ];
+
     protected $fillable = [
         'uuid',
         'entity_id',

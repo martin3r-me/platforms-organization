@@ -891,7 +891,6 @@
                             <div class="space-y-4">
                                 <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required />
                                 <x-ui-input-text name="code" label="Code" wire:model.live="form.code" placeholder="Optional: Code oder Nummer" />
-                                <x-ui-input-text name="cost_center" label="Kostenstelle" wire:model.live="form.cost_center" placeholder="z.B. KST-4200 — jede Einheit ist ihre eigene Kostenstelle" />
                                 <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" />
                                 <x-ui-input-select
                                     name="entity_type_id"
@@ -928,6 +927,59 @@
                                     <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
                                 </div>
                             </div>
+                        </div>
+
+                        {{-- Identifier / Fremd-IDs (Kostenstelle, DATEV, Buchungskonto, …) --}}
+                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                            <div class="flex items-start justify-between gap-3 mb-1">
+                                <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Identifier</h2>
+                                <x-ui-button variant="ghost" size="sm" wire:click="addIdentifier">
+                                    @svg('heroicon-o-plus', 'w-4 h-4')
+                                    <span>Identifier hinzufügen</span>
+                                </x-ui-button>
+                            </div>
+                            <p class="text-xs text-[var(--ui-muted)] mb-4">
+                                Fremd-IDs dieser Einheit in anderen Systemen. Jede Einheit IST faktisch ihre eigene Kostenstelle — die Kostenstelle ist nur das System <code class="bg-[var(--ui-muted-5)] px-1 rounded">kostenstelle</code>.
+                            </p>
+
+                            <datalist id="org-known-systems">
+                                @foreach(\Platform\Organization\Models\OrganizationEntityExternalId::KNOWN_SYSTEMS as $sysKey => $sysLabel)
+                                    <option value="{{ $sysKey }}">{{ $sysLabel }}</option>
+                                @endforeach
+                            </datalist>
+
+                            @if(empty($identifiers))
+                                <div class="py-6 text-center rounded-lg border border-dashed border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
+                                    @svg('heroicon-o-identification', 'w-6 h-6 text-[var(--ui-muted)] mx-auto mb-2')
+                                    <p class="text-sm text-[var(--ui-muted)]">Noch keine Identifier hinterlegt</p>
+                                </div>
+                            @else
+                                <div class="space-y-3">
+                                    <div class="hidden md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_auto] gap-2 px-1 text-[10px] uppercase tracking-wider text-[var(--ui-muted)] font-semibold">
+                                        <span>System</span><span>Wert</span><span>Label (optional)</span><span></span>
+                                    </div>
+                                    @foreach($identifiers as $i => $identifier)
+                                        <div wire:key="identifier-{{ $i }}" class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_auto] gap-2 items-start">
+                                            <input type="text" list="org-known-systems"
+                                                   wire:model.live="identifiers.{{ $i }}.system"
+                                                   placeholder="z.B. kostenstelle"
+                                                   class="w-full text-sm rounded-md border-[var(--ui-border)] focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                                            <input type="text"
+                                                   wire:model.live="identifiers.{{ $i }}.value"
+                                                   placeholder="z.B. KST-4200"
+                                                   class="w-full text-sm rounded-md border-[var(--ui-border)] focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                                            <input type="text"
+                                                   wire:model.live="identifiers.{{ $i }}.label"
+                                                   placeholder="Anzeigename"
+                                                   class="w-full text-sm rounded-md border-[var(--ui-border)] focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                                            <button type="button" wire:click="removeIdentifier({{ $i }})"
+                                                    class="justify-self-start md:justify-self-center p-2 rounded-md text-red-500 hover:bg-red-50" title="Entfernen">
+                                                @svg('heroicon-o-trash', 'w-4 h-4')
+                                            </button>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
                         </div>
 
                     </div>

@@ -537,18 +537,66 @@ class Show extends Component
         $this->loadForm();
     }
 
+    /** Fremd-ID-Editor: Zeilen [['system','value','label'], ...]. */
+    public array $identifiers = [];
+
     public function loadForm()
     {
         $this->form = [
             'name' => $this->entity->name,
             'code' => $this->entity->code,
-            'cost_center' => $this->entity->cost_center,
             'description' => $this->entity->description,
             'entity_type_id' => $this->entity->entity_type_id,
             'parent_entity_id' => $this->entity->parent_entity_id,
             'linked_user_id' => $this->entity->linked_user_id,
             'is_active' => $this->entity->is_active,
         ];
+
+        $this->loadIdentifiers();
+    }
+
+    /** Lädt die Fremd-IDs der Entity in den Editor (Kostenstelle ist nur eine Zeile davon). */
+    public function loadIdentifiers()
+    {
+        $this->entity->unsetRelation('externalIds');
+
+        $this->identifiers = $this->entity->externalIds
+            ->sortBy('system')
+            ->map(fn ($e) => [
+                'system' => $e->system,
+                'value'  => $e->value,
+                'label'  => $e->label,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /** Fügt eine leere Fremd-ID-Zeile hinzu. */
+    public function addIdentifier(): void
+    {
+        $this->identifiers[] = ['system' => '', 'value' => '', 'label' => ''];
+    }
+
+    /** Entfernt eine Fremd-ID-Zeile aus dem Editor (persistiert erst beim Speichern). */
+    public function removeIdentifier(int $index): void
+    {
+        unset($this->identifiers[$index]);
+        $this->identifiers = array_values($this->identifiers);
+    }
+
+    /** Normalisierte, nicht-leere Editor-Zeilen (system+value gesetzt). */
+    private function normalizedIdentifiers(): array
+    {
+        return collect($this->identifiers)
+            ->map(fn ($r) => [
+                'system' => trim($r['system'] ?? ''),
+                'value'  => trim($r['value'] ?? ''),
+                'label'  => (trim($r['label'] ?? '') ?: null),
+            ])
+            ->filter(fn ($r) => $r['system'] !== '' && $r['value'] !== '')
+            ->sortBy('system')
+            ->values()
+            ->all();
     }
 
     public function edit()
@@ -561,7 +609,6 @@ class Show extends Component
         $this->validate([
             'form.name' => 'required|string|max:255',
             'form.code' => 'nullable|string|max:255',
-            'form.cost_center' => 'nullable|string|max:255',
             'form.description' => 'nullable|string',
             'form.entity_type_id' => 'required|exists:organization_entity_types,id',
             'form.parent_entity_id' => 'nullable|exists:organization_entities,id',
@@ -569,17 +616,27 @@ class Show extends Component
             'form.is_active' => 'boolean',
         ]);
 
-        try {
-            // cost_center ist eine Fremd-ID (kein Entity-Spaltenfeld) — separat behandeln.
-            $columns = $this->form;
-            $costCenter = $columns['cost_center'] ?? null;
-            unset($columns['cost_center']);
+        $identifiers = $this->normalizedIdentifiers();
 
-            $this->entity->update($columns);
-            $this->entity->setExternalId(
-                \Platform\Organization\Models\OrganizationEntityExternalId::SYSTEM_COST_CENTER,
-                $costCenter
-            );
+        // Ein System darf pro Entity nur einmal vorkommen (system ist der Schlüssel).
+        $systems = array_column($identifiers, 'system');
+        if (count($systems) !== count(array_unique($systems))) {
+            session()->flash('error', 'Jedes Fremd-ID-System darf pro Einheit nur einmal vorkommen.');
+            return;
+        }
+
+        try {
+            $this->entity->update($this->form);
+
+            // Fremd-IDs synchronisieren: entfernte Systeme löschen, vorhandene upserten.
+            $keep = array_column($identifiers, 'system');
+            $this->entity->externalIds()
+                ->when($keep, fn ($q) => $q->whereNotIn('system', $keep), fn ($q) => $q)
+                ->delete();
+
+            foreach ($identifiers as $row) {
+                $this->entity->setExternalId($row['system'], $row['value'], $row['label']);
+            }
 
             $this->loadForm();
             session()->flash('message', 'Organisationseinheit erfolgreich aktualisiert.');
@@ -591,14 +648,20 @@ class Show extends Component
     #[Computed]
     public function isDirty()
     {
+        $entityIdentifiers = $this->entity->externalIds
+            ->sortBy('system')
+            ->map(fn ($e) => ['system' => $e->system, 'value' => $e->value, 'label' => $e->label ?: null])
+            ->values()
+            ->all();
+
         return $this->form['name'] !== $this->entity->name ||
                $this->form['code'] !== $this->entity->code ||
-               ($this->form['cost_center'] ?? null) !== $this->entity->cost_center ||
                $this->form['description'] !== $this->entity->description ||
                $this->form['entity_type_id'] != $this->entity->entity_type_id ||
                $this->form['parent_entity_id'] != $this->entity->parent_entity_id ||
                $this->form['linked_user_id'] != $this->entity->linked_user_id ||
-               $this->form['is_active'] !== $this->entity->is_active;
+               $this->form['is_active'] !== $this->entity->is_active ||
+               $this->normalizedIdentifiers() != $entityIdentifiers;
     }
 
     public function getEntityTypesProperty()

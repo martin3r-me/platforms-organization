@@ -131,7 +131,14 @@ class SnapshotEntitiesCommand extends Command
                     $flat = [];
                     foreach ($signs as $sectionKey => $sectionSigns) {
                         foreach ($sectionSigns as $sign) {
-                            $flat["person_{$sectionKey}_{$sign['key']}"] = $sign['value'];
+                            // vitalSigns()['value'] ist ein Anzeigewert und darf ein String
+                            // sein (z.B. Academy liefert "5/10"). Als summierbare Metrik taugen
+                            // nur numerische Werte — nicht-numerische überspringen, sonst
+                            // vergiften sie die metrics-Spalte (PHP-8.4-Crash in der Aggregation).
+                            if (! isset($sign['value']) || ! is_numeric($sign['value'])) {
+                                continue;
+                            }
+                            $flat["person_{$sectionKey}_{$sign['key']}"] = $sign['value'] + 0;
                         }
                     }
                     if (!empty($flat)) {

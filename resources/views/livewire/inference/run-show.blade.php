@@ -98,7 +98,7 @@
                     ] as [$label, $value, $icon])
                         <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                             <div class="flex items-center gap-2 text-xs text-[var(--ui-muted)] mb-1">
-                                @svg('heroicon-o-' . $icon, 'w-3.5 h-3.5')
+                                @svg('heroicon-o-' . (app('safe-svg')->resolve($icon ?? null, 'heroicon-o-') ?? 'cube'), 'w-3.5 h-3.5')
                                 <span>{{ $label }}</span>
                             </div>
                             <div class="text-2xl font-bold text-[var(--ui-secondary)] tabular-nums">{{ $value }}</div>

@@ -24,7 +24,7 @@
                        collapsed ? 'justify-center' : 'gap-2.5'
                    ]"
                    wire:navigate>
-                    @svg('heroicon-o-' . $item['icon'], 'w-5 h-5 flex-shrink-0')
+                    @svg('heroicon-o-' . (app('safe-svg')->resolve($item['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-5 h-5 flex-shrink-0')
                     <span x-show="!collapsed" class="truncate">{{ $item['label'] }}</span>
                 </a>
             @endforeach

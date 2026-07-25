@@ -148,7 +148,7 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                                 </svg>
                             </div>
-                            @svg('heroicon-o-' . $group['icon'], 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
+                            @svg('heroicon-o-' . (app('safe-svg')->resolve($group['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
                             <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $group['label'] }}</span>
                             <span class="text-xs text-[var(--ui-muted)]">({{ count($group['items']) }})</span>
                             @if(($group['group_logged_minutes'] ?? 0) > 0)

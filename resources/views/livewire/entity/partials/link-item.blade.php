@@ -40,7 +40,7 @@
                     </svg>
                 @endif
             </div>
-            @svg('heroicon-o-' . $groupIcon, 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
+            @svg('heroicon-o-' . (app('safe-svg')->resolve($groupIcon ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
             @if($link['url'])
                 <a href="{{ $link['url'] }}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate {{ $isDone ? 'line-through opacity-60' : '' }}" @click.stop>
                     {{ $link['name'] }}
@@ -74,7 +74,7 @@
                     <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">
                         <div class="flex items-center gap-2">
                             <div class="w-5 h-5 flex-shrink-0"></div>
-                            @svg('heroicon-o-' . $childIconName, 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
+                            @svg('heroicon-o-' . (app('safe-svg')->resolve($childIconName ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
                             <span class="text-sm font-medium text-[var(--ui-secondary)] truncate {{ $childIsDone ? 'line-through opacity-60' : '' }}">
                                 {{ $child[$nameField] ?? '—' }}
                             </span>

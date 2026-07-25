@@ -852,7 +852,7 @@
                                                             <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                                                         </svg>
                                                     </div>
-                                                    @svg('heroicon-o-' . $group['icon'], 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
+                                                    @svg('heroicon-o-' . (app('safe-svg')->resolve($group['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
                                                     <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $group['label'] }}</span>
                                                     <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-[var(--ui-secondary)] bg-[var(--ui-muted-5)] rounded-full">{{ count($group['items']) }}</span>
                                                     @if(($group['group_logged_minutes'] ?? 0) > 0)
@@ -1678,7 +1678,7 @@
                                     <div class="flex items-center justify-between mb-3">
                                         <div class="flex items-center gap-3 min-w-0">
                                             <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/10 shrink-0">
-                                                @svg('heroicon-o-' . $cell['icon'], 'w-5 h-5')
+                                                @svg('heroicon-o-' . (app('safe-svg')->resolve($cell['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-5 h-5')
                                             </span>
                                             <div class="min-w-0">
                                                 <div class="text-sm font-semibold text-[var(--ui-secondary)]">{{ $cell['label'] }}</div>

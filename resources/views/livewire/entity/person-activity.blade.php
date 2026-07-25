@@ -36,7 +36,7 @@
                 @php $config = $sectionConfigs[$sectionKey] ?? ['label' => $sectionKey, 'icon' => 'chart-bar']; @endphp
                 <div class="mb-6">
                     <div class="flex items-center gap-2 mb-3">
-                        @svg('heroicon-o-' . $config['icon'], 'w-4 h-4 text-[var(--ui-muted)]')
+                        @svg('heroicon-o-' . (app('safe-svg')->resolve($config['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 text-[var(--ui-muted)]')
                         <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider">{{ $config['label'] }}</h3>
                     </div>
                     <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
@@ -69,7 +69,7 @@
                                  :class="{ 'border-b border-[var(--ui-border)]/40': open }"
                                  @click="open = !open">
                                 <div class="flex items-center gap-2">
-                                    @svg('heroicon-o-' . $group['icon'], 'w-4 h-4 text-[var(--ui-muted)]')
+                                    @svg('heroicon-o-' . (app('safe-svg')->resolve($group['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 text-[var(--ui-muted)]')
                                     <span class="text-sm font-semibold text-[var(--ui-secondary)]">{{ $group['label'] }}</span>
                                     <span class="text-xs text-[var(--ui-muted)]">({{ $group['total_count'] }})</span>
                                 </div>

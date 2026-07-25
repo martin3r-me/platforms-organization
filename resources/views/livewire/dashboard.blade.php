@@ -44,7 +44,7 @@
                             @foreach($linkDist as $dist)
                                 <div class="flex items-center gap-3 py-2 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
                                     <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                                        @svg('heroicon-o-' . $dist['icon'], 'w-3.5 h-3.5 text-[var(--ui-muted)]')
+                                        @svg('heroicon-o-' . (app('safe-svg')->resolve($dist['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-3.5 h-3.5 text-[var(--ui-muted)]')
                                     </div>
                                     <span class="text-xs text-[var(--ui-muted)] flex-1 truncate">{{ $dist['label'] }}</span>
                                     <span class="text-sm font-bold text-[var(--ui-secondary)]">{{ $dist['count'] }}</span>

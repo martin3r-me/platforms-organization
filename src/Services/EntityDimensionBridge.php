@@ -293,14 +293,22 @@ class EntityDimensionBridge
 
         $linkableType = DimensionLinkService::resolveContextType($linkableType);
 
-        return OrganizationDimensionLink::create(array_merge([
-            'dimension_definition_id' => $defId,
-            'dimension_value_id' => $dvId,
-            'linkable_type' => $linkableType,
-            'linkable_id' => $linkableId,
-            'team_id' => auth()->check() ? auth()->user()->currentTeam?->id : null,
-            'created_by_user_id' => auth()->id(),
-        ], $meta));
+        // Idempotent: ein Entity↔Linkable-Link ist Mengen-Zugehörigkeit, kein
+        // Multiset. Ein bestehender Link wird zurückgegeben statt dupliziert (und
+        // statt in die Unique-Constraint zu laufen). Match auf den logischen
+        // Schlüssel; team_id/created_by/meta nur beim ersten Anlegen.
+        return OrganizationDimensionLink::firstOrCreate(
+            [
+                'dimension_definition_id' => $defId,
+                'dimension_value_id' => $dvId,
+                'linkable_type' => $linkableType,
+                'linkable_id' => $linkableId,
+            ],
+            array_merge([
+                'team_id' => auth()->check() ? auth()->user()->currentTeam?->id : null,
+                'created_by_user_id' => auth()->id(),
+            ], $meta),
+        );
     }
 
     /**

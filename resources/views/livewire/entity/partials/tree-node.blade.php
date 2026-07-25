@@ -114,7 +114,9 @@
                     @php $config = $this->linkTypeConfig[$type] ?? null; @endphp
                     @if($config && $count > 0)
                         <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/20">
-                            @svg('heroicon-o-' . $config['icon'], 'w-3 h-3')
+                            @if($safeIcon = app('safe-svg')->resolve($config['icon'] ?? null, 'heroicon-o-'))
+                                @svg('heroicon-o-' . $safeIcon, 'w-3 h-3')
+                            @endif
                             {{ $config['label'] }}
                             <span class="font-semibold text-[var(--ui-secondary)]">{{ $count }}</span>
                         </span>

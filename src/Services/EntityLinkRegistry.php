@@ -65,6 +65,13 @@ class EntityLinkRegistry
             $this->cachedLinkTypeConfig = [];
             foreach ($this->providers as $provider) {
                 foreach ($provider->linkTypeConfig() as $alias => $config) {
+                    // Icons konsistent als blanken Suffix cachen — die Views prependen
+                    // überall 'heroicon-o-'. Manche Provider hinterlegen den vollen Namen
+                    // ("heroicon-o-users"), was sonst zu 'heroicon-o-heroicon-o-users'
+                    // → SvgNotFound führt (BladeUI\Icons).
+                    if (isset($config['icon']) && is_string($config['icon'])) {
+                        $config['icon'] = preg_replace('/^heroicon-(?:[a-z]-)?/', '', $config['icon']);
+                    }
                     $this->cachedLinkTypeConfig[$alias] = $config;
                 }
             }

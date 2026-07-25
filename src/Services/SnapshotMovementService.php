@@ -194,6 +194,11 @@ class SnapshotMovementService
         $totals = [];
         foreach ($snapshots as $snap) {
             foreach ($snap->metrics as $key => $value) {
+                // Nicht-numerische Metriken (Labels, Zustände, verschachtelte Strukturen)
+                // lassen sich nicht summieren — überspringen statt unter PHP 8.4 zu crashen.
+                if (! is_numeric($value)) {
+                    continue;
+                }
                 $totals[$key] = ($totals[$key] ?? 0) + $value;
             }
         }
@@ -251,6 +256,10 @@ class SnapshotMovementService
                     $cur = $currentMetrics[$key] ?? 0;
                     $prev = $previousMetrics[$key] ?? 0;
                 }
+
+                // Gegen nicht-numerische Metrik-Werte absichern (PHP 8.4 wirft sonst).
+                $cur = is_numeric($cur) ? $cur + 0 : 0;
+                $prev = is_numeric($prev) ? $prev + 0 : 0;
 
                 $delta = $cur - $prev;
 

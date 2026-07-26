@@ -252,9 +252,10 @@ class AuthzMaterializeCommand extends Command
                     if (! $a->person_entity_id || ! $a->context_entity_id) {
                         continue;
                     }
-                    $capability = $roleCaps[$a->role_id] ?? $cap;
+                    // Capability ist opt-in: Rolle ohne (gültige) Capability → KEIN Grant.
+                    $capability = $roleCaps[$a->role_id] ?? null;
                     if (! in_array($capability, ['read', 'write', 'manage'], true)) {
-                        $capability = $cap;
+                        continue;
                     }
                     $rows[] = [
                         'subject_type' => 'entity',

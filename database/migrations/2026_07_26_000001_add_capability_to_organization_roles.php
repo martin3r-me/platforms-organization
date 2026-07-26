@@ -22,7 +22,7 @@ return new class extends Migration
     {
         if (! Schema::hasColumn('organization_roles', 'capability')) {
             Schema::table('organization_roles', function (Blueprint $table) {
-                $table->string('capability', 16)->default('write')->after('vsm_system');
+                $table->string('capability', 16)->nullable()->after('vsm_system');
             });
         }
 

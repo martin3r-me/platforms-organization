@@ -213,22 +213,32 @@ class AuthzMaterializeCommand extends Command
         $rows = [];
         $count = 0;
 
+        // Capability pro Rolle (falls Feld vorhanden) — Assignment erbt sie,
+        // Fallback = --default-capability.
+        $roleCaps = Schema::hasColumn('organization_roles', 'capability')
+            ? DB::table('organization_roles')->pluck('capability', 'id')->all()
+            : [];
+
         DB::table('organization_role_assignments')
             ->where('team_id', $teamId)
             ->whereNull('deleted_at')
             ->where(fn ($q) => $q->whereNull('valid_from')->orWhere('valid_from', '<=', $today))
             ->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', $today))
-            ->select('person_entity_id', 'context_entity_id', 'valid_from', 'valid_to')
+            ->select('person_entity_id', 'context_entity_id', 'role_id', 'valid_from', 'valid_to')
             ->orderBy('id')
-            ->chunk(1000, function ($assignments) use (&$rows, &$count, $cap, $teamId, $now) {
+            ->chunk(1000, function ($assignments) use (&$rows, &$count, $cap, $teamId, $now, $roleCaps) {
                 foreach ($assignments as $a) {
                     if (! $a->person_entity_id || ! $a->context_entity_id) {
                         continue;
                     }
+                    $capability = $roleCaps[$a->role_id] ?? $cap;
+                    if (! in_array($capability, ['read', 'write', 'owner'], true)) {
+                        $capability = $cap;
+                    }
                     $rows[] = [
                         'subject_type' => 'entity',
                         'subject_id'   => (int) $a->person_entity_id,
-                        'capability'   => $cap,
+                        'capability'   => $capability,
                         'scope_type'   => 'entity',
                         'scope_id'     => (int) $a->context_entity_id,
                         'scope_key'    => null,

@@ -285,22 +285,7 @@ class EnvironmentPullService
             // SemanticLayer module may not be available
         }
 
-        // 2. Zukunftsbild (Focus Area Titles)
-        try {
-            $forecast = \Platform\Okr\Models\Forecast::where('team_id', $source->team_id)
-                ->latest()
-                ->first();
-            if ($forecast) {
-                $focusTitles = $forecast->focusAreas()->pluck('title')->implode(', ');
-                if ($focusTitles) {
-                    $parts[] = "## Strategische Fokusfelder\n{$focusTitles}";
-                }
-            }
-        } catch (\Throwable) {
-            // OKR module may not be available
-        }
-
-        // 3. Gelerntes Feedback aus source_relevance Memory
+        // 2. Gelerntes Feedback aus source_relevance Memory
         $relevanceMemory = OrganizationMemoryEntry::forTeam($source->team_id)
             ->ofType('source_relevance')
             ->active()

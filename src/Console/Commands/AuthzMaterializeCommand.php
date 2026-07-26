@@ -71,13 +71,14 @@ class AuthzMaterializeCommand extends Command
 
     private function materializeTeam(int $teamId, string $cap): void
     {
-        $closure = $this->buildClosure($teamId);
-        $links   = $this->buildResourceLinks($teamId);
-        $grants  = $this->buildRoleGrants($teamId, $cap);
+        $closure   = $this->buildClosure($teamId);
+        $links     = $this->buildResourceLinks($teamId);
+        $grants    = $this->buildRoleGrants($teamId, $cap);
+        $relGrants = $this->buildRelationGrants($teamId);
 
         $this->info(sprintf(
-            'Team %d: Closure %d, resource_links %d, Rollen-Grants %d (capability=%s).',
-            $teamId, $closure, $links, $grants, $cap
+            'Team %d: Closure %d, resource_links %d, Rollen-Grants %d, Relation-Grants %d (default-cap=%s).',
+            $teamId, $closure, $links, $grants, $relGrants, $cap
         ));
     }
 
@@ -265,6 +266,91 @@ class AuthzMaterializeCommand extends Command
                         'source'       => 'org:role_assignment',
                         'valid_from'   => $a->valid_from,
                         'valid_to'     => $a->valid_to,
+                        'team_id'      => $teamId,
+                        'created_at'   => $now,
+                        'updated_at'   => $now,
+                    ];
+                    $count++;
+                    if (count($rows) >= 500) {
+                        DB::table('authz_grant')->insert($rows);
+                        $rows = [];
+                    }
+                }
+            });
+        if ($rows) {
+            DB::table('authz_grant')->insert($rows);
+        }
+
+        return $count;
+    }
+
+    /**
+     * Phase 4: zugriffsgebende Relations (Person → Entity) → Entity-Grants.
+     * Capability kommt vom Relation-TYP (default null = kein Zugriff). Nur
+     * Kanten, deren from-Seite eine Person ist (Subjekt = Person, Scope = Ziel).
+     */
+    private function buildRelationGrants(int $teamId): int
+    {
+        DB::table('authz_grant')
+            ->where('team_id', $teamId)
+            ->where('source', 'org:relation')
+            ->delete();
+
+        if (! Schema::hasTable('organization_entity_relationships')
+            || ! Schema::hasTable('organization_entity_relation_types')
+            || ! Schema::hasColumn('organization_entity_relation_types', 'capability')) {
+            return 0;
+        }
+
+        $typeCaps = DB::table('organization_entity_relation_types')
+            ->whereNotNull('capability')
+            ->pluck('capability', 'id')
+            ->all();
+        if ($typeCaps === []) {
+            return 0;
+        }
+
+        // Nur Person-Entities als Subjekt (Kante Person → Entity).
+        $personIds = DB::table('organization_entities as e')
+            ->join('organization_entity_types as t', 't.id', '=', 'e.entity_type_id')
+            ->where('e.team_id', $teamId)
+            ->whereNull('e.deleted_at')
+            ->where('t.code', 'person')
+            ->pluck('e.id')
+            ->flip();
+
+        $today = now()->toDateString();
+        $now = now();
+        $rows = [];
+        $count = 0;
+
+        DB::table('organization_entity_relationships')
+            ->where('team_id', $teamId)
+            ->whereNull('deleted_at')
+            ->whereIn('relation_type_id', array_keys($typeCaps))
+            ->where(fn ($q) => $q->whereNull('valid_from')->orWhere('valid_from', '<=', $today))
+            ->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', $today))
+            ->select('from_entity_id', 'to_entity_id', 'relation_type_id', 'valid_from', 'valid_to')
+            ->orderBy('id')
+            ->chunk(1000, function ($rels) use (&$rows, &$count, $typeCaps, $personIds, $teamId, $now) {
+                foreach ($rels as $r) {
+                    if (! isset($personIds[$r->from_entity_id]) || ! $r->to_entity_id) {
+                        continue; // nur Person → Entity
+                    }
+                    $cap = $typeCaps[$r->relation_type_id] ?? null;
+                    if (! in_array($cap, ['read', 'write', 'manage'], true)) {
+                        continue;
+                    }
+                    $rows[] = [
+                        'subject_type' => 'entity',
+                        'subject_id'   => (int) $r->from_entity_id,
+                        'capability'   => $cap,
+                        'scope_type'   => 'entity',
+                        'scope_id'     => (int) $r->to_entity_id,
+                        'scope_key'    => null,
+                        'source'       => 'org:relation',
+                        'valid_from'   => $r->valid_from,
+                        'valid_to'     => $r->valid_to,
                         'team_id'      => $teamId,
                         'created_at'   => $now,
                         'updated_at'   => $now,

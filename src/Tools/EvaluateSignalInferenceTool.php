@@ -142,14 +142,6 @@ class EvaluateSignalInferenceTool implements ToolContract, ToolMetadataContract
                     $communicationSummary['recent_activities'] = $this->getRecentActivities($entityIdList);
                 }
 
-                // 8b. Zukunftsbild (if data_sources includes zukunftsbild)
-                if (in_array('zukunftsbild', $prompt->data_sources ?? [])) {
-                    $zukunftsbild = $this->getZukunftsbildContext($rootTeamId);
-                    if (!empty($zukunftsbild)) {
-                        $communicationSummary['zukunftsbild'] = $zukunftsbild;
-                    }
-                }
-
                 // 8c. Environment data (if data_sources includes environment)
                 if (in_array('environment', $prompt->data_sources ?? [])) {
                     $envContext = $this->getEnvironmentContext($rootTeamId);
@@ -448,73 +440,6 @@ class EvaluateSignalInferenceTool implements ToolContract, ToolMetadataContract
                 ->toArray();
 
             return $activities;
-        } catch (\Throwable) {
-            return [];
-        }
-    }
-
-    protected function getZukunftsbildContext(int $rootTeamId): array
-    {
-        try {
-            $forecastClass = Relation::getMorphedModel('forecast');
-            if (!$forecastClass) {
-                $forecastClass = \Platform\Okr\Models\Forecast::class;
-            }
-            if (!class_exists($forecastClass)) {
-                return [];
-            }
-
-            $forecast = $forecastClass::where('team_id', $rootTeamId)
-                ->with(['focusAreas.visionImages', 'focusAreas.obstacles', 'focusAreas.milestones'])
-                ->latest()
-                ->first();
-
-            if (!$forecast) {
-                return [];
-            }
-
-            $lines = [];
-            $lines[] = "Forecast: {$forecast->title} (Zieldatum: " . ($forecast->target_date ? $forecast->target_date->format('Y-m-d') : 'offen') . ')';
-
-            $focusAreas = $forecast->focusAreas ?? collect();
-            if ($focusAreas->isNotEmpty()) {
-                $lines[] = 'FocusAreas:';
-                foreach ($focusAreas as $fa) {
-                    $lines[] = "- {$fa->title}: " . ($fa->description ? mb_substr($fa->description, 0, 200) : '');
-
-                    $visionImages = $fa->visionImages ?? collect();
-                    if ($visionImages->isNotEmpty()) {
-                        $viTitles = $visionImages->pluck('title')->filter()->implode(', ');
-                        $lines[] = "  VisionImages: {$viTitles}";
-                    }
-
-                    $obstacles = $fa->obstacles ?? collect();
-                    if ($obstacles->isNotEmpty()) {
-                        $obTitles = $obstacles->pluck('title')->filter()->implode(', ');
-                        $lines[] = "  Obstacles: {$obTitles}";
-                    }
-
-                    $milestones = $fa->milestones ?? collect();
-                    if ($milestones->isNotEmpty()) {
-                        $msParts = [];
-                        $now = now();
-                        foreach ($milestones as $ms) {
-                            $label = $ms->title;
-                            if ($ms->target_date) {
-                                if ($ms->target_date->lt($now)) {
-                                    $label .= ' (überfällig!)';
-                                } else {
-                                    $label .= ' (fällig: ' . $ms->target_date->format('Y-m-d') . ')';
-                                }
-                            }
-                            $msParts[] = $label;
-                        }
-                        $lines[] = '  Milestones: ' . implode(', ', $msParts);
-                    }
-                }
-            }
-
-            return ['forecast_context' => implode("\n", $lines)];
         } catch (\Throwable) {
             return [];
         }

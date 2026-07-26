@@ -25,7 +25,7 @@ use Illuminate\Support\Facades\Schema;
  */
 class AuthzMaterializeCommand extends Command
 {
-    protected $signature = 'authz:materialize {--team= : Team-ID} {--all : Alle Teams mit Org-Graph} {--default-capability=write : read|write|owner für Rollen-Grants}';
+    protected $signature = 'authz:materialize {--team= : Team-ID} {--all : Alle Teams mit Org-Graph} {--default-capability=write : read|write|manage für Rollen-Grants}';
 
     protected $description = 'Materialisiert Content-Achse (Closure + resource_links + Rollen-Grants) EINES Teams in die authz_*-Tabellen.';
 
@@ -39,7 +39,7 @@ class AuthzMaterializeCommand extends Command
         }
 
         $cap = (string) $this->option('default-capability');
-        if (! in_array($cap, ['read', 'write', 'owner'], true)) {
+        if (! in_array($cap, ['read', 'write', 'manage'], true)) {
             $cap = 'write';
         }
 
@@ -252,7 +252,7 @@ class AuthzMaterializeCommand extends Command
                         continue;
                     }
                     $capability = $roleCaps[$a->role_id] ?? $cap;
-                    if (! in_array($capability, ['read', 'write', 'owner'], true)) {
+                    if (! in_array($capability, ['read', 'write', 'manage'], true)) {
                         $capability = $cap;
                     }
                     $rows[] = [

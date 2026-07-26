@@ -10,7 +10,7 @@ use Illuminate\Support\Facades\Schema;
  * Jede RoleAssignment erbt sie — kein zweites Feld beim Zuweisen.
  *
  * Backfill in 3 Eimer (Rest = Default 'write'):
- *   owner  → Lead-/Eigentümer-Rollen (sehen + bearbeiten + löschen)
+ *   manage → Lead-Rollen (sehen + bearbeiten + löschen/verwalten)
  *   read   → Beobachter-/Governance-Rollen (nur sehen)
  *   write  → alle operativen Rollen (Default)
  *
@@ -33,7 +33,7 @@ return new class extends Migration
             'inhaber',
             'project-lead',
             'account-manager',
-        ])->update(['capability' => 'owner']);
+        ])->update(['capability' => 'manage']);
 
         DB::table('organization_roles')->whereIn('slug', [
             'aufsichtsrat',

@@ -264,6 +264,13 @@ class OrganizationServiceProvider extends ServiceProvider
         Schedule::command('organization:decay-environment-relevance')
             ->weekly()
             ->withoutOverlapping();
+
+        // Autorisierungs-Index frisch halten: Closure + resource_links + Rollen-Grants
+        // aus den Org-Daten neu materialisieren, alle Teams, alle 10 Minuten.
+        // (Später gehen die Hot-Paths auf Observer; dies bleibt als Reconcile-Netz.)
+        Schedule::command('authz:materialize --all')
+            ->everyTenMinutes()
+            ->withoutOverlapping();
     }
 
     /**

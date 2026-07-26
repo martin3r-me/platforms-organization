@@ -25,18 +25,12 @@ use Illuminate\Support\Facades\Schema;
  */
 class AuthzMaterializeCommand extends Command
 {
-    protected $signature = 'authz:materialize {--team= : Team-ID (Pflicht)} {--default-capability=write : read|write|owner für Rollen-Grants}';
+    protected $signature = 'authz:materialize {--team= : Team-ID} {--all : Alle Teams mit Org-Graph} {--default-capability=write : read|write|owner für Rollen-Grants}';
 
     protected $description = 'Materialisiert Content-Achse (Closure + resource_links + Rollen-Grants) EINES Teams in die authz_*-Tabellen.';
 
     public function handle(): int
     {
-        $teamId = (int) $this->option('team');
-        if ($teamId <= 0) {
-            $this->error('Bitte Team angeben: php artisan authz:materialize --team=<id>');
-            return self::FAILURE;
-        }
-
         foreach (['authz_scope_closure', 'authz_resource_link', 'authz_grant', 'organization_entities'] as $t) {
             if (! Schema::hasTable($t)) {
                 $this->error("Tabelle {$t} fehlt — Migrationen nicht vollständig.");
@@ -49,16 +43,42 @@ class AuthzMaterializeCommand extends Command
             $cap = 'write';
         }
 
+        if ($this->option('all')) {
+            $teamIds = DB::table('organization_entities')
+                ->whereNull('deleted_at')
+                ->whereNotNull('team_id')
+                ->distinct()
+                ->pluck('team_id')
+                ->all();
+            foreach ($teamIds as $tid) {
+                $this->materializeTeam((int) $tid, $cap);
+            }
+            $this->info('Fertig: '.count($teamIds).' Team(s) materialisiert.');
+
+            return self::SUCCESS;
+        }
+
+        $teamId = (int) $this->option('team');
+        if ($teamId <= 0) {
+            $this->error('Bitte Team angeben: php artisan authz:materialize --team=<id> (oder --all)');
+            return self::FAILURE;
+        }
+
+        $this->materializeTeam($teamId, $cap);
+
+        return self::SUCCESS;
+    }
+
+    private function materializeTeam(int $teamId, string $cap): void
+    {
         $closure = $this->buildClosure($teamId);
         $links   = $this->buildResourceLinks($teamId);
         $grants  = $this->buildRoleGrants($teamId, $cap);
 
         $this->info(sprintf(
-            'Team %d materialisiert: Closure %d Zeilen, resource_links %d, Rollen-Grants %d (capability=%s).',
+            'Team %d: Closure %d, resource_links %d, Rollen-Grants %d (capability=%s).',
             $teamId, $closure, $links, $grants, $cap
         ));
-
-        return self::SUCCESS;
     }
 
     /** Phase 1: Entity-Hierarchie → transitive Closure. */

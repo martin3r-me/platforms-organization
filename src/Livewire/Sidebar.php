@@ -14,38 +14,37 @@ class Sidebar extends Component
     }
 
     /**
-     * Sidebar navigation structure.
-     * Each section has a label and a list of items.
-     * Each item: route, label, icon, match (URL substring used for active highlighting).
+     * Sidebar navigation structure — Schritt 1 der IA-Restrukturierung.
+     *
+     * Gruppen spiegeln die Klassifikation „Betreiben / Organisation / Maschinenraum":
+     * front-of-house (Betreiben, Organisation, Zeit & Kosten) vs. abgesetzte,
+     * org-interne bzw. abwandernde Bereiche (Maschinenraum, Reporting).
+     *
+     * NICHTS wird entfernt oder verschoben — alle 25 Zugänge bleiben lauffähig.
+     * Abwandernde Ziele werden nur MARKIERT (lebende Migrations-Landkarte):
+     *   - Gruppe: 'note' (z. B. „→ eigenes Modul") + 'muted' (optisch abgesetzt)
+     *   - Item:   'migrates' => 'reporting' | 'home' (Marker-Pille am Item)
+     *
+     * Each item: route, label, icon, match (URL-Substring fürs Active-Highlighting),
+     *            optional migrates.
      */
     protected function buildSections(): array
     {
         return [
             [
-                'label' => 'Arbeiten',
+                'label' => 'Betreiben',
                 'items' => [
                     ['route' => 'organization.dashboard', 'label' => 'Dashboard', 'icon' => 'chart-bar', 'match' => '/organization$|/organization/$'],
                     ['route' => 'organization.signals.index', 'label' => 'Signale', 'icon' => 'bell-alert', 'match' => '/signals'],
-                    ['route' => 'organization.my-inquiries.index', 'label' => 'Meine Inquiries', 'icon' => 'inbox', 'match' => '/my-inquiries'],
-                    ['route' => 'organization.entities.index', 'label' => 'Organisationseinheiten', 'icon' => 'building-office', 'match' => '/entities'],
-                ],
-            ],
-            [
-                'label' => 'Steuerung',
-                'items' => [
-                    ['route' => 'organization.pulse', 'label' => 'Pulse', 'icon' => 'signal', 'match' => '/pulse'],
+                    ['route' => 'organization.my-inquiries.index', 'label' => 'Meine Inquiries', 'icon' => 'inbox', 'match' => '/my-inquiries', 'migrates' => 'home'],
                     ['route' => 'organization.ops-room', 'label' => 'Ops-Room (VSM)', 'icon' => 'squares-2x2', 'match' => '/ops-room'],
+                    ['route' => 'organization.pulse', 'label' => 'Pulse', 'icon' => 'signal', 'match' => '/pulse'],
                 ],
             ],
             [
-                'label' => 'Berichte',
+                'label' => 'Organisation',
                 'items' => [
-                    ['route' => 'core.verbalization.factory', 'label' => 'Baukasten', 'icon' => 'squares-2x2', 'match' => '/verbalization/factory'],
-                ],
-            ],
-            [
-                'label' => 'Struktur',
-                'items' => [
+                    ['route' => 'organization.entities.index', 'label' => 'Organisationseinheiten', 'icon' => 'building-office', 'match' => '/entities'],
                     ['route' => 'organization.interlinks.index', 'label' => 'Interlinks', 'icon' => 'arrows-right-left', 'match' => '/interlinks'],
                     ['route' => 'organization.sla-contracts.index', 'label' => 'SLA-Verträge', 'icon' => 'shield-check', 'match' => '/sla-contracts'],
                     ['route' => 'organization.job-profiles.index', 'label' => 'Jobprofile', 'icon' => 'identification', 'match' => '/job-profiles'],
@@ -61,14 +60,25 @@ class Sidebar extends Component
                 ],
             ],
             [
-                'label' => 'Umwelt & Inference',
+                'label' => 'Maschinenraum',
+                'note' => 'org-intern · Engine',
+                'muted' => true,
                 'items' => [
+                    ['route' => 'organization.inference-runs.index', 'label' => 'Inference Runs', 'icon' => 'play', 'match' => '/inference-runs'],
+                    ['route' => 'organization.memory.index', 'label' => 'Memory', 'icon' => 'circle-stack', 'match' => '/memory'],
                     ['route' => 'organization.environment-sources.index', 'label' => 'Umwelt-Quellen', 'icon' => 'globe-alt', 'match' => '/environment-sources'],
                     ['route' => 'organization.environment-snapshots.index', 'label' => 'Umwelt-Snapshots', 'icon' => 'camera', 'match' => '/environment-snapshots'],
-                    ['route' => 'organization.memory.index', 'label' => 'Memory', 'icon' => 'circle-stack', 'match' => '/memory'],
-                    ['route' => 'organization.inference-runs.index', 'label' => 'Inference Runs', 'icon' => 'play', 'match' => '/inference-runs'],
                     ['route' => 'organization.inquiries.index', 'label' => 'Inquiries (Admin)', 'icon' => 'question-mark-circle', 'match' => '/inquiries'],
-                    ['route' => 'organization.synthesis-reports.index', 'label' => 'Synthesis Reports', 'icon' => 'document-text', 'match' => '/synthesis-reports'],
+                ],
+            ],
+            [
+                'label' => 'Reporting',
+                'note' => '→ eigenes Modul',
+                'muted' => true,
+                'items' => [
+                    ['route' => 'core.verbalization.factory', 'label' => 'Baukasten', 'icon' => 'squares-2x2', 'match' => '/verbalization/factory', 'migrates' => 'reporting'],
+                    ['route' => 'organization.synthesis-reports.index', 'label' => 'Synthesis Reports', 'icon' => 'document-text', 'match' => '/synthesis-reports', 'migrates' => 'reporting'],
+                    ['route' => 'organization.settings.synthesis-prompts.index', 'label' => 'Synthesis Prompts', 'icon' => 'document-text', 'match' => '/settings/synthesis-prompts', 'migrates' => 'reporting'],
                 ],
             ],
             [
@@ -76,9 +86,8 @@ class Sidebar extends Component
                 'items' => [
                     ['route' => 'organization.settings.entity-types.index', 'label' => 'Entity Types', 'icon' => 'cube', 'match' => '/settings/entity-types'],
                     ['route' => 'organization.settings.relation-types.index', 'label' => 'Relation Types', 'icon' => 'arrows-right-left', 'match' => '/settings/relation-types'],
-                    ['route' => 'organization.settings.inference-prompts.index', 'label' => 'Inference Prompts', 'icon' => 'cpu-chip', 'match' => '/settings/inference-prompts'],
-                    ['route' => 'organization.settings.synthesis-prompts.index', 'label' => 'Synthesis Prompts', 'icon' => 'document-text', 'match' => '/settings/synthesis-prompts'],
                     ['route' => 'organization.settings.signal-definitions.index', 'label' => 'Signaldefinitionen', 'icon' => 'bell-alert', 'match' => '/settings/signal-definitions'],
+                    ['route' => 'organization.settings.inference-prompts.index', 'label' => 'Inference Prompts', 'icon' => 'cpu-chip', 'match' => '/settings/inference-prompts'],
                 ],
             ],
         ];

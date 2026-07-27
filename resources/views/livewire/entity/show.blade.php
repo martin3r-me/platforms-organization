@@ -1825,7 +1825,7 @@
                                         <x-nx-card>
                                             <div class="text-sm font-semibold text-[color:var(--nx-text)] mb-2">{{ $strategy['mission']['title'] }}</div>
                                             @if(!empty($strategy['mission']['content']))
-                                                <div class="prose prose-sm max-w-none text-[color:var(--nx-text)]">
+                                                <div class="nx-prose">
                                                     {!! \Illuminate\Support\Str::markdown($strategy['mission']['content']) !!}
                                                 </div>
                                             @else
@@ -1844,7 +1844,7 @@
                                         <x-nx-card>
                                             <div class="text-sm font-semibold text-[color:var(--nx-text)] mb-2">{{ $strategy['vision']['title'] }}</div>
                                             @if(!empty($strategy['vision']['content']))
-                                                <div class="prose prose-sm max-w-none text-[color:var(--nx-text)]">
+                                                <div class="nx-prose">
                                                     {!! \Illuminate\Support\Str::markdown($strategy['vision']['content']) !!}
                                                 </div>
                                             @else
@@ -2090,7 +2090,7 @@
                                                     @svg('heroicon-o-book-open', 'w-3.5 h-3.5')
                                                     <span>Regnose-Rückblick — Erzählung aus der Zieljahres-Perspektive</span>
                                                 </div>
-                                                <div class="prose prose-sm max-w-none text-[color:var(--nx-text)]">
+                                                <div class="nx-prose">
                                                     {!! \Illuminate\Support\Str::markdown($forecast['content']) !!}
                                                 </div>
                                             </div>

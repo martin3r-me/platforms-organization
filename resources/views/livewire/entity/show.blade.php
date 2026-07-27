@@ -1736,7 +1736,7 @@
                                     </div>
                                     <h3 class="text-sm font-semibold text-[color:var(--nx-text)]">Noch kein strategisches Zukunftsbild</h3>
                                     <p class="text-xs text-[color:var(--nx-muted)] mt-1 max-w-md mx-auto">
-                                        Diese Carrier-Entity hat noch keine Mission, Vision oder Prognose. Lege sie an, um Zielbilder, Hindernisse und Meilensteine zu strukturieren.
+                                        Diese Carrier-Entity hat noch keine Mission, Vision oder Regnose. Lege sie an, um Zielbilder, Hindernisse und Meilensteine zu strukturieren.
                                     </p>
                                     <div class="mt-4 flex items-center justify-center gap-1.5 flex-wrap text-[10px] text-[color:var(--nx-faint)]">
                                         <span>MCP-Tools:</span>
@@ -1765,7 +1765,7 @@
                                 <x-nx-stat-grid :cols="4">
                                     <x-nx-stat label="Mission" :value="$strategy['mission'] ? 'aktiv' : '—'" icon="heroicon-o-flag" />
                                     <x-nx-stat label="Vision" :value="$strategy['vision'] ? 'aktiv' : '—'" icon="heroicon-o-sparkles" />
-                                    <x-nx-stat label="Prognosen" :value="count($strategy['forecasts'])" hint="Regnosen" icon="heroicon-o-map" />
+                                    <x-nx-stat label="Regnosen" :value="count($strategy['forecasts'])" hint="Rückblick a. d. Zukunft" icon="heroicon-o-map" />
                                     <x-nx-stat label="Fokusräume" :value="$totalFA" icon="heroicon-o-squares-2x2" />
                                     <x-nx-stat label="Zielbilder" :value="$totalVI" icon="heroicon-o-photo" />
                                     <x-nx-stat label="Hindernisse" :value="$totalOb" icon="heroicon-o-exclamation-triangle" />
@@ -1855,7 +1855,7 @@
                                 </div>
                             @endif
 
-                            {{-- 3. Prognosen (Regnosen) — je eigener Block --}}
+                            {{-- 3. Regnosen (Rückblicke aus der Zukunft) — je eigener Block --}}
                             @foreach($strategy['forecasts'] as $forecast)
                                 @php
                                     $daysToTarget = null;
@@ -1877,7 +1877,7 @@
                                     }
                                 @endphp
                                 <div class="mb-8">
-                                    <x-nx-section icon="heroicon-o-map" title="Prognose — {{ $forecast['title'] }}" hint="Rückblick aus der Zukunft">
+                                    <x-nx-section icon="heroicon-o-map" title="Regnose — {{ $forecast['title'] }}" hint="Rückblick aus der Zukunft">
                                         <x-slot name="action">
                                             <div class="flex items-center gap-2 flex-wrap">
                                                 @if($forecast['target_date'])
@@ -1899,11 +1899,11 @@
                                             </div>
                                         </x-slot>
 
-                                        {{-- Fokusräume — abgeleitet aus dieser Prognose --}}
+                                        {{-- Fokusräume — abgeleitet aus dieser Regnose --}}
                                         @if($faCount > 0)
                                             <div class="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-[color:var(--nx-faint)] font-semibold mb-3 pl-1">
                                                 @svg('heroicon-o-arrow-turn-down-right', 'w-3.5 h-3.5')
-                                                <span>Fokusräume — abgeleitet aus dieser Prognose ({{ $faCount }})</span>
+                                                <span>Fokusräume — abgeleitet aus dieser Regnose ({{ $faCount }})</span>
                                             </div>
                                             <div class="space-y-3">
                                                 @foreach($forecast['focus_areas'] as $fa)

@@ -19,13 +19,13 @@
                 <div class="flex-1 min-w-0">
                     <div class="text-sm font-semibold text-[var(--ui-secondary)]">
                         @if($isFrom)
-                            {{ $thisEntity->name }}
+                            {{ $thisEntity?->name ?? '–' }}
                             <span class="font-normal text-[var(--ui-muted)] px-1">{{ $relation->relationType->name ?? '–' }}</span>
-                            {{ $otherEntity->name }}
+                            <span @class(['italic text-[var(--ui-muted)]' => ! $otherEntity])>{{ $otherEntity?->name ?? 'Gelöschte Einheit' }}</span>
                         @else
-                            {{ $otherEntity->name }}
+                            <span @class(['italic text-[var(--ui-muted)]' => ! $otherEntity])>{{ $otherEntity?->name ?? 'Gelöschte Einheit' }}</span>
                             <span class="font-normal text-[var(--ui-muted)] px-1">{{ $relation->relationType->name ?? '–' }}</span>
-                            {{ $thisEntity->name }}
+                            {{ $thisEntity?->name ?? '–' }}
                         @endif
                     </div>
                     <div class="flex items-center gap-2 text-xs text-[var(--ui-muted)] mt-0.5">

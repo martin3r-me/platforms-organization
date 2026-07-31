@@ -1774,6 +1774,39 @@
                                 </x-nx-stat-grid>
                             </div>
 
+                            {{-- Vollständigkeit gegen das Strategie-Blueprint --}}
+                            @php $sc = $this->strategyCompleteness; @endphp
+                            @if($sc)
+                                <div class="mb-8">
+                                    <x-nx-card>
+                                        <div class="flex items-center justify-between gap-3 mb-3">
+                                            <div class="text-sm font-medium text-[color:var(--nx-text)]">Vollständigkeit</div>
+                                            <div class="text-sm font-semibold tabular-nums text-[color:var(--nx-text)]">{{ $sc['percent'] }}%</div>
+                                        </div>
+                                        <div class="h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--nx-line)] mb-4">
+                                            <div class="h-full rounded-full transition-all"
+                                                 style="width: {{ $sc['percent'] }}%; background: {{ $sc['complete'] ? 'var(--nx-success)' : 'var(--nx-accent)' }}"></div>
+                                        </div>
+                                        <div class="flex flex-wrap gap-1.5">
+                                            @foreach($sc['chapters'] as $ch)
+                                                <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs {{ $ch['ok'] ? 'text-[color:var(--nx-success)] bg-[rgba(47,158,68,.10)]' : ($ch['required'] ? 'text-[color:var(--nx-warning)] bg-[rgba(232,89,12,.10)]' : 'text-[color:var(--nx-faint)] bg-[color:var(--nx-accent-soft)]') }}"
+                                                      @if($ch['reason']) title="{{ $ch['reason'] }}" @endif>
+                                                    {{ $ch['order'] }}. {{ $ch['label'] }}
+                                                    @if($ch['ok'])<span aria-hidden="true">✓</span>@elseif($ch['required'])<span aria-hidden="true">!</span>@endif
+                                                </span>
+                                            @endforeach
+                                        </div>
+                                        @if(!empty($sc['issues']))
+                                            <div class="mt-4 space-y-2">
+                                                @foreach($sc['issues'] as $issue)
+                                                    <x-nx-callout :variant="$issue['severity'] === 'error' ? 'warning' : 'info'">{{ $issue['message'] }}</x-nx-callout>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </x-nx-card>
+                                </div>
+                            @endif
+
                             {{-- Öffentlich teilen --}}
                             @php $publicUrl = $this->publicStrategyUrl; @endphp
                             <div class="mb-8">

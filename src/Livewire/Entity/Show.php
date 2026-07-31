@@ -189,6 +189,20 @@ class Show extends Component
         return \Platform\Organization\Services\EntityStrategyPresenter::forEntity($this->entity);
     }
 
+    /** Vollständigkeit der Strategie gegen das Blueprint (percent, Kapitel, Issues). */
+    #[Computed]
+    public function strategyCompleteness(): ?array
+    {
+        $strategy = $this->strategy;
+        if ($strategy === null) {
+            return null;
+        }
+
+        return (new \Platform\Organization\Strategy\StrategyCompleteness())->evaluate(
+            \Platform\Organization\Strategy\StrategyNormalizer::fromPresenter($strategy)
+        );
+    }
+
     /** Öffentlich teilbare URL der Strategie-Ansicht (null, wenn kein gültiger Link). */
     #[Computed]
     public function publicStrategyUrl(): ?string

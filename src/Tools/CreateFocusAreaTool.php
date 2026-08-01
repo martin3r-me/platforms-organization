@@ -17,8 +17,9 @@ class CreateFocusAreaTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /organization/focus-areas - Erstellt einen Fokusraum an einer Carrier-Entity, gebunden an einen Forecast. '
-            . 'entity_id (Pflicht) muss Carrier sein und passt inhaltlich zum Forecast.';
+        return 'POST /organization/focus-areas - Erstellt einen Fokusraum an einer Carrier-Entity. '
+            . 'entity_id (Pflicht) muss Carrier sein. forecast_id ist optional (Modell-Shift: '
+            . 'Fokusräume hängen primär an der Entity, nicht an der Regnose).';
     }
 
     public function getSchema(): array
@@ -27,7 +28,7 @@ class CreateFocusAreaTool implements ToolContract, ToolMetadataContract
             'type' => 'object',
             'properties' => [
                 'entity_id'                      => ['type' => 'integer', 'description' => 'Carrier-Entity (PFLICHT).'],
-                'forecast_id'                    => ['type' => 'integer', 'description' => 'Forecast-ID (PFLICHT).'],
+                'forecast_id'                    => ['type' => 'integer', 'description' => 'Optional: Forecast-ID (Soft-Link; Fokusräume hängen primär an der Entity).'],
                 'title'                          => ['type' => 'string', 'description' => 'Titel (PFLICHT).'],
                 'description'                    => ['type' => 'string', 'description' => 'Optional.'],
                 'content'                        => ['type' => 'string', 'description' => 'Optional: Markdown-Content.'],
@@ -41,7 +42,7 @@ class CreateFocusAreaTool implements ToolContract, ToolMetadataContract
                 'updated_at'                     => ['type' => 'string', 'description' => 'Optional: Aenderungszeit.'],
                 'deleted_at'                     => ['type' => 'string', 'description' => 'Optional: Soft-Delete-Zeit.'],
             ],
-            'required' => ['entity_id', 'forecast_id', 'title'],
+            'required' => ['entity_id', 'title'],
         ];
     }
 
@@ -52,10 +53,10 @@ class CreateFocusAreaTool implements ToolContract, ToolMetadataContract
             if ($entityId <= 0) {
                 return ToolResult::error('VALIDATION_ERROR', 'entity_id ist erforderlich.');
             }
-            $forecastId = (int) ($arguments['forecast_id'] ?? 0);
-            if ($forecastId <= 0) {
-                return ToolResult::error('VALIDATION_ERROR', 'forecast_id ist erforderlich.');
-            }
+            // forecast_id ist optional (Modell-Shift) — Soft-Link, sonst null.
+            $forecastId = isset($arguments['forecast_id']) && (int) $arguments['forecast_id'] > 0
+                ? (int) $arguments['forecast_id']
+                : null;
             $teamId = (int) ($arguments['team_id'] ?? $context->team?->id ?? 0);
             if ($teamId <= 0) {
                 return ToolResult::error('MISSING_TEAM', 'team_id konnte nicht aufgeloest werden.');

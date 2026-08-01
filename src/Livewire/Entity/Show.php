@@ -193,13 +193,13 @@ class Show extends Component
     #[Computed]
     public function strategyCompleteness(): ?array
     {
-        $strategy = $this->strategy;
-        if ($strategy === null) {
+        if (! $this->isCarrierEntity) {
             return null;
         }
 
+        // Entity-nativ (Modell-Shift): Fokusräume über entity_id, eine Regnose.
         return (new \Platform\Organization\Strategy\StrategyCompleteness())->evaluate(
-            \Platform\Organization\Strategy\StrategyNormalizer::fromPresenter($strategy)
+            \Platform\Organization\Strategy\StrategyReader::forEntity($this->entity)
         );
     }
 

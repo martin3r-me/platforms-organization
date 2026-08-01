@@ -115,6 +115,13 @@ class OrganizationServiceProvider extends ServiceProvider
             });
         }
 
+        // Agent-API (Worker-Token, auth:api) — bewusst wie dev/helpdesk registriert, damit
+        // der generische Zeit-Stempel unter /api/org/agent/time mit demselben Token läuft.
+        \Illuminate\Support\Facades\Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
+            ->middleware(['api'])
+            ->prefix('api')
+            ->group(__DIR__.'/../routes/agent.php');
+
         // Schritt 4: Migrationen laden
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 

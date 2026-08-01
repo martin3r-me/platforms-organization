@@ -11,8 +11,7 @@ use Platform\Organization\Models\OrganizationStrategicDocument;
  * Kanonischer, entity-nativer Strategie-Reader (Modell-Shift).
  *
  * Liest direkt in Blueprint-Form — Fokusräume über entity_id (nicht mehr via
- * Forecast), eine Regnose (der Forecast des Carriers). Löst mittelfristig den
- * Übergangs-Adapter StrategyNormalizer(→Presenter) ab.
+ * Forecast), eine Regnose (der Forecast des Carriers).
  *
  *   Mission/Vision = aktives StrategicDocument
  *   Regnose        = Inhalt des (primären) Forecasts

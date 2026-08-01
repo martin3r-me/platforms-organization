@@ -156,23 +156,20 @@ class Show extends Component
     /**
      * Strategy artifacts attached to this carrier-entity for the Strategie-Tab.
      *
-     * Shape:
+     * Shape (Modell-Shift: Fokusräume entity-nativ, Regnose optional):
      * [
-     *   'mission'         => ['title','content','version','valid_from'] | null,
-     *   'vision'          => ['title','content','version','valid_from'] | null,
-     *   'forecasts'       => [ ...see below ],
+     *   'mission'            => ['title','content','version','valid_from'] | null,
+     *   'vision'             => ['title','content','version','valid_from'] | null,
+     *   'focus_areas'        => [ ...per FA, entity-native, flat ],
+     *   'transformation_map' => [
+     *      'years' => [int, ...],  // sorted union of years across all focus-area milestones
+     *      'grid'  => [focus_area_id => [year => [milestone,...]]],
+     *      'no_year' => [focus_area_id => [milestone,...]],  // milestones without year
+     *   ],
+     *   'forecasts'       => [ ...per Regnose: id, title, target_date, content, current_version ],
      *   'milestone_total' => int,
      *   'has_any'         => bool,
      * ]
-     *
-     * A forecast has:
-     *   id, title, target_date, content, current_version_id,
-     *   focus_areas => [ ...per FA ],
-     *   transformation_map => [
-     *      'years' => [int, ...],  // sorted union of years across this forecast's milestones
-     *      'grid'  => [focus_area_id => [year => [milestone,...]]],
-     *      'no_year' => [focus_area_id => [milestone,...]],  // milestones without year
-     *   ]
      *
      * A focus_area has:
      *   id, title, description, order,

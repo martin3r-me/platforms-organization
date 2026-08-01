@@ -97,9 +97,62 @@
             </div>
         @endif
 
-        {{-- Forecasts --}}
+        {{-- Fokusräume (entity-nativ) --}}
+        @if(!empty($strategy['focus_areas']))
+            <div class="section-title">Fokusräume</div>
+            @foreach($strategy['focus_areas'] as $fa)
+                <div class="fa">
+                    <div class="fa-title">{{ $fa['title'] }}</div>
+                    @if(!empty($fa['description']))
+                        <div class="fa-desc">{{ $fa['description'] }}</div>
+                    @endif
+                    @foreach($fa['vision_images'] as $vi)
+                        <span class="chip vision-image">🎯 {{ $vi['title'] }}</span>
+                    @endforeach
+                    @foreach($fa['obstacles'] as $ob)
+                        <span class="chip obstacle">⚠ {{ $ob['title'] }}</span>
+                    @endforeach
+                    @foreach($fa['milestones'] as $m)
+                        <div class="milestone">
+                            @if($m['target_year'])<span class="yr">{{ $m['target_year'] }}@if($m['target_quarter']) Q{{ $m['target_quarter'] }}@endif</span> · @endif{{ $m['title'] }}
+                        </div>
+                    @endforeach
+                </div>
+            @endforeach
+
+            {{-- Transformations-Map — über alle Fokusräume --}}
+            @php $tmap = $strategy['transformation_map']; @endphp
+            @if(!empty($tmap['years']))
+                <table class="tmap">
+                    <thead>
+                        <tr>
+                            <th>Fokusraum</th>
+                            @foreach($tmap['years'] as $year)
+                                <th>{{ $year }}</th>
+                            @endforeach
+                        </tr>
+                    </thead>
+                    <tbody>
+                        @foreach($strategy['focus_areas'] as $fa)
+                            <tr>
+                                <td class="fa-col">{{ $fa['title'] }}</td>
+                                @foreach($tmap['years'] as $year)
+                                    <td>
+                                        @foreach($tmap['grid'][$fa['id']][$year] ?? [] as $m)
+                                            <span class="tm-item">{{ $m['title'] }}@if($m['target_quarter']) (Q{{ $m['target_quarter'] }})@endif</span>
+                                        @endforeach
+                                    </td>
+                                @endforeach
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+            @endif
+        @endif
+
+        {{-- Regnosen (Rückblicke aus der Zukunft) --}}
         @if(!empty($strategy['forecasts']))
-            <div class="section-title">Zukunftsbilder &amp; Fokusräume</div>
+            <div class="section-title">Regnosen</div>
             @foreach($strategy['forecasts'] as $forecast)
                 <div class="forecast">
                     <div class="forecast-head">
@@ -110,57 +163,7 @@
                     </div>
 
                     @if(!empty($forecast['content']))
-                        <div class="prose" style="margin-bottom:12px;">{!! \Illuminate\Support\Str::markdown($forecast['content']) !!}</div>
-                    @endif
-
-                    {{-- Fokusräume --}}
-                    @foreach($forecast['focus_areas'] as $fa)
-                        <div class="fa">
-                            <div class="fa-title">{{ $fa['title'] }}</div>
-                            @if(!empty($fa['description']))
-                                <div class="fa-desc">{{ $fa['description'] }}</div>
-                            @endif
-                            @foreach($fa['vision_images'] as $vi)
-                                <span class="chip vision-image">🎯 {{ $vi['title'] }}</span>
-                            @endforeach
-                            @foreach($fa['obstacles'] as $ob)
-                                <span class="chip obstacle">⚠ {{ $ob['title'] }}</span>
-                            @endforeach
-                            @foreach($fa['milestones'] as $m)
-                                <div class="milestone">
-                                    @if($m['target_year'])<span class="yr">{{ $m['target_year'] }}@if($m['target_quarter']) Q{{ $m['target_quarter'] }}@endif</span> · @endif{{ $m['title'] }}
-                                </div>
-                            @endforeach
-                        </div>
-                    @endforeach
-
-                    {{-- Transformations-Map --}}
-                    @php $tmap = $forecast['transformation_map']; @endphp
-                    @if(!empty($tmap['years']))
-                        <table class="tmap">
-                            <thead>
-                                <tr>
-                                    <th>Fokusraum</th>
-                                    @foreach($tmap['years'] as $year)
-                                        <th>{{ $year }}</th>
-                                    @endforeach
-                                </tr>
-                            </thead>
-                            <tbody>
-                                @foreach($forecast['focus_areas'] as $fa)
-                                    <tr>
-                                        <td class="fa-col">{{ $fa['title'] }}</td>
-                                        @foreach($tmap['years'] as $year)
-                                            <td>
-                                                @foreach($tmap['grid'][$fa['id']][$year] ?? [] as $m)
-                                                    <span class="tm-item">{{ $m['title'] }}@if($m['target_quarter']) (Q{{ $m['target_quarter'] }})@endif</span>
-                                                @endforeach
-                                            </td>
-                                        @endforeach
-                                    </tr>
-                                @endforeach
-                            </tbody>
-                        </table>
+                        <div class="prose">{!! \Illuminate\Support\Str::markdown($forecast['content']) !!}</div>
                     @endif
                 </div>
             @endforeach

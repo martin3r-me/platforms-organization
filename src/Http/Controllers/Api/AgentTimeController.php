@@ -24,10 +24,10 @@ class AgentTimeController extends Controller
         'Platform\Dev\Models\DevIssue',
         'Platform\Planner\Models\PlannerTask',
         'Platform\Helpdesk\Models\HelpdeskTicket',
-        // Assistenz-Zeit wird auf den betreuten User („Chef") gebucht — Attribution der
-        // sonst unsichtbaren Assistenz-Arbeit („N min Assistenz für Martin"). Team = das
-        // aktuelle Team des Users (User hat kein eigenes team_id).
-        'Platform\Core\Models\User',
+        // Assistenz bucht auf ein RUN-Projekt „Assistenz · <Chef>", das dem Worker gehört
+        // (der Ausführende = VSM System 1) — rollt wie jedes Projekt zu Team/Org auf. KEIN
+        // Buchen mehr direkt auf den User (das war ein Waise im Reporting).
+        'Platform\Planner\Models\PlannerProject',
     ];
 
     public function stamp(Request $request): JsonResponse
@@ -58,8 +58,8 @@ class AgentTimeController extends Controller
             return response()->json(['message' => 'Time tracking unavailable'], 501);
         }
 
-        // Autoritatives Team aus dem Item; ein User hat kein eigenes team_id → aktuelles Team.
-        $teamId = $item->team_id ?? ($item->current_team_id ?? null);
+        // Autoritatives Team kommt aus dem Item (alle erlaubten Kontexte haben team_id).
+        $teamId = $item->team_id ?? null;
         if (! $teamId) {
             return response()->json(['message' => 'No team context for item'], 422);
         }

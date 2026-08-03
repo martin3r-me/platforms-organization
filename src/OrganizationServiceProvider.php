@@ -549,7 +549,9 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\ListEnvironmentSnapshotsTool());
             $registry->register(new \Platform\Organization\Tools\RateEnvironmentSourceTool());
 
-            // Strategy Layer (Mission/Vision, Forecasts, FocusAreas, VisionImages, Obstacles, Milestones, MilestoneContributions)
+            // Strategy Layer (Aggregat, Mission/Vision, Forecasts, FocusAreas, VisionImages, Obstacles, Milestones, MilestoneContributions)
+            $registry->register(new \Platform\Organization\Tools\ListStrategiesTool());
+            $registry->register(new \Platform\Organization\Tools\UpdateStrategyTool());
             $registry->register(new \Platform\Organization\Tools\ListStrategicDocumentsTool());
             $registry->register(new \Platform\Organization\Tools\CreateStrategicDocumentTool());
             $registry->register(new \Platform\Organization\Tools\UpdateStrategicDocumentTool());

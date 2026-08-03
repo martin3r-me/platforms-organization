@@ -1777,7 +1777,15 @@
                                 <div class="mb-8">
                                     <x-nx-card>
                                         <div class="flex items-center justify-between gap-3 mb-3">
-                                            <div class="text-sm font-medium text-[color:var(--nx-text)]">Vollständigkeit</div>
+                                            <div class="flex items-center gap-2">
+                                                <div class="text-sm font-medium text-[color:var(--nx-text)]">Vollständigkeit</div>
+                                                @php $sm = $strategy['strategy_meta'] ?? null; @endphp
+                                                @if($sm)
+                                                    <x-nx-badge :variant="$sm['status'] === 'active' ? 'success' : ($sm['status'] === 'archived' ? 'neutral' : 'warning')">
+                                                        {{ ['draft' => 'Entwurf', 'active' => 'Aktiv', 'archived' => 'Archiviert'][$sm['status']] ?? $sm['status'] }} · v{{ $sm['version'] }}
+                                                    </x-nx-badge>
+                                                @endif
+                                            </div>
                                             <div class="text-sm font-semibold tabular-nums text-[color:var(--nx-text)]">{{ $sc['percent'] }}%</div>
                                         </div>
                                         <div class="h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--nx-line)] mb-4">

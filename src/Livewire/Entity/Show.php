@@ -167,6 +167,7 @@ class Show extends Component
      *      'no_year' => [focus_area_id => [milestone,...]],  // milestones without year
      *   ],
      *   'forecasts'       => [ ...per Regnose: id, title, target_date, content, current_version ],
+     *   'strategy_meta'   => ['status','version','published_at','owner_name'] | null,  // Strategy-Aggregat
      *   'milestone_total' => int,
      *   'has_any'         => bool,
      * ]

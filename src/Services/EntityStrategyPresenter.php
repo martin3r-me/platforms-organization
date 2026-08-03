@@ -6,6 +6,7 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationFocusArea;
 use Platform\Organization\Models\OrganizationForecast;
 use Platform\Organization\Models\OrganizationStrategicDocument;
+use Platform\Organization\Models\OrganizationStrategy;
 
 /**
  * Baut die Strategie-Ansicht einer Carrier-Entity zusammen (Mission/Vision,
@@ -156,12 +157,26 @@ class EntityStrategyPresenter
             return null;
         }
 
+        // Strategy-Aggregat (1:1 zum Carrier) — Lifecycle-Meta, optional.
+        $strategy = OrganizationStrategy::query()
+            ->where('entity_id', $entity->id)
+            ->whereNull('deleted_at')
+            ->with('owner:id,name')
+            ->first();
+        $strategyMeta = $strategy ? [
+            'status'       => $strategy->status,
+            'version'      => (int) $strategy->version,
+            'published_at' => $strategy->published_at?->toDateString(),
+            'owner_name'   => $strategy->owner?->name,
+        ] : null;
+
         return [
             'mission'            => $mission,
             'vision'             => $vision,
             'focus_areas'        => $focusAreas,
             'transformation_map' => $transformationMap,
             'forecasts'          => $forecastData,
+            'strategy_meta'      => $strategyMeta,
             'milestone_total'    => $milestoneTotal,
             'has_any'            => true,
         ];

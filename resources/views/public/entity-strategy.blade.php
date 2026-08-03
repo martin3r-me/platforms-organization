@@ -115,6 +115,12 @@
                     @foreach($fa['milestones'] as $m)
                         <div class="milestone">
                             @if($m['target_year'])<span class="yr">{{ $m['target_year'] }}@if($m['target_quarter']) Q{{ $m['target_quarter'] }}@endif</span> · @endif{{ $m['title'] }}
+                            @if(!empty($m['description']))
+                                <div style="color:#64748b;font-size:11px;margin-top:2px;">{{ $m['description'] }}</div>
+                            @endif
+                            @if(!empty($m['central_question']))
+                                <div style="color:#94a3b8;font-size:11px;font-style:italic;margin-top:2px;">{{ $m['central_question'] }}</div>
+                            @endif
                         </div>
                     @endforeach
                 </div>

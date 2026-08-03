@@ -1930,14 +1930,25 @@
                                                                     <span class="text-[10px] uppercase tracking-wider text-[color:var(--nx-muted)] font-semibold">Zielbilder</span>
                                                                     @if($viCount > 0)<span class="text-[10px] text-[color:var(--nx-faint)]">{{ $viCount }}</span>@endif
                                                                 </div>
+                                                                @if(!empty($fa['central_question_vision_images']))
+                                                                    <p class="text-[11px] text-[color:var(--nx-faint)] italic mb-2 leading-snug">{{ $fa['central_question_vision_images'] }}</p>
+                                                                @endif
                                                                 @if($viCount === 0)
                                                                     <p class="text-[11px] text-[color:var(--nx-faint)] italic">noch offen</p>
                                                                 @else
-                                                                    <ul class="space-y-1">
+                                                                    <ul class="space-y-2">
                                                                         @foreach($fa['vision_images'] as $vi)
                                                                             <li class="flex items-start gap-1.5 text-xs text-[color:var(--nx-text)]">
                                                                                 <span class="w-1 h-1 rounded-full bg-[color:var(--nx-tone-sky)] mt-1.5 flex-shrink-0"></span>
-                                                                                <span class="leading-snug">{{ $vi['title'] }}</span>
+                                                                                <div class="min-w-0 flex-1">
+                                                                                    <span class="leading-snug">{{ $vi['title'] }}</span>
+                                                                                    @if(!empty($vi['description']))
+                                                                                        <p class="text-[11px] text-[color:var(--nx-muted)] mt-0.5 leading-snug">{{ $vi['description'] }}</p>
+                                                                                    @endif
+                                                                                    @if(!empty($vi['central_question']))
+                                                                                        <p class="text-[11px] text-[color:var(--nx-faint)] italic mt-0.5 leading-snug">{{ $vi['central_question'] }}</p>
+                                                                                    @endif
+                                                                                </div>
                                                                             </li>
                                                                         @endforeach
                                                                     </ul>
@@ -1950,14 +1961,25 @@
                                                                     <span class="text-[10px] uppercase tracking-wider text-[color:var(--nx-muted)] font-semibold">Hindernisse</span>
                                                                     @if($obCount > 0)<span class="text-[10px] text-[color:var(--nx-faint)]">{{ $obCount }}</span>@endif
                                                                 </div>
+                                                                @if(!empty($fa['central_question_obstacles']))
+                                                                    <p class="text-[11px] text-[color:var(--nx-faint)] italic mb-2 leading-snug">{{ $fa['central_question_obstacles'] }}</p>
+                                                                @endif
                                                                 @if($obCount === 0)
                                                                     <p class="text-[11px] text-[color:var(--nx-faint)] italic">noch offen</p>
                                                                 @else
-                                                                    <ul class="space-y-1">
+                                                                    <ul class="space-y-2">
                                                                         @foreach($fa['obstacles'] as $ob)
                                                                             <li class="flex items-start gap-1.5 text-xs text-[color:var(--nx-text)]">
                                                                                 <span class="w-1 h-1 rounded-full bg-[color:var(--nx-warning)] mt-1.5 flex-shrink-0"></span>
-                                                                                <span class="leading-snug">{{ $ob['title'] }}</span>
+                                                                                <div class="min-w-0 flex-1">
+                                                                                    <span class="leading-snug">{{ $ob['title'] }}</span>
+                                                                                    @if(!empty($ob['description']))
+                                                                                        <p class="text-[11px] text-[color:var(--nx-muted)] mt-0.5 leading-snug">{{ $ob['description'] }}</p>
+                                                                                    @endif
+                                                                                    @if(!empty($ob['central_question']))
+                                                                                        <p class="text-[11px] text-[color:var(--nx-faint)] italic mt-0.5 leading-snug">{{ $ob['central_question'] }}</p>
+                                                                                    @endif
+                                                                                </div>
                                                                             </li>
                                                                         @endforeach
                                                                     </ul>
@@ -1970,22 +1992,35 @@
                                                                     <span class="text-[10px] uppercase tracking-wider text-[color:var(--nx-muted)] font-semibold">Meilensteine</span>
                                                                     @if($msCount > 0)<span class="text-[10px] text-[color:var(--nx-faint)]">{{ $msCount }}</span>@endif
                                                                 </div>
+                                                                @if(!empty($fa['central_question_milestones']))
+                                                                    <p class="text-[11px] text-[color:var(--nx-faint)] italic mb-2 leading-snug">{{ $fa['central_question_milestones'] }}</p>
+                                                                @endif
                                                                 @if($msCount === 0)
                                                                     <p class="text-[11px] text-[color:var(--nx-faint)] italic">noch offen</p>
                                                                 @else
-                                                                    <ul class="space-y-1">
+                                                                    <ul class="space-y-2">
                                                                         @foreach($fa['milestones'] as $m)
                                                                             <li class="flex items-start gap-1.5 text-xs text-[color:var(--nx-text)]">
                                                                                 <span class="w-1 h-1 rounded-full bg-[color:var(--nx-tone-emerald)] mt-1.5 flex-shrink-0"></span>
-                                                                                <span class="leading-snug flex-1">{{ $m['title'] }}</span>
-                                                                                @if($m['target_year'] || $m['target_quarter'])
-                                                                                    <span class="text-[9px] font-semibold text-[color:var(--nx-muted)] bg-[color:var(--nx-bg)] border border-[color:var(--nx-line)] rounded px-1 flex-shrink-0 whitespace-nowrap leading-4">
-                                                                                        @if($m['target_year'] && $m['target_quarter']){{ $m['target_year'] }}·Q{{ $m['target_quarter'] }}
-                                                                                        @elseif($m['target_year']){{ $m['target_year'] }}
-                                                                                        @else Q{{ $m['target_quarter'] }}
+                                                                                <div class="min-w-0 flex-1">
+                                                                                    <div class="flex items-start gap-1.5">
+                                                                                        <span class="leading-snug flex-1">{{ $m['title'] }}</span>
+                                                                                        @if($m['target_year'] || $m['target_quarter'])
+                                                                                            <span class="text-[9px] font-semibold text-[color:var(--nx-muted)] bg-[color:var(--nx-bg)] border border-[color:var(--nx-line)] rounded px-1 flex-shrink-0 whitespace-nowrap leading-4">
+                                                                                                @if($m['target_year'] && $m['target_quarter']){{ $m['target_year'] }}·Q{{ $m['target_quarter'] }}
+                                                                                                @elseif($m['target_year']){{ $m['target_year'] }}
+                                                                                                @else Q{{ $m['target_quarter'] }}
+                                                                                                @endif
+                                                                                            </span>
                                                                                         @endif
-                                                                                    </span>
-                                                                                @endif
+                                                                                    </div>
+                                                                                    @if(!empty($m['description']))
+                                                                                        <p class="text-[11px] text-[color:var(--nx-muted)] mt-0.5 leading-snug">{{ $m['description'] }}</p>
+                                                                                    @endif
+                                                                                    @if(!empty($m['central_question']))
+                                                                                        <p class="text-[11px] text-[color:var(--nx-faint)] italic mt-0.5 leading-snug">{{ $m['central_question'] }}</p>
+                                                                                    @endif
+                                                                                </div>
                                                                             </li>
                                                                         @endforeach
                                                                     </ul>

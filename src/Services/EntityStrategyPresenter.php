@@ -85,11 +85,13 @@ class EntityStrategyPresenter
         $focusAreas = $focusAreaModels->map(function ($fa) use (&$milestoneTotal, &$years, &$grid, &$noYear) {
             $milestones = $fa->milestones->map(function ($m) {
                 return [
-                    'id'             => $m->id,
-                    'title'          => $m->title,
-                    'target_year'    => $m->target_year !== null ? (int) $m->target_year : null,
-                    'target_quarter' => $m->target_quarter !== null ? (int) $m->target_quarter : null,
-                    'order'          => (int) $m->order,
+                    'id'               => $m->id,
+                    'title'            => $m->title,
+                    'description'      => $m->description,
+                    'central_question' => $m->central_question,
+                    'target_year'      => $m->target_year !== null ? (int) $m->target_year : null,
+                    'target_quarter'   => $m->target_quarter !== null ? (int) $m->target_quarter : null,
+                    'order'            => (int) $m->order,
                 ];
             })->values()->toArray();
 
@@ -108,8 +110,18 @@ class EntityStrategyPresenter
                 'title'         => $fa->title,
                 'description'   => $fa->description,
                 'order'         => (int) $fa->order,
-                'vision_images' => $fa->visionImages->map(fn ($vi) => ['id' => $vi->id, 'title' => $vi->title])->values()->toArray(),
-                'obstacles'     => $fa->obstacles->map(fn ($ob) => ['id' => $ob->id, 'title' => $ob->title])->values()->toArray(),
+                // Leitfragen je Spalte (Modell-Felder existieren bereits).
+                'central_question_vision_images' => $fa->central_question_vision_images,
+                'central_question_obstacles'     => $fa->central_question_obstacles,
+                'central_question_milestones'    => $fa->central_question_milestones,
+                'vision_images' => $fa->visionImages->map(fn ($vi) => [
+                    'id' => $vi->id, 'title' => $vi->title,
+                    'description' => $vi->description, 'central_question' => $vi->central_question,
+                ])->values()->toArray(),
+                'obstacles'     => $fa->obstacles->map(fn ($ob) => [
+                    'id' => $ob->id, 'title' => $ob->title,
+                    'description' => $ob->description, 'central_question' => $ob->central_question,
+                ])->values()->toArray(),
                 'milestones'    => $milestones,
             ];
         })->values()->toArray();

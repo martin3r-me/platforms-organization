@@ -34,6 +34,11 @@ class OrganizationRole extends Model
         'vsm_system',
         'status',
         'owner_entity_id',
+        'capabilities',
+    ];
+
+    protected $casts = [
+        'capabilities' => 'array',
     ];
 
     /**

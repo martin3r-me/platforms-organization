@@ -17,9 +17,9 @@ use Illuminate\Support\Facades\Schema;
  *                      (welches Modul-Objekt hängt an welcher Entity). linkable_type
  *                      wird via Morph-Map auf die volle Klasse normalisiert.
  * Phase 3 — Grants:    organization_role_assignments → authz_grant(scope=entity)
- *                      (Person hält Rolle an Kontext-Entity). Capability aus
- *                      --default-capability (Role trägt sie noch nicht; TODO: Feld
- *                      auf organization_roles).
+ *                      (Person hält Rolle an Kontext-Entity). Capability aus dem
+ *                      JSON-Feld organization_roles.capabilities (höchste Content-
+ *                      Stufe manage>write>read gewinnt; leer = kein Grant).
  *
  * Ändert NICHTS am Enforcement — füllt nur die Tabellen; der Shadow misst weiter.
  */
@@ -234,11 +234,23 @@ class AuthzMaterializeCommand extends Command
         $rows = [];
         $count = 0;
 
-        // Capability pro Rolle (falls Feld vorhanden) — Assignment erbt sie,
-        // Fallback = --default-capability.
-        $roleCaps = Schema::hasColumn('organization_roles', 'capability')
-            ? DB::table('organization_roles')->pluck('capability', 'id')->all()
-            : [];
+        // Capability pro Rolle aus dem JSON-Feld 'capabilities' (Plural). Aus dem
+        // Array wird die höchste Content-Stufe (manage>write>read) als Grant-Cap
+        // abgeleitet. Rollen ohne passende Capability → KEIN Grant.
+        $roleCaps = [];
+        if (Schema::hasColumn('organization_roles', 'capabilities')) {
+            foreach (
+                DB::table('organization_roles')
+                    ->whereNotNull('capabilities')
+                    ->select('id', 'capabilities')
+                    ->get() as $role
+            ) {
+                $derived = $this->highestCapability(json_decode($role->capabilities ?? '', true));
+                if ($derived !== null) {
+                    $roleCaps[$role->id] = $derived;
+                }
+            }
+        }
 
         DB::table('organization_role_assignments')
             ->where('team_id', $teamId)
@@ -254,7 +266,7 @@ class AuthzMaterializeCommand extends Command
                     }
                     // Capability ist opt-in: Rolle ohne (gültige) Capability → KEIN Grant.
                     $capability = $roleCaps[$a->role_id] ?? null;
-                    if (! in_array($capability, ['read', 'write', 'manage'], true)) {
+                    if ($capability === null) {
                         continue;
                     }
                     $rows[] = [
@@ -287,8 +299,9 @@ class AuthzMaterializeCommand extends Command
 
     /**
      * Phase 4: zugriffsgebende Relations (Person → Entity) → Entity-Grants.
-     * Capability kommt vom Relation-TYP (default null = kein Zugriff). Nur
-     * Kanten, deren from-Seite eine Person ist (Subjekt = Person, Scope = Ziel).
+     * Capability kommt aus relation_types.capabilities (JSON-Array, höchste Stufe
+     * gewinnt; leer = kein Zugriff). Nur Kanten, deren from-Seite eine Person ist
+     * (Subjekt = Person, Scope = Ziel).
      */
     private function buildRelationGrants(int $teamId): int
     {
@@ -299,14 +312,24 @@ class AuthzMaterializeCommand extends Command
 
         if (! Schema::hasTable('organization_entity_relationships')
             || ! Schema::hasTable('organization_entity_relation_types')
-            || ! Schema::hasColumn('organization_entity_relation_types', 'capability')) {
+            || ! Schema::hasColumn('organization_entity_relation_types', 'capabilities')) {
             return 0;
         }
 
-        $typeCaps = DB::table('organization_entity_relation_types')
-            ->whereNotNull('capability')
-            ->pluck('capability', 'id')
-            ->all();
+        // Capability pro Relation-Typ aus dem JSON-Feld 'capabilities' (Plural) —
+        // höchste Content-Stufe (manage>write>read) gewinnt; leer = kein Zugriff.
+        $typeCaps = [];
+        foreach (
+            DB::table('organization_entity_relation_types')
+                ->whereNotNull('capabilities')
+                ->select('id', 'capabilities')
+                ->get() as $type
+        ) {
+            $derived = $this->highestCapability(json_decode($type->capabilities ?? '', true));
+            if ($derived !== null) {
+                $typeCaps[$type->id] = $derived;
+            }
+        }
         if ($typeCaps === []) {
             return 0;
         }
@@ -339,7 +362,7 @@ class AuthzMaterializeCommand extends Command
                         continue; // nur Person → Entity
                     }
                     $cap = $typeCaps[$r->relation_type_id] ?? null;
-                    if (! in_array($cap, ['read', 'write', 'manage'], true)) {
+                    if ($cap === null) {
                         continue;
                     }
                     $rows[] = [
@@ -368,5 +391,23 @@ class AuthzMaterializeCommand extends Command
         }
 
         return $count;
+    }
+
+    /**
+     * Leitet aus einem freien Capabilities-Array die höchste Content-Stufe ab.
+     * manage > write > read. Kein Treffer (oder kein Array) → null (→ kein Grant).
+     */
+    private function highestCapability(mixed $caps): ?string
+    {
+        if (! is_array($caps)) {
+            return null;
+        }
+        foreach (['manage', 'write', 'read'] as $level) {
+            if (in_array($level, $caps, true)) {
+                return $level;
+            }
+        }
+
+        return null;
     }
 }

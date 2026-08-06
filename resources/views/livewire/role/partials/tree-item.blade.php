@@ -16,6 +16,9 @@
                         {{ strtoupper(str_replace('_', '', $item->vsm_system)) }}
                     </span>
                 @endif
+                @foreach($item->capabilities ?? [] as $cap)
+                    <x-ui-badge variant="primary" size="sm" title="Verleiht Capability '{{ $cap }}' im Kontext der Zuweisung">{{ $cap }}</x-ui-badge>
+                @endforeach
             </div>
             @if($item->description)
                 <div class="text-xs text-[var(--ui-muted)] ml-5.5 truncate">{{ \Illuminate\Support\Str::limit($item->description, 80) }}</div>

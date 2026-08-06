@@ -48,6 +48,7 @@
                 <x-ui-table-header-cell compact="true">Code</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Eigenschaften</x-ui-table-header-cell>
+                <x-ui-table-header-cell compact="true">Berechtigung</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Aktionen</x-ui-table-header-cell>
             </x-ui-table-header>
@@ -77,6 +78,15 @@
                                 @if(!$relationType->is_directional && !$relationType->is_hierarchical && !$relationType->is_reciprocal)
                                     <span class="text-[var(--ui-muted)]">–</span>
                                 @endif
+                            </div>
+                        </x-ui-table-cell>
+                        <x-ui-table-cell compact="true">
+                            <div class="flex items-center gap-1">
+                                @forelse($relationType->capabilities ?? [] as $cap)
+                                    <x-ui-badge variant="primary" size="xs">{{ $cap }}</x-ui-badge>
+                                @empty
+                                    <span class="text-[var(--ui-muted)]">–</span>
+                                @endforelse
                             </div>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">

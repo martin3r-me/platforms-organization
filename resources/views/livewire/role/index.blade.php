@@ -98,6 +98,29 @@
                     </select>
                 </div>
             </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">
+                    Berechtigungen (Autorisierung)
+                </label>
+                <p class="text-xs text-gray-500 mb-2">
+                    Wird diese Rolle einer Person an einer Kontext-Entity zugewiesen, erhält sie die gewählte Content-Capability auf diese Entity und ihren Teilbaum. Ohne Auswahl verleiht die Rolle keinen Zugriff. Höchste Stufe gewinnt (manage&nbsp;&gt;&nbsp;write&nbsp;&gt;&nbsp;read).
+                </p>
+                <div class="space-y-2">
+                    <label class="flex items-center text-sm text-gray-700">
+                        <input type="checkbox" wire:model.live="form.capabilities" value="read" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                        <span class="ml-2">Lesen <code class="text-xs">read</code> — Objekte im Teilbaum sehen</span>
+                    </label>
+                    <label class="flex items-center text-sm text-gray-700">
+                        <input type="checkbox" wire:model.live="form.capabilities" value="write" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                        <span class="ml-2">Bearbeiten <code class="text-xs">write</code> — sehen und ändern</span>
+                    </label>
+                    <label class="flex items-center text-sm text-gray-700">
+                        <input type="checkbox" wire:model.live="form.capabilities" value="manage" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                        <span class="ml-2">Verwalten <code class="text-xs">manage</code> — voller Zugriff inkl. Verwalten/Löschen</span>
+                    </label>
+                </div>
+            </div>
         </form>
 
         <x-slot name="footer">

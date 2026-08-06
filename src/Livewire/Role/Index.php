@@ -34,6 +34,8 @@ class Index extends Component
         'vsm_system' => '',
         'status' => 'active',
         'owner_entity_id' => '',
+        // Authz: welche Content-Capability verleiht diese Rolle im Kontext ihrer Zuweisung?
+        'capabilities' => [],
     ];
 
     protected $queryString = [
@@ -50,6 +52,8 @@ class Index extends Component
             'form.vsm_system'      => ['nullable', 'in:s1,s2,s3,s3_star,s4,s5'],
             'form.status'          => ['required', 'in:active,archived'],
             'form.owner_entity_id' => ['nullable', 'integer', 'exists:organization_entities,id'],
+            'form.capabilities'    => ['array'],
+            'form.capabilities.*'  => ['in:read,write,manage'],
         ];
     }
 
@@ -186,6 +190,7 @@ class Index extends Component
             'vsm_system'      => (string) ($role->vsm_system ?? ''),
             'status'          => (string) ($role->status ?? 'active'),
             'owner_entity_id' => (string) ($role->owner_entity_id ?? ''),
+            'capabilities'    => $role->capabilities ?? [],
         ];
         $this->modalShow = true;
     }
@@ -201,6 +206,8 @@ class Index extends Component
             'vsm_system'      => $data['vsm_system'] !== '' ? $data['vsm_system'] : null,
             'status'          => $data['status'],
             'owner_entity_id' => $data['owner_entity_id'] !== '' ? (int) $data['owner_entity_id'] : null,
+            // Leere Auswahl → null (kein Grant), statt leeres JSON-Array.
+            'capabilities'    => ! empty($data['capabilities']) ? array_values($data['capabilities']) : null,
         ];
 
         if ($this->editingId) {

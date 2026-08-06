@@ -61,6 +61,16 @@
                     </div>
                 </div>
                 <div>
+                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Berechtigung</h3>
+                    <div class="flex items-center gap-1 flex-wrap">
+                        @forelse($relationType->capabilities ?? [] as $cap)
+                            <x-ui-badge variant="primary" size="sm">{{ $cap }}</x-ui-badge>
+                        @empty
+                            <span class="text-xs text-[var(--ui-muted)]">Kein Zugriff (verleiht keine Rechte)</span>
+                        @endforelse
+                    </div>
+                </div>
+                <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Details</h3>
                     <div class="space-y-3">
                         <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
@@ -131,6 +141,36 @@
                     <div class="flex items-center">
                         <input type="checkbox" wire:model.live="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
                         <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
+                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-1">Berechtigungen (Autorisierung)</h2>
+                <p class="text-xs text-[var(--ui-muted)] mb-4">
+                    Ist eine <strong>Person</strong> über diese Relation mit einer Entity verbunden, erhält sie die gewählte Content-Capability auf diese Entity und ihren gesamten Teilbaum. Ohne Auswahl verleiht die Relation keinen Zugriff. Nur <em>Person&nbsp;→&nbsp;Entity</em>-Relationen wirken; rein strukturelle Entity↔Entity-Relationen bleiben ohne Effekt. Die höchste gewählte Stufe gewinnt (manage&nbsp;&gt;&nbsp;write&nbsp;&gt;&nbsp;read).
+                </p>
+                <div class="space-y-3">
+                    <div class="flex items-center">
+                        <input type="checkbox" wire:model.live="form.capabilities" value="read" id="cap_read" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                        <label for="cap_read" class="ml-2 text-sm text-[var(--ui-secondary)]">
+                            Lesen <code class="text-xs">read</code>
+                            <span class="text-xs text-[var(--ui-muted)] block">Objekte im Teilbaum sehen</span>
+                        </label>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" wire:model.live="form.capabilities" value="write" id="cap_write" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                        <label for="cap_write" class="ml-2 text-sm text-[var(--ui-secondary)]">
+                            Bearbeiten <code class="text-xs">write</code>
+                            <span class="text-xs text-[var(--ui-muted)] block">Objekte im Teilbaum sehen und ändern</span>
+                        </label>
+                    </div>
+                    <div class="flex items-center">
+                        <input type="checkbox" wire:model.live="form.capabilities" value="manage" id="cap_manage" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
+                        <label for="cap_manage" class="ml-2 text-sm text-[var(--ui-secondary)]">
+                            Verwalten <code class="text-xs">manage</code>
+                            <span class="text-xs text-[var(--ui-muted)] block">Voller Zugriff inkl. Verwalten/Löschen</span>
+                        </label>
                     </div>
                 </div>
             </div>

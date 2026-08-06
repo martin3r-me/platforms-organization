@@ -30,12 +30,19 @@ class Show extends Component
             'is_directional' => $this->relationType->is_directional,
             'is_hierarchical' => $this->relationType->is_hierarchical,
             'is_reciprocal' => $this->relationType->is_reciprocal,
+            // Authz: welche Content-Capability verleiht diese Relation (Person → Entity)?
+            'capabilities' => $this->relationType->capabilities ?? [],
         ];
     }
 
     #[Computed]
     public function isDirty()
     {
+        $capsNow = $this->relationType->capabilities ?? [];
+        $capsForm = $this->form['capabilities'] ?? [];
+        sort($capsNow);
+        sort($capsForm);
+
         return $this->form['name'] !== $this->relationType->name ||
                $this->form['code'] !== $this->relationType->code ||
                $this->form['description'] !== $this->relationType->description ||
@@ -44,7 +51,8 @@ class Show extends Component
                $this->form['is_active'] !== $this->relationType->is_active ||
                $this->form['is_directional'] !== $this->relationType->is_directional ||
                $this->form['is_hierarchical'] !== $this->relationType->is_hierarchical ||
-               $this->form['is_reciprocal'] !== $this->relationType->is_reciprocal;
+               $this->form['is_reciprocal'] !== $this->relationType->is_reciprocal ||
+               $capsForm !== $capsNow;
     }
 
     public function save()
@@ -59,10 +67,15 @@ class Show extends Component
             'form.is_directional' => 'boolean',
             'form.is_hierarchical' => 'boolean',
             'form.is_reciprocal' => 'boolean',
+            'form.capabilities' => 'array',
+            'form.capabilities.*' => 'in:read,write,manage',
         ]);
 
         try {
-            $this->relationType->update($this->form);
+            $data = $this->form;
+            // Leere Auswahl → null (kein Grant), statt leeres JSON-Array.
+            $data['capabilities'] = empty($data['capabilities']) ? null : array_values($data['capabilities']);
+            $this->relationType->update($data);
             $this->loadForm();
             $this->dispatch('toast', message: 'Relation Type gespeichert');
         } catch (\Exception $e) {

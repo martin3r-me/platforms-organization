@@ -61,10 +61,8 @@ class OrganizationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
-        // Morph-Map-Aliase für JobProfile-, Role- und Process-Modelle
+        // Morph-Map-Aliase für Role- und Process-Modelle
         Relation::morphMap([
-            'organization_job_profile'        => \Platform\Organization\Models\OrganizationJobProfile::class,
-            'organization_person_job_profile' => \Platform\Organization\Models\OrganizationPersonJobProfile::class,
             'organization_role'               => \Platform\Organization\Models\OrganizationRole::class,
             'organization_role_assignment'    => \Platform\Organization\Models\OrganizationRoleAssignment::class,
         ]);
@@ -408,26 +406,6 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\UpdateSlaContractTool());
             $registry->register(new \Platform\Organization\Tools\DeleteSlaContractTool());
 
-            // JobProfile Tools
-            $registry->register(new \Platform\Organization\Tools\ListJobProfilesTool());
-            $registry->register(new \Platform\Organization\Tools\CreateJobProfileTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateJobProfileTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteJobProfileTool());
-
-            // JobProfile ↔ Role Bundling
-            $registry->register(new \Platform\Organization\Tools\SyncJobProfileRolesTool());
-            $registry->register(new \Platform\Organization\Tools\ListJobProfileRolesTool());
-
-            // PersonJobProfile ↔ Role Override + effektive Verteilung
-            $registry->register(new \Platform\Organization\Tools\SyncPersonJobProfileRolesTool());
-            $registry->register(new \Platform\Organization\Tools\GetPersonJobProfileEffectiveRolesTool());
-
-            // Person ↔ JobProfile Tools
-            $registry->register(new \Platform\Organization\Tools\ListPersonJobProfilesTool());
-            $registry->register(new \Platform\Organization\Tools\CreatePersonJobProfileTool());
-            $registry->register(new \Platform\Organization\Tools\UpdatePersonJobProfileTool());
-            $registry->register(new \Platform\Organization\Tools\DeletePersonJobProfileTool());
-
             // Role Tools (Rollen-Katalog)
             $registry->register(new \Platform\Organization\Tools\ListRolesTool());
             $registry->register(new \Platform\Organization\Tools\CreateRoleTool());
@@ -456,30 +434,6 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\DeleteVsmAssignmentTool());
             $registry->register(new \Platform\Organization\Tools\ListVsmVacanciesTool());
             $registry->register(new \Platform\Organization\Tools\ListVsmActorCoverageTool());
-
-            // Skill-Katalog Tools
-            $registry->register(new \Platform\Organization\Tools\ListSkillsTool());
-            $registry->register(new \Platform\Organization\Tools\CreateSkillTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateSkillTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteSkillTool());
-
-            // Soft-Skill-Katalog Tools
-            $registry->register(new \Platform\Organization\Tools\ListSoftSkillsTool());
-            $registry->register(new \Platform\Organization\Tools\CreateSoftSkillTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateSoftSkillTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteSoftSkillTool());
-
-            // JobProfile ↔ Skill Zuordnung
-            $registry->register(new \Platform\Organization\Tools\ListJobProfileSkillsTool());
-            $registry->register(new \Platform\Organization\Tools\AssignJobProfileSkillTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateJobProfileSkillTool());
-            $registry->register(new \Platform\Organization\Tools\RemoveJobProfileSkillTool());
-
-            // JobProfile ↔ Soft-Skill Zuordnung
-            $registry->register(new \Platform\Organization\Tools\ListJobProfileSoftSkillsTool());
-            $registry->register(new \Platform\Organization\Tools\AssignJobProfileSoftSkillTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateJobProfileSoftSkillTool());
-            $registry->register(new \Platform\Organization\Tools\RemoveJobProfileSoftSkillTool());
 
             // Person ↔ Skill Zuordnung: nach People migriert (Phase 2a).
             // Bestand lebt jetzt in people_employee_skills (people.employee_skills.*).

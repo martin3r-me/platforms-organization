@@ -34,11 +34,6 @@ return [
                     'title' => 'Personen',
                     'icon' => 'heroicon-o-user-group',
                     'items' => [
-                        'job-profiles' => [
-                            'title' => 'JobProfiles',
-                            'route' => 'organization.job-profiles.index',
-                            'icon' => 'heroicon-o-identification',
-                        ],
                         'roles' => [
                             'title' => 'Rollen',
                             'route' => 'organization.roles.index',

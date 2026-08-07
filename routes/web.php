@@ -21,8 +21,6 @@ use Platform\Organization\Livewire\SlaContract\Index as SlaContractIndex;
 use Platform\Organization\Livewire\SlaContract\Show as SlaContractShow;
 use Platform\Organization\Livewire\TimeEntries\Index as TimeEntriesIndex;
 use Platform\Organization\Livewire\PlannedTimes\Index as PlannedTimesIndex;
-use Platform\Organization\Livewire\JobProfile\Index as JobProfileIndex;
-use Platform\Organization\Livewire\JobProfile\Show as JobProfileShow;
 use Platform\Organization\Livewire\Role\Index as RoleIndex;
 use Platform\Organization\Livewire\Settings\SignalDefinition\Index as SignalDefinitionIndex;
 use Platform\Organization\Livewire\Settings\SignalDefinition\Show as SignalDefinitionShow;
@@ -39,7 +37,6 @@ use Platform\Organization\Livewire\Inquiry\MyInquiries;
 use Platform\Organization\Livewire\Inquiry\Respond as InquiryRespond;
 use Platform\Organization\Livewire\Synthesis\Index as SynthesisIndex;
 use Platform\Organization\Livewire\Synthesis\Show as SynthesisShow;
-use Platform\Organization\Livewire\Skill\Index as SkillIndex;
 use Platform\Organization\Livewire\EnvironmentSource\Index as EnvironmentSourceIndex;
 use Platform\Organization\Livewire\EnvironmentSnapshot\Index as EnvironmentSnapshotIndex;
 use Platform\Organization\Livewire\EnvironmentSnapshot\Show as EnvironmentSnapshotShow;
@@ -114,11 +111,8 @@ Route::get('/sla-contracts/{slaContract}', SlaContractShow::class)->name('organi
 Route::get('/time-entries', TimeEntriesIndex::class)->name('organization.time-entries.index');
 Route::get('/planned-times', PlannedTimesIndex::class)->name('organization.planned-times.index');
 
-// Personen-Katalog: JobProfiles und Rollen
-Route::get('/job-profiles', JobProfileIndex::class)->name('organization.job-profiles.index');
-Route::get('/job-profiles/{jobProfile}', JobProfileShow::class)->name('organization.job-profiles.show');
+// Personen-Katalog: Rollen
 Route::get('/roles', RoleIndex::class)->name('organization.roles.index');
-Route::get('/skills', SkillIndex::class)->name('organization.skills.index');
 
 // Umwelt: Environment Sources & Snapshots
 Route::get('/environment-sources', EnvironmentSourceIndex::class)->name('organization.environment-sources.index');

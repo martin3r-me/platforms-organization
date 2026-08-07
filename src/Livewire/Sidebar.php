@@ -47,9 +47,7 @@ class Sidebar extends Component
                     ['route' => 'organization.entities.index', 'label' => 'Organisationseinheiten', 'icon' => 'building-office', 'match' => '/entities'],
                     ['route' => 'organization.interlinks.index', 'label' => 'Interlinks', 'icon' => 'arrows-right-left', 'match' => '/interlinks'],
                     ['route' => 'organization.sla-contracts.index', 'label' => 'SLA-Verträge', 'icon' => 'shield-check', 'match' => '/sla-contracts'],
-                    ['route' => 'organization.job-profiles.index', 'label' => 'Jobprofile', 'icon' => 'identification', 'match' => '/job-profiles'],
                     ['route' => 'organization.roles.index', 'label' => 'Rollen', 'icon' => 'user-group', 'match' => '/roles'],
-                    ['route' => 'organization.skills.index', 'label' => 'Skills', 'icon' => 'academic-cap', 'match' => '/skills'],
                 ],
             ],
             [

@@ -26,8 +26,6 @@ use Platform\Organization\Services\EntityHierarchyService;
 use Platform\Organization\Services\SnapshotMovementService;
 use Platform\Organization\Services\DimensionRadarService;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
-use Platform\Organization\Models\OrganizationSkill;
-use Platform\Organization\Models\OrganizationSoftSkill;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Core\Models\VerbalizationChannel;
 use Platform\Core\Models\VerbalizationFeed;
@@ -49,10 +47,6 @@ class Show extends Component
 
     public ?string $movementStream = null;
     public bool $analyseLoaded = false;
-
-    // Skills tab
-    public string $personSkillSearch = '';
-    public string $personSoftSkillSearch = '';
 
     // Signals tab
     public string $signalStatusFilter = '';
@@ -1766,112 +1760,6 @@ class Show extends Component
         }
 
         return $result;
-    }
-
-    // ── Skills Tab ─────────────────────────────────────────────
-
-    #[Computed]
-    public function isPersonEntity(): bool
-    {
-        return $this->entity->type?->code === 'person';
-    }
-
-    #[Computed]
-    public function entitySkills()
-    {
-        return $this->entity->skills()->get();
-    }
-
-    #[Computed]
-    public function entitySoftSkills()
-    {
-        return $this->entity->softSkills()->get();
-    }
-
-    #[Computed]
-    public function availablePersonSkills()
-    {
-        if (strlen($this->personSkillSearch) < 1) {
-            return collect();
-        }
-
-        $existingIds = $this->entity->skills()->pluck('organization_skills.id')->toArray();
-
-        return OrganizationSkill::forTeam(auth()->user()->currentTeam->id)
-            ->active()
-            ->where('name', 'like', '%' . $this->personSkillSearch . '%')
-            ->whereNotIn('id', $existingIds)
-            ->orderBy('name')
-            ->limit(10)
-            ->get();
-    }
-
-    #[Computed]
-    public function availablePersonSoftSkills()
-    {
-        if (strlen($this->personSoftSkillSearch) < 1) {
-            return collect();
-        }
-
-        $existingIds = $this->entity->softSkills()->pluck('organization_soft_skills.id')->toArray();
-
-        return OrganizationSoftSkill::forTeam(auth()->user()->currentTeam->id)
-            ->active()
-            ->where('name', 'like', '%' . $this->personSoftSkillSearch . '%')
-            ->whereNotIn('id', $existingIds)
-            ->orderBy('name')
-            ->limit(10)
-            ->get();
-    }
-
-    public function assignPersonSkill(int $skillId, string $level = 'basic'): void
-    {
-        $this->entity->skills()->syncWithoutDetaching([
-            $skillId => ['level' => $level],
-        ]);
-
-        $this->personSkillSearch = '';
-        unset($this->entitySkills, $this->availablePersonSkills);
-        $this->dispatch('toast', message: 'Skill zugeordnet');
-    }
-
-    public function removePersonSkill(int $skillId): void
-    {
-        $this->entity->skills()->detach($skillId);
-        unset($this->entitySkills);
-        $this->dispatch('toast', message: 'Skill entfernt');
-    }
-
-    public function updatePersonSkillLevel(int $skillId, string $level): void
-    {
-        $this->entity->skills()->updateExistingPivot($skillId, ['level' => $level]);
-        unset($this->entitySkills);
-        $this->dispatch('toast', message: 'Level aktualisiert');
-    }
-
-    public function assignPersonSoftSkill(int $softSkillId, string $level = 'basic'): void
-    {
-        $this->entity->softSkills()->syncWithoutDetaching([
-            $softSkillId => ['level' => $level],
-        ]);
-
-        $this->personSoftSkillSearch = '';
-        unset($this->entitySoftSkills, $this->availablePersonSoftSkills);
-        $this->dispatch('toast', message: 'Soft Skill zugeordnet');
-    }
-
-    public function removePersonSoftSkill(int $softSkillId): void
-    {
-        $this->entity->softSkills()->detach($softSkillId);
-        unset($this->entitySoftSkills);
-        $this->dispatch('toast', message: 'Soft Skill entfernt');
-    }
-
-    public function updatePersonSoftSkillLevel(int $softSkillId, string $level): void
-    {
-        $this->entity->softSkills()->updateExistingPivot($softSkillId, ['level' => $level]);
-        unset($this->entitySoftSkills);
-        $this->dispatch('toast', message: 'Level aktualisiert');
     }
 
     // ── Signals Tab ────────────────────────────────────────────

@@ -387,26 +387,6 @@ class OrganizationEntity extends Model
     }
 
     /**
-     * Skills (Person ↔ Skill)
-     */
-    public function skills(): BelongsToMany
-    {
-        return $this->belongsToMany(OrganizationSkill::class, 'organization_person_skills', 'person_entity_id', 'skill_id')
-            ->withPivot('level', 'certified_at', 'notes')
-            ->withTimestamps();
-    }
-
-    /**
-     * Soft Skills (Person ↔ SoftSkill)
-     */
-    public function softSkills(): BelongsToMany
-    {
-        return $this->belongsToMany(OrganizationSoftSkill::class, 'organization_person_soft_skills', 'person_entity_id', 'soft_skill_id')
-            ->withPivot('level', 'notes')
-            ->withTimestamps();
-    }
-
-    /**
      * Booted Event - UUID automatisch generieren + Name-History tracking
      */
     protected static function booted(): void

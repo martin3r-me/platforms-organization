@@ -481,17 +481,8 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\UpdateJobProfileSoftSkillTool());
             $registry->register(new \Platform\Organization\Tools\RemoveJobProfileSoftSkillTool());
 
-            // Person ↔ Skill Zuordnung
-            $registry->register(new \Platform\Organization\Tools\ListPersonSkillsTool());
-            $registry->register(new \Platform\Organization\Tools\AssignPersonSkillTool());
-            $registry->register(new \Platform\Organization\Tools\UpdatePersonSkillTool());
-            $registry->register(new \Platform\Organization\Tools\RemovePersonSkillTool());
-
-            // Person ↔ Soft-Skill Zuordnung
-            $registry->register(new \Platform\Organization\Tools\ListPersonSoftSkillsTool());
-            $registry->register(new \Platform\Organization\Tools\AssignPersonSoftSkillTool());
-            $registry->register(new \Platform\Organization\Tools\UpdatePersonSoftSkillTool());
-            $registry->register(new \Platform\Organization\Tools\RemovePersonSoftSkillTool());
+            // Person ↔ Skill Zuordnung: nach People migriert (Phase 2a).
+            // Bestand lebt jetzt in people_employee_skills (people.employee_skills.*).
 
             // Signal (Algedonic) Tools
             $registry->register(new \Platform\Organization\Tools\ListSignalDefinitionsTool());

@@ -69,7 +69,7 @@ class DeleteSkillTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('ACCESS_DENIED', 'Skill gehört nicht zum Root/Elterteam des angegebenen Teams.');
             }
 
-            if ($skill->jobProfiles()->exists() || $skill->persons()->exists()) {
+            if ($skill->jobProfiles()->exists()) {
                 return ToolResult::error('VALIDATION_ERROR', 'Skill ist JobProfiles oder Personen zugeordnet. Bitte zuerst Zuordnungen entfernen oder is_active=false setzen.');
             }
 

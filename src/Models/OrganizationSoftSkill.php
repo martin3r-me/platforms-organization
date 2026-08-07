@@ -49,13 +49,6 @@ class OrganizationSoftSkill extends Model
             ->withPivot('level', 'is_required', 'sort_order');
     }
 
-    public function persons(): BelongsToMany
-    {
-        return $this->belongsToMany(OrganizationEntity::class, 'organization_person_soft_skills', 'soft_skill_id', 'person_entity_id')
-            ->withPivot('level', 'notes')
-            ->withTimestamps();
-    }
-
     public function scopeActive($query)
     {
         return $query->where('is_active', true);

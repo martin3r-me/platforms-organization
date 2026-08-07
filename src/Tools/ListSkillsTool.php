@@ -84,7 +84,7 @@ class ListSkillsTool implements ToolContract, ToolMetadataContract
                 'category' => $skill->category,
                 'description' => $skill->description,
                 'is_active' => (bool)$skill->is_active,
-                'usage_count' => $skill->jobProfiles()->count() + $skill->persons()->count(),
+                'usage_count' => $skill->jobProfiles()->count(),
             ])->values()->toArray();
 
             return ToolResult::success([

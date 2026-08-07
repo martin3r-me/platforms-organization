@@ -50,13 +50,6 @@ class OrganizationSkill extends Model
             ->withPivot('level', 'is_required', 'sort_order');
     }
 
-    public function persons(): BelongsToMany
-    {
-        return $this->belongsToMany(OrganizationEntity::class, 'organization_person_skills', 'skill_id', 'person_entity_id')
-            ->withPivot('level', 'certified_at', 'notes')
-            ->withTimestamps();
-    }
-
     public function scopeActive($query)
     {
         return $query->where('is_active', true);

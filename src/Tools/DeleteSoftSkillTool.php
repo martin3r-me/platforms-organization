@@ -63,7 +63,7 @@ class DeleteSoftSkillTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('ACCESS_DENIED', 'Soft-Skill gehört nicht zum Team.');
             }
 
-            if ($ss->jobProfiles()->exists() || $ss->persons()->exists()) {
+            if ($ss->jobProfiles()->exists()) {
                 return ToolResult::error('VALIDATION_ERROR', 'Soft-Skill ist JobProfiles oder Personen zugeordnet. Bitte zuerst Zuordnungen entfernen oder is_active=false setzen.');
             }
 

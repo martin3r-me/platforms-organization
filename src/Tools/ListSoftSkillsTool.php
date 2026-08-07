@@ -71,7 +71,7 @@ class ListSoftSkillsTool implements ToolContract, ToolMetadataContract
                 'name'        => $ss->name,
                 'description' => $ss->description,
                 'is_active'   => $ss->is_active,
-                'usage_count' => $ss->jobProfiles()->count() + $ss->persons()->count(),
+                'usage_count' => $ss->jobProfiles()->count(),
             ])->values()->toArray();
 
             return ToolResult::success([

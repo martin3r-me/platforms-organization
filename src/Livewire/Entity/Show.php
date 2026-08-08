@@ -189,9 +189,10 @@ class Show extends Component
             return null;
         }
 
-        // Entity-nativ (Modell-Shift): Fokusräume über entity_id, eine Regnose.
+        // Eine Quelle: derselbe reiche Read wie das Panel (memoisiert via $this->strategy),
+        // auf die Blueprint-Eval-Form projiziert. Ersetzt den separaten StrategyReader.
         return (new \Platform\Organization\Strategy\StrategyCompleteness())->evaluate(
-            \Platform\Organization\Strategy\StrategyReader::forEntity($this->entity)
+            \Platform\Organization\Strategy\StrategyBlueprintMapper::fromStrategyArray($this->strategy)
         );
     }
 

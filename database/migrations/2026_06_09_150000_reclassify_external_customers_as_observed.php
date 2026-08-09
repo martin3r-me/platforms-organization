@@ -45,6 +45,19 @@ return new class extends Migration
                 ->where('name', 'Organisationseinheiten')
                 ->value('id');
 
+            // Fresh-DB-Fall: die Gruppe kommt sonst aus dem Seeder (updateOrCreate → kollisionsfrei).
+            // Hier absichern, damit `migrate` ohne vorheriges `db:seed` nicht am NOT-NULL-FK scheitert.
+            if (!$groupId) {
+                $groupId = DB::table('organization_entity_type_groups')->insertGetId([
+                    'name'        => 'Organisationseinheiten',
+                    'description' => 'Teams, Abteilungen, Services und operative Einheiten der Organisation',
+                    'sort_order'  => 1,
+                    'is_active'   => true,
+                    'created_at'  => now(),
+                    'updated_at'  => now(),
+                ]);
+            }
+
             DB::table('organization_entity_types')->insert([
                 'code' => 'network_customer',
                 'name' => 'Netzwerk-Kunde',

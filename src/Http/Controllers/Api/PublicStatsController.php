@@ -38,7 +38,6 @@ class PublicStatsController extends ApiController
             $humanMin = max(0, $totalMin - $agentMin);
 
             return $this->success([
-                'team' => \App\Models\Team::find($teamId)?->name,
                 'time' => [
                     'human_hours' => round($humanMin / 60, 1),
                     'agent_hours' => round($agentMin / 60, 1),
@@ -85,7 +84,8 @@ class PublicStatsController extends ApiController
             return [];
         }
 
-        $names = \App\Models\User::query()
+        $userModel = config('auth.providers.users.model');
+        $names = $userModel::query()
             ->whereIn('id', $rows->pluck('user_id')->all())
             ->pluck('name', 'id');
 

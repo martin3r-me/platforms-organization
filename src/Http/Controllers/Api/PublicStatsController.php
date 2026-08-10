@@ -49,7 +49,9 @@ class PublicStatsController extends ApiController
                 'generated_at' => now()->toIso8601String(),
             ], 'Public Stats');
         } catch (\Throwable $e) {
-            return $this->error('debug: '.$e->getMessage().' @ '.basename($e->getFile()).':'.$e->getLine(), null, 500);
+            \Illuminate\Support\Facades\Log::warning('PublicStats error', ['message' => $e->getMessage()]);
+
+            return $this->error('Stats momentan nicht verfügbar.', null, 500);
         }
     }
 

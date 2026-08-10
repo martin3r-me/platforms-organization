@@ -30,24 +30,28 @@ class PublicStatsController extends ApiController
             return $this->error('Kein Team im Token-Kontext.', null, 422);
         }
 
-        $base = OrganizationTimeEntry::query()->where('team_id', $teamId);
+        try {
+            $base = OrganizationTimeEntry::query()->where('team_id', $teamId);
 
-        $totalMin = (int) (clone $base)->sum('minutes');
-        $agentMin = (int) (clone $base)->where('metadata->source', 'agent')->sum('minutes');
-        $humanMin = max(0, $totalMin - $agentMin);
+            $totalMin = (int) (clone $base)->sum('minutes');
+            $agentMin = (int) (clone $base)->where('metadata->source', 'agent')->sum('minutes');
+            $humanMin = max(0, $totalMin - $agentMin);
 
-        return $this->success([
-            'team' => Auth::user()?->currentTeam?->name,
-            'time' => [
-                'human_hours' => round($humanMin / 60, 1),
-                'agent_hours' => round($agentMin / 60, 1),
-                'total_hours' => round($totalMin / 60, 1),
-                'agent_share_pct' => $totalMin > 0 ? round($agentMin / $totalMin * 100, 1) : 0.0,
-            ],
-            'agents' => $this->agents($teamId),
-            'activity' => $this->activity($teamId),
-            'generated_at' => now()->toIso8601String(),
-        ], 'Public Stats');
+            return $this->success([
+                'team' => \App\Models\Team::find($teamId)?->name,
+                'time' => [
+                    'human_hours' => round($humanMin / 60, 1),
+                    'agent_hours' => round($agentMin / 60, 1),
+                    'total_hours' => round($totalMin / 60, 1),
+                    'agent_share_pct' => $totalMin > 0 ? round($agentMin / $totalMin * 100, 1) : 0.0,
+                ],
+                'agents' => $this->agents($teamId),
+                'activity' => $this->activity($teamId),
+                'generated_at' => now()->toIso8601String(),
+            ], 'Public Stats');
+        } catch (\Throwable $e) {
+            return $this->error('debug: '.$e->getMessage().' @ '.basename($e->getFile()).':'.$e->getLine(), null, 500);
+        }
     }
 
     public function health(Request $request)

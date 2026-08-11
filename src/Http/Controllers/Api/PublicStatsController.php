@@ -46,6 +46,7 @@ class PublicStatsController extends ApiController
                 ],
                 'agents' => $this->agents($teamId),
                 'activity' => $this->activity($teamId),
+                'agent_activity' => $this->agentActivity($teamId, 50),
                 'generated_at' => now()->toIso8601String(),
             ], 'Public Stats');
         } catch (\Throwable $e) {
@@ -157,6 +158,36 @@ class PublicStatsController extends ApiController
                 ];
             })
             ->all();
+    }
+
+    /**
+     * Aktivitäts-Log nur der Agenten (Bumblebee/Ironhide), inkl. Agent-Name.
+     * Letzte $limit Einträge. Keine Notizen/Kontext-Labels.
+     */
+    protected function agentActivity(int $teamId, int $limit = 50): array
+    {
+        $rows = OrganizationTimeEntry::query()
+            ->where('team_id', $teamId)
+            ->where('metadata->source', 'agent')
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get(['user_id', 'minutes', 'context_type', 'created_at']);
+
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $userModel = config('auth.providers.users.model');
+        $names = $userModel::query()
+            ->whereIn('id', $rows->pluck('user_id')->unique()->all())
+            ->pluck('name', 'id');
+
+        return $rows->map(fn ($e) => [
+            'at' => optional($e->created_at)->toIso8601String(),
+            'agent' => $this->cleanName($names[$e->user_id] ?? 'Agent'),
+            'type' => $this->classify((string) $e->context_type, true),
+            'minutes' => (int) $e->minutes,
+        ])->all();
     }
 
     /** Kontext-Typ (FQCN) → grober Arbeitstyp für die Anzeige. */

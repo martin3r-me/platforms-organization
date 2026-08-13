@@ -623,6 +623,14 @@ class Show extends Component
             'form.is_active' => 'boolean',
         ]);
 
+        // Leere Select-Werte ('') auf null normalisieren — sonst schlägt das Update
+        // auf Integer-FK-Spalten fehl (SQLSTATE 1366 "Incorrect integer value: ''").
+        foreach (['linked_user_id', 'parent_entity_id'] as $nullableFk) {
+            if (($this->form[$nullableFk] ?? null) === '') {
+                $this->form[$nullableFk] = null;
+            }
+        }
+
         // Invariante: ein verknüpfter User darf nur auf einer Person-Entity sitzen.
         if (($this->form['linked_user_id'] ?? null) !== null) {
             $typeCode = \Platform\Organization\Models\OrganizationEntityType::query()

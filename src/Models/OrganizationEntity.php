@@ -391,6 +391,28 @@ class OrganizationEntity extends Model
      */
     protected static function booted(): void
     {
+        // Invariante: linked_user_id darf NUR auf Person-Entities sitzen.
+        // Ein User gehört an genau EINE Person-Entity — niemals an einen
+        // Abteilungs-/Struktur-Knoten. Sonst kapert der Fehl-Link die Authz-
+        // Auflösung (User → Person-Entity) und macht Grants unsichtbar.
+        // Clearing auf null bleibt erlaubt (zum Bereinigen von Alt-Fehlern).
+        static::saving(function (self $model) {
+            if ($model->linked_user_id === null || ! $model->isDirty('linked_user_id')) {
+                return;
+            }
+
+            $typeCode = OrganizationEntityType::query()
+                ->whereKey($model->entity_type_id)
+                ->value('code');
+
+            if ($typeCode !== 'person') {
+                throw new \InvalidArgumentException(
+                    'linked_user_id darf nur auf Person-Entities gesetzt werden ('
+                    .'Entity-Type "'.($typeCode ?? '?').'" ist keine Person).'
+                );
+            }
+        });
+
         static::creating(function (self $model) {
             if (empty($model->uuid)) {
                 do {

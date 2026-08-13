@@ -623,6 +623,17 @@ class Show extends Component
             'form.is_active' => 'boolean',
         ]);
 
+        // Invariante: ein verknüpfter User darf nur auf einer Person-Entity sitzen.
+        if (($this->form['linked_user_id'] ?? null) !== null) {
+            $typeCode = \Platform\Organization\Models\OrganizationEntityType::query()
+                ->whereKey($this->form['entity_type_id'] ?? null)
+                ->value('code');
+            if ($typeCode !== 'person') {
+                $this->addError('form.linked_user_id', 'Ein verknüpfter User ist nur auf Person-Entities erlaubt.');
+                return;
+            }
+        }
+
         $identifiers = $this->normalizedIdentifiers();
 
         // Ein System darf pro Entity nur einmal vorkommen (system ist der Schlüssel).

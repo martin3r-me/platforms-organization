@@ -26,7 +26,7 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /organization/signal_inference/create_signal - Erzeugt ein Signal aus Claudes Inferenz-Ergebnis. Nutze organization.signal_inference.evaluate um zuerst den Kontext zu laden und zu analysieren.';
+        return 'POST /organization/signal_inference/create_signal - Erzeugt ein Signal aus Claudes Inferenz-Ergebnis. Nutze organization.signal_inference.evaluate um zuerst den Kontext zu laden und zu analysieren. Pro Knoten (entity) und VSM-Ebene existiert höchstens EIN aktives Signal: Ein weiterer Aufruf für denselben Knoten aktualisiert das bestehende Signal (und eskaliert nur bei höherer Severity), statt ein Duplikat zu erzeugen.';
     }
 
     public function getSchema(): array
@@ -220,6 +220,74 @@ class CreateInferenceSignalTool implements ToolContract, ToolMetadataContract
                 config('organization.signal_deadlines.default', 168) // 7 Tage
             );
             $deadlineAt = now()->copy()->addHours($deadlineHours);
+
+            // ── Supersede-Gate ──────────────────────────────────────────────
+            // Best Practice: pro Knoten + VSM-Ebene höchstens EIN aktives Signal.
+            // Existiert bereits eins (open/acknowledged), wird es aktualisiert statt
+            // dupliziert. Höhere Severity eskaliert und öffnet das Signal neu;
+            // 'algedonic' bricht damit immer durch. Ergebnis: ruhige UI, ohne
+            // kritische Signale zu verschlucken.
+            $severityRank = ['info' => 1, 'warning' => 2, 'critical' => 3, 'algedonic' => 4];
+
+            $existing = OrganizationSignal::forTeam($rootTeamId)
+                ->where('entity_id', $entityId)
+                ->where('vsm_level', $vsmLevel)
+                ->whereIn('status', ['open', 'acknowledged'])
+                ->orderByDesc('id')
+                ->first();
+
+            if ($existing) {
+                $escalated = ($severityRank[$severity] ?? 1) > ($severityRank[$existing->severity] ?? 1);
+
+                // Leichter Refresh: hält das eine Signal aktuell, ohne die
+                // Deadline zu verlängern (damit die Eskalations-Uhr weiterläuft).
+                $update = [
+                    'message' => $message,
+                    'trigger_metrics' => $arguments['evidence'] ?? $existing->trigger_metrics,
+                    'inference_prompt_id' => $promptId,
+                ];
+
+                if ($escalated) {
+                    // Höhere Severity: anheben, neu öffnen, Deadline + Actions erneuern.
+                    $update['severity'] = $severity;
+                    $update['status'] = 'open';
+                    $update['escalated_at'] = now();
+                    $update['deadline_at'] = $deadlineAt;
+                    $update['suggested_actions'] = $suggestedActions;
+
+                    $existing->actions()->delete();
+                    foreach (array_values($suggestedActions) as $idx => $action) {
+                        OrganizationSignalAction::create([
+                            'signal_id' => $existing->id,
+                            'position' => $idx,
+                            'title' => mb_substr((string) $action['title'], 0, 255),
+                            'description' => $action['description'] ?? null,
+                            'status' => 'pending',
+                        ]);
+                    }
+                }
+
+                $existing->update($update);
+
+                return ToolResult::success([
+                    'id' => $existing->id,
+                    'uuid' => $existing->uuid,
+                    'entity_id' => $existing->entity_id,
+                    'entity_name' => $entity->name,
+                    'severity' => $existing->severity,
+                    'source' => 'inference',
+                    'inference_prompt_name' => $prompt->name,
+                    'superseded' => true,
+                    'escalated' => $escalated,
+                    // 'skipped' verhindert die "signals_created"-Zählung im Aufrufer —
+                    // es entstand kein neues Signal, ein bestehendes wurde aktualisiert.
+                    'skipped' => true,
+                    'message' => $escalated
+                        ? 'Bestehendes Signal eskaliert (höhere Severity).'
+                        : 'Bestehendes Signal aktualisiert (kein Duplikat erzeugt).',
+                ]);
+            }
+            // ────────────────────────────────────────────────────────────────
 
             // Create signal
             $signal = OrganizationSignal::create([

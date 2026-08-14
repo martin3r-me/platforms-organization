@@ -117,12 +117,16 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
                 $context,
                 [
                     'system' => $systemPrompt,
-                    'model' => config('ai.anthropic.inference_model', 'claude-sonnet-4-6'),
+                    'model' => config('ai.anthropic.inference_model', 'claude-sonnet-5'),
                     'max_tokens' => 4096,
                     'max_iterations' => 20,
                     'tools' => $actionTools,
                     // include_meta_tools defaults to true → discover_tools + execute_tool
-                    'temperature' => 0.3,
+                    // Adaptive Thinking + effort: mehrstufige VSM-Diagnostik profitiert vom
+                    // Reasoning. Der Runner ignoriert beides auf Modellen ohne Support.
+                    // (temperature entfällt — aktuelle Modelle lehnen Sampling-Params ab.)
+                    'thinking' => ['type' => 'adaptive'],
+                    'effort' => 'high',
                     'on_assistant_message' => function (int $iteration, string $text) use (&$stepIndex, $runId, $promptId) {
                         // Reasoning-Log: pro Iteration wird der LLM-Text als Step persistiert.
                         try {
@@ -188,7 +192,7 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
 
             // Return token usage via stats for accumulation in worker
             $stats['token_usage'] = $result['token_usage'] ?? null;
-            $stats['llm_model'] = $result['model'] ?? 'claude-sonnet-4-6';
+            $stats['llm_model'] = $result['model'] ?? 'claude-sonnet-5';
 
             // Update last_evaluated_at + run_count, clear last_error
             $prompt->update([
@@ -330,9 +334,11 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
             $context,
             [
                 'system' => $systemPrompt,
-                'model' => $definition?->model ?: config('ai.anthropic.inference_model', 'claude-sonnet-4-6'),
+                'model' => $definition?->model ?: config('ai.anthropic.inference_model', 'claude-sonnet-5'),
                 'max_tokens' => $definition?->max_tokens ?? 8192,
                 'max_iterations' => 5,
+                'thinking' => ['type' => 'adaptive'],
+                'effort' => 'high',
                 // meta-tools (discover + execute) are included by default
             ]
         );

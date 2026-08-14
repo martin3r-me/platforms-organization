@@ -140,7 +140,7 @@ class InferenceWorkerJob implements ShouldQueue
 
         // Update run with accumulated token usage
         $run->update([
-            'llm_model' => $lastModel ?? 'claude-sonnet-4-6',
+            'llm_model' => $lastModel ?? 'claude-sonnet-5',
             'token_usage' => $accumulatedTokens,
         ]);
 

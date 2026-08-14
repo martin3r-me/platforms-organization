@@ -50,6 +50,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 \Platform\Organization\Console\Commands\EscalateSignalsCommand::class,
                 SyncEntityTypeCatalogCommand::class,
                 \Platform\Organization\Console\Commands\AuthzMaterializeCommand::class,
+                \Platform\Organization\Console\Commands\PurgeSignalsCommand::class,
             ]);
         }
 

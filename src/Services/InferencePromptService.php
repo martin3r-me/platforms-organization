@@ -365,6 +365,8 @@ Wenn Umwelt-Daten (environment) im Kontext enthalten sind:
             'title' => $title,
             'definition_id' => $definition?->id,
             'using_fallback' => $usingFallback,
+            'token_usage' => $result['token_usage'] ?? null,
+            'llm_model' => $result['model'] ?? null,
         ];
     }
 

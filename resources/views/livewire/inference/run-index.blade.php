@@ -54,6 +54,7 @@
                 <x-ui-table-header-cell compact="true">Inquiries</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Memory</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Dauer</x-ui-table-header-cell>
+                <x-ui-table-header-cell compact="true">Kosten</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Model</x-ui-table-header-cell>
                 <x-ui-table-header-cell compact="true">Erstellt</x-ui-table-header-cell>
             </x-ui-table-header>
@@ -101,6 +102,16 @@
                             </span>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
+                            <div class="flex flex-col leading-tight">
+                                <span class="text-sm text-[var(--ui-secondary)] tabular-nums">
+                                    ${{ number_format($run->cost_usd, 4) }}@if($run->cost_eur !== null)<span class="text-[var(--ui-muted)]"> · {{ number_format($run->cost_eur, 4) }}€</span>@endif
+                                </span>
+                                @if($run->cost_per_signal_usd !== null)
+                                    <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">${{ number_format($run->cost_per_signal_usd, 4) }}/Signal</span>
+                                @endif
+                            </div>
+                        </x-ui-table-cell>
+                        <x-ui-table-cell compact="true">
                             <span class="text-xs text-[var(--ui-muted)]">{{ $run->llm_model ?? '–' }}</span>
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
@@ -109,7 +120,7 @@
                     </x-ui-table-row>
                 @empty
                     <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="11">
+                        <x-ui-table-cell compact="true" colspan="12">
                             <div class="text-center py-8">
                                 @svg('heroicon-o-play', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
                                 <p class="text-sm text-[var(--ui-muted)]">Keine Inference Runs gefunden.</p>

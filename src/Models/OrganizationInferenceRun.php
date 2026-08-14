@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 use Platform\Core\Models\Team;
+use Platform\Core\Services\LlmCostCalculator;
 use Symfony\Component\Uid\UuidV7;
 
 class OrganizationInferenceRun extends Model
@@ -100,6 +101,43 @@ class OrganizationInferenceRun extends Model
     {
         $usage = $this->token_usage ?? [];
         return (int) ($usage['input_tokens'] ?? 0) + (int) ($usage['output_tokens'] ?? 0);
+    }
+
+    /**
+     * Kosten dieses Runs in USD (berechnet aus token_usage × Modellpreis).
+     */
+    public function getCostUsdAttribute(): float
+    {
+        return app(LlmCostCalculator::class)
+            ->costUsd($this->llm_model ?: 'default', $this->token_usage ?? []);
+    }
+
+    /**
+     * Kosten in EUR, sofern ein USD→EUR-Kurs konfiguriert ist — sonst null.
+     */
+    public function getCostEurAttribute(): ?float
+    {
+        return app(LlmCostCalculator::class)
+            ->costEur($this->llm_model ?: 'default', $this->token_usage ?? []);
+    }
+
+    /**
+     * Kosten pro erzeugtem Signal in USD — null, wenn keine Signale entstanden sind.
+     */
+    public function getCostPerSignalUsdAttribute(): ?float
+    {
+        $signals = (int) ($this->signals_created ?? 0);
+
+        return $signals > 0 ? $this->cost_usd / $signals : null;
+    }
+
+    /**
+     * Kompakte Kostenübersicht (usd/eur/model/tokens) für Logs und UI.
+     */
+    public function costBreakdown(): array
+    {
+        return app(LlmCostCalculator::class)
+            ->breakdown($this->llm_model ?: 'default', $this->token_usage ?? []);
     }
 
     public function markCompleted(array $stats = []): void

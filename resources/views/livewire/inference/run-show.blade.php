@@ -114,11 +114,14 @@
                 @endif
             </div>
 
-            {{-- LLM Info --}}
+            {{-- LLM & Kosten --}}
             @if($run->llm_model || $run->token_usage)
+                @php($cost = $run->costBreakdown())
+                @php($cacheRead = (int) ($run->token_usage['cache_read_input_tokens'] ?? 0))
+                @php($cacheWrite = (int) ($run->token_usage['cache_creation_input_tokens'] ?? 0))
                 <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">LLM</h2>
-                    <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">LLM &amp; Kosten</h2>
+                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
                         @if($run->llm_model)
                             <div>
                                 <div class="text-xs text-[var(--ui-muted)]">Model</div>
@@ -134,10 +137,41 @@
                                 <div class="text-xs text-[var(--ui-muted)]">Output Tokens</div>
                                 <div class="font-medium tabular-nums text-[var(--ui-secondary)]">{{ number_format($run->token_usage['output_tokens'] ?? 0, 0, ',', '.') }}</div>
                             </div>
+                            @if($cacheRead > 0 || $cacheWrite > 0)
+                                <div>
+                                    <div class="text-xs text-[var(--ui-muted)]">Cache (read / write)</div>
+                                    <div class="font-medium tabular-nums text-[var(--ui-secondary)]">{{ number_format($cacheRead, 0, ',', '.') }} / {{ number_format($cacheWrite, 0, ',', '.') }}</div>
+                                </div>
+                            @endif
                         @endif
                     </div>
-                    @if($run->getTotalTokens() > 0)
-                        <p class="text-xs text-[var(--ui-muted)] mt-3">Total: {{ number_format($run->getTotalTokens(), 0, ',', '.') }} Tokens</p>
+
+                    {{-- Kosten-Highlight --}}
+                    <div class="mt-4 pt-4 border-t border-[var(--ui-border)]/40 grid grid-cols-2 md:grid-cols-4 gap-4">
+                        <div>
+                            <div class="text-xs text-[var(--ui-muted)]">Kosten (USD)</div>
+                            <div class="text-2xl font-bold text-[var(--ui-secondary)] tabular-nums">${{ number_format($cost['usd'], 4) }}</div>
+                        </div>
+                        @if($cost['eur'] !== null)
+                            <div>
+                                <div class="text-xs text-[var(--ui-muted)]">Kosten (EUR)</div>
+                                <div class="text-2xl font-bold text-[var(--ui-secondary)] tabular-nums">{{ number_format($cost['eur'], 4) }}€</div>
+                            </div>
+                        @endif
+                        @if($run->cost_per_signal_usd !== null)
+                            <div>
+                                <div class="text-xs text-[var(--ui-muted)]">Kosten / Signal</div>
+                                <div class="text-2xl font-bold text-[var(--ui-secondary)] tabular-nums">${{ number_format($run->cost_per_signal_usd, 4) }}</div>
+                            </div>
+                        @endif
+                        <div>
+                            <div class="text-xs text-[var(--ui-muted)]">Total Tokens</div>
+                            <div class="text-2xl font-bold text-[var(--ui-secondary)] tabular-nums">{{ number_format($cost['tokens'], 0, ',', '.') }}</div>
+                        </div>
+                    </div>
+
+                    @if($run->token_usage && $cacheRead === 0 && $cacheWrite === 0)
+                        <p class="text-[11px] text-[var(--ui-muted)] mt-3">Hinweis: kein Prompt-Caching aktiv — der Input-Kontext wird pro Loop-Iteration voll berechnet (Kostenhebel „B").</p>
                     @endif
                 </div>
             @endif

@@ -109,7 +109,12 @@ class InferenceWorkerJob implements ShouldQueue
         $totalMemory = 0;
         $totalDoNothing = 0;
         $totalEntities = 0;
-        $accumulatedTokens = ['input_tokens' => 0, 'output_tokens' => 0];
+        $accumulatedTokens = [
+            'input_tokens' => 0,
+            'output_tokens' => 0,
+            'cache_creation_input_tokens' => 0,
+            'cache_read_input_tokens' => 0,
+        ];
         $lastModel = null;
 
         // Entity filter from trigger (P6: pass through to executePrompt)
@@ -126,10 +131,11 @@ class InferenceWorkerJob implements ShouldQueue
             $totalDoNothing += $result['do_nothing_count'] ?? 0;
             $totalEntities += $result['entities_analyzed'] ?? 0;
 
-            // Accumulate token usage across prompts
+            // Accumulate token usage across prompts (inkl. Cache-Tokens für korrekte Kosten)
             if (! empty($result['token_usage'])) {
-                $accumulatedTokens['input_tokens'] += $result['token_usage']['input_tokens'] ?? 0;
-                $accumulatedTokens['output_tokens'] += $result['token_usage']['output_tokens'] ?? 0;
+                foreach (array_keys($accumulatedTokens) as $key) {
+                    $accumulatedTokens[$key] += $result['token_usage'][$key] ?? 0;
+                }
             }
             if (! empty($result['llm_model'])) {
                 $lastModel = $result['llm_model'];
@@ -153,6 +159,19 @@ class InferenceWorkerJob implements ShouldQueue
             'do_nothing_count' => $totalDoNothing,
             'duration_ms' => $durationMs,
         ]);
+
+        // Kostentransparenz: Was hat dieser Run gekostet — und pro Signal?
+        $cost = $run->costBreakdown();
+        Log::info('[InferenceWorker] Run abgeschlossen', [
+            'run_id' => $run->id,
+            'team_id' => $trigger->team_id,
+            'model' => $cost['model'],
+            'tokens' => $cost['tokens'],
+            'cost_usd' => $cost['usd'],
+            'cost_eur' => $cost['eur'],
+            'signals' => $totalSignals,
+            'cost_per_signal_usd' => $run->cost_per_signal_usd !== null ? round($run->cost_per_signal_usd, 4) : null,
+        ]);
     }
 
     protected function runSynthesis(OrganizationInferenceTrigger $trigger, OrganizationInferenceRun $run, int $startTime): void
@@ -164,11 +183,28 @@ class InferenceWorkerJob implements ShouldQueue
 
         $durationMs = $this->elapsedMs($startTime);
 
+        if (! empty($result['token_usage'])) {
+            $run->update([
+                'llm_model' => $result['llm_model'] ?? $run->llm_model,
+                'token_usage' => $result['token_usage'],
+            ]);
+        }
+
         $run->markCompleted([
             'prompts_evaluated' => 1,
             'signals_created' => 0,
             'duration_ms' => $durationMs,
             'summary' => $result['title'] ?? 'Synthesis report generated',
+        ]);
+
+        $cost = $run->fresh()->costBreakdown();
+        Log::info('[InferenceWorker] Synthese abgeschlossen', [
+            'run_id' => $run->id,
+            'team_id' => $trigger->team_id,
+            'model' => $cost['model'],
+            'tokens' => $cost['tokens'],
+            'cost_usd' => $cost['usd'],
+            'cost_eur' => $cost['eur'],
         ]);
     }
 

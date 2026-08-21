@@ -17,10 +17,10 @@ class OrganizationAgentProfile extends Model
 {
     protected $fillable = [
         'organization_entity_id',
-        'domain',
-        'stages',
         'five_hour_reserve_pct',
         'seven_day_burn_margin_pct',
+        'max_story_points',
+        'claude_model',
         'active',
         'github_username',
         'status',
@@ -31,17 +31,14 @@ class OrganizationAgentProfile extends Model
     ];
 
     protected $casts = [
-        'stages' => 'array',
         'five_hour_reserve_pct' => 'integer',
         'seven_day_burn_margin_pct' => 'integer',
+        'max_story_points' => 'integer',
         'active' => 'boolean',
         'five_hour_pct' => 'decimal:2',
         'seven_day_pct' => 'decimal:2',
         'last_heartbeat_at' => 'datetime',
     ];
-
-    /** Bekannte Domänen — nicht als DB-Enum, damit analysis/signal später ohne Schema-Änderung andockt. */
-    public const DOMAINS = ['development', 'backoffice', 'helpdesk', 'assistant', 'analysis'];
 
     public function entity(): BelongsTo
     {

@@ -31,6 +31,8 @@ class OrganizationRole extends Model
         'slug',
         'description',
         'vsm_system',
+        'domain',
+        'stage',
         'status',
         'owner_entity_id',
         'capabilities',
@@ -39,6 +41,16 @@ class OrganizationRole extends Model
     protected $casts = [
         'capabilities' => 'array',
     ];
+
+    /**
+     * Agent-Domänen (Worker-Runtime). Eine Rolle mit gesetzter Domäne ist „agent-ausführbar";
+     * reine Menschen-Rollen lassen domain/stage null. Nicht als DB-Enum, damit analysis/signal
+     * später ohne Schema-Änderung andockt.
+     */
+    public const DOMAINS = ['development', 'backoffice', 'helpdesk', 'assistant', 'analysis'];
+
+    /** Stufen (Matrix-Achse). operativ: triage/execute/learn · analysis: signal. */
+    public const STAGES = ['triage', 'execute', 'learn', 'signal'];
 
     /**
      * Erlaubte VSM-Systeme — synchron mit OrganizationEntityVsmAssignment::VSM_SYSTEMS.

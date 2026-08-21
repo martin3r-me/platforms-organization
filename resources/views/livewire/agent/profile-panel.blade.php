@@ -5,26 +5,17 @@
         <h3 class="text-sm font-semibold text-[var(--ui-primary)]">Runtime-Konfiguration</h3>
 
         <div>
-            <label class="block text-xs font-medium text-[var(--ui-muted)] mb-1">Domäne</label>
-            <select wire:model="domain" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
-                <option value="">– keine –</option>
-                @foreach (\Platform\Organization\Models\OrganizationAgentProfile::DOMAINS as $d)
-                    <option value="{{ $d }}">{{ $d }}</option>
-                @endforeach
-            </select>
-            <p class="text-[11px] text-[var(--ui-muted)] mt-1">operativ (S1): development/backoffice/helpdesk/assistant · analysis (S2–S4): signal-erzeugend.</p>
-        </div>
-
-        <div>
-            <label class="block text-xs font-medium text-[var(--ui-muted)] mb-1">Stufen</label>
-            <div class="flex flex-wrap gap-3">
-                @foreach ($availableStages as $s)
-                    <label class="inline-flex items-center gap-1.5 text-sm">
-                        <input type="checkbox" wire:model="stages" value="{{ $s }}" class="rounded border-[var(--ui-border)]">
-                        {{ $s }}
-                    </label>
-                @endforeach
-            </div>
+            <label class="block text-xs font-medium text-[var(--ui-muted)] mb-1">Rollen (Domäne · Stufe)</label>
+            @if (count($roles))
+                <ul class="text-sm space-y-0.5">
+                    @foreach ($roles as $r)
+                        <li class="inline-flex items-center gap-1.5 mr-2 rounded bg-[var(--ui-muted-5,#0001)] px-2 py-0.5">{{ $r }}</li>
+                    @endforeach
+                </ul>
+            @else
+                <p class="text-[11px] text-amber-700">Noch keine Rolle zugewiesen — der Agent tut nichts, bis er in der Rollen-UI eine (agent-ausführbare) Rolle bekommt.</p>
+            @endif
+            <p class="text-[11px] text-[var(--ui-muted)] mt-1">Was der Agent TUT, kommt aus seinen Rollen — gepflegt in der Rollen-UI, wie bei jedem Mitglied. Hier nur zur Info.</p>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -35,6 +26,14 @@
             <div>
                 <label class="block text-xs font-medium text-[var(--ui-muted)] mb-1">7d-Burn-Margin %</label>
                 <input type="number" min="0" max="100" wire:model="seven_day_burn_margin_pct" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-[var(--ui-muted)] mb-1">Max Story Points (Claim-Cap)</label>
+                <input type="number" min="1" max="100" wire:model="max_story_points" placeholder="kein Limit" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-[var(--ui-muted)] mb-1">Claude-Modell (optional)</label>
+                <input type="text" wire:model="claude_model" placeholder="leer = bestes verfügbares" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
             </div>
         </div>
 

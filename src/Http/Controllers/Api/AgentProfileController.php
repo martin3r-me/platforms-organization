@@ -7,6 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Platform\Organization\Models\OrganizationAgentProfile;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationRoleAssignment;
 
 /**
  * Agent-Vertrag: der Client-Daemon ZIEHT seine Config (`profile`) und MELDET Status
@@ -25,14 +26,28 @@ class AgentProfileController extends Controller
             return response()->json(['message' => 'No agent profile for this token'], 404);
         }
 
+        // Identität (Domäne × Stufen) aus den Rollen-Assignments des Agenten ableiten — nicht
+        // mehr aus dem Profil. Invariante „eine Domäne pro Agent": die erste nicht-leere zählt.
+        $roles = OrganizationRoleAssignment::query()
+            ->where('person_entity_id', $profile->organization_entity_id)
+            ->with('role')
+            ->get()
+            ->pluck('role')
+            ->filter();
+
+        $domain = $roles->pluck('domain')->filter()->unique()->first();
+        $stages = $roles->pluck('stage')->filter()->unique()->values()->all();
+
         return response()->json(['data' => [
-            'domain' => $profile->domain,
-            'stages' => $profile->stages ?? [],
+            'domain' => $domain,
+            'stages' => $stages,
             'active' => (bool) $profile->active,
             'governor' => [
                 'five_hour_reserve_pct' => $profile->five_hour_reserve_pct,
                 'seven_day_burn_margin_pct' => $profile->seven_day_burn_margin_pct,
             ],
+            'max_story_points' => $profile->max_story_points,
+            'claude_model' => $profile->claude_model,
             'github_username' => $profile->github_username,
         ]]);
     }

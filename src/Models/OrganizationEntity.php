@@ -243,6 +243,22 @@ class OrganizationEntity extends Model
     }
 
     /**
+     * Scope: Agent-Entities (EntityType mit code 'agent') — die KI-Worker.
+     */
+    public function scopeAgents($query)
+    {
+        return $query->whereHas('type', fn ($q) => $q->where('code', 'agent'));
+    }
+
+    /**
+     * Runtime-Profil einer agent-Entity (Domäne, Stufen, Governor, gemeldeter Status). 1:1.
+     */
+    public function agentProfile()
+    {
+        return $this->hasOne(OrganizationAgentProfile::class, 'organization_entity_id');
+    }
+
+    /**
      * Beziehung zu Organization Contexts (Module Entities, die an diese Entity gehängt sind)
      */
     public function contexts()
@@ -405,10 +421,12 @@ class OrganizationEntity extends Model
                 ->whereKey($model->entity_type_id)
                 ->value('code');
 
-            if ($typeCode !== 'person') {
+            // Mitglied-artige Typen mit eigenem User: person UND agent (der KI-Worker ist ein
+            // echtes Org-Mitglied mit eigenem Bot-User). Struktur-/Abteilungs-Knoten weiterhin nicht.
+            if (! in_array($typeCode, ['person', 'agent'], true)) {
                 throw new \InvalidArgumentException(
-                    'linked_user_id darf nur auf Person-Entities gesetzt werden ('
-                    .'Entity-Type "'.($typeCode ?? '?').'" ist keine Person).'
+                    'linked_user_id darf nur auf Person- oder Agent-Entities gesetzt werden ('
+                    .'Entity-Type "'.($typeCode ?? '?').'" ist keins von beidem).'
                 );
             }
         });

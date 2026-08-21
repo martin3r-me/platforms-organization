@@ -62,9 +62,9 @@ class OrganizationRoleAssignment extends Model
 
         $typeCode = $entity->type?->code;
 
-        if ($typeCode !== 'person') {
+        if (! in_array($typeCode, ['person', 'agent'], true)) {
             throw ValidationException::withMessages([
-                'person_entity_id' => 'Rollen können nur an Entities vom Typ "person" zugewiesen werden (gefunden: '.($typeCode ?? 'unbekannt').').',
+                'person_entity_id' => 'Rollen können nur an Entities vom Typ "person" oder "agent" zugewiesen werden (gefunden: '.($typeCode ?? 'unbekannt').').',
             ]);
         }
     }

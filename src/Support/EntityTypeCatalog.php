@@ -47,6 +47,7 @@ class EntityTypeCatalog
         'board',
         'capability_area',
         'system_agent',
+        'agent',
     ];
 
     /**

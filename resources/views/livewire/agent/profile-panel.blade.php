@@ -53,6 +53,30 @@
         </div>
     </div>
 
+    {{-- Live-Log: was der Agent gerade tut (vom Daemon gemeldet, kein Voll-Token-Strom) --}}
+    <div class="rounded-lg border border-[var(--ui-border)] p-5 space-y-3" wire:poll.4s>
+        <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-[var(--ui-primary)]">Live-Log</h3>
+            @if ($profile && $profile->isOnline())<span class="text-xs text-green-600">● live</span>@endif
+        </div>
+        @if (count($events))
+            @php
+                $sym = ['claimed'=>'▶','sync'=>'⇅','read'=>'✎','edit'=>'✎','write'=>'✎','shell'=>'$','tool'=>'∙','text'=>'…','commit'=>'⌥','push'=>'⇡','done'=>'✓','fail'=>'✗'];
+            @endphp
+            <div class="rounded-md bg-black/90 text-gray-100 font-mono text-[12px] leading-relaxed p-3 max-h-80 overflow-y-auto space-y-0.5">
+                @foreach ($events as $e)
+                    <div class="flex gap-2">
+                        <span class="text-gray-500 shrink-0">{{ optional($e->created_at)->format('H:i:s') ?? '' }}</span>
+                        <span class="shrink-0 {{ $e->kind === 'fail' ? 'text-red-400' : ($e->kind === 'done' ? 'text-green-400' : 'text-gray-400') }}">{{ $sym[$e->kind] ?? '·' }}</span>
+                        <span class="break-all {{ $e->kind === 'fail' ? 'text-red-300' : '' }}">{{ $e->text }}</span>
+                    </div>
+                @endforeach
+            </div>
+        @else
+            <p class="text-[11px] text-[var(--ui-muted)]">Noch keine Aktivität gemeldet — sichtbar, sobald der Daemon einen Lauf startet.</p>
+        @endif
+    </div>
+
     {{-- Plattform-Zugang: Token inline minten --}}
     <div class="rounded-lg border border-[var(--ui-border)] p-5 space-y-3">
         <h3 class="text-sm font-semibold text-[var(--ui-primary)]">Plattform-Zugang</h3>

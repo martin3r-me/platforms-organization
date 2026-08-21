@@ -3,6 +3,7 @@
 namespace Platform\Organization\Livewire\Agent;
 
 use Livewire\Component;
+use Platform\Organization\Models\OrganizationAgentRunEvent;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationRoleAssignment;
 
@@ -101,12 +102,33 @@ class ProfilePanel extends Component
         $this->mintedToken = null;
     }
 
+    /** Der Aktivitäts-Feed des jüngsten Laufs (vom Daemon gemeldet) — read-only, live gepollt. */
+    public function recentEvents(): array
+    {
+        $latestRun = OrganizationAgentRunEvent::query()
+            ->where('organization_entity_id', $this->entity->id)
+            ->orderByDesc('id')
+            ->value('run_id');
+
+        if (! $latestRun) {
+            return [];
+        }
+
+        return OrganizationAgentRunEvent::query()
+            ->where('organization_entity_id', $this->entity->id)
+            ->where('run_id', $latestRun)
+            ->orderBy('id')
+            ->get(['kind', 'text', 'created_at'])
+            ->all();
+    }
+
     public function render()
     {
         return view('organization::livewire.agent.profile-panel', [
             'profile' => $this->entity->agentProfile,
             'linkedUser' => $this->entity->linkedUser,
             'roles' => $this->agentRoles(),
+            'events' => $this->recentEvents(),
         ]);
     }
 }

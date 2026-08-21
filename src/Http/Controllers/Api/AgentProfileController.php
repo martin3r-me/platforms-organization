@@ -6,6 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Platform\Organization\Models\OrganizationAgentProfile;
+use Platform\Organization\Models\OrganizationAgentRunEvent;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationRoleAssignment;
 
@@ -77,6 +78,52 @@ class AgentProfileController extends Controller
         $profile->save();
 
         return response()->json(['data' => ['ok' => true, 'active' => (bool) $profile->active]]);
+    }
+
+    /**
+     * POST /api/org/agent/log — der Daemon meldet seinen Aktivitäts-Feed (Claim, Reads/Edits,
+     * Shell, Git-Schritte, Ergebnis). Kuratiert, kein Voll-Token-Strom. Gepruned auf die
+     * jüngsten Events pro Agent, damit die Tabelle nicht unbegrenzt wächst.
+     */
+    public function log(Request $request): JsonResponse
+    {
+        $profile = $this->profileForUser($request);
+        if (! $profile) {
+            return response()->json(['message' => 'No agent profile for this token'], 404);
+        }
+
+        $data = $request->validate([
+            'run_id' => 'required|string|max:64',
+            'events' => 'required|array|max:200',
+            'events.*.kind' => 'required|string|max:24',
+            'events.*.text' => 'nullable|string|max:2000',
+        ]);
+
+        $entityId = (int) $profile->organization_entity_id;
+        $now = now();
+        $rows = array_map(fn ($e) => [
+            'organization_entity_id' => $entityId,
+            'run_id' => $data['run_id'],
+            'kind' => $e['kind'],
+            'text' => $e['text'] ?? null,
+            'created_at' => $now,
+        ], $data['events']);
+
+        OrganizationAgentRunEvent::insert($rows);
+
+        // Pruning: nur die jüngsten ~2000 Events pro Agent behalten.
+        $cutoff = OrganizationAgentRunEvent::where('organization_entity_id', $entityId)
+            ->orderByDesc('id')
+            ->skip(2000)
+            ->take(1)
+            ->value('id');
+        if ($cutoff) {
+            OrganizationAgentRunEvent::where('organization_entity_id', $entityId)
+                ->where('id', '<=', $cutoff)
+                ->delete();
+        }
+
+        return response()->json(['data' => ['ok' => true]]);
     }
 
     private function profileForUser(Request $request): ?OrganizationAgentProfile

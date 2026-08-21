@@ -281,7 +281,9 @@ class Index extends Component
         $entities = OrganizationEntity::where('team_id', Auth::user()->currentTeam->id)
             ->with(['type'])
             ->where('is_active', true)
-            ->whereHas('type', fn ($q) => $q->where('code', 'person'))
+            // Mitglied-artige Träger: person UND agent (KI-Worker sind echte Org-Mitglieder
+            // und bekommen Rollen wie jedes andere Mitglied).
+            ->whereHas('type', fn ($q) => $q->whereIn('code', ['person', 'agent']))
             ->orderBy('name')
             ->get();
 

@@ -258,6 +258,18 @@
                             @svg('heroicon-o-link', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
                             Relations
                         </button>
+                        @if($this->isAgentEntity)
+                            <button
+                                @click="tab = 'agent'"
+                                :class="tab === 'agent'
+                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
+                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                                class="px-4 py-2.5 text-sm transition-colors"
+                            >
+                                @svg('heroicon-o-sparkles', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
+                                Agent
+                            </button>
+                        @endif
                         @if($this->isCarrierEntity)
                             @php
                                 $vsmMatrix = $this->vsmMatrix;
@@ -1337,6 +1349,13 @@
                         @endif
                     </div>
                 </div>
+
+                {{-- Tab: Agent (KI-Worker als Org-Mitglied) — Runtime-Config + Token + Status --}}
+                @if($this->isAgentEntity)
+                    <div x-show="tab === 'agent'" x-cloak>
+                        @livewire(\Platform\Organization\Livewire\Agent\ProfilePanel::class, ['entity' => $entity], key('agent-panel-'.$entity->id))
+                    </div>
+                @endif
 
                 {{-- Tab: System-Agent --}}
                 @if($this->isSystemAgent)

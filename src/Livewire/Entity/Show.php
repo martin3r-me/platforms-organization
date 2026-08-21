@@ -145,6 +145,13 @@ class Show extends Component
         return $this->entity->type?->vsm_class === OrganizationEntityType::VSM_CLASS_CARRIER;
     }
 
+    /** Agent-Entity (KI-Worker) → eigener Tab mit Runtime-Config + Token + Status. */
+    #[Computed]
+    public function isAgentEntity(): bool
+    {
+        return $this->entity->type?->code === 'agent';
+    }
+
     // ── Strategy Tab ──────────────────────────────────────────
 
     /**

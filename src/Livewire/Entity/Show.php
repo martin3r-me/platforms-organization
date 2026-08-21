@@ -638,13 +638,15 @@ class Show extends Component
             }
         }
 
-        // Invariante: ein verknüpfter User darf nur auf einer Person-Entity sitzen.
+        // Invariante: ein verknüpfter User darf nur auf mitglied-artigen Entities sitzen —
+        // Person UND agent (der KI-Worker ist ein echtes Org-Mitglied mit eigenem Bot-User).
+        // Muss mit OrganizationEntity::booted() synchron bleiben.
         if (($this->form['linked_user_id'] ?? null) !== null) {
             $typeCode = \Platform\Organization\Models\OrganizationEntityType::query()
                 ->whereKey($this->form['entity_type_id'] ?? null)
                 ->value('code');
-            if ($typeCode !== 'person') {
-                $this->addError('form.linked_user_id', 'Ein verknüpfter User ist nur auf Person-Entities erlaubt.');
+            if (! in_array($typeCode, ['person', 'agent'], true)) {
+                $this->addError('form.linked_user_id', 'Ein verknüpfter User ist nur auf Person- oder Agent-Entities erlaubt.');
                 return;
             }
         }

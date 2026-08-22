@@ -61,7 +61,7 @@
         </div>
         @if (count($events))
             @php
-                $sym = ['claimed'=>'▶','sync'=>'⇅','read'=>'✎','edit'=>'✎','write'=>'✎','shell'=>'$','tool'=>'∙','text'=>'…','commit'=>'⌥','push'=>'⇡','done'=>'✓','fail'=>'✗','ask'=>'❓'];
+                $sym = ['claimed'=>'▶','sync'=>'⇅','read'=>'✎','edit'=>'✎','write'=>'✎','shell'=>'$','tool'=>'∙','text'=>'…','commit'=>'⌥','push'=>'⇡','done'=>'✓','fail'=>'✗','ask'=>'❓','review'=>'⊙'];
             @endphp
             <div class="rounded-md bg-black/90 text-gray-100 font-mono text-[12px] leading-relaxed p-3 max-h-80 overflow-y-auto space-y-0.5">
                 @foreach ($events as $e)

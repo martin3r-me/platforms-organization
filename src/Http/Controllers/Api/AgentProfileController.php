@@ -49,6 +49,7 @@ class AgentProfileController extends Controller
             ],
             'max_story_points' => $profile->max_story_points,
             'claude_model' => $profile->claude_model,
+            'claim_unassigned' => (bool) $profile->claim_unassigned,
             'github_username' => $profile->github_username,
         ]]);
     }

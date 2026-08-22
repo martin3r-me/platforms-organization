@@ -23,6 +23,7 @@ class ProfilePanel extends Component
     public int $seven_day_burn_margin_pct = 10;
     public ?int $max_story_points = null;
     public ?string $claude_model = null;
+    public bool $claim_unassigned = true;
     public bool $active = true;
     public ?string $github_username = null;
 
@@ -39,6 +40,7 @@ class ProfilePanel extends Component
             $this->seven_day_burn_margin_pct = (int) $p->seven_day_burn_margin_pct;
             $this->max_story_points = $p->max_story_points;
             $this->claude_model = $p->claude_model;
+            $this->claim_unassigned = (bool) $p->claim_unassigned;
             $this->active = (bool) $p->active;
             $this->github_username = $p->github_username;
         }
@@ -51,6 +53,7 @@ class ProfilePanel extends Component
             'seven_day_burn_margin_pct' => 'integer|min:0|max:100',
             'max_story_points' => 'nullable|integer|min:1|max:100',
             'claude_model' => 'nullable|string|max:64',
+            'claim_unassigned' => 'boolean',
             'github_username' => 'nullable|string|max:255',
         ]);
 
@@ -59,6 +62,7 @@ class ProfilePanel extends Component
             'seven_day_burn_margin_pct' => $this->seven_day_burn_margin_pct,
             'max_story_points' => $this->max_story_points ?: null,
             'claude_model' => $this->claude_model ?: null,
+            'claim_unassigned' => $this->claim_unassigned,
             'active' => $this->active,
             'github_username' => $this->github_username ?: null,
         ]);

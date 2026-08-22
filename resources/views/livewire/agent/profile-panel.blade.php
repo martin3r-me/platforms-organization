@@ -43,6 +43,11 @@
         </div>
 
         <label class="inline-flex items-center gap-2 text-sm">
+            <input type="checkbox" wire:model="claim_unassigned" class="rounded border-[var(--ui-border)]">
+            Herrenlose Pool-Issues ziehen (aus, wenn nur explizit zugewiesene)
+        </label>
+
+        <label class="inline-flex items-center gap-2 text-sm">
             <input type="checkbox" wire:model="active" class="rounded border-[var(--ui-border)]">
             Aktiv (Daemon arbeitet)
         </label>

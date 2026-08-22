@@ -19,4 +19,6 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     // Learn-Loop: Domänen-Wissen ziehen (beim Claim) + ablegen (nach dem Run).
     Route::get('/knowledge', [AgentKnowledgeController::class, 'index'])->name('organization.api.agent.knowledge.index');
     Route::post('/knowledge', [AgentKnowledgeController::class, 'store'])->name('organization.api.agent.knowledge.store');
+    // Dashboard-Kennzahlen: getrackte Zeit (24h / Monat).
+    Route::get('/stats', [AgentProfileController::class, 'stats'])->name('organization.api.agent.stats');
 });

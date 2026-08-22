@@ -9,6 +9,7 @@ use Platform\Organization\Models\OrganizationAgentProfile;
 use Platform\Organization\Models\OrganizationAgentRunEvent;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationRoleAssignment;
+use Platform\Organization\Models\OrganizationTimeEntry;
 
 /**
  * Agent-Vertrag: der Client-Daemon ZIEHT seine Config (`profile`) und MELDET Status
@@ -125,6 +126,27 @@ class AgentProfileController extends Controller
         }
 
         return response()->json(['data' => ['ok' => true]]);
+    }
+
+    /**
+     * GET /api/org/agent/stats — getrackte Zeit des Agenten (24 h / laufender Monat) fürs
+     * Dashboard. Quelle: OrganizationTimeEntry (vom Agenten via org/agent/time gestempelt).
+     */
+    public function stats(Request $request): JsonResponse
+    {
+        $userId = (int) $request->user()?->id;
+        if ($userId < 1) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+        $sum = fn ($since) => (int) OrganizationTimeEntry::query()
+            ->where('user_id', $userId)
+            ->where('created_at', '>=', $since)
+            ->sum('minutes');
+
+        return response()->json(['data' => [
+            'tracked_24h_min' => $sum(now()->subDay()),
+            'tracked_month_min' => $sum(now()->startOfMonth()),
+        ]]);
     }
 
     private function profileForUser(Request $request): ?OrganizationAgentProfile

@@ -2,9 +2,12 @@
 
 namespace Platform\Organization\Livewire\Agent;
 
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
 use Platform\Organization\Models\OrganizationAgentRunEvent;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationMemoryEntry;
 use Platform\Organization\Models\OrganizationRoleAssignment;
 
 /**
@@ -126,6 +129,63 @@ class ProfilePanel extends Component
             ->all();
     }
 
+    /**
+     * Nächste Aufgaben = die dem Agenten zugewiesenen offenen Dev-Issues (user_in_charge_id = sein
+     * Bot-User), in Board-Reihenfolge. Cross-Modul → nur lesende DB-Query, per Schema-Guard: fehlt
+     * das dev-Modul in dieser Instanz, bleibt der Block leer statt zu brechen.
+     */
+    public function nextTasks(): array
+    {
+        $user = $this->entity->linkedUser;
+        if (! $user || ! Schema::hasTable('dev_issues')) {
+            return [];
+        }
+
+        return DB::table('dev_issues')
+            ->leftJoin('dev_boards', 'dev_issues.dev_board_id', '=', 'dev_boards.id')
+            ->whereNull('dev_issues.deleted_at')
+            ->where('dev_issues.user_in_charge_id', $user->id)
+            ->where('dev_issues.status', 'open')
+            ->where('dev_issues.is_done', false)
+            ->orderBy('dev_boards.order')
+            ->orderBy('dev_issues.slot_order')
+            ->orderBy('dev_issues.created_at')
+            ->limit(12)
+            ->get(['dev_issues.title', 'dev_boards.name as board', 'dev_boards.type as board_type'])
+            ->map(fn ($r) => [
+                'title' => $r->title,
+                'board' => $r->board,
+                'type' => $r->board_type,
+            ])
+            ->all();
+    }
+
+    /**
+     * Gelerntes = die Dev-Lektionen der Domäne (OrganizationMemoryEntry, memory_type dev.*),
+     * team-scoped, meistverstärkte zuerst. Same-module, kein Cross-Coupling.
+     */
+    public function learnings(): array
+    {
+        if (! Schema::hasTable('organization_memory_entries')) {
+            return [];
+        }
+
+        return OrganizationMemoryEntry::query()
+            ->where('team_id', (int) $this->entity->team_id)
+            ->where('memory_type', 'like', 'dev.%')
+            ->where('is_active', true)
+            ->orderByDesc('reinforcement_count')
+            ->orderByDesc('id')
+            ->limit(12)
+            ->get(['content', 'structured_data', 'reinforcement_count'])
+            ->map(fn ($m) => [
+                'content' => $m->content,
+                'package' => data_get($m->structured_data, 'package'),
+                'count' => (int) $m->reinforcement_count,
+            ])
+            ->all();
+    }
+
     public function render()
     {
         return view('organization::livewire.agent.profile-panel', [
@@ -133,6 +193,8 @@ class ProfilePanel extends Component
             'linkedUser' => $this->entity->linkedUser,
             'roles' => $this->agentRoles(),
             'events' => $this->recentEvents(),
+            'nextTasks' => $this->nextTasks(),
+            'learnings' => $this->learnings(),
         ]);
     }
 }

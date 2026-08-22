@@ -82,6 +82,43 @@
         @endif
     </div>
 
+    {{-- Nächste Aufgaben: die dem Agenten zugewiesenen offenen Dev-Issues, in Board-Reihenfolge --}}
+    <div class="rounded-lg border border-[var(--ui-border)] p-5 space-y-3" wire:poll.30s>
+        <h3 class="text-sm font-semibold text-[var(--ui-primary)]">Nächste Aufgaben</h3>
+        @if (count($nextTasks))
+            <ul class="space-y-1.5">
+                @foreach ($nextTasks as $t)
+                    <li class="flex items-start gap-2 text-[13px]">
+                        <span class="mt-0.5 shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium {{ ($t['type'] ?? '') === 'bug' ? 'bg-red-100 text-red-700' : 'bg-blue-100 text-blue-700' }}">{{ $t['board'] ?? '—' }}</span>
+                        <span class="break-words">{{ $t['title'] }}</span>
+                    </li>
+                @endforeach
+            </ul>
+        @else
+            <p class="text-[11px] text-[var(--ui-muted)]">Keine offenen Aufgaben zugewiesen — der Agent hat gerade nichts in seiner Queue.</p>
+        @endif
+    </div>
+
+    {{-- Gelerntes: die Dev-Lektionen der Domäne (meistverstärkte zuerst) --}}
+    <div class="rounded-lg border border-[var(--ui-border)] p-5 space-y-3">
+        <h3 class="text-sm font-semibold text-[var(--ui-primary)]">Gelerntes</h3>
+        @if (count($learnings))
+            <ul class="space-y-2">
+                @foreach ($learnings as $l)
+                    <li class="text-[13px]">
+                        <div class="flex items-center gap-2 mb-0.5">
+                            @if ($l['package'])<span class="rounded bg-[var(--ui-muted-5,#0001)] px-1.5 py-0.5 text-[10px] text-[var(--ui-muted)]">{{ $l['package'] }}</span>@endif
+                            @if (($l['count'] ?? 0) > 0)<span class="text-[10px] text-[var(--ui-muted)]">×{{ $l['count'] }}</span>@endif
+                        </div>
+                        <p class="break-words text-[var(--ui-fg)]">{{ $l['content'] }}</p>
+                    </li>
+                @endforeach
+            </ul>
+        @else
+            <p class="text-[11px] text-[var(--ui-muted)]">Noch nichts gelernt — Lektionen erscheinen, sobald der Learn-Loop läuft.</p>
+        @endif
+    </div>
+
     {{-- Plattform-Zugang: Token inline minten --}}
     <div class="rounded-lg border border-[var(--ui-border)] p-5 space-y-3">
         <h3 class="text-sm font-semibold text-[var(--ui-primary)]">Plattform-Zugang</h3>

@@ -21,4 +21,6 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::post('/knowledge', [AgentKnowledgeController::class, 'store'])->name('organization.api.agent.knowledge.store');
     // Dashboard-Kennzahlen: getrackte Zeit (24h / Monat).
     Route::get('/stats', [AgentProfileController::class, 'stats'])->name('organization.api.agent.stats');
+    // Observability: jüngste Run-Events lesen (z. B. ?kind=fail für Ablehnungsgründe).
+    Route::get('/events', [AgentProfileController::class, 'events'])->name('organization.api.agent.events');
 });

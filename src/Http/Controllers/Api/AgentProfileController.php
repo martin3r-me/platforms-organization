@@ -129,6 +129,45 @@ class AgentProfileController extends Controller
     }
 
     /**
+     * GET /api/org/agent/events — jüngste Run-Events des Agenten (Observability). Optional
+     * gefiltert nach kind (z. B. „fail" für Ablehnungsgründe) oder run_id. Neueste zuerst.
+     */
+    public function events(Request $request): JsonResponse
+    {
+        $profile = $this->profileForUser($request);
+        if (! $profile) {
+            return response()->json(['message' => 'No agent profile for this token'], 404);
+        }
+
+        $data = $request->validate([
+            'limit' => 'nullable|integer|min:1|max:500',
+            'kind' => 'nullable|string|max:24',
+            'run_id' => 'nullable|string|max:64',
+        ]);
+
+        $query = OrganizationAgentRunEvent::where('organization_entity_id', (int) $profile->organization_entity_id)
+            ->orderByDesc('id');
+        if (! empty($data['kind'])) {
+            $query->where('kind', $data['kind']);
+        }
+        if (! empty($data['run_id'])) {
+            $query->where('run_id', $data['run_id']);
+        }
+
+        $events = $query->limit((int) ($data['limit'] ?? 100))
+            ->get(['id', 'run_id', 'kind', 'text', 'created_at'])
+            ->map(fn ($e) => [
+                'id' => $e->id,
+                'run_id' => $e->run_id,
+                'kind' => $e->kind,
+                'text' => $e->text,
+                'at' => (string) $e->created_at,
+            ]);
+
+        return response()->json(['data' => $events]);
+    }
+
+    /**
      * GET /api/org/agent/stats — getrackte Zeit des Agenten (24 h / laufender Monat) fürs
      * Dashboard. Quelle: OrganizationTimeEntry (vom Agenten via org/agent/time gestempelt).
      */

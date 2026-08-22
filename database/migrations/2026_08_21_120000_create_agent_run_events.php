@@ -14,6 +14,11 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Selbstheilend: ein zuvor fehlgeschlagener Deploy (Index-Name zu lang) lässt die Tabelle
+        // ggf. halb angelegt zurück (MySQL-DDL ist nicht transaktional) → sonst „already exists"
+        // beim Retry. Die Migration läuft ohnehin nur einmal; hier gibt es nie Daten zu verlieren.
+        Schema::dropIfExists('organization_agent_run_events');
+
         Schema::create('organization_agent_run_events', function (Blueprint $table) {
             $table->id();
             $table->foreignId('organization_entity_id')->constrained()->cascadeOnDelete();
@@ -22,8 +27,10 @@ return new class extends Migration
             $table->text('text')->nullable();
             $table->timestamp('created_at')->nullable();
 
-            $table->index(['organization_entity_id', 'id']);
-            $table->index(['organization_entity_id', 'run_id']);
+            // EXPLIZITE Kurznamen (<64) → unabhängig vom SafeBlueprint-Resolver; deploy-sicher auf
+            // jeder core-Version. Naive Auto-Namen würden hier 65 Zeichen erreichen (1059).
+            $table->index(['organization_entity_id', 'id'], 'org_agent_run_events_entity_id_idx');
+            $table->index(['organization_entity_id', 'run_id'], 'org_agent_run_events_entity_run_idx');
         });
     }
 

@@ -61,14 +61,14 @@
         </div>
         @if (count($events))
             @php
-                $sym = ['claimed'=>'▶','sync'=>'⇅','read'=>'✎','edit'=>'✎','write'=>'✎','shell'=>'$','tool'=>'∙','text'=>'…','commit'=>'⌥','push'=>'⇡','done'=>'✓','fail'=>'✗'];
+                $sym = ['claimed'=>'▶','sync'=>'⇅','read'=>'✎','edit'=>'✎','write'=>'✎','shell'=>'$','tool'=>'∙','text'=>'…','commit'=>'⌥','push'=>'⇡','done'=>'✓','fail'=>'✗','ask'=>'❓'];
             @endphp
             <div class="rounded-md bg-black/90 text-gray-100 font-mono text-[12px] leading-relaxed p-3 max-h-80 overflow-y-auto space-y-0.5">
                 @foreach ($events as $e)
                     <div class="flex gap-2">
                         <span class="text-gray-500 shrink-0">{{ optional($e->created_at)->format('H:i:s') ?? '' }}</span>
-                        <span class="shrink-0 {{ $e->kind === 'fail' ? 'text-red-400' : ($e->kind === 'done' ? 'text-green-400' : 'text-gray-400') }}">{{ $sym[$e->kind] ?? '·' }}</span>
-                        <span class="break-all {{ $e->kind === 'fail' ? 'text-red-300' : '' }}">{{ $e->text }}</span>
+                        <span class="shrink-0 {{ $e->kind === 'fail' ? 'text-red-400' : ($e->kind === 'done' ? 'text-green-400' : ($e->kind === 'ask' ? 'text-amber-400' : 'text-gray-400')) }}">{{ $sym[$e->kind] ?? '·' }}</span>
+                        <span class="break-all {{ $e->kind === 'fail' ? 'text-red-300' : ($e->kind === 'ask' ? 'text-amber-300' : '') }}">{{ $e->text }}</span>
                     </div>
                 @endforeach
             </div>

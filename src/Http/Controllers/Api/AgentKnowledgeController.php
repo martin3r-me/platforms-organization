@@ -5,6 +5,7 @@ namespace Platform\Organization\Http\Controllers\Api;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
+use Platform\Core\Services\EmbeddingService;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationMemoryEntry;
 
@@ -19,6 +20,12 @@ use Platform\Organization\Models\OrganizationMemoryEntry;
 class AgentKnowledgeController extends Controller
 {
     private const TYPE = 'dev.lesson';
+
+    /** Entity-Type unter dem Lektionen im core-Embedding-Index liegen (siehe embedAndStore/search unten). */
+    private const EMBED_ENTITY_TYPE = 'OrganizationMemoryEntry';
+
+    /** Ab dieser Cosine-Similarity gilt eine neue Lektion als Dublette einer bestehenden. */
+    private const SIMILARITY_THRESHOLD = 0.9;
 
     /**
      * GET /api/org/agent/knowledge?package=X — relevante Dev-Lektionen (Package + global),
@@ -58,7 +65,9 @@ class AgentKnowledgeController extends Controller
 
     /**
      * POST /api/org/agent/knowledge {content, package?, kind?, source_id?} — Lektion ablegen.
-     * Dedup: gleiche Lektion (Team+Typ+Package+Content) → reinforcement_count++ statt Duplikat.
+     * Dedup zweistufig: 1) exakter Content-Match (Team+Typ+Package), 2) semantische Ähnlichkeit
+     * über den core EmbeddingService (Team+Domäne). Beide Treffer → reinforcement_count++ statt
+     * Duplikat. Sonst neu anlegen und für künftige Vergleiche embedden (fail-open, s. u.).
      */
     public function store(Request $request): JsonResponse
     {
@@ -85,6 +94,8 @@ class AgentKnowledgeController extends Controller
             ->where('content', $content)
             ->first();
 
+        $existing ??= $this->findSemanticDuplicate($teamId, $content);
+
         if ($existing) {
             $existing->increment('reinforcement_count');
             $existing->is_active = true;
@@ -110,7 +121,68 @@ class AgentKnowledgeController extends Controller
             'reinforcement_count' => 0,
         ]);
 
+        $this->embedLesson($m);
+
         return response()->json(['data' => ['id' => $m->id]]);
+    }
+
+    /**
+     * Semantische Near-Duplicate-Suche vor dem Insert. Domänen-gescoped über den memory_type-
+     * Präfix (z. B. "dev" aus "dev.lesson") — eine backoffice-Lektion darf niemals eine dev-
+     * Lektion verstärken. Fail-open: kein Embedding-Provider/-Fehler → einfach neu anlegen.
+     */
+    private function findSemanticDuplicate(int $teamId, string $content): ?OrganizationMemoryEntry
+    {
+        $domain = strstr(self::TYPE, '.', true) ?: self::TYPE;
+
+        try {
+            $hits = app(EmbeddingService::class)->search(
+                $teamId,
+                $content,
+                [self::EMBED_ENTITY_TYPE],
+                3,
+                self::SIMILARITY_THRESHOLD,
+            );
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        foreach ($hits as $hit) {
+            $hitType = (string) data_get($hit, 'metadata.memory_type', '');
+            if ((strstr($hitType, '.', true) ?: $hitType) !== $domain) {
+                continue; // andere Domäne (z. B. backoffice) — kein Cross-Domain-Merge
+            }
+
+            $match = OrganizationMemoryEntry::query()
+                ->where('team_id', $teamId)
+                ->find((int) ($hit['entity_id'] ?? 0));
+
+            if ($match) {
+                return $match;
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Legt die Lektion im core-Embedding-Index ab, damit künftige ähnliche Lektionen sie als
+     * Dublette erkennen. Best-effort: schlägt der EmbeddingService fehl (kein Provider, API-
+     * Fehler), bleibt die Lektion trotzdem gespeichert — kein Verlust.
+     */
+    private function embedLesson(OrganizationMemoryEntry $m): void
+    {
+        try {
+            app(EmbeddingService::class)->embedAndStore(
+                teamId: (int) $m->team_id,
+                entityType: self::EMBED_ENTITY_TYPE,
+                entityId: $m->id,
+                text: $m->content,
+                metadata: ['memory_type' => $m->memory_type],
+            );
+        } catch (\Throwable $e) {
+            // fail-open: Embedding ist optional, das Ablegen der Lektion darf nicht daran hängen.
+        }
     }
 
     private function agentEntity(Request $request): ?OrganizationEntity

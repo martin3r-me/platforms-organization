@@ -5,6 +5,8 @@ namespace Platform\Organization\Http\Controllers\Api;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\Http\Controllers\ApiController;
+use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationRoleAssignment;
 use Platform\Organization\Models\OrganizationTimeEntry;
 
 /**
@@ -12,8 +14,10 @@ use Platform\Organization\Models\OrganizationTimeEntry;
  *
  * Auth: Bearer-Token (api.auth). Team = current_team_id des Token-Users.
  * Bewusst NICHT ausgeliefert: Notizen (note), Kontext-Labels (Kundennamen),
- * Beträge/€ (rate/amount), Nutzernamen von Menschen. Agenten werden namentlich
- * genannt (Teil der Story), Menschen erscheinen nur aggregiert/anonym.
+ * Beträge/€ (rate/amount), Nutzernamen von Menschen, Governor-Interna
+ * (five_hour_pct/-reserve_pct, seven_day_pct/-burn_margin_pct), Token,
+ * E-Mail, linked_user_id. Agenten werden namentlich genannt (Teil der
+ * Story), Menschen erscheinen nur aggregiert/anonym.
  *
  * Mensch vs. Agent: Agent-Zeiteinträge tragen metadata.source = 'agent'
  * (gesetzt vom AgentTimeController). Alles andere zählt als Menschenzeit.
@@ -71,37 +75,66 @@ class PublicStatsController extends ApiController
     }
 
     /**
-     * Kennzahlen je Agent: Name, seit wann dabei, erfasste Zeit, Einträge,
-     * geschlossene Dev-Issues und Story Points (best-effort).
+     * Kennzahlen je Agent: über die Agent-Entity gefunden (nicht mehr nur über Zeiteinträge),
+     * damit auch frisch onboardete Agenten ohne gebuchte Zeit auftauchen. Zeit-Kennzahlen,
+     * Rolle/Beschreibung/Domäne/Stufe und Status/Steckbrief werden per linked_user_id bzw.
+     * Rollen-Zuweisung/Agent-Profil angehängt (LEFT JOIN-Semantik über PHP-Maps, best-effort).
      */
     protected function agents(int $teamId): array
     {
-        $rows = OrganizationTimeEntry::query()
-            ->where('team_id', $teamId)
-            ->where('metadata->source', 'agent')
-            ->selectRaw('user_id, SUM(minutes) as minutes, COUNT(*) as entries, MIN(work_date) as since')
-            ->groupBy('user_id')
+        $entities = OrganizationEntity::query()
+            ->forTeam($teamId)
+            ->agents()
+            ->with('agentProfile')
             ->get();
 
-        if ($rows->isEmpty()) {
+        if ($entities->isEmpty()) {
             return [];
         }
 
-        $userModel = config('auth.providers.users.model');
-        $names = $userModel::query()
-            ->whereIn('id', $rows->pluck('user_id')->all())
-            ->pluck('name', 'id');
+        $linkedUserIds = $entities->pluck('linked_user_id')->filter()->unique()->values()->all();
 
-        return $rows->map(function ($row) use ($names) {
-            [$closed, $points] = $this->devTotals((int) $row->user_id);
+        $timeByUser = $linkedUserIds
+            ? OrganizationTimeEntry::query()
+                ->where('team_id', $teamId)
+                ->where('metadata->source', 'agent')
+                ->whereIn('user_id', $linkedUserIds)
+                ->selectRaw('user_id, SUM(minutes) as minutes, COUNT(*) as entries, MIN(work_date) as since')
+                ->groupBy('user_id')
+                ->get()
+                ->keyBy('user_id')
+            : collect();
+
+        $rolesByEntity = OrganizationRoleAssignment::query()
+            ->whereIn('person_entity_id', $entities->pluck('id')->all())
+            ->with('role')
+            ->get()
+            ->groupBy('person_entity_id');
+
+        return $entities->map(function (OrganizationEntity $entity) use ($timeByUser, $rolesByEntity) {
+            $userId = (int) ($entity->linked_user_id ?? 0);
+            $time = $userId ? $timeByUser->get($userId) : null;
+            [$closed, $points] = $this->devTotals($userId);
+
+            $role = $rolesByEntity->get($entity->id, collect())->pluck('role')->filter()->first();
+            $profile = $entity->agentProfile;
+            $online = (bool) $profile?->active && (bool) $profile?->isOnline();
 
             return [
-                'name' => $this->cleanName($names[$row->user_id] ?? 'Agent'),
-                'since' => $row->since,
-                'hours' => round(((int) $row->minutes) / 60, 1),
-                'entries' => (int) $row->entries,
+                'name' => $this->cleanName($entity->name),
+                'since' => $time->since ?? null,
+                'hours' => round(((int) ($time->minutes ?? 0)) / 60, 1),
+                'entries' => (int) ($time->entries ?? 0),
                 'issues_closed' => $closed,
                 'story_points' => $points,
+                'role' => $role?->name,
+                'description' => $entity->description,
+                'domain' => $role?->domain,
+                'stage' => $role?->stage,
+                'status' => $online ? 'online' : 'idle',
+                'last_active' => optional($profile?->last_heartbeat_at)->toIso8601String(),
+                'claude_model' => $profile?->claude_model,
+                'github_username' => $profile?->github_username,
             ];
         })->sortByDesc('hours')->values()->all();
     }

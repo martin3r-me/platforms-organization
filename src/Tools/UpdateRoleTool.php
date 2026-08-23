@@ -35,6 +35,8 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
                 'slug'        => ['type' => 'string'],
                 'description' => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'vsm_system'  => ['type' => 'string', 'description' => 'Optional: s1, s2, s3, s3_star, s4, s5. "" zum Loesen.', 'enum' => ['', 's1', 's2', 's3', 's3_star', 's4', 's5']],
+                'domain'      => ['type' => 'string', 'description' => 'Optional: macht die Rolle AGENT-ausfuehrbar (development|backoffice|helpdesk|assistant|analysis). "" zum Loesen (reine Menschen-Rolle).'],
+                'stage'       => ['type' => 'string', 'description' => 'Optional (mit domain): triage|execute|learn|signal. "" zum Loesen.'],
                 'status'      => ['type' => 'string'],
             ],
             'required' => ['role_id'],
@@ -105,6 +107,26 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
                     return ToolResult::error('VALIDATION_ERROR', 'vsm_system muss einer von ' . implode(', ', OrganizationRole::VSM_SYSTEMS) . ' oder "" sein.');
                 }
             }
+            if (array_key_exists('domain', $arguments)) {
+                $val = (string) ($arguments['domain'] ?? '');
+                if ($val === '') {
+                    $update['domain'] = null;
+                } elseif (in_array($val, OrganizationRole::DOMAINS, true)) {
+                    $update['domain'] = $val;
+                } else {
+                    return ToolResult::error('VALIDATION_ERROR', 'domain muss einer von ' . implode(', ', OrganizationRole::DOMAINS) . ' oder "" sein.');
+                }
+            }
+            if (array_key_exists('stage', $arguments)) {
+                $val = (string) ($arguments['stage'] ?? '');
+                if ($val === '') {
+                    $update['stage'] = null;
+                } elseif (in_array($val, OrganizationRole::STAGES, true)) {
+                    $update['stage'] = $val;
+                } else {
+                    return ToolResult::error('VALIDATION_ERROR', 'stage muss einer von ' . implode(', ', OrganizationRole::STAGES) . ' oder "" sein.');
+                }
+            }
             if (array_key_exists('status', $arguments)) {
                 $update['status'] = (string) $arguments['status'];
             }
@@ -120,6 +142,8 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
                 'slug'       => $role->slug,
                 'status'     => $role->status,
                 'vsm_system' => $role->vsm_system,
+                'domain'     => $role->domain,
+                'stage'      => $role->stage,
                 'team_id'    => $role->team_id,
                 'message'    => 'Rolle erfolgreich aktualisiert.',
             ]);

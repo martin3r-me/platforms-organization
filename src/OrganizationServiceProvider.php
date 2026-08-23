@@ -419,6 +419,9 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\UpdateRoleAssignmentTool());
             $registry->register(new \Platform\Organization\Tools\DeleteRoleAssignmentTool());
 
+            // Agent-Onboarding: Agent-Profil per API setzen (an/aus + Governor) — Domaene via Rollen.
+            $registry->register(new \Platform\Organization\Tools\UpsertAgentProfileTool());
+
 
             // Movement & Metric Definition Tools
             $registry->register(new \Platform\Organization\Tools\EntityMovementTool());

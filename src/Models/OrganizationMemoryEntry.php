@@ -8,6 +8,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 use Platform\Core\Models\Team;
 use Symfony\Component\Uid\UuidV7;
 
+/**
+ * @property string $content
+ * @property array|null $structured_data
+ * @property int $reinforcement_count
+ */
 class OrganizationMemoryEntry extends Model
 {
     use SoftDeletes;

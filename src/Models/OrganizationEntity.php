@@ -259,6 +259,36 @@ class OrganizationEntity extends Model
     }
 
     /**
+     * Die VSM-Domäne dieser Entity aus ihren Rollen-Assignments (z. B. "development",
+     * "backoffice"), oder null ohne (agent-ausführbare) Rolle.
+     */
+    public function roleDomain(): ?string
+    {
+        return OrganizationRoleAssignment::query()
+            ->where('person_entity_id', $this->id)
+            ->with('role')
+            ->get()
+            ->pluck('role.domain')
+            ->filter()
+            ->first();
+    }
+
+    /**
+     * memory_type-Präfix des Wissens-Pools dieser Domäne (Learn-Loop-Partitionierung, siehe
+     * AgentKnowledgeSearchService). Naming-Wart: Domäne "development" legt unter memory_type
+     * "dev.*" ab; andere Domänen sind 1:1 (z. B. "backoffice" → "backoffice.*"). Ohne Domäne
+     * null, damit ein Abruf nie in einen fremden Pool leakt.
+     */
+    public function memoryTypePrefix(): ?string
+    {
+        return match ($domain = $this->roleDomain()) {
+            'development' => 'dev',
+            null => null,
+            default => $domain,
+        };
+    }
+
+    /**
      * Beziehung zu Organization Contexts (Module Entities, die an diese Entity gehängt sind)
      */
     public function contexts()

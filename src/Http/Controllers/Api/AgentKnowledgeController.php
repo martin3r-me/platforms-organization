@@ -8,6 +8,7 @@ use Illuminate\Routing\Controller;
 use Platform\Core\Services\EmbeddingService;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationMemoryEntry;
+use Platform\Organization\Services\AgentKnowledgeSearchService;
 
 /**
  * Domänen-Wissensbasis für Agenten (Learn-Loop). Der Client SCHREIBT nach einem Run eine
@@ -28,39 +29,27 @@ class AgentKnowledgeController extends Controller
     private const SIMILARITY_THRESHOLD = 0.9;
 
     /**
-     * GET /api/org/agent/knowledge?package=X — relevante Dev-Lektionen (Package + global),
-     * gerankt nach Verstärkung/Confidence/Aktualität, gekappt (schmale Prompt-Scheibe).
+     * GET /api/org/agent/knowledge?package=X&q=Y — relevante Domänen-Lektionen, semantisch
+     * gerankt (Top-k) über den core EmbeddingService statt LIKE. `q` ist eine explizite Frage
+     * ans Gedächtnis (überstimmt `package` als Suchtext); ohne beides oder ohne Embeddings
+     * fällt der Abruf sauber auf die bestehende Package-/Confidence-Filterung zurück (siehe
+     * AgentKnowledgeSearchService). Domänen-gescoped: nur die Lektionen der Domäne des
+     * anfragenden Agenten.
      */
-    public function index(Request $request): JsonResponse
+    public function index(Request $request, AgentKnowledgeSearchService $search): JsonResponse
     {
         $entity = $this->agentEntity($request);
         if (! $entity) {
             return response()->json(['message' => 'No agent profile for this token'], 404);
         }
 
-        $package = trim((string) $request->query('package', ''));
+        $rows = $search->lessons(
+            $entity,
+            package: trim((string) $request->query('package', '')),
+            query: trim((string) $request->query('q', '')),
+        );
 
-        $rows = OrganizationMemoryEntry::query()
-            ->where('team_id', (int) $entity->team_id)
-            ->where('memory_type', 'like', 'dev.%')
-            ->where('is_active', true)
-            ->where(fn ($w) => $w->whereNull('valid_until')->orWhere('valid_until', '>', now()))
-            ->when($package !== '', fn ($q) => $q->where(function ($w) use ($package) {
-                $w->where('structured_data->package', $package)
-                    ->orWhere('structured_data->scope', 'global');
-            }))
-            ->orderByDesc('reinforcement_count')
-            ->orderByDesc('confidence')
-            ->orderByDesc('id')
-            ->limit(12)
-            ->get(['content', 'structured_data', 'reinforcement_count']);
-
-        return response()->json(['data' => $rows->map(fn ($m) => [
-            'content' => $m->content,
-            'package' => data_get($m->structured_data, 'package'),
-            'kind' => data_get($m->structured_data, 'kind'),
-            'reinforced' => (int) $m->reinforcement_count,
-        ])->all()]);
+        return response()->json(['data' => $rows]);
     }
 
     /**

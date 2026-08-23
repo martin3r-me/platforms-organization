@@ -9,6 +9,7 @@ use Platform\Organization\Models\OrganizationAgentRunEvent;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationMemoryEntry;
 use Platform\Organization\Models\OrganizationRoleAssignment;
+use Platform\Organization\Services\AgentKnowledgeSearchService;
 
 /**
  * Agent-Tab: die „kleine UI". Bearbeitet den reinen Runtime-Facet (Governor/Claim-Cap/Modell/
@@ -34,6 +35,11 @@ class ProfilePanel extends Component
 
     /** Frisch geminteter Token — NUR einmal sichtbar (danach nur der Hash in der DB). */
     public ?string $mintedToken = null;
+
+    /** Frage-Feld im "Gelerntes"-Tab (semantische Suche über AgentKnowledgeSearchService). */
+    public string $knowledgeQuery = '';
+    public array $knowledgeResults = [];
+    public bool $knowledgeSearched = false;
 
     public function mount(OrganizationEntity $entity): void
     {
@@ -109,6 +115,17 @@ class ProfilePanel extends Component
         $this->mintedToken = null;
     }
 
+    /**
+     * Frage an das Gedächtnis (Cockpit-Suche, #805): Top-k Lektionen der EIGENEN Domäne per
+     * AgentKnowledgeSearchService — dieselbe Quelle wie der Worker-Endpoint. Read-only.
+     */
+    public function askKnowledge(AgentKnowledgeSearchService $search): void
+    {
+        $q = trim($this->knowledgeQuery);
+        $this->knowledgeSearched = true;
+        $this->knowledgeResults = $q !== '' ? $search->lessons($this->entity, query: $q) : [];
+    }
+
     /** Der Aktivitäts-Feed des jüngsten Laufs (vom Daemon gemeldet) — read-only, live gepollt. */
     public function recentEvents(): array
     {
@@ -129,18 +146,6 @@ class ProfilePanel extends Component
             ->all();
     }
 
-    /** Die Domäne des Agenten aus seinen Rollen (wie der /agent/profile-Endpoint). null = keine. */
-    private function agentDomain(): ?string
-    {
-        return OrganizationRoleAssignment::query()
-            ->where('person_entity_id', $this->entity->id)
-            ->with('role')
-            ->get()
-            ->pluck('role.domain')
-            ->filter()
-            ->first();
-    }
-
     /**
      * Nächste Aufgaben — DOMÄNEN-abhängig: ein Dev-Agent sieht seine dev_issues, ein Backoffice-Agent
      * seine planner_tasks (jeweils user_in_charge_id = sein Bot-User). Cross-Modul, nur lesend, per
@@ -152,7 +157,7 @@ class ProfilePanel extends Component
         if (! $user) {
             return [];
         }
-        $domain = $this->agentDomain();
+        $domain = $this->entity->roleDomain();
 
         try {
             if ($domain === 'development' && Schema::hasTable('dev_issues')) {
@@ -201,11 +206,7 @@ class ProfilePanel extends Component
         if (! Schema::hasTable('organization_memory_entries')) {
             return [];
         }
-        $prefix = match ($this->agentDomain()) {
-            'development' => 'dev',
-            null => null,
-            default => $this->agentDomain(),
-        };
+        $prefix = $this->entity->memoryTypePrefix();
         if (! $prefix) {
             return [];
         }

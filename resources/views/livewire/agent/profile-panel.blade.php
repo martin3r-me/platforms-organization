@@ -102,6 +102,33 @@
     {{-- Gelerntes: die Dev-Lektionen der Domäne (meistverstärkte zuerst) --}}
     <div class="rounded-lg border border-[var(--ui-border)] p-5 space-y-3">
         <h3 class="text-sm font-semibold text-[var(--ui-primary)]">Gelerntes</h3>
+
+        {{-- Frage ans Gedächtnis: semantische Suche über die Lektionen der eigenen Domäne --}}
+        <form wire:submit.prevent="askKnowledge" class="flex items-center gap-2">
+            <input type="text" wire:model="knowledgeQuery" placeholder="Frage ans Gedächtnis stellen …" class="flex-1 rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
+            <button type="submit" class="px-3 py-1.5 rounded-md border border-[var(--ui-border)] text-sm shrink-0">Fragen</button>
+        </form>
+
+        @if ($knowledgeSearched)
+            <div class="rounded-md bg-[var(--ui-muted-5,#0001)] p-3 space-y-2">
+                @if (count($knowledgeResults))
+                    <ul class="space-y-2">
+                        @foreach ($knowledgeResults as $l)
+                            <li class="text-[13px]">
+                                <div class="flex items-center gap-2 mb-0.5">
+                                    @if ($l['package'])<span class="rounded bg-[var(--ui-muted-5,#0001)] px-1.5 py-0.5 text-[10px] text-[var(--ui-muted)]">{{ $l['package'] }}</span>@endif
+                                    @if (($l['reinforced'] ?? 0) > 0)<span class="text-[10px] text-[var(--ui-muted)]">×{{ $l['reinforced'] }}</span>@endif
+                                </div>
+                                <p class="break-words text-[var(--ui-fg)]">{{ $l['content'] }}</p>
+                            </li>
+                        @endforeach
+                    </ul>
+                @else
+                    <p class="text-[11px] text-[var(--ui-muted)]">Keine passenden Lektionen gefunden.</p>
+                @endif
+            </div>
+        @endif
+
         @if (count($learnings))
             <ul class="space-y-2">
                 @foreach ($learnings as $l)

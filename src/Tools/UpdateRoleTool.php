@@ -37,6 +37,7 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
                 'vsm_system'  => ['type' => 'string', 'description' => 'Optional: s1, s2, s3, s3_star, s4, s5. "" zum Loesen.', 'enum' => ['', 's1', 's2', 's3', 's3_star', 's4', 's5']],
                 'domain'      => ['type' => 'string', 'description' => 'Optional: macht die Rolle AGENT-ausfuehrbar (development|backoffice|helpdesk|assistant|analysis). "" zum Loesen (reine Menschen-Rolle).'],
                 'stage'       => ['type' => 'string', 'description' => 'Optional (mit domain): triage|execute|learn|signal. "" zum Loesen.'],
+                'capabilities' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['read', 'write', 'manage']], 'description' => 'Optional: Content-Zugriff der Rolle auf Kontext-Entity + Teilbaum (read|write|manage; hoechste gewinnt). Leeres Array [] = KEIN Zugriff. Fuer arbeitende Agenten i.d.R. ["write"].'],
                 'status'      => ['type' => 'string'],
             ],
             'required' => ['role_id'],
@@ -127,6 +128,18 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
                     return ToolResult::error('VALIDATION_ERROR', 'stage muss einer von ' . implode(', ', OrganizationRole::STAGES) . ' oder "" sein.');
                 }
             }
+            if (array_key_exists('capabilities', $arguments)) {
+                $caps = $arguments['capabilities'];
+                if (! is_array($caps)) {
+                    return ToolResult::error('VALIDATION_ERROR', 'capabilities muss ein Array sein (read|write|manage) oder [] zum Loesen.');
+                }
+                foreach ($caps as $c) {
+                    if (! in_array($c, ['read', 'write', 'manage'], true)) {
+                        return ToolResult::error('VALIDATION_ERROR', 'capabilities dürfen nur read|write|manage enthalten.');
+                    }
+                }
+                $update['capabilities'] = array_values(array_unique($caps)) ?: null;
+            }
             if (array_key_exists('status', $arguments)) {
                 $update['status'] = (string) $arguments['status'];
             }
@@ -144,6 +157,7 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
                 'vsm_system' => $role->vsm_system,
                 'domain'     => $role->domain,
                 'stage'      => $role->stage,
+                'capabilities' => $role->capabilities,
                 'team_id'    => $role->team_id,
                 'message'    => 'Rolle erfolgreich aktualisiert.',
             ]);

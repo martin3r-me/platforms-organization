@@ -6,6 +6,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Platform\ActivityLog\Traits\LogsActivity;
 use Symfony\Component\Uid\UuidV7;
@@ -252,8 +253,10 @@ class OrganizationEntity extends Model
 
     /**
      * Runtime-Profil einer agent-Entity (Domäne, Stufen, Governor, gemeldeter Status). 1:1.
+     *
+     * @return HasOne<OrganizationAgentProfile, $this>
      */
-    public function agentProfile()
+    public function agentProfile(): HasOne
     {
         return $this->hasOne(OrganizationAgentProfile::class, 'organization_entity_id');
     }

@@ -52,6 +52,7 @@ class AgentProfileController extends Controller
             'claude_model' => $profile->claude_model,
             'claim_unassigned' => (bool) $profile->claim_unassigned,
             'github_username' => $profile->github_username,
+            'settings' => $profile->settings ?? [],
         ]]);
     }
 

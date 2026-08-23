@@ -10,6 +10,7 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationMemoryEntry;
 use Platform\Organization\Models\OrganizationRoleAssignment;
 use Platform\Organization\Services\AgentKnowledgeSearchService;
+use Platform\Organization\Services\AgentSettingsRegistry;
 
 /**
  * Agent-Tab: die „kleine UI". Bearbeitet den reinen Runtime-Facet (Governor/Claim-Cap/Modell/
@@ -25,11 +26,12 @@ class ProfilePanel extends Component
 
     public int $five_hour_reserve_pct = 90;
     public int $seven_day_burn_margin_pct = 10;
-    public ?int $max_story_points = null;
     public ?string $claude_model = null;
     public bool $claim_unassigned = true;
     public bool $active = true;
-    public ?string $github_username = null;
+
+    /** Domänen-Felder aus der AgentSettingsRegistry, generisch gerendert. Key => Wert. */
+    public array $settingsValues = [];
 
     public ?string $savedMsg = null;
 
@@ -47,34 +49,79 @@ class ProfilePanel extends Component
         if ($p = $entity->agentProfile) {
             $this->five_hour_reserve_pct = (int) $p->five_hour_reserve_pct;
             $this->seven_day_burn_margin_pct = (int) $p->seven_day_burn_margin_pct;
-            $this->max_story_points = $p->max_story_points;
             $this->claude_model = $p->claude_model;
             $this->claim_unassigned = (bool) $p->claim_unassigned;
             $this->active = (bool) $p->active;
-            $this->github_username = $p->github_username;
         }
+
+        foreach ($this->settingsFields() as $field) {
+            $this->settingsValues[$field['key']] = $this->readSettingValue($field);
+        }
+    }
+
+    /**
+     * Die Domänen-Felder dieses Agenten (AgentSettingsRegistry, #810/#811) — universell (Governor,
+     * Modell, an/aus) bleibt hart verdrahtet, alles Domänen-spezifische (github_username,
+     * max_story_points, …) kommt generisch aus den registrierten Providern.
+     */
+    public function settingsFields(): array
+    {
+        return app(AgentSettingsRegistry::class)->fieldsForDomain($this->entity->roleDomain());
+    }
+
+    private function readSettingValue(array $field): mixed
+    {
+        $profile = $this->entity->agentProfile;
+
+        if (str_starts_with($field['storage'], 'column:')) {
+            $column = substr($field['storage'], 7);
+
+            return $profile->{$column} ?? ($field['default'] ?? null);
+        }
+
+        $bag = (array) ($profile->settings ?? []);
+
+        return $bag[$field['key']] ?? ($field['default'] ?? null);
     }
 
     public function save(): void
     {
-        $this->validate([
+        $rules = [
             'five_hour_reserve_pct' => 'integer|min:0|max:100',
             'seven_day_burn_margin_pct' => 'integer|min:0|max:100',
-            'max_story_points' => 'nullable|integer|min:1|max:100',
             'claude_model' => 'nullable|string|max:64',
             'claim_unassigned' => 'boolean',
-            'github_username' => 'nullable|string|max:255',
-        ]);
+        ];
 
-        $this->entity->agentProfile()->updateOrCreate([], [
+        $fields = $this->settingsFields();
+        foreach ($fields as $field) {
+            if (! empty($field['validation'])) {
+                $rules['settingsValues.'.$field['key']] = $field['validation'];
+            }
+        }
+
+        $this->validate($rules);
+
+        $update = [
             'five_hour_reserve_pct' => $this->five_hour_reserve_pct,
             'seven_day_burn_margin_pct' => $this->seven_day_burn_margin_pct,
-            'max_story_points' => $this->max_story_points ?: null,
             'claude_model' => $this->claude_model ?: null,
             'claim_unassigned' => $this->claim_unassigned,
             'active' => $this->active,
-            'github_username' => $this->github_username ?: null,
-        ]);
+        ];
+
+        $bag = (array) ($this->entity->agentProfile->settings ?? []);
+        foreach ($fields as $field) {
+            $value = $this->settingsValues[$field['key']] ?? null;
+            if (str_starts_with($field['storage'], 'column:')) {
+                $update[substr($field['storage'], 7)] = $value === '' ? null : $value;
+            } else {
+                $bag[$field['key']] = $value;
+            }
+        }
+        $update['settings'] = $bag;
+
+        $this->entity->agentProfile()->updateOrCreate([], $update);
 
         $this->savedMsg = 'Gespeichert.';
     }
@@ -236,6 +283,7 @@ class ProfilePanel extends Component
             'events' => $this->recentEvents(),
             'nextTasks' => $this->nextTasks(),
             'learnings' => $this->learnings(),
+            'settingsFields' => $this->settingsFields(),
         ]);
     }
 }

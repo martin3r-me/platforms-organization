@@ -28,19 +28,43 @@
                 <input type="number" min="0" max="100" wire:model="seven_day_burn_margin_pct" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
             </div>
             <div>
-                <label class="block text-xs font-medium text-[var(--ui-muted)] mb-1">Max Story Points (Claim-Cap)</label>
-                <input type="number" min="1" max="100" wire:model="max_story_points" placeholder="kein Limit" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
-            </div>
-            <div>
                 <label class="block text-xs font-medium text-[var(--ui-muted)] mb-1">Claude-Modell (optional)</label>
                 <input type="text" wire:model="claude_model" placeholder="leer = bestes verfügbares" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
             </div>
         </div>
 
-        <div>
-            <label class="block text-xs font-medium text-[var(--ui-muted)] mb-1">GitHub-User (Referenz, kein Token)</label>
-            <input type="text" wire:model="github_username" placeholder="z. B. bumblebee-bhgdigital" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
-        </div>
+        {{-- Domänen-Felder: generisch aus der AgentSettingsRegistry (#810/#811) — ein Backoffice-Agent
+             sieht hier keine Dev-Felder (github_username, max_story_points) und umgekehrt. --}}
+        @if (count($settingsFields))
+            <div class="grid grid-cols-2 gap-4">
+                @foreach ($settingsFields as $f)
+                    <div>
+                        @if ($f['type'] === 'bool')
+                            <label class="inline-flex items-center gap-2 text-sm">
+                                <input type="checkbox" wire:model="settingsValues.{{ $f['key'] }}" class="rounded border-[var(--ui-border)]">
+                                {{ $f['label'] }}
+                            </label>
+                        @else
+                            <label class="block text-xs font-medium text-[var(--ui-muted)] mb-1">{{ $f['label'] }}</label>
+                            @if ($f['type'] === 'enum')
+                                <select wire:model="settingsValues.{{ $f['key'] }}" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
+                                    @foreach (($f['options'] ?? []) as $optValue => $optLabel)
+                                        <option value="{{ $optValue }}">{{ $optLabel }}</option>
+                                    @endforeach
+                                </select>
+                            @elseif ($f['type'] === 'int')
+                                <input type="number" wire:model="settingsValues.{{ $f['key'] }}" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
+                            @else
+                                <input type="text" wire:model="settingsValues.{{ $f['key'] }}" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
+                            @endif
+                        @endif
+                        @if (!empty($f['help']))
+                            <p class="text-[11px] text-[var(--ui-muted)] mt-1">{{ $f['help'] }}</p>
+                        @endif
+                    </div>
+                @endforeach
+            </div>
+        @endif
 
         <label class="inline-flex items-center gap-2 text-sm">
             <input type="checkbox" wire:model="claim_unassigned" class="rounded border-[var(--ui-border)]">

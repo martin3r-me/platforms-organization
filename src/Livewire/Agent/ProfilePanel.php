@@ -129,50 +129,90 @@ class ProfilePanel extends Component
             ->all();
     }
 
+    /** Die Domäne des Agenten aus seinen Rollen (wie der /agent/profile-Endpoint). null = keine. */
+    private function agentDomain(): ?string
+    {
+        return OrganizationRoleAssignment::query()
+            ->where('person_entity_id', $this->entity->id)
+            ->with('role')
+            ->get()
+            ->pluck('role.domain')
+            ->filter()
+            ->first();
+    }
+
     /**
-     * Nächste Aufgaben = die dem Agenten zugewiesenen offenen Dev-Issues (user_in_charge_id = sein
-     * Bot-User), in Board-Reihenfolge. Cross-Modul → nur lesende DB-Query, per Schema-Guard: fehlt
-     * das dev-Modul in dieser Instanz, bleibt der Block leer statt zu brechen.
+     * Nächste Aufgaben — DOMÄNEN-abhängig: ein Dev-Agent sieht seine dev_issues, ein Backoffice-Agent
+     * seine planner_tasks (jeweils user_in_charge_id = sein Bot-User). Cross-Modul, nur lesend, per
+     * Schema-Guard + try/catch (fehlt das Modul/Spalte, bleibt der Block leer statt zu brechen).
      */
     public function nextTasks(): array
     {
         $user = $this->entity->linkedUser;
-        if (! $user || ! Schema::hasTable('dev_issues')) {
+        if (! $user) {
+            return [];
+        }
+        $domain = $this->agentDomain();
+
+        try {
+            if ($domain === 'development' && Schema::hasTable('dev_issues')) {
+                return DB::table('dev_issues')
+                    ->leftJoin('dev_boards', 'dev_issues.dev_board_id', '=', 'dev_boards.id')
+                    ->whereNull('dev_issues.deleted_at')
+                    ->where('dev_issues.user_in_charge_id', $user->id)
+                    ->where('dev_issues.status', 'open')
+                    ->where('dev_issues.is_done', false)
+                    ->orderBy('dev_boards.order')
+                    ->orderBy('dev_issues.slot_order')
+                    ->orderBy('dev_issues.created_at')
+                    ->limit(12)
+                    ->get(['dev_issues.title', 'dev_boards.name as board', 'dev_boards.type as board_type'])
+                    ->map(fn ($r) => ['title' => $r->title, 'board' => $r->board, 'type' => $r->board_type])
+                    ->all();
+            }
+            if ($domain === 'backoffice' && Schema::hasTable('planner_tasks')) {
+                return DB::table('planner_tasks')
+                    ->leftJoin('planner_projects', 'planner_tasks.project_id', '=', 'planner_projects.id')
+                    ->whereNull('planner_tasks.deleted_at')
+                    ->where('planner_tasks.user_in_charge_id', $user->id)
+                    ->where('planner_tasks.is_done', false)
+                    ->orderBy('planner_tasks.project_slot_order')
+                    ->orderBy('planner_tasks.created_at')
+                    ->limit(12)
+                    ->get(['planner_tasks.title', 'planner_projects.name as board'])
+                    ->map(fn ($r) => ['title' => $r->title, 'board' => $r->board ?? 'Planner', 'type' => 'task'])
+                    ->all();
+            }
+        } catch (\Throwable $e) {
             return [];
         }
 
-        return DB::table('dev_issues')
-            ->leftJoin('dev_boards', 'dev_issues.dev_board_id', '=', 'dev_boards.id')
-            ->whereNull('dev_issues.deleted_at')
-            ->where('dev_issues.user_in_charge_id', $user->id)
-            ->where('dev_issues.status', 'open')
-            ->where('dev_issues.is_done', false)
-            ->orderBy('dev_boards.order')
-            ->orderBy('dev_issues.slot_order')
-            ->orderBy('dev_issues.created_at')
-            ->limit(12)
-            ->get(['dev_issues.title', 'dev_boards.name as board', 'dev_boards.type as board_type'])
-            ->map(fn ($r) => [
-                'title' => $r->title,
-                'board' => $r->board,
-                'type' => $r->board_type,
-            ])
-            ->all();
+        return [];
     }
 
     /**
-     * Gelerntes = die Dev-Lektionen der Domäne (OrganizationMemoryEntry, memory_type dev.*),
-     * team-scoped, meistverstärkte zuerst. Same-module, kein Cross-Coupling.
+     * Gelerntes = die Lektionen der EIGENEN Domäne des Agenten (nicht global!). Wissen gehört der
+     * Domäne — ein Backoffice-Agent darf NICHT die Dev-Lektionen sehen. Naming-Wart: die Domäne
+     * heißt "development", der Dev-Learn-Loop legt aber unter memory_type "dev.*" ab → gemappt.
+     * Andere Domänen (backoffice …) haben (noch) keinen eigenen Store hier → leer statt Leak.
      */
     public function learnings(): array
     {
         if (! Schema::hasTable('organization_memory_entries')) {
             return [];
         }
+        $prefix = match ($this->agentDomain()) {
+            'development' => 'dev',
+            null => null,
+            default => $this->agentDomain(),
+        };
+        if (! $prefix) {
+            return [];
+        }
 
         return OrganizationMemoryEntry::query()
             ->where('team_id', (int) $this->entity->team_id)
-            ->where('memory_type', 'like', 'dev.%')
+            ->where('memory_type', 'like', $prefix.'.%')
             ->where('is_active', true)
             ->orderByDesc('reinforcement_count')
             ->orderByDesc('id')

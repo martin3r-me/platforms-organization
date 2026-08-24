@@ -35,7 +35,7 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
                 'slug'        => ['type' => 'string'],
                 'description' => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'vsm_system'  => ['type' => 'string', 'description' => 'Optional: s1, s2, s3, s3_star, s4, s5. "" zum Loesen.', 'enum' => ['', 's1', 's2', 's3', 's3_star', 's4', 's5']],
-                'domain'      => ['type' => 'string', 'description' => 'Optional: macht die Rolle AGENT-ausfuehrbar (development|backoffice|helpdesk|assistant|analysis). "" zum Loesen (reine Menschen-Rolle).'],
+                'domain'      => ['type' => 'string', 'description' => 'Optional: macht die Rolle AGENT-ausfuehrbar (development|backoffice|accounting|helpdesk|assistant|analysis). "" zum Loesen (reine Menschen-Rolle).'],
                 'stage'       => ['type' => 'string', 'description' => 'Optional (mit domain): triage|execute|learn|signal. "" zum Loesen.'],
                 'capabilities' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['read', 'write', 'manage']], 'description' => 'Optional: Content-Zugriff der Rolle auf Kontext-Entity + Teilbaum (read|write|manage; hoechste gewinnt). Leeres Array [] = KEIN Zugriff. Fuer arbeitende Agenten i.d.R. ["write"].'],
                 'status'      => ['type' => 'string'],

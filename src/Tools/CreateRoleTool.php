@@ -33,7 +33,7 @@ class CreateRoleTool implements ToolContract, ToolMetadataContract
                 'slug'        => ['type' => 'string', 'description' => 'Optional: Slug (auto, falls nicht angegeben).'],
                 'description' => ['type' => 'string'],
                 'vsm_system'  => ['type' => 'string', 'description' => 'Optional: VSM-Funktion dieser Rolle (s1, s2, s3, s3_star, s4, s5). Beer: dieselbe Person traegt mehrere VSM-Funktionen durch ihre Rollen (GF=s3, Inhaber=s5).', 'enum' => ['s1', 's2', 's3', 's3_star', 's4', 's5']],
-                'domain'      => ['type' => 'string', 'description' => 'Optional: macht die Rolle AGENT-ausfuehrbar. Domaene des KI-Workers (development|backoffice|helpdesk|assistant|analysis). Reine Menschen-Rollen lassen das leer.', 'enum' => OrganizationRole::DOMAINS],
+                'domain'      => ['type' => 'string', 'description' => 'Optional: macht die Rolle AGENT-ausfuehrbar. Domaene des KI-Workers (development|backoffice|accounting|helpdesk|assistant|analysis). Reine Menschen-Rollen lassen das leer.', 'enum' => OrganizationRole::DOMAINS],
                 'stage'       => ['type' => 'string', 'description' => 'Optional (nur mit domain): Stufe der Agent-Rolle (triage|execute|learn|signal).', 'enum' => OrganizationRole::STAGES],
                 'capabilities' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['read', 'write', 'manage']], 'description' => 'Optional: Content-Zugriff, den die Rolle bei Zuweisung auf die Kontext-Entity + Teilbaum verleiht (read|write|manage; hoechste gewinnt). LEER = KEIN Datenzugriff. Fuer arbeitende Agenten i.d.R. ["write"].'],
                 'status'      => ['type' => 'string', 'description' => 'Optional: active/archived. Default: active.'],

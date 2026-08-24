@@ -47,7 +47,7 @@ class OrganizationRole extends Model
      * reine Menschen-Rollen lassen domain/stage null. Nicht als DB-Enum, damit analysis/signal
      * später ohne Schema-Änderung andockt.
      */
-    public const DOMAINS = ['development', 'backoffice', 'helpdesk', 'assistant', 'analysis'];
+    public const DOMAINS = ['development', 'backoffice', 'accounting', 'helpdesk', 'assistant', 'analysis'];
 
     /** Stufen (Matrix-Achse). operativ: triage/execute/learn · analysis: signal. */
     public const STAGES = ['triage', 'execute', 'learn', 'signal'];

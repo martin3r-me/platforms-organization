@@ -53,7 +53,50 @@ class AgentProfileController extends Controller
             'claim_unassigned' => (bool) $profile->claim_unassigned,
             'github_username' => $profile->github_username,
             'settings' => $profile->settings ?? [],
+            // Die Stellenbeschreibung als Org-Daten: purpose + responsibilities (= die Routinen der
+            // Loop) + kpis + reporting. Weich referenziert (People baut auf Organization auf, nicht
+            // umgekehrt) — fehlt das People-Modul oder das Profil, bleibt der Schlüssel null.
+            'job_profile' => $this->jobProfileForEntity((int) $profile->organization_entity_id),
         ]]);
+    }
+
+    /**
+     * Weiche Auflösung der Stellenbeschreibung eines Agenten über die Org-Entity-Kante
+     * (people_job_profiles.owner_entity_id = organization_entities.id). Tolerant: fehlende
+     * People-Klasse oder kein aktives Profil → null (kein harter Abbruch, kein Cross-Modul-Zwang).
+     */
+    private function jobProfileForEntity(int $entityId): ?array
+    {
+        if ($entityId < 1) {
+            return null;
+        }
+        $class = \Platform\People\Models\JobProfile::class;
+        if (! class_exists($class)) {
+            return null;
+        }
+        try {
+            /** @var \Platform\People\Models\JobProfile|null $jp */
+            $jp = $class::query()
+                ->where('owner_entity_id', $entityId)
+                ->where('status', 'active')
+                ->orderByDesc('id')
+                ->first();
+        } catch (\Throwable $e) {
+            return null;
+        }
+        if (! $jp) {
+            return null;
+        }
+
+        return [
+            'name' => $jp->name,
+            'level' => $jp->level,
+            'purpose' => $jp->purpose,
+            // responsibilities = die wiederkehrenden Pflichten → werden im Daemon zu Routinen der Loop.
+            'responsibilities' => $jp->responsibilities ?? [],
+            'kpis' => $jp->kpis ?? [],
+            'reporting' => $jp->reporting ?? [],
+        ];
     }
 
     /**

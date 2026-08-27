@@ -106,9 +106,11 @@
             @php($cal = $snap['calibration'] ?? null)
             <div class="text-sm space-y-1">
                 @if ($cal && ($cal['n'] ?? 0) > 0)
-                    @php($gap = $cal['gap'] ?? 0)
-                    @php($lab = $gap > 0.05 ? 'überkonfident' : ($gap < -0.05 ? 'zu vorsichtig' : 'kalibriert'))
-                    @php($col = $gap > 0.05 ? 'text-amber-600' : ($gap < -0.05 ? 'text-sky-600' : 'text-emerald-600'))
+                    @php
+                        $gap = (float) ($cal['gap'] ?? 0);
+                        $lab = $gap > 0.05 ? 'überkonfident' : ($gap < -0.05 ? 'zu vorsichtig' : 'kalibriert');
+                        $col = $gap > 0.05 ? 'text-amber-600' : ($gap < -0.05 ? 'text-sky-600' : 'text-emerald-600');
+                    @endphp
                     <div>
                         <span class="text-[var(--ui-muted)]">Kalibrierung:</span>
                         <span class="font-semibold {{ $col }}">Gap {{ sprintf('%+.2f', $gap) }} ({{ $lab }})</span>

@@ -46,9 +46,11 @@
                         {{-- Kalibrierung --}}
                         <div class="text-sm mb-2">
                             @if ($a['calib_n'] > 0 && $a['calib_gap'] !== null)
-                                @php($gap = $a['calib_gap'])
-                                @php($label = $gap > 0.05 ? 'überkonfident' : ($gap < -0.05 ? 'zu vorsichtig' : 'kalibriert'))
-                                @php($color = $gap > 0.05 ? 'text-amber-600' : ($gap < -0.05 ? 'text-sky-600' : 'text-emerald-600'))
+                                @php
+                                    $gap = (float) $a['calib_gap'];
+                                    $label = $gap > 0.05 ? 'überkonfident' : ($gap < -0.05 ? 'zu vorsichtig' : 'kalibriert');
+                                    $color = $gap > 0.05 ? 'text-amber-600' : ($gap < -0.05 ? 'text-sky-600' : 'text-emerald-600');
+                                @endphp
                                 <span class="text-[var(--ui-secondary)]">Kalibrierung:</span>
                                 <span class="font-semibold {{ $color }}">Gap {{ sprintf('%+.2f', $gap) }} ({{ $label }})</span>
                                 <span class="text-[var(--ui-secondary)]">· {{ number_format($a['calib_accuracy'] * 100, 0) }}% Treffer · {{ $a['calib_n'] }} Paare</span>

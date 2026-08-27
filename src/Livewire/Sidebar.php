@@ -39,6 +39,7 @@ class Sidebar extends Component
                     ['route' => 'organization.my-inquiries.index', 'label' => 'Meine Inquiries', 'icon' => 'inbox', 'match' => '/my-inquiries', 'migrates' => 'home'],
                     ['route' => 'organization.ops-room', 'label' => 'Ops-Room (VSM)', 'icon' => 'squares-2x2', 'match' => '/ops-room'],
                     ['route' => 'organization.pulse', 'label' => 'Pulse', 'icon' => 'signal', 'match' => '/pulse'],
+                    ['route' => 'organization.agents.index', 'label' => 'Agenten', 'icon' => 'cpu-chip', 'match' => '/agents'],
                 ],
             ],
             [

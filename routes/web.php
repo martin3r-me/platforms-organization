@@ -22,6 +22,7 @@ use Platform\Organization\Livewire\SlaContract\Show as SlaContractShow;
 use Platform\Organization\Livewire\TimeEntries\Index as TimeEntriesIndex;
 use Platform\Organization\Livewire\PlannedTimes\Index as PlannedTimesIndex;
 use Platform\Organization\Livewire\Role\Index as RoleIndex;
+use Platform\Organization\Livewire\Agent\Fleet as AgentFleet;
 use Platform\Organization\Livewire\Settings\SignalDefinition\Index as SignalDefinitionIndex;
 use Platform\Organization\Livewire\Settings\SignalDefinition\Show as SignalDefinitionShow;
 use Platform\Organization\Livewire\Signal\Index as SignalIndex;
@@ -51,6 +52,9 @@ Route::get('/ops-room/signal/{signal}', \Platform\Organization\Livewire\OpsRoomS
 
 // Pulse — operative cross-modul Live-Lage (Health-Snapshots aller Module)
 Route::get('/pulse', \Platform\Organization\Livewire\Pulse::class)->name('organization.pulse');
+
+// Fleet: die Roster-Sicht über ALLE Agent-Mitglieder (host-agnostisch, gefüttert aus dem Heartbeat).
+Route::get('/agents', AgentFleet::class)->name('organization.agents.index');
 
 Route::get('/entities', EntityIndex::class)->name('organization.entities.index');
 Route::get('/entities/{entity}', EntityShow::class)->name('organization.entities.show');

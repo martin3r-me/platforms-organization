@@ -23,6 +23,32 @@
         @endunless
     </div>
 
+    {{-- Effizienz: abgestufter Kortex (Anstrengungs-Governor) --}}
+    <div class="rounded-lg border border-[var(--ui-border)] p-4">
+        <h4 class="text-xs font-semibold text-[var(--ui-secondary)] uppercase tracking-wide mb-1">Effizienz — abgestufter Kortex</h4>
+        <p class="text-[11px] text-[var(--ui-muted)] mb-2">Nicht flach denken: <b>System 1</b> (billiges Modell) für Routine, <b>System 2</b> (das teure) nur für Neues/Riskantes/Unklares/Angespanntes. Gewählt aus Lage + Affekt. Das Change-Gate spart „Welt unverändert → 0", dies ist der mittlere Gang.</p>
+        @if ($effort && ($effort['at'] ?? 0) > 0)
+            @php
+                $sys = (int) ($effort['system'] ?? 2);
+                $score = (float) ($effort['score'] ?? 0);
+            @endphp
+            <div class="flex items-center gap-3 flex-wrap text-[12px]">
+                <span class="shrink-0 rounded px-2 py-0.5 text-[11px] font-semibold {{ $sys === 1 ? 'bg-emerald-100 text-emerald-700' : 'bg-indigo-100 text-indigo-700' }}">System {{ $sys }} · {{ $sys === 1 ? 'billig/schnell' : 'teuer/gründlich' }}</span>
+                <span class="text-[var(--ui-muted)]">Modell: <span class="font-semibold text-[var(--ui-fg)]">{{ ($effort['tier'] ?? '') !== '' ? $effort['tier'] : 'default (bestes)' }}</span></span>
+                <div class="flex items-center gap-2 flex-1 min-w-[160px]">
+                    <span class="text-[var(--ui-muted)] shrink-0">Anstrengung</span>
+                    <div class="flex-1 h-2 rounded bg-[var(--ui-muted-5,#0001)] overflow-hidden">
+                        <div class="h-full rounded" style="width: {{ round($score * 100) }}%; background: hsl({{ round(140 - $score * 140) }},65%,50%);"></div>
+                    </div>
+                    <span class="w-8 text-right font-semibold text-[var(--ui-fg)]">{{ number_format($score, 2) }}</span>
+                </div>
+            </div>
+            @if (! empty($effort['reason']))<div class="text-[11px] text-[var(--ui-muted)] mt-1">{{ $effort['reason'] }}</div>@endif
+        @else
+            <div class="text-[11px] text-[var(--ui-muted)] italic py-2">— noch nicht gemeldet. Zeigt pro Takt die gewählte Kortex-Stufe (System 1/2) + wie hart der Takt war. Routing ist opt-in (env <code>CHEAP_CORTEX</code>); ohne es läuft alles auf System 2.</div>
+        @endif
+    </div>
+
     {{-- 1) Wissensgraph (Neocortex) --}}
     <div>
         <h4 class="text-xs font-semibold text-[var(--ui-secondary)] uppercase tracking-wide mb-1">Wissensgraph — Neocortex</h4>

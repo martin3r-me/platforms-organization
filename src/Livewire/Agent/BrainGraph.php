@@ -44,6 +44,7 @@ class BrainGraph extends Component
             'hasSnapshot' => $this->entity->agentProfile?->brain_snapshot_at !== null,
             'affect' => is_array($snap['affect'] ?? null) ? $snap['affect'] : null,
             'mood' => $snap['mood'] ?? null,
+            'effort' => is_array($snap['effort'] ?? null) ? $snap['effort'] : null,
             'factCount' => (int) ($snap['facts'] ?? 0),
             'edgeCount' => (int) ($snap['edges'] ?? 0),
             'episodeCount' => (int) ($snap['episodes'] ?? 0),

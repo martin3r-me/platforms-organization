@@ -57,7 +57,41 @@ class AgentProfileController extends Controller
             // Loop) + kpis + reporting. Weich referenziert (People baut auf Organization auf, nicht
             // umgekehrt) — fehlt das People-Modul oder das Profil, bleibt der Schlüssel null.
             'job_profile' => $this->jobProfileForEntity((int) $profile->organization_entity_id),
+            // ART-PRIOR (empirical Bayes, leave-one-out): wie kalibriert die ANDEREN Agent-Mitglieder
+            // im Schnitt sind. Ein neues Mitglied erbt diesen Instinkt bei der Geburt, bis es eigene
+            // Daten hat (VSM: die Organisation lernt über ihre Mitglieder und prägt die neuen).
+            'calibration_prior' => $this->calibrationPrior((int) $profile->organization_entity_id),
         ]]);
+    }
+
+    /**
+     * calibrationPrior — der ART-PRIOR aus der Population: n-gewichteter Durchschnitt der
+     * Kalibrierung ALLER ANDEREN aktiven Agent-Mitglieder (leave-one-out, sonst zählt der Agent
+     * seine eigenen Daten doppelt). Nur frische Meldungen (30 Tage). null = noch keine Population.
+     */
+    private function calibrationPrior(int $excludeEntityId): ?array
+    {
+        $fleet = OrganizationAgentProfile::query()
+            ->where('active', true)
+            ->where('organization_entity_id', '!=', $excludeEntityId)
+            ->where('calib_n', '>', 0)
+            ->whereNotNull('calib_gap')
+            ->where('calib_updated_at', '>', now()->subDays(30))
+            ->get(['calib_n', 'calib_mean_conf', 'calib_accuracy', 'calib_gap']);
+
+        $totalN = (int) $fleet->sum('calib_n');
+        if ($totalN < 1) {
+            return null;
+        }
+        $w = fn (string $col) => $fleet->sum(fn ($p) => $p->calib_n * (float) $p->$col) / $totalN;
+
+        return [
+            'n' => $totalN,
+            'agents' => $fleet->count(),
+            'mean_conf' => round($w('calib_mean_conf'), 4),
+            'accuracy' => round($w('calib_accuracy'), 4),
+            'gap' => round($w('calib_gap'), 4),
+        ];
     }
 
     /**
@@ -116,11 +150,19 @@ class AgentProfileController extends Controller
             'five_hour_pct' => 'nullable|numeric|min:0|max:100',
             'seven_day_pct' => 'nullable|numeric|min:0|max:100',
             'github_username' => 'nullable|string|max:255',
+            // Kalibrierungs-Snapshot (für den Art-Prior): behauptete vs. tatsächliche Confidence.
+            'calib_n' => 'nullable|integer|min:0',
+            'calib_mean_conf' => 'nullable|numeric|min:0|max:1',
+            'calib_accuracy' => 'nullable|numeric|min:0|max:1',
+            'calib_gap' => 'nullable|numeric|min:-1|max:1',
         ]);
 
         // Nur gemeldete Felder überschreiben; Heartbeat-Zeit immer setzen.
         $profile->fill(array_filter($data, fn ($v) => $v !== null));
         $profile->last_heartbeat_at = now();
+        if (($data['calib_n'] ?? null) !== null) {
+            $profile->calib_updated_at = now(); // frische Kalibrierungs-Meldung → hält den Art-Prior aktuell
+        }
         $profile->save();
 
         return response()->json(['data' => ['ok' => true, 'active' => (bool) $profile->active]]);

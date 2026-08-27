@@ -45,6 +45,11 @@ class OrganizationAgentProfile extends Model
         'seven_day_pct',
         'last_heartbeat_at',
         'settings',
+        'calib_n',
+        'calib_mean_conf',
+        'calib_accuracy',
+        'calib_gap',
+        'calib_updated_at',
     ];
 
     protected $casts = [
@@ -57,6 +62,11 @@ class OrganizationAgentProfile extends Model
         'seven_day_pct' => 'decimal:2',
         'last_heartbeat_at' => 'datetime',
         'settings' => 'array',
+        'calib_n' => 'integer',
+        'calib_mean_conf' => 'decimal:4',
+        'calib_accuracy' => 'decimal:4',
+        'calib_gap' => 'decimal:4',
+        'calib_updated_at' => 'datetime',
     ];
 
     public function entity(): BelongsTo

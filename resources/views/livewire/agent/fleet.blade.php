@@ -10,7 +10,7 @@
         ]" />
     </x-slot>
 
-    <div class="p-6">
+    <div class="p-6" wire:poll.15s>
         <div class="mb-4 text-sm text-[var(--ui-secondary)]">
             Alle Agent-Mitglieder, die bei der Organisation einzahlen — host-agnostisch (sichtbar, wer Heartbeat meldet, egal wo gehostet).
         </div>

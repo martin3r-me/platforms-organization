@@ -50,6 +50,8 @@ class OrganizationAgentProfile extends Model
         'calib_accuracy',
         'calib_gap',
         'calib_updated_at',
+        'brain_snapshot',
+        'brain_snapshot_at',
     ];
 
     protected $casts = [
@@ -67,6 +69,8 @@ class OrganizationAgentProfile extends Model
         'calib_accuracy' => 'decimal:4',
         'calib_gap' => 'decimal:4',
         'calib_updated_at' => 'datetime',
+        'brain_snapshot' => 'array',
+        'brain_snapshot_at' => 'datetime',
     ];
 
     public function entity(): BelongsTo

@@ -169,6 +169,29 @@ class AgentProfileController extends Controller
     }
 
     /**
+     * POST /api/org/agent/brain — der Daemon pusht einen gebündelten Gehirn-Snapshot (Kalibrierung
+     * voll, Hirn-Zähler, Budget). Damit zeigt die Org das EINZELNE Gehirn host-agnostisch — die Tiefe,
+     * die bisher nur die lokale Leitwarte via Vault-Mount sah. Beschränkter Snapshot, nicht der Vault.
+     */
+    public function brain(Request $request): JsonResponse
+    {
+        $profile = $this->profileForUser($request);
+        if (! $profile) {
+            return response()->json(['message' => 'No agent profile for this token'], 404);
+        }
+
+        $data = $request->validate([
+            'snapshot' => 'required|array',
+        ]);
+
+        $profile->brain_snapshot = $data['snapshot'];
+        $profile->brain_snapshot_at = now();
+        $profile->save();
+
+        return response()->json(['data' => ['ok' => true]]);
+    }
+
+    /**
      * POST /api/org/agent/log — der Daemon meldet seinen Aktivitäts-Feed (Claim, Reads/Edits,
      * Shell, Git-Schritte, Ergebnis). Kuratiert, kein Voll-Token-Strom. Gepruned auf die
      * jüngsten Events pro Agent, damit die Tabelle nicht unbegrenzt wächst.

@@ -83,6 +83,65 @@
     </div>
 
     {{-- Live-Log: was der Agent gerade tut (vom Daemon gemeldet, kein Voll-Token-Strom) --}}
+    {{-- Gehirn: der gepushte Snapshot (host-agnostisch — egal wo der Agent läuft). --}}
+    @php($snap = $profile?->brain_snapshot)
+    <div class="rounded-lg border border-[var(--ui-border)] p-5 space-y-3">
+        <div class="flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-[var(--ui-primary)]">Gehirn</h3>
+            @if ($profile?->brain_snapshot_at)
+                <span class="text-[11px] text-[var(--ui-muted)]">Snapshot {{ $profile->brain_snapshot_at->diffForHumans() }}</span>
+            @endif
+        </div>
+        @if (! $snap)
+            <p class="text-sm text-[var(--ui-muted)]">Noch kein Snapshot gemeldet (kommt beim nächsten Push des Daemons, ~10 min).</p>
+        @else
+            <div class="grid grid-cols-4 gap-2 text-center">
+                @foreach ([['episodes','Episoden'],['facts','Fakten'],['edges','Kanten'],['skills','Skills']] as $c)
+                    <div class="rounded-md bg-[var(--ui-muted-5,#0001)] py-2">
+                        <div class="text-lg font-bold">{{ $snap[$c[0]] ?? 0 }}</div>
+                        <div class="text-[11px] text-[var(--ui-muted)]">{{ $c[1] }}</div>
+                    </div>
+                @endforeach
+            </div>
+            @php($cal = $snap['calibration'] ?? null)
+            <div class="text-sm space-y-1">
+                @if ($cal && ($cal['n'] ?? 0) > 0)
+                    @php($gap = $cal['gap'] ?? 0)
+                    @php($lab = $gap > 0.05 ? 'überkonfident' : ($gap < -0.05 ? 'zu vorsichtig' : 'kalibriert'))
+                    @php($col = $gap > 0.05 ? 'text-amber-600' : ($gap < -0.05 ? 'text-sky-600' : 'text-emerald-600'))
+                    <div>
+                        <span class="text-[var(--ui-muted)]">Kalibrierung:</span>
+                        <span class="font-semibold {{ $col }}">Gap {{ sprintf('%+.2f', $gap) }} ({{ $lab }})</span>
+                        <span class="text-[var(--ui-muted)]">· ECE {{ number_format($cal['ece'] ?? 0, 2) }} · Brier {{ number_format($cal['brier'] ?? 0, 2) }} · Schärfe {{ number_format($cal['resolution'] ?? 0, 2) }} · {{ $cal['n'] }} Paare</span>
+                    </div>
+                    @if (! empty($cal['intervened']))
+                        <div class="text-[var(--ui-muted)]">Seit Selbst-Korrektur: Gap {{ sprintf('%+.2f', $cal['before_gap'] ?? 0) }} → {{ sprintf('%+.2f', $cal['after_gap'] ?? 0) }}
+                            @if (abs($cal['after_gap'] ?? 0) < abs($cal['before_gap'] ?? 0) - 0.02)<span class="text-emerald-600">✓ besser</span>@endif
+                        </div>
+                    @endif
+                    @if (! empty($cal['worst_themes']))
+                        <div class="text-[var(--ui-muted)]">Schwächste Themen:
+                            @foreach ($cal['worst_themes'] as $w)
+                                <span class="mr-2">{{ $w['subject'] }} ({{ number_format(($w['accuracy'] ?? 0) * 100, 0) }}%)</span>
+                            @endforeach
+                        </div>
+                    @endif
+                @else
+                    <span class="text-[var(--ui-muted)]">Kalibrierung: — (noch keine Confidence-Paare)</span>
+                @endif
+            </div>
+            @php($bud = $snap['budget'] ?? null)
+            @if ($bud)
+                <div class="text-xs text-[var(--ui-muted)]">
+                    Token: <span class="font-semibold text-[var(--ui-text)]">{{ number_format($bud['tokens_today'] ?? 0) }}</span> heute ·
+                    <span class="font-semibold text-[var(--ui-text)]">{{ number_format($bud['tokens_7d'] ?? 0) }}</span> 7d ·
+                    Burn {{ number_format($bud['burn_per_hour'] ?? 0) }}/h ·
+                    Gate {{ $snap['gate_total'] ?? 0 }} ({{ $snap['gate_asks'] ?? 0 }}× gefragt)
+                </div>
+            @endif
+        @endif
+    </div>
+
     <div class="rounded-lg border border-[var(--ui-border)] p-5 space-y-3" wire:poll.4s>
         <div class="flex items-center justify-between">
             <h3 class="text-sm font-semibold text-[var(--ui-primary)]">Live-Log</h3>

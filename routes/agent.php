@@ -1,7 +1,6 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
-use Platform\Organization\Http\Controllers\Api\AgentKnowledgeController;
 use Platform\Organization\Http\Controllers\Api\AgentProfileController;
 use Platform\Organization\Http\Controllers\Api\AgentTimeController;
 
@@ -18,9 +17,6 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::post('/log', [AgentProfileController::class, 'log'])->name('organization.api.agent.log');
     // Client-Daemon: einen gebündelten Gehirn-Snapshot pushen → Org-Einzel-Gehirn-Ansicht (host-agnostisch).
     Route::post('/brain', [AgentProfileController::class, 'brain'])->name('organization.api.agent.brain');
-    // Learn-Loop: Domänen-Wissen ziehen (beim Claim) + ablegen (nach dem Run).
-    Route::get('/knowledge', [AgentKnowledgeController::class, 'index'])->name('organization.api.agent.knowledge.index');
-    Route::post('/knowledge', [AgentKnowledgeController::class, 'store'])->name('organization.api.agent.knowledge.store');
     // Dashboard-Kennzahlen: getrackte Zeit (24h / Monat).
     Route::get('/stats', [AgentProfileController::class, 'stats'])->name('organization.api.agent.stats');
     // Observability: jüngste Run-Events lesen (z. B. ?kind=fail für Ablehnungsgründe).

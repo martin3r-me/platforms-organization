@@ -129,7 +129,6 @@ class PublicStatsController extends ApiController
                 'story_points' => $points,
                 'role' => $role?->name,
                 'description' => $entity->description,
-                'domain' => $role?->domain,
                 'stage' => $role?->stage,
                 'status' => $online ? 'online' : 'idle',
                 'last_active' => optional($profile?->last_heartbeat_at)->toIso8601String(),

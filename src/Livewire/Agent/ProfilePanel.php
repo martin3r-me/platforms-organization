@@ -7,18 +7,14 @@ use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
 use Platform\Organization\Models\OrganizationAgentRunEvent;
 use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationMemoryEntry;
 use Platform\Organization\Models\OrganizationRoleAssignment;
-use Platform\Organization\Services\AgentKnowledgeSearchService;
-use Platform\Organization\Services\AgentSettingsRegistry;
 
 /**
  * Agent-Tab: die „kleine UI". Bearbeitet den reinen Runtime-Facet (Governor/Claim-Cap/Modell/
  * an-aus), zeigt den vom Daemon gemeldeten Status (read-only) und mintet den Plattform-API-Token
  * für den Bot-User dieses Agenten INLINE (kein Login-Flow — einmal anzeigen, in die VM-ENV kopieren).
- * Was der Agent TUT (Domäne × Stufe) kommt NICHT von hier, sondern aus seinen Rollen-Assignments
- * (Rollen-UI, wie bei jedem Mitglied) — hier read-only als Info. Claude-Login + GitHub-Token
- * bleiben auf dem Client; hier nur github_username als Referenz.
+ * Was der Agent TUT, kommt aus seinem Job-Profil (people) + seinen Capabilities/Tokens — nicht aus
+ * einer „Domäne". Die Rollen-Assignments zeigen wir read-only als Info (Stufe/Name).
  */
 class ProfilePanel extends Component
 {
@@ -30,18 +26,10 @@ class ProfilePanel extends Component
     public bool $claim_unassigned = true;
     public bool $active = true;
 
-    /** Domänen-Felder aus der AgentSettingsRegistry, generisch gerendert. Key => Wert. */
-    public array $settingsValues = [];
-
     public ?string $savedMsg = null;
 
     /** Frisch geminteter Token — NUR einmal sichtbar (danach nur der Hash in der DB). */
     public ?string $mintedToken = null;
-
-    /** Frage-Feld im "Gelerntes"-Tab (semantische Suche über AgentKnowledgeSearchService). */
-    public string $knowledgeQuery = '';
-    public array $knowledgeResults = [];
-    public bool $knowledgeSearched = false;
 
     public function mount(OrganizationEntity $entity): void
     {
@@ -53,80 +41,29 @@ class ProfilePanel extends Component
             $this->claim_unassigned = (bool) $p->claim_unassigned;
             $this->active = (bool) $p->active;
         }
-
-        foreach ($this->settingsFields() as $field) {
-            $this->settingsValues[$field['key']] = $this->readSettingValue($field);
-        }
-    }
-
-    /**
-     * Die Domänen-Felder dieses Agenten (AgentSettingsRegistry, #810/#811) — universell (Governor,
-     * Modell, an/aus) bleibt hart verdrahtet, alles Domänen-spezifische (github_username,
-     * max_story_points, …) kommt generisch aus den registrierten Providern.
-     */
-    public function settingsFields(): array
-    {
-        return app(AgentSettingsRegistry::class)->fieldsForDomain($this->entity->roleDomain());
-    }
-
-    private function readSettingValue(array $field): mixed
-    {
-        $profile = $this->entity->agentProfile;
-
-        if (str_starts_with($field['storage'], 'column:')) {
-            $column = substr($field['storage'], 7);
-
-            return $profile->{$column} ?? ($field['default'] ?? null);
-        }
-
-        $bag = (array) ($profile->settings ?? []);
-
-        return $bag[$field['key']] ?? ($field['default'] ?? null);
     }
 
     public function save(): void
     {
-        $rules = [
+        $this->validate([
             'five_hour_reserve_pct' => 'integer|min:0|max:100',
             'seven_day_burn_margin_pct' => 'integer|min:0|max:100',
             'claude_model' => 'nullable|string|max:64',
             'claim_unassigned' => 'boolean',
-        ];
+        ]);
 
-        $fields = $this->settingsFields();
-        foreach ($fields as $field) {
-            if (! empty($field['validation'])) {
-                $rules['settingsValues.'.$field['key']] = $field['validation'];
-            }
-        }
-
-        $this->validate($rules);
-
-        $update = [
+        $this->entity->agentProfile()->updateOrCreate([], [
             'five_hour_reserve_pct' => $this->five_hour_reserve_pct,
             'seven_day_burn_margin_pct' => $this->seven_day_burn_margin_pct,
             'claude_model' => $this->claude_model ?: null,
             'claim_unassigned' => $this->claim_unassigned,
             'active' => $this->active,
-        ];
-
-        $bag = (array) ($this->entity->agentProfile->settings ?? []);
-        foreach ($fields as $field) {
-            $value = $this->settingsValues[$field['key']] ?? null;
-            if (str_starts_with($field['storage'], 'column:')) {
-                $update[substr($field['storage'], 7)] = $value === '' ? null : $value;
-            } else {
-                $bag[$field['key']] = $value;
-            }
-        }
-        $update['settings'] = $bag;
-
-        $this->entity->agentProfile()->updateOrCreate([], $update);
+        ]);
 
         $this->savedMsg = 'Gespeichert.';
     }
 
-    /** Die Rollen des Agenten (Domäne × Stufe) — read-only, gepflegt in der Rollen-UI. */
+    /** Die Rollen-Assignments des Agenten (Stufe · Name) — read-only, gepflegt in der Rollen-UI. */
     public function agentRoles(): array
     {
         return OrganizationRoleAssignment::query()
@@ -135,7 +72,7 @@ class ProfilePanel extends Component
             ->get()
             ->pluck('role')
             ->filter()
-            ->map(fn ($r) => trim(($r->domain ?? '—').' · '.($r->stage ?? '—')).'  ('.$r->name.')')
+            ->map(fn ($r) => trim(($r->stage ? $r->stage.' · ' : '').$r->name))
             ->values()
             ->all();
     }
@@ -162,17 +99,6 @@ class ProfilePanel extends Component
         $this->mintedToken = null;
     }
 
-    /**
-     * Frage an das Gedächtnis (Cockpit-Suche, #805): Top-k Lektionen der EIGENEN Domäne per
-     * AgentKnowledgeSearchService — dieselbe Quelle wie der Worker-Endpoint. Read-only.
-     */
-    public function askKnowledge(AgentKnowledgeSearchService $search): void
-    {
-        $q = trim($this->knowledgeQuery);
-        $this->knowledgeSearched = true;
-        $this->knowledgeResults = $q !== '' ? $search->lessons($this->entity, query: $q) : [];
-    }
-
     /** Der Aktivitäts-Feed des jüngsten Laufs (vom Daemon gemeldet) — read-only, live gepollt. */
     public function recentEvents(): array
     {
@@ -194,9 +120,10 @@ class ProfilePanel extends Component
     }
 
     /**
-     * Nächste Aufgaben — DOMÄNEN-abhängig: ein Dev-Agent sieht seine dev_issues, ein Backoffice-Agent
-     * seine planner_tasks (jeweils user_in_charge_id = sein Bot-User). Cross-Modul, nur lesend, per
-     * Schema-Guard + try/catch (fehlt das Modul/Spalte, bleibt der Block leer statt zu brechen).
+     * Nächste Aufgaben des Bot-Users (user_in_charge_id) — aus dev_issues UND planner_tasks
+     * zusammengeführt. Kein Domänen-Schalter mehr: ein Agent hat faktisch nur in einer der Tabellen
+     * Einträge; wir zeigen einfach, was ihm zugewiesen ist. Cross-Modul, nur lesend, per Schema-Guard
+     * + try/catch (fehlt Modul/Spalte, bleibt der Block leer statt zu brechen).
      */
     public function nextTasks(): array
     {
@@ -204,11 +131,12 @@ class ProfilePanel extends Component
         if (! $user) {
             return [];
         }
-        $domain = $this->entity->roleDomain();
+
+        $tasks = [];
 
         try {
-            if ($domain === 'development' && Schema::hasTable('dev_issues')) {
-                return DB::table('dev_issues')
+            if (Schema::hasTable('dev_issues')) {
+                $tasks = array_merge($tasks, DB::table('dev_issues')
                     ->leftJoin('dev_boards', 'dev_issues.dev_board_id', '=', 'dev_boards.id')
                     ->whereNull('dev_issues.deleted_at')
                     ->where('dev_issues.user_in_charge_id', $user->id)
@@ -220,10 +148,15 @@ class ProfilePanel extends Component
                     ->limit(12)
                     ->get(['dev_issues.title', 'dev_boards.name as board', 'dev_boards.type as board_type'])
                     ->map(fn ($r) => ['title' => $r->title, 'board' => $r->board, 'type' => $r->board_type])
-                    ->all();
+                    ->all());
             }
-            if ($domain === 'backoffice' && Schema::hasTable('planner_tasks')) {
-                return DB::table('planner_tasks')
+        } catch (\Throwable $e) {
+            // dev-Modul nicht verfügbar → überspringen
+        }
+
+        try {
+            if (Schema::hasTable('planner_tasks')) {
+                $tasks = array_merge($tasks, DB::table('planner_tasks')
                     ->leftJoin('planner_projects', 'planner_tasks.project_id', '=', 'planner_projects.id')
                     ->whereNull('planner_tasks.deleted_at')
                     ->where('planner_tasks.user_in_charge_id', $user->id)
@@ -233,45 +166,13 @@ class ProfilePanel extends Component
                     ->limit(12)
                     ->get(['planner_tasks.title', 'planner_projects.name as board'])
                     ->map(fn ($r) => ['title' => $r->title, 'board' => $r->board ?? 'Planner', 'type' => 'task'])
-                    ->all();
+                    ->all());
             }
         } catch (\Throwable $e) {
-            return [];
+            // planner-Modul nicht verfügbar → überspringen
         }
 
-        return [];
-    }
-
-    /**
-     * Gelerntes = die Lektionen der EIGENEN Domäne des Agenten (nicht global!). Wissen gehört der
-     * Domäne — ein Backoffice-Agent darf NICHT die Dev-Lektionen sehen. Naming-Wart: die Domäne
-     * heißt "development", der Dev-Learn-Loop legt aber unter memory_type "dev.*" ab → gemappt.
-     * Andere Domänen (backoffice …) haben (noch) keinen eigenen Store hier → leer statt Leak.
-     */
-    public function learnings(): array
-    {
-        if (! Schema::hasTable('organization_memory_entries')) {
-            return [];
-        }
-        $prefix = $this->entity->memoryTypePrefix();
-        if (! $prefix) {
-            return [];
-        }
-
-        return OrganizationMemoryEntry::query()
-            ->where('team_id', (int) $this->entity->team_id)
-            ->where('memory_type', 'like', $prefix.'.%')
-            ->where('is_active', true)
-            ->orderByDesc('reinforcement_count')
-            ->orderByDesc('id')
-            ->limit(12)
-            ->get(['content', 'structured_data', 'reinforcement_count'])
-            ->map(fn ($m) => [
-                'content' => $m->content,
-                'package' => data_get($m->structured_data, 'package'),
-                'count' => (int) $m->reinforcement_count,
-            ])
-            ->all();
+        return array_slice($tasks, 0, 12);
     }
 
     public function render()
@@ -282,8 +183,6 @@ class ProfilePanel extends Component
             'roles' => $this->agentRoles(),
             'events' => $this->recentEvents(),
             'nextTasks' => $this->nextTasks(),
-            'learnings' => $this->learnings(),
-            'settingsFields' => $this->settingsFields(),
         ]);
     }
 }

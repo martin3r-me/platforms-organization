@@ -31,7 +31,6 @@ class OrganizationRole extends Model
         'slug',
         'description',
         'vsm_system',
-        'domain',
         'stage',
         'status',
         'owner_entity_id',
@@ -43,13 +42,10 @@ class OrganizationRole extends Model
     ];
 
     /**
-     * Agent-Domänen (Worker-Runtime). Eine Rolle mit gesetzter Domäne ist „agent-ausführbar";
-     * reine Menschen-Rollen lassen domain/stage null. Nicht als DB-Enum, damit analysis/signal
-     * später ohne Schema-Änderung andockt.
+     * Stufen einer Agent-Rolle (Dev-Loop-Konfiguration). operativ: triage/execute/learn · analysis:
+     * signal. Was ein Agent TUT, kommt aus seinem Job-Profil + Capabilities — nicht aus einer „Domäne"
+     * (abgeschafft); die Stufe bleibt als reine Loop-Konfiguration.
      */
-    public const DOMAINS = ['development', 'backoffice', 'accounting', 'helpdesk', 'assistant', 'analysis'];
-
-    /** Stufen (Matrix-Achse). operativ: triage/execute/learn · analysis: signal. */
     public const STAGES = ['triage', 'execute', 'learn', 'signal'];
 
     /**

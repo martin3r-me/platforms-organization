@@ -83,18 +83,9 @@
             <div class="grid grid-cols-2 gap-4">
                 <div>
                     <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Agent-Domäne
-                        <span class="ml-1 text-xs font-normal text-gray-500">— gesetzt → von einem Worker-Agenten ausführbar; leer → reine Menschen-Rolle</span>
+                        Stufe
+                        <span class="ml-1 text-xs font-normal text-gray-500">— Dev-Loop-Konfiguration einer Agent-Rolle (optional)</span>
                     </label>
-                    <select wire:model.live="form.domain" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">– keine (Menschen-Rolle) –</option>
-                        @foreach(\Platform\Organization\Models\OrganizationRole::DOMAINS as $d)
-                            <option value="{{ $d }}">{{ $d }}</option>
-                        @endforeach
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Stufe</label>
                     <select wire:model.live="form.stage" class="w-full rounded-md border-gray-300 shadow-sm">
                         <option value="">– keine –</option>
                         @foreach(\Platform\Organization\Models\OrganizationRole::STAGES as $s)

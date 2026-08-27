@@ -5,7 +5,7 @@
         <h3 class="text-sm font-semibold text-[var(--ui-primary)]">Runtime-Konfiguration</h3>
 
         <div>
-            <label class="block text-xs font-medium text-[var(--ui-muted)] mb-1">Rollen (Domäne · Stufe)</label>
+            <label class="block text-xs font-medium text-[var(--ui-muted)] mb-1">Rollen (Stufe)</label>
             @if (count($roles))
                 <ul class="text-sm space-y-0.5">
                     @foreach ($roles as $r)
@@ -13,9 +13,9 @@
                     @endforeach
                 </ul>
             @else
-                <p class="text-[11px] text-amber-700">Noch keine Rolle zugewiesen — der Agent tut nichts, bis er in der Rollen-UI eine (agent-ausführbare) Rolle bekommt.</p>
+                <p class="text-[11px] text-[var(--ui-muted)]">Keine Rolle zugewiesen.</p>
             @endif
-            <p class="text-[11px] text-[var(--ui-muted)] mt-1">Was der Agent TUT, kommt aus seinen Rollen — gepflegt in der Rollen-UI, wie bei jedem Mitglied. Hier nur zur Info.</p>
+            <p class="text-[11px] text-[var(--ui-muted)] mt-1">Was der Agent TUT, kommt aus seinem Job-Profil (people) + seinen Capabilities/Tokens. Rollen hier nur zur Info.</p>
         </div>
 
         <div class="grid grid-cols-2 gap-4">
@@ -32,39 +32,6 @@
                 <input type="text" wire:model="claude_model" placeholder="leer = bestes verfügbares" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
             </div>
         </div>
-
-        {{-- Domänen-Felder: generisch aus der AgentSettingsRegistry (#810/#811) — ein Backoffice-Agent
-             sieht hier keine Dev-Felder (github_username, max_story_points) und umgekehrt. --}}
-        @if (count($settingsFields))
-            <div class="grid grid-cols-2 gap-4">
-                @foreach ($settingsFields as $f)
-                    <div>
-                        @if ($f['type'] === 'bool')
-                            <label class="inline-flex items-center gap-2 text-sm">
-                                <input type="checkbox" wire:model="settingsValues.{{ $f['key'] }}" class="rounded border-[var(--ui-border)]">
-                                {{ $f['label'] }}
-                            </label>
-                        @else
-                            <label class="block text-xs font-medium text-[var(--ui-muted)] mb-1">{{ $f['label'] }}</label>
-                            @if ($f['type'] === 'enum')
-                                <select wire:model="settingsValues.{{ $f['key'] }}" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
-                                    @foreach (($f['options'] ?? []) as $optValue => $optLabel)
-                                        <option value="{{ $optValue }}">{{ $optLabel }}</option>
-                                    @endforeach
-                                </select>
-                            @elseif ($f['type'] === 'int')
-                                <input type="number" wire:model="settingsValues.{{ $f['key'] }}" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
-                            @else
-                                <input type="text" wire:model="settingsValues.{{ $f['key'] }}" class="w-full rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
-                            @endif
-                        @endif
-                        @if (!empty($f['help']))
-                            <p class="text-[11px] text-[var(--ui-muted)] mt-1">{{ $f['help'] }}</p>
-                        @endif
-                    </div>
-                @endforeach
-            </div>
-        @endif
 
         <label class="inline-flex items-center gap-2 text-sm">
             <input type="checkbox" wire:model="claim_unassigned" class="rounded border-[var(--ui-border)]">
@@ -187,53 +154,6 @@
             </ul>
         @else
             <p class="text-[11px] text-[var(--ui-muted)]">Keine offenen Aufgaben zugewiesen — der Agent hat gerade nichts in seiner Queue.</p>
-        @endif
-    </div>
-
-    {{-- Gelerntes: die Dev-Lektionen der Domäne (meistverstärkte zuerst) --}}
-    <div class="rounded-lg border border-[var(--ui-border)] p-5 space-y-3">
-        <h3 class="text-sm font-semibold text-[var(--ui-primary)]">Gelerntes</h3>
-
-        {{-- Frage ans Gedächtnis: semantische Suche über die Lektionen der eigenen Domäne --}}
-        <form wire:submit.prevent="askKnowledge" class="flex items-center gap-2">
-            <input type="text" wire:model="knowledgeQuery" placeholder="Frage ans Gedächtnis stellen …" class="flex-1 rounded-md border border-[var(--ui-border)] bg-transparent px-2.5 py-1.5 text-sm">
-            <button type="submit" class="px-3 py-1.5 rounded-md border border-[var(--ui-border)] text-sm shrink-0">Fragen</button>
-        </form>
-
-        @if ($knowledgeSearched)
-            <div class="rounded-md bg-[var(--ui-muted-5,#0001)] p-3 space-y-2">
-                @if (count($knowledgeResults))
-                    <ul class="space-y-2">
-                        @foreach ($knowledgeResults as $l)
-                            <li class="text-[13px]">
-                                <div class="flex items-center gap-2 mb-0.5">
-                                    @if ($l['package'])<span class="rounded bg-[var(--ui-muted-5,#0001)] px-1.5 py-0.5 text-[10px] text-[var(--ui-muted)]">{{ $l['package'] }}</span>@endif
-                                    @if (($l['reinforced'] ?? 0) > 0)<span class="text-[10px] text-[var(--ui-muted)]">×{{ $l['reinforced'] }}</span>@endif
-                                </div>
-                                <p class="break-words text-[var(--ui-fg)]">{{ $l['content'] }}</p>
-                            </li>
-                        @endforeach
-                    </ul>
-                @else
-                    <p class="text-[11px] text-[var(--ui-muted)]">Keine passenden Lektionen gefunden.</p>
-                @endif
-            </div>
-        @endif
-
-        @if (count($learnings))
-            <ul class="space-y-2">
-                @foreach ($learnings as $l)
-                    <li class="text-[13px]">
-                        <div class="flex items-center gap-2 mb-0.5">
-                            @if ($l['package'])<span class="rounded bg-[var(--ui-muted-5,#0001)] px-1.5 py-0.5 text-[10px] text-[var(--ui-muted)]">{{ $l['package'] }}</span>@endif
-                            @if (($l['count'] ?? 0) > 0)<span class="text-[10px] text-[var(--ui-muted)]">×{{ $l['count'] }}</span>@endif
-                        </div>
-                        <p class="break-words text-[var(--ui-fg)]">{{ $l['content'] }}</p>
-                    </li>
-                @endforeach
-            </ul>
-        @else
-            <p class="text-[11px] text-[var(--ui-muted)]">Noch nichts gelernt — Lektionen erscheinen, sobald der Learn-Loop läuft.</p>
         @endif
     </div>
 

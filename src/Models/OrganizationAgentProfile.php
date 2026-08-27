@@ -24,7 +24,7 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string|null $five_hour_pct
  * @property string|null $seven_day_pct
  * @property \Illuminate\Support\Carbon|null $last_heartbeat_at
- * @property array|null  $settings domänen-spezifische Felder ohne eigene Spalte (AgentSettingsProvider, storage=bag)
+ * @property array|null  $settings freier Einstellungs-Bag ohne eigene Spalte (aktuell ungenutzt)
  * @property \Illuminate\Support\Carbon|null $created_at
  * @property \Illuminate\Support\Carbon|null $updated_at
  */

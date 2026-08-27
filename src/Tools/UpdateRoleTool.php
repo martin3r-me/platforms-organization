@@ -35,8 +35,7 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
                 'slug'        => ['type' => 'string'],
                 'description' => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'vsm_system'  => ['type' => 'string', 'description' => 'Optional: s1, s2, s3, s3_star, s4, s5. "" zum Loesen.', 'enum' => ['', 's1', 's2', 's3', 's3_star', 's4', 's5']],
-                'domain'      => ['type' => 'string', 'description' => 'Optional: macht die Rolle AGENT-ausfuehrbar (development|backoffice|accounting|helpdesk|assistant|analysis). "" zum Loesen (reine Menschen-Rolle).'],
-                'stage'       => ['type' => 'string', 'description' => 'Optional (mit domain): triage|execute|learn|signal. "" zum Loesen.'],
+                'stage'       => ['type' => 'string', 'description' => 'Optional: triage|execute|learn|signal (Dev-Loop-Konfiguration einer Agent-Rolle). "" zum Loesen.'],
                 'capabilities' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['read', 'write', 'manage']], 'description' => 'Optional: Content-Zugriff der Rolle auf Kontext-Entity + Teilbaum (read|write|manage; hoechste gewinnt). Leeres Array [] = KEIN Zugriff. Fuer arbeitende Agenten i.d.R. ["write"].'],
                 'status'      => ['type' => 'string'],
             ],
@@ -108,16 +107,6 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
                     return ToolResult::error('VALIDATION_ERROR', 'vsm_system muss einer von ' . implode(', ', OrganizationRole::VSM_SYSTEMS) . ' oder "" sein.');
                 }
             }
-            if (array_key_exists('domain', $arguments)) {
-                $val = (string) ($arguments['domain'] ?? '');
-                if ($val === '') {
-                    $update['domain'] = null;
-                } elseif (in_array($val, OrganizationRole::DOMAINS, true)) {
-                    $update['domain'] = $val;
-                } else {
-                    return ToolResult::error('VALIDATION_ERROR', 'domain muss einer von ' . implode(', ', OrganizationRole::DOMAINS) . ' oder "" sein.');
-                }
-            }
             if (array_key_exists('stage', $arguments)) {
                 $val = (string) ($arguments['stage'] ?? '');
                 if ($val === '') {
@@ -155,7 +144,6 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
                 'slug'       => $role->slug,
                 'status'     => $role->status,
                 'vsm_system' => $role->vsm_system,
-                'domain'     => $role->domain,
                 'stage'      => $role->stage,
                 'capabilities' => $role->capabilities,
                 'team_id'    => $role->team_id,

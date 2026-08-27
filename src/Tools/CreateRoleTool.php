@@ -33,8 +33,7 @@ class CreateRoleTool implements ToolContract, ToolMetadataContract
                 'slug'        => ['type' => 'string', 'description' => 'Optional: Slug (auto, falls nicht angegeben).'],
                 'description' => ['type' => 'string'],
                 'vsm_system'  => ['type' => 'string', 'description' => 'Optional: VSM-Funktion dieser Rolle (s1, s2, s3, s3_star, s4, s5). Beer: dieselbe Person traegt mehrere VSM-Funktionen durch ihre Rollen (GF=s3, Inhaber=s5).', 'enum' => ['s1', 's2', 's3', 's3_star', 's4', 's5']],
-                'domain'      => ['type' => 'string', 'description' => 'Optional: macht die Rolle AGENT-ausfuehrbar. Domaene des KI-Workers (development|backoffice|accounting|helpdesk|assistant|analysis). Reine Menschen-Rollen lassen das leer.', 'enum' => OrganizationRole::DOMAINS],
-                'stage'       => ['type' => 'string', 'description' => 'Optional (nur mit domain): Stufe der Agent-Rolle (triage|execute|learn|signal).', 'enum' => OrganizationRole::STAGES],
+                'stage'       => ['type' => 'string', 'description' => 'Optional: Stufe einer Agent-Rolle (triage|execute|learn|signal) — Dev-Loop-Konfiguration.', 'enum' => OrganizationRole::STAGES],
                 'capabilities' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['read', 'write', 'manage']], 'description' => 'Optional: Content-Zugriff, den die Rolle bei Zuweisung auf die Kontext-Entity + Teilbaum verleiht (read|write|manage; hoechste gewinnt). LEER = KEIN Datenzugriff. Fuer arbeitende Agenten i.d.R. ["write"].'],
                 'status'      => ['type' => 'string', 'description' => 'Optional: active/archived. Default: active.'],
             ],
@@ -73,11 +72,8 @@ class CreateRoleTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'vsm_system muss einer von ' . implode(', ', OrganizationRole::VSM_SYSTEMS) . ' sein.');
             }
 
-            // Agent-Ausfuehrbarkeit: domain (+ optional stage) machen die Rolle fuer KI-Worker nutzbar.
-            $domain = ($arguments['domain'] ?? null) ?: null;
-            if ($domain !== null && ! in_array($domain, OrganizationRole::DOMAINS, true)) {
-                return ToolResult::error('VALIDATION_ERROR', 'domain muss einer von ' . implode(', ', OrganizationRole::DOMAINS) . ' sein.');
-            }
+            // Stufe (optional): Dev-Loop-Konfiguration einer Agent-Rolle. Was der Agent TUT, kommt
+            // aus seinem Job-Profil + Capabilities, nicht mehr aus einer „Domäne".
             $stage = ($arguments['stage'] ?? null) ?: null;
             if ($stage !== null && ! in_array($stage, OrganizationRole::STAGES, true)) {
                 return ToolResult::error('VALIDATION_ERROR', 'stage muss einer von ' . implode(', ', OrganizationRole::STAGES) . ' sein.');
@@ -99,7 +95,6 @@ class CreateRoleTool implements ToolContract, ToolMetadataContract
                 'slug'         => $slug !== '' ? $slug : null, // Auto via Model-Event
                 'description'  => ($arguments['description'] ?? null) ?: null,
                 'vsm_system'   => $vsmSystem,
-                'domain'       => $domain,
                 'stage'        => $stage,
                 'capabilities' => $capabilities,
                 'status'       => ($arguments['status'] ?? 'active'),
@@ -112,7 +107,6 @@ class CreateRoleTool implements ToolContract, ToolMetadataContract
                 'slug'       => $role->slug,
                 'status'     => $role->status,
                 'vsm_system' => $role->vsm_system,
-                'domain'     => $role->domain,
                 'stage'      => $role->stage,
                 'capabilities' => $role->capabilities,
                 'team_id'    => $role->team_id,

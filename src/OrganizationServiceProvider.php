@@ -58,7 +58,6 @@ class OrganizationServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Organization\Services\PersonActivityRegistry::class);
         $this->app->singleton(\Platform\Organization\Services\InferencePromptService::class);
         $this->app->singleton(\Platform\Organization\Services\MilestoneContributorRegistry::class);
-        $this->app->singleton(\Platform\Organization\Services\AgentSettingsRegistry::class);
     }
 
     public function boot(): void
@@ -142,9 +141,6 @@ class OrganizationServiceProvider extends ServiceProvider
         // Entity-Komponenten manuell registrieren (für Sicherheit)
         Livewire::component('organization.entity.modal-relations', \Platform\Organization\Livewire\Entity\ModalRelations::class);
         Livewire::component('organization.entity.person-activity', \Platform\Organization\Livewire\Entity\PersonActivity::class);
-
-        // Agent-Settings-Provider registrieren (loose gekoppelt, #810/#812)
-        $this->registerAgentSettingsProviders();
 
         // Tools registrieren (loose gekoppelt - für AI/Chat)
         $this->registerTools();
@@ -281,20 +277,6 @@ class OrganizationServiceProvider extends ServiceProvider
         Schedule::command('authz:materialize --all')
             ->everyTenMinutes()
             ->withoutOverlapping();
-    }
-
-    /**
-     * Registriert die eigenen AgentSettingsProvider (aktuell nur backoffice — development
-     * registriert sich vom dev-Modul aus über dieselbe Registry).
-     */
-    protected function registerAgentSettingsProviders(): void
-    {
-        try {
-            resolve(\Platform\Organization\Services\AgentSettingsRegistry::class)
-                ->register(new \Platform\Organization\Services\AgentSettings\BackofficeAgentSettingsProvider());
-        } catch (\Throwable $e) {
-            // Registry (noch) nicht verfügbar (z.B. während Migrationen) — überspringen.
-        }
     }
 
     /**

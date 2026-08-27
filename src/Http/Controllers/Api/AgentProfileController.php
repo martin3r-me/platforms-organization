@@ -28,8 +28,9 @@ class AgentProfileController extends Controller
             return response()->json(['message' => 'No agent profile for this token'], 404);
         }
 
-        // Identität (Domäne × Stufen) aus den Rollen-Assignments des Agenten ableiten — nicht
-        // mehr aus dem Profil. Invariante „eine Domäne pro Agent": die erste nicht-leere zählt.
+        // Stufen (Dev-Loop-Konfiguration) aus den Rollen-Assignments ableiten. Die „Domäne" als
+        // Verhaltens-Treiber ist abgeschafft — was der Agent TUT, kommt aus dem Job-Profil (unten)
+        // + seinen Capabilities/Tokens.
         $roles = OrganizationRoleAssignment::query()
             ->where('person_entity_id', $profile->organization_entity_id)
             ->with('role')
@@ -37,11 +38,9 @@ class AgentProfileController extends Controller
             ->pluck('role')
             ->filter();
 
-        $domain = $roles->pluck('domain')->filter()->unique()->first();
         $stages = $roles->pluck('stage')->filter()->unique()->values()->all();
 
         return response()->json(['data' => [
-            'domain' => $domain,
             'stages' => $stages,
             'active' => (bool) $profile->active,
             'governor' => [

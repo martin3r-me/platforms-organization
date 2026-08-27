@@ -32,9 +32,8 @@ class Index extends Component
         'slug' => '',
         'description' => '',
         'vsm_system' => '',
-        // Agent-Ausführbarkeit: Domäne × Stufe. Gesetzt → die Rolle ist von einem Worker-Agenten
-        // ausführbar (der Daemon dispatcht per Domäne). Leer → reine Menschen-Rolle.
-        'domain' => '',
+        // Stufe (optional): Dev-Loop-Konfiguration einer Agent-Rolle. Was der Agent TUT, kommt aus
+        // seinem Job-Profil + Capabilities — nicht aus einer „Domäne" (abgeschafft).
         'stage' => '',
         'status' => 'active',
         'owner_entity_id' => '',
@@ -54,7 +53,6 @@ class Index extends Component
             'form.slug'        => ['nullable', 'string', 'max:255'],
             'form.description' => ['nullable', 'string'],
             'form.vsm_system'      => ['nullable', 'in:s1,s2,s3,s3_star,s4,s5'],
-            'form.domain'          => ['nullable', 'in:'.implode(',', OrganizationRole::DOMAINS)],
             'form.stage'           => ['nullable', 'in:'.implode(',', OrganizationRole::STAGES)],
             'form.status'          => ['required', 'in:active,archived'],
             'form.owner_entity_id' => ['nullable', 'integer', 'exists:organization_entities,id'],
@@ -193,7 +191,6 @@ class Index extends Component
             'slug'            => (string) ($role->slug ?? ''),
             'description'     => (string) ($role->description ?? ''),
             'vsm_system'      => (string) ($role->vsm_system ?? ''),
-            'domain'          => (string) ($role->domain ?? ''),
             'stage'           => (string) ($role->stage ?? ''),
             'status'          => (string) ($role->status ?? 'active'),
             'owner_entity_id' => (string) ($role->owner_entity_id ?? ''),
@@ -211,7 +208,6 @@ class Index extends Component
             'slug'            => $data['slug'] !== '' ? $data['slug'] : null,
             'description'     => $data['description'] !== '' ? $data['description'] : null,
             'vsm_system'      => $data['vsm_system'] !== '' ? $data['vsm_system'] : null,
-            'domain'          => $data['domain'] !== '' ? $data['domain'] : null,
             'stage'           => $data['stage'] !== '' ? $data['stage'] : null,
             'status'          => $data['status'],
             'owner_entity_id' => $data['owner_entity_id'] !== '' ? (int) $data['owner_entity_id'] : null,

@@ -39,7 +39,7 @@
 
                         {{-- Rolle/Domäne --}}
                         <div class="text-xs text-[var(--ui-secondary)] mb-3">
-                            {{ $a['domain'] ?? '— keine Domäne' }}
+                            {{ $a['domain'] ?? '— keine Rolle' }}
                             @if ($a['subscription']) · {{ $a['subscription'] }} @endif
                         </div>
 

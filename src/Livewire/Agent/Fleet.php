@@ -24,7 +24,7 @@ class Fleet extends Component
             ->orderBy('name')
             ->get();
 
-        // Domäne je Agent aus den Rollen-Assignments (eine Query, gruppiert — die erste nicht-leere zählt).
+        // Domäne je Agent aus den Rollen-Assignments — nur noch FALLBACK-Label, bis die Domäne ganz raus ist.
         $domains = OrganizationRoleAssignment::query()
             ->whereIn('person_entity_id', $entities->pluck('id'))
             ->with('role')
@@ -32,7 +32,21 @@ class Fleet extends Component
             ->groupBy('person_entity_id')
             ->map(fn ($rows) => $rows->pluck('role.domain')->filter()->first());
 
-        return $entities->map(function ($e) use ($domains) {
+        // Das WAS des Agenten = der JOB-PROFIL-Name (weich über owner_entity_id, wie im Profil-Endpoint) —
+        // löst die Domäne als Label ab. class_exists-Gate: kein harter Cross-Modul-Zwang auf People.
+        $jobNames = [];
+        if (class_exists(\Platform\People\Models\JobProfile::class)) {
+            $jobNames = \Platform\People\Models\JobProfile::query()
+                ->whereIn('owner_entity_id', $entities->pluck('id'))
+                ->where('status', 'active')
+                ->orderByDesc('id')
+                ->get(['owner_entity_id', 'name'])
+                ->groupBy('owner_entity_id')
+                ->map(fn ($g) => $g->first()->name)
+                ->all();
+        }
+
+        return $entities->map(function ($e) use ($domains, $jobNames) {
             $p = $e->agentProfile;
             // Liveness großzügig (20 min): der Wach-Loop ruht bei Leerlauf bis ~15 min, ohne offline zu sein.
             $online = $p && $p->last_heartbeat_at && $p->last_heartbeat_at->greaterThan(now()->subMinutes(20));
@@ -40,7 +54,7 @@ class Fleet extends Component
             return [
                 'id' => $e->id,
                 'name' => $e->name,
-                'domain' => $domains[$e->id] ?? null,
+                'domain' => $jobNames[$e->id] ?? ($domains[$e->id] ?? null),
                 'active' => $p ? (bool) $p->active : false,
                 'online' => $online,
                 'status' => $p?->status,

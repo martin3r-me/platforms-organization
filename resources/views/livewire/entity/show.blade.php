@@ -275,10 +275,10 @@
                                     ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
                                     : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
                                 class="px-4 py-2.5 text-sm transition-colors"
-                                title="Der Wissensgraph des Agenten (Neocortex, gepushter Snapshot)"
+                                title="Das Innenleben des Agenten: Wissensgraph, Genom, Zustand, Selbstmodell, Episoden (gepushter Snapshot)"
                             >
-                                @svg('heroicon-o-share', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
-                                Wissensgraph
+                                @svg('heroicon-o-cpu-chip', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
+                                Gehirn
                             </button>
                         @endif
                         @if($this->isCarrierEntity)

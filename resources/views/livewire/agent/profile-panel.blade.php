@@ -133,6 +133,12 @@
                 @endif
             </div>
             @php $bud = $snap['budget'] ?? null; @endphp
+            @php $usage = $snap['usage'] ?? null; @endphp
+            @if ($usage && ! empty($usage['ok']))
+                <div class="text-xs text-[var(--ui-muted)]">
+                    Abo-Nutzung: 5h <span class="font-semibold text-[var(--ui-text)]">{{ number_format($usage['five_hour_pct'] ?? 0, 0) }}%</span> · 7d <span class="font-semibold text-[var(--ui-text)]">{{ number_format($usage['seven_day_pct'] ?? 0, 0) }}%</span>
+                </div>
+            @endif
             @if ($bud)
                 <div class="text-xs text-[var(--ui-muted)]">
                     Token: <span class="font-semibold text-[var(--ui-text)]">{{ number_format($bud['tokens_today'] ?? 0) }}</span> heute ·

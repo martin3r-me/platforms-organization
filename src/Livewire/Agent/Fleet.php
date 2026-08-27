@@ -45,12 +45,15 @@ class Fleet extends Component
                 'online' => $online,
                 'status' => $p?->status,
                 'subscription' => $p?->claude_subscription,
-                'five_hour_pct' => $p?->five_hour_pct !== null ? (float) $p->five_hour_pct : null,
-                'seven_day_pct' => $p?->seven_day_pct !== null ? (float) $p->seven_day_pct : null,
+                // Usage AUS DEM STREAM (Gehirn-Snapshot) statt aus dem einfrierenden Heartbeat-Feld:
+                // ok=false / kein Snapshot → null → das Dashboard zeigt ehrlich „—" statt Alt-Wert.
+                'five_hour_pct' => (is_array($p?->brain_snapshot) && ! empty($p->brain_snapshot['usage']['ok'])) ? (float) ($p->brain_snapshot['usage']['five_hour_pct'] ?? 0) : null,
+                'seven_day_pct' => (is_array($p?->brain_snapshot) && ! empty($p->brain_snapshot['usage']['ok'])) ? (float) ($p->brain_snapshot['usage']['seven_day_pct'] ?? 0) : null,
                 'calib_n' => (int) ($p?->calib_n ?? 0),
                 'calib_gap' => $p?->calib_gap !== null ? (float) $p->calib_gap : null,
                 'calib_accuracy' => $p?->calib_accuracy !== null ? (float) $p->calib_accuracy : null,
                 'last_heartbeat' => $p?->last_heartbeat_at,
+                'snapshot_at' => $p?->brain_snapshot_at,
             ];
         })->all();
     }

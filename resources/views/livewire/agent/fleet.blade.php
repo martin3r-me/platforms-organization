@@ -59,10 +59,11 @@
                             @endif
                         </div>
 
-                        {{-- Budget-Fenster --}}
-                        <div class="flex items-center gap-4 text-xs text-[var(--ui-secondary)]">
+                        {{-- Budget-Fenster (aus dem Snapshot-Stream, mit Frische-Stempel) --}}
+                        <div class="flex items-center gap-3 flex-wrap text-xs text-[var(--ui-secondary)]">
                             <span>5h-Fenster: <span class="font-semibold text-[var(--ui-fg)]">{{ $a['five_hour_pct'] !== null ? number_format($a['five_hour_pct'], 0).'%' : '—' }}</span></span>
                             <span>7d: <span class="font-semibold text-[var(--ui-fg)]">{{ $a['seven_day_pct'] !== null ? number_format($a['seven_day_pct'], 0).'%' : '—' }}</span></span>
+                            @if ($a['snapshot_at'])<span class="text-neutral-400">· Snapshot {{ $a['snapshot_at']->diffForHumans() }}</span>@endif
                         </div>
 
                         {{-- Zuletzt gesehen --}}

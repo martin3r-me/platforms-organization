@@ -15,7 +15,7 @@
             Alle Agent-Mitglieder, die bei der Organisation einzahlen — host-agnostisch (sichtbar, wer Heartbeat meldet, egal wo gehostet).
         </div>
 
-        @php($agents = $this->agents)
+        @php $agents = $this->agents; @endphp
 
         @if (count($agents) === 0)
             <div class="text-[var(--ui-secondary)] text-sm">Noch keine Agent-Mitglieder.</div>

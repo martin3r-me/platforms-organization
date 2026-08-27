@@ -84,7 +84,7 @@
 
     {{-- Live-Log: was der Agent gerade tut (vom Daemon gemeldet, kein Voll-Token-Strom) --}}
     {{-- Gehirn: der gepushte Snapshot (host-agnostisch — egal wo der Agent läuft). --}}
-    @php($snap = $profile?->brain_snapshot)
+    @php $snap = $profile?->brain_snapshot; @endphp
     <div class="rounded-lg border border-[var(--ui-border)] p-5 space-y-3">
         <div class="flex items-center justify-between">
             <h3 class="text-sm font-semibold text-[var(--ui-primary)]">Gehirn</h3>
@@ -103,7 +103,7 @@
                     </div>
                 @endforeach
             </div>
-            @php($cal = $snap['calibration'] ?? null)
+            @php $cal = $snap['calibration'] ?? null; @endphp
             <div class="text-sm space-y-1">
                 @if ($cal && ($cal['n'] ?? 0) > 0)
                     @php
@@ -132,7 +132,7 @@
                     <span class="text-[var(--ui-muted)]">Kalibrierung: — (noch keine Confidence-Paare)</span>
                 @endif
             </div>
-            @php($bud = $snap['budget'] ?? null)
+            @php $bud = $snap['budget'] ?? null; @endphp
             @if ($bud)
                 <div class="text-xs text-[var(--ui-muted)]">
                     Token: <span class="font-semibold text-[var(--ui-text)]">{{ number_format($bud['tokens_today'] ?? 0) }}</span> heute ·

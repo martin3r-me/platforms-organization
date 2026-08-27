@@ -269,6 +269,17 @@
                                 @svg('heroicon-o-sparkles', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
                                 Agent
                             </button>
+                            <button
+                                @click="tab = 'braingraph'"
+                                :class="tab === 'braingraph'
+                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
+                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
+                                class="px-4 py-2.5 text-sm transition-colors"
+                                title="Der Wissensgraph des Agenten (Neocortex, gepushter Snapshot)"
+                            >
+                                @svg('heroicon-o-share', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
+                                Wissensgraph
+                            </button>
                         @endif
                         @if($this->isCarrierEntity)
                             @php
@@ -1354,6 +1365,9 @@
                 @if($this->isAgentEntity)
                     <div x-show="tab === 'agent'" x-cloak>
                         @livewire(\Platform\Organization\Livewire\Agent\ProfilePanel::class, ['entity' => $entity], key('agent-panel-'.$entity->id))
+                    </div>
+                    <div x-show="tab === 'braingraph'" x-cloak>
+                        @livewire(\Platform\Organization\Livewire\Agent\BrainGraph::class, ['entity' => $entity], key('agent-braingraph-'.$entity->id))
                     </div>
                 @endif
 

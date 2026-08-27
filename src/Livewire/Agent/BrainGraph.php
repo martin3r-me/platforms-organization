@@ -41,6 +41,9 @@ class BrainGraph extends Component
         return view('organization::livewire.agent.brain-graph', [
             'graph' => $this->graph(),
             'snapshotAt' => $this->entity->agentProfile?->brain_snapshot_at,
+            'hasSnapshot' => $this->entity->agentProfile?->brain_snapshot_at !== null,
+            'affect' => is_array($snap['affect'] ?? null) ? $snap['affect'] : null,
+            'mood' => $snap['mood'] ?? null,
             'factCount' => (int) ($snap['facts'] ?? 0),
             'edgeCount' => (int) ($snap['edges'] ?? 0),
             'episodeCount' => (int) ($snap['episodes'] ?? 0),

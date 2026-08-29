@@ -75,27 +75,31 @@ class AgentPortfolioController extends Controller
             return '';
         }
 
+        // Verinnerlichung braucht die ESSENZ (Weltbild), nicht jede Zeile — daher gekappt: Mission/Vision
+        // getrimmt, Fokusräume + Meilensteine begrenzt. Der Agent lernt den Geist, nicht das Auswendige.
+        $trim = fn ($v, $n) => \Illuminate\Support\Str::limit(trim((string) $v), $n);
+
         $lines = [];
         if (! empty($s['mission']['content'])) {
-            $lines[] = 'Mission: ' . trim((string) $s['mission']['content']);
+            $lines[] = 'Mission: ' . $trim($s['mission']['content'], 600);
         }
         if (! empty($s['vision']['content'])) {
-            $lines[] = 'Vision: ' . trim((string) $s['vision']['content']);
+            $lines[] = 'Vision: ' . $trim($s['vision']['content'], 600);
         }
 
         $focusAreas = $s['focus_areas'] ?? [];
         if (is_array($focusAreas) && ! empty($focusAreas)) {
             $lines[] = 'Transformation (Fokusräume × Meilensteine):';
-            foreach ($focusAreas as $fa) {
+            foreach (array_slice($focusAreas, 0, 12) as $fa) {
                 $title = trim((string) ($fa['title'] ?? ''));
                 if ($title === '') {
                     continue;
                 }
                 $desc = trim((string) ($fa['description'] ?? ''));
-                $lines[] = '- Fokusraum "' . $title . '"' . ($desc !== '' ? ': ' . $desc : '');
+                $lines[] = '- Fokusraum "' . $title . '"' . ($desc !== '' ? ': ' . $trim($desc, 200) : '');
 
                 $visions = [];
-                foreach (($fa['vision_images'] ?? []) as $vi) {
+                foreach (array_slice($fa['vision_images'] ?? [], 0, 5) as $vi) {
                     if (! empty($vi['title'])) {
                         $visions[] = trim((string) $vi['title']);
                     }
@@ -105,7 +109,7 @@ class AgentPortfolioController extends Controller
                 }
 
                 $miles = [];
-                foreach (($fa['milestones'] ?? []) as $m) {
+                foreach (array_slice($fa['milestones'] ?? [], 0, 8) as $m) {
                     if (empty($m['title'])) {
                         continue;
                     }
@@ -121,6 +125,7 @@ class AgentPortfolioController extends Controller
             }
         }
 
-        return trim(implode("\n", $lines));
+        // Harte Obergrenze als letzter Schutz (der Studien-Prompt bleibt bezahlbar).
+        return $trim(implode("\n", $lines), 4000);
     }
 }

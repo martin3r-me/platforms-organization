@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Platform\Organization\Http\Controllers\Api\AgentOkrController;
 use Platform\Organization\Http\Controllers\Api\AgentProfileController;
 use Platform\Organization\Http\Controllers\Api\AgentTimeController;
 
@@ -21,4 +22,6 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::get('/stats', [AgentProfileController::class, 'stats'])->name('organization.api.agent.stats');
     // Observability: jüngste Run-Events lesen (z. B. ?kind=fail für Ablehnungsgründe).
     Route::get('/events', [AgentProfileController::class, 'events'])->name('organization.api.agent.events');
+    // FOKUS & ZIELE: die eigenen OKRs des aktuellen Zyklus ziehen (Firmware lädt sie als DNA-Achse).
+    Route::get('/okrs', [AgentOkrController::class, 'okrs'])->name('organization.api.agent.okrs');
 });

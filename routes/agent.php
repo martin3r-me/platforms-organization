@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Platform\Organization\Http\Controllers\Api\AgentOkrController;
+use Platform\Organization\Http\Controllers\Api\AgentPortfolioController;
 use Platform\Organization\Http\Controllers\Api\AgentProfileController;
 use Platform\Organization\Http\Controllers\Api\AgentTimeController;
 
@@ -24,4 +25,6 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::get('/events', [AgentProfileController::class, 'events'])->name('organization.api.agent.events');
     // FOKUS & ZIELE: die eigenen OKRs des aktuellen Zyklus ziehen (Firmware lädt sie als DNA-Achse).
     Route::get('/okrs', [AgentOkrController::class, 'okrs'])->name('organization.api.agent.okrs');
+    // WELTBILD: das Venture-Portfolio (Strategie-Briefs) ziehen → der Schlaf verinnerlicht es.
+    Route::get('/portfolio', [AgentPortfolioController::class, 'portfolio'])->name('organization.api.agent.portfolio');
 });

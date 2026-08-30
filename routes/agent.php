@@ -1,6 +1,7 @@
 <?php
 
 use Illuminate\Support\Facades\Route;
+use Platform\Organization\Http\Controllers\Api\AgentChangeController;
 use Platform\Organization\Http\Controllers\Api\AgentOkrController;
 use Platform\Organization\Http\Controllers\Api\AgentPortfolioController;
 use Platform\Organization\Http\Controllers\Api\AgentProfileController;
@@ -27,4 +28,6 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::get('/okrs', [AgentOkrController::class, 'okrs'])->name('organization.api.agent.okrs');
     // WELTBILD: das Venture-Portfolio (Strategie-Briefs) ziehen → der Schlaf verinnerlicht es.
     Route::get('/portfolio', [AgentPortfolioController::class, 'portfolio'])->name('organization.api.agent.portfolio');
+    // RICHTUNG: die aktiven Transformationen (Change-Vorhaben) ziehen → verinnerlichen + als Vektor im Primer.
+    Route::get('/changes', [AgentChangeController::class, 'changes'])->name('organization.api.agent.changes');
 });

@@ -124,6 +124,9 @@ class AgentProfileController extends Controller
         return [
             'name' => $jp->name,
             'level' => $jp->level,
+            // VSM-Funktions-Stufe(n) der Rolle (Liste, z.B. ["S2","S3","S3star"]). Der Daemon gated
+            // darüber rollen-gescopte Sinne (Pulse nur für S2↑).
+            'vsm_level' => $jp->vsm_level ?? [],
             'purpose' => $jp->purpose,
             // responsibilities = die wiederkehrenden Pflichten → werden im Daemon zu Routinen der Loop.
             'responsibilities' => $jp->responsibilities ?? [],

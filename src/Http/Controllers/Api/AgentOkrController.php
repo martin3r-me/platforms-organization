@@ -6,22 +6,27 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Services\EntityDimensionBridge;
 
 /**
- * FOKUS & ZIELE als Agent-Vertrag: der Client-Daemon ZIEHT die aktuellen OKRs des Agenten
- * (`okrs`) und lädt sie als DNA-Achse (immer im Primer, formt Salienz + Effort). Die OKRs
- * gehören dem Bot-User des Agenten (`user_id`), den er später selbst pflegt — hier nur lesen.
+ * FOKUS & ZIELE als Agent-Vertrag, ZWEI EBENEN (wie bei Menschen):
+ *   1. PERSÖNLICHES OKR — das OKR, das per dimensionLink an der Agenten-ENTITÄT hängt. Voll (alle
+ *      Objectives + KRs); das ist SEINS (Selbstentwicklung).
+ *   2. ZUGEWIESENE OBJECTIVES — Objectives in FREMDEN (Venture-)OKRs, deren `user_id` der Bot-User des
+ *      Agenten ist. Der Agent bekommt das OKR als KONTEXT (Titel + Venture über den dimensionLink +
+ *      Geschwister-Objective-Titel), aber nur SEINE Objectives voll (mit KRs) — „mein Beitrag in diesem
+ *      Bild", nicht „das OKR gehört mir". Der Antrieb/Gap speist sich NUR aus den eigenen Objectives.
  *
- * Weiche Kopplung zum okr-Modul (class_exists): fehlt es, liefert der Endpoint leere Ziele
- * statt zu brechen. Kein Secret fließt; auth:api → Bot-User-Token → agent-Entität.
+ * Basis der Venture-Zuordnung ist IMMER der dimensionLink des OKRs (das Okr-Modell hat kein Entity-Feld).
+ * Weiche Kopplung zum okr-Modul (class_exists) → leere Ziele statt Fehler.
  */
 class AgentOkrController extends Controller
 {
-    /** Cycle-Status, die als „laufend" gelten (aktueller Fokus). */
     private const CURRENT_CYCLE_STATES = ['active', 'ending_soon'];
+    private const OKR_MORPH = 'okr';
 
     /**
-     * GET /api/org/agent/okrs — die OKRs des aktuellen Zyklus, die dem Agenten gehören.
+     * GET /api/org/agent/okrs — persönliches OKR (voll) + zugewiesene Objectives (im OKR-Kontext).
      */
     public function okrs(Request $request): JsonResponse
     {
@@ -29,83 +34,161 @@ class AgentOkrController extends Controller
         if ($userId < 1) {
             return response()->json(['message' => 'No user for this token'], 404);
         }
-        // Nur echte Agent-Tokens: die Entität muss ein Agent sein (Konsistenz mit den anderen Endpoints).
-        $isAgent = OrganizationEntity::query()->agents()->where('linked_user_id', $userId)->exists();
-        if (! $isAgent) {
+        $agent = OrganizationEntity::query()->agents()->where('linked_user_id', $userId)->first();
+        if (! $agent) {
             return response()->json(['message' => 'No agent for this token'], 404);
         }
 
-        return response()->json(['data' => $this->goalsForUser($userId)]);
-    }
-
-    /**
-     * Baut die Ziel-Struktur (cycle + objectives[ + key_results ]) für den Bot-User.
-     * Progress = performance_score (0..1) → als „Ist X% → Soll 100%" dargestellt (die Lücke),
-     * universell über alle KR-Typen (metrik-getrieben oder manuell), ohne Measure-Komplexität.
-     */
-    private function goalsForUser(int $userId): array
-    {
+        $objectiveClass = \Platform\Okr\Models\Objective::class;
         $okrClass = \Platform\Okr\Models\Okr::class;
-        if (! class_exists($okrClass)) {
-            return ['cycle' => '', 'objectives' => []];
-        }
-
-        try {
-            /** @var iterable $okrs */
-            $okrs = $okrClass::query()
-                ->where('user_id', $userId)
-                ->where('is_template', false)
-                ->with(['cycles' => function ($q) {
-                    $q->whereIn('status', self::CURRENT_CYCLE_STATES)
-                        ->with(['objectives.keyResults', 'template']);
-                }])
-                ->get();
-        } catch (\Throwable $e) {
-            return ['cycle' => '', 'objectives' => []];
+        if (! class_exists($objectiveClass) || ! class_exists($okrClass)) {
+            return response()->json(['data' => ['cycle' => '', 'personal' => [], 'assigned' => []]]);
         }
 
         $cycleLabel = '';
-        $objectives = [];
-        foreach ($okrs as $okr) {
-            foreach ($okr->cycles as $cycle) {
-                if ($cycleLabel === '') {
-                    $cycleLabel = $this->cycleLabel($cycle);
-                }
-                foreach ($cycle->objectives as $objective) {
-                    $krs = [];
-                    foreach ($objective->keyResults as $kr) {
-                        $progress = $kr->performance_score !== null ? (float) $kr->performance_score : 0.0;
-                        $krs[] = [
-                            'title' => (string) $kr->title,
-                            'current' => round($progress * 100),
-                            'target' => 100,
-                            'unit' => '%',
-                            'progress' => $progress,
-                        ];
-                    }
-                    $objectives[] = [
-                        'title' => (string) $objective->title,
-                        'description' => (string) ($objective->description ?? ''),
-                        'key_results' => $krs,
-                    ];
-                }
-            }
+        try {
+            // 1. PERSÖNLICH: OKRs, die per dimensionLink an der Agenten-Entität hängen.
+            $personalOkrIds = $this->personalOkrIds((int) $agent->id);
+            $personal = $this->objectivesForOkrs($objectiveClass, $personalOkrIds, $cycleLabel);
+
+            // 2. ZUGEWIESEN: Objectives mit user_id = Bot-User in FREMDEN OKRs.
+            $assigned = $this->assignedOkrs($objectiveClass, $okrClass, $userId, $personalOkrIds, $cycleLabel);
+        } catch (\Throwable $e) {
+            return response()->json(['data' => ['cycle' => '', 'personal' => [], 'assigned' => []]]);
         }
 
-        return ['cycle' => $cycleLabel, 'objectives' => $objectives];
+        return response()->json(['data' => [
+            'cycle' => $cycleLabel,
+            'personal' => $personal,
+            'assigned' => $assigned,
+        ]]);
     }
 
-    /** Ein lesbares Zyklus-Label (Template-Titel, sonst Status), defensiv. */
-    private function cycleLabel($cycle): string
+    /** OKR-IDs, die per dimensionLink an der Agenten-Entität hängen (= sein persönliches OKR). */
+    private function personalOkrIds(int $agentEntityId): array
     {
+        return EntityDimensionBridge::linksForEntity($agentEntityId)
+            ->where('linkable_type', self::OKR_MORPH)
+            ->pluck('linkable_id')
+            ->map(fn ($v) => (int) $v)
+            ->unique()
+            ->values()
+            ->all();
+    }
+
+    /** Alle Objectives (laufender Zyklus) dieser OKRs → voll (alle sind die des Agenten). */
+    private function objectivesForOkrs(string $objectiveClass, array $okrIds, string &$cycleLabel): array
+    {
+        if (empty($okrIds)) {
+            return [];
+        }
+        $objs = $this->activeObjectives($objectiveClass)->whereIn('okr_id', $okrIds)->orderBy('order')->get();
+        $out = [];
+        foreach ($objs as $o) {
+            $this->captureCycle($o, $cycleLabel);
+            $out[] = $this->objectiveArray($o);
+        }
+        return $out;
+    }
+
+    /**
+     * Zugewiesene Objectives (user_id = Bot-User) in FREMDEN OKRs, jeweils MIT OKR-Kontext:
+     * OKR-Titel + Venture (dimensionLink) + Geschwister-Objective-Titel; die eigenen Objectives voll.
+     */
+    private function assignedOkrs(string $objectiveClass, string $okrClass, int $botUserId, array $personalOkrIds, string &$cycleLabel): array
+    {
+        $mine = $this->activeObjectives($objectiveClass)
+            ->where('user_id', $botUserId)
+            ->when(! empty($personalOkrIds), fn ($q) => $q->whereNotIn('okr_id', $personalOkrIds))
+            ->get();
+        if ($mine->isEmpty()) {
+            return [];
+        }
+
+        $okrIds = $mine->pluck('okr_id')->map(fn ($v) => (int) $v)->unique()->values()->all();
+
+        // Venture je OKR über den dimensionLink des OKRs.
+        $ventureByOkr = [];
         try {
-            $t = $cycle->template;
-            if ($t && ! empty($t->title)) {
-                return (string) $t->title;
+            foreach (EntityDimensionBridge::linksForLinkables([self::OKR_MORPH], $okrIds, true) as $lnk) {
+                if ($ent = $lnk->entity) {
+                    $ventureByOkr[(int) $lnk->linkable_id] = (string) $ent->name;
+                }
+            }
+        } catch (\Throwable $e) {
+            // ohne Venture-Kontext weiter — nicht kritisch
+        }
+
+        $okrTitles = $okrClass::query()->whereIn('id', $okrIds)->pluck('title', 'id');
+
+        // Alle Objectives dieser OKRs (laufender Zyklus) für den Geschwister-Kontext.
+        $allByOkr = $this->activeObjectives($objectiveClass)->whereIn('okr_id', $okrIds)->orderBy('order')->get()->groupBy('okr_id');
+
+        $out = [];
+        foreach ($okrIds as $okrId) {
+            $objs = $allByOkr->get($okrId) ?? collect();
+            $myObjectives = [];
+            $context = [];
+            foreach ($objs as $o) {
+                $this->captureCycle($o, $cycleLabel);
+                if ((int) $o->user_id === $botUserId) {
+                    $myObjectives[] = $this->objectiveArray($o);
+                } else {
+                    $context[] = (string) $o->title;
+                }
+            }
+            $out[] = [
+                'okr_title' => (string) ($okrTitles[$okrId] ?? ''),
+                'venture' => (string) ($ventureByOkr[$okrId] ?? ''),
+                'context_objectives' => $context,
+                'my_objectives' => $myObjectives,
+            ];
+        }
+        return $out;
+    }
+
+    /** Basis-Query: Objectives im laufenden Zyklus, mit KRs + Cycle geladen. */
+    private function activeObjectives(string $objectiveClass)
+    {
+        return $objectiveClass::query()
+            ->whereHas('cycle', fn ($q) => $q->whereIn('status', self::CURRENT_CYCLE_STATES))
+            ->with(['keyResults', 'cycle.template']);
+    }
+
+    /** Ein Objective als Array: Titel + Beschreibung + KRs (Progress als „X% → 100%" = die Lücke). */
+    private function objectiveArray($o): array
+    {
+        $krs = [];
+        foreach ($o->keyResults as $kr) {
+            $progress = $kr->performance_score !== null ? (float) $kr->performance_score : 0.0;
+            $krs[] = [
+                'title' => (string) $kr->title,
+                'current' => round($progress * 100),
+                'target' => 100,
+                'unit' => '%',
+                'progress' => $progress,
+            ];
+        }
+        return [
+            'title' => (string) $o->title,
+            'description' => (string) ($o->description ?? ''),
+            'key_results' => $krs,
+        ];
+    }
+
+    /** Zyklus-Label aus dem ersten gesehenen Objective (Template-Titel, sonst Status). */
+    private function captureCycle($o, string &$cycleLabel): void
+    {
+        if ($cycleLabel !== '') {
+            return;
+        }
+        try {
+            $c = $o->cycle;
+            if ($c) {
+                $cycleLabel = (string) ($c->template?->title ?: $c->status ?: '');
             }
         } catch (\Throwable $e) {
             // ignore
         }
-        return (string) ($cycle->status ?? '');
     }
 }

@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Platform\Organization\Http\Controllers\Api\AgentChangeController;
+use Platform\Organization\Http\Controllers\Api\AgentEnvironmentController;
 use Platform\Organization\Http\Controllers\Api\AgentOkrController;
 use Platform\Organization\Http\Controllers\Api\AgentPortfolioController;
 use Platform\Organization\Http\Controllers\Api\AgentProfileController;
@@ -30,4 +31,6 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::get('/portfolio', [AgentPortfolioController::class, 'portfolio'])->name('organization.api.agent.portfolio');
     // RICHTUNG: die aktiven Transformationen (Change-Vorhaben) ziehen → verinnerlichen + als Vektor im Primer.
     Route::get('/changes', [AgentChangeController::class, 'changes'])->name('organization.api.agent.changes');
+    // UMWELT: das Sensor-Feld (Außen + Bewegung) für S4/Perceptor — Deltas als Signal-Rohstoff.
+    Route::get('/environment', [AgentEnvironmentController::class, 'environment'])->name('organization.api.agent.environment');
 });

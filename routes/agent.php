@@ -5,6 +5,7 @@ use Platform\Organization\Http\Controllers\Api\AgentChangeController;
 use Platform\Organization\Http\Controllers\Api\AgentEnvironmentController;
 use Platform\Organization\Http\Controllers\Api\AgentOkrController;
 use Platform\Organization\Http\Controllers\Api\AgentPortfolioController;
+use Platform\Organization\Http\Controllers\Api\AgentPulseController;
 use Platform\Organization\Http\Controllers\Api\AgentProfileController;
 use Platform\Organization\Http\Controllers\Api\AgentTimeController;
 
@@ -33,4 +34,6 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::get('/changes', [AgentChangeController::class, 'changes'])->name('organization.api.agent.changes');
     // UMWELT: das Sensor-Feld (Außen + Bewegung) für S4/Perceptor — Deltas als Signal-Rohstoff.
     Route::get('/environment', [AgentEnvironmentController::class, 'environment'])->name('organization.api.agent.environment');
+    // PULSE: die operative Innen-Lage (was brennt / was kippt) für S3/S2 (Steward).
+    Route::get('/pulse', [AgentPulseController::class, 'pulse'])->name('organization.api.agent.pulse');
 });

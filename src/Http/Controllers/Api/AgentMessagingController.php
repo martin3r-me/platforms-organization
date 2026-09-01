@@ -191,6 +191,7 @@ class AgentMessagingController extends Controller
         $teams = new Microsoft365TeamsConnector($api);
         $mail = new Microsoft365MailConnector($api);
         [$agentName] = $this->identity((int) $agent->id, (string) ($agent->name ?? 'Agent'));
+        $ownMs365 = is_array($connection->credentials) ? ($connection->credentials['ms365_user_id'] ?? null) : null;
 
         $items = [];
         $maxTs = $since->copy();
@@ -238,14 +239,23 @@ class AgentMessagingController extends Controller
                     if (! $created || Carbon::parse($created)->lessThanOrEqualTo($since)) {
                         continue;
                     }
-                    if (($tm['from'] ?? '') === $agentName) {
-                        continue; // eigene Nachrichten nicht zurückspiegeln
+                    $fromId = $tm['from_id'] ?? null;
+                    // Eigene Nachrichten NICHT zurückspiegeln (Loop-Schutz): primär per Sender-ID
+                    // (robust), Anzeigename als Fallback.
+                    if (($fromId !== null && $ownMs365 !== null && $fromId === $ownMs365)
+                        || ($tm['from'] ?? '') === $agentName) {
+                        continue;
+                    }
+                    $preview = $this->preview($tm['body'] ?? '');
+                    // System-/Event-Nachrichten (kein Sender + kein Inhalt) sind kein Posteingang.
+                    if (($fromId === null || $fromId === '') && $preview === '') {
+                        continue;
                     }
                     $items[] = [
                         'transport' => 'teams',
                         'from' => $tm['from'] ?? null,
                         'subject' => $chat['topic'] ?? null,
-                        'preview' => $this->preview($tm['body'] ?? ''),
+                        'preview' => $preview,
                         'thread' => ['chat_id' => $chat['id'], 'message_id' => $tm['id'] ?? null],
                         'received_at' => $created,
                         'is_read' => null,

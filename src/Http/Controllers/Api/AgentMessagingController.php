@@ -2,11 +2,13 @@
 
 namespace Platform\Organization\Http\Controllers\Api;
 
+use Carbon\Carbon;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Validation\Rule;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\UserConnectors\DTOs\Pagination;
 use Platform\UserConnectors\Models\UserConnector;
 use Platform\UserConnectors\Models\UserConnectorConnection;
 use Platform\UserConnectors\Services\Microsoft365\Microsoft365ApiService;
@@ -95,8 +97,14 @@ class AgentMessagingController extends Controller
             $transport = $data['transport'] ?? 'auto';
             $graphId = null;
             if ($transport !== 'mail') {
-                $res = $teams->resolveUserIds($agent, [$data['to']]);
-                $graphId = $res['resolved'][$data['to']] ?? null;
+                // Bevorzugt: Graph-ID des Empfängers aus SEINER eigenen Plattform-M365-Connection
+                // (kennt die Plattform bereits) — braucht kein User.Read.All auf der Agent-App.
+                $graphId = $this->recipientGraphId((string) $data['to']);
+                if (! $graphId) {
+                    // Fallback: Directory-Lookup (nur falls die Agent-App den Scope hat).
+                    $res = $teams->resolveUserIds($agent, [$data['to']]);
+                    $graphId = $res['resolved'][$data['to']] ?? null;
+                }
                 if ($transport === 'auto') {
                     $transport = $graphId ? 'teams' : 'mail';
                 }
@@ -149,6 +157,146 @@ class AgentMessagingController extends Controller
             'transport' => $transport,
             'ids' => $ids,
         ]]);
+    }
+
+    /**
+     * GET /api/org/agent/messages?since=<iso8601>&limit=<n>
+     *
+     * Der Eingangs-Sinn: EIN Posteingang aus Teams + Mail seit last-seen (pull-basiert, keine
+     * Webhook-Abhängigkeit). Der Daemon persistiert den zurückgegebenen `since`-Cursor und reicht
+     * ihn nächste Runde wieder rein. Fehlt die eigene Connection → leerer Posteingang (kein Fehler).
+     */
+    public function inbox(Request $request): JsonResponse
+    {
+        $agent = $request->user();
+        if (! $agent) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+
+        $sinceParam = (string) $request->query('since', '');
+        try {
+            $since = $sinceParam !== '' ? Carbon::parse($sinceParam) : now()->subHour();
+        } catch (\Throwable $e) {
+            $since = now()->subHour();
+        }
+        $limit = max(1, min((int) $request->query('limit', 25), 50));
+
+        $emptyCursor = now()->toIso8601String();
+        $connection = $this->ownMicrosoft365Connection((int) $agent->id);
+        if (! $connection) {
+            return response()->json(['data' => ['since' => $emptyCursor, 'count' => 0, 'messages' => []]]);
+        }
+
+        $api = app(Microsoft365ApiService::class)->forConnection((int) $connection->id);
+        $teams = new Microsoft365TeamsConnector($api);
+        $mail = new Microsoft365MailConnector($api);
+        [$agentName] = $this->identity((int) $agent->id, (string) ($agent->name ?? 'Agent'));
+
+        $items = [];
+        $maxTs = $since->copy();
+
+        // MAIL — Posteingang, neueste zuerst, nur was seit `since` ankam.
+        try {
+            $res = $mail->listMessages($agent, ['folder' => 'inbox'], new Pagination(1, $limit));
+            foreach ($res['messages'] ?? [] as $m) {
+                if ($m->date->lessThanOrEqualTo($since)) {
+                    continue;
+                }
+                $items[] = [
+                    'transport' => 'mail',
+                    'from' => $m->from,
+                    'subject' => $m->subject,
+                    'preview' => $this->preview($m->body),
+                    'thread' => ['mail_message_id' => $m->id, 'conversation_id' => $m->threadId],
+                    'received_at' => $m->date->toIso8601String(),
+                    'is_read' => $m->isRead,
+                ];
+                if ($m->date->greaterThan($maxTs)) {
+                    $maxTs = $m->date->copy();
+                }
+            }
+        } catch (\Throwable $e) {
+            // Mail nicht verfügbar → überspringen, nicht den ganzen Posteingang kippen.
+        }
+
+        // TEAMS — nur Chats, die seit `since` bewegt wurden (Kosten begrenzen), fremde Nachrichten.
+        try {
+            $chats = $teams->listChats($agent)['chats'] ?? [];
+            $drilled = 0;
+            foreach ($chats as $chat) {
+                $lu = $chat['last_updated'] ?? null;
+                if (! $lu || Carbon::parse($lu)->lessThanOrEqualTo($since)) {
+                    continue;
+                }
+                if ($drilled >= 15) {
+                    break;
+                }
+                $drilled++;
+                $msgs = $teams->getChatMessages($agent, (string) $chat['id'], new Pagination(1, 15))['messages'] ?? [];
+                foreach ($msgs as $tm) {
+                    $created = $tm['created_at'] ?? null;
+                    if (! $created || Carbon::parse($created)->lessThanOrEqualTo($since)) {
+                        continue;
+                    }
+                    if (($tm['from'] ?? '') === $agentName) {
+                        continue; // eigene Nachrichten nicht zurückspiegeln
+                    }
+                    $items[] = [
+                        'transport' => 'teams',
+                        'from' => $tm['from'] ?? null,
+                        'subject' => $chat['topic'] ?? null,
+                        'preview' => $this->preview($tm['body'] ?? ''),
+                        'thread' => ['chat_id' => $chat['id'], 'message_id' => $tm['id'] ?? null],
+                        'received_at' => $created,
+                        'is_read' => null,
+                    ];
+                    $c = Carbon::parse($created);
+                    if ($c->greaterThan($maxTs)) {
+                        $maxTs = $c;
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            // Teams nicht verfügbar → überspringen.
+        }
+
+        usort($items, fn ($a, $b) => strcmp((string) $b['received_at'], (string) $a['received_at']));
+        $items = array_slice($items, 0, $limit);
+
+        return response()->json(['data' => [
+            'since' => $maxTs->toIso8601String(),
+            'count' => count($items),
+            'messages' => $items,
+        ]]);
+    }
+
+    private function preview(string $body): string
+    {
+        $text = trim(preg_replace('/\s+/', ' ', strip_tags($body)) ?? '');
+
+        return mb_substr($text, 0, 200);
+    }
+
+    /**
+     * Graph-user-id des Empfängers aus SEINER eigenen Plattform-M365-Connection auflösen.
+     * Kein Directory-Scope nötig; funktioniert nur für Leute, die selbst M365 verbunden haben.
+     */
+    private function recipientGraphId(string $email): ?string
+    {
+        $email = trim($email);
+        if ($email === '') {
+            return null;
+        }
+        $user = \Platform\Core\Models\User::query()
+            ->whereRaw('LOWER(email) = ?', [mb_strtolower($email)])
+            ->first();
+        if (! $user) {
+            return null;
+        }
+        $conn = $this->ownMicrosoft365Connection((int) $user->id);
+        $creds = $conn?->credentials;
+
+        return is_array($creds) ? ($creds['ms365_user_id'] ?? null) : null;
     }
 
     /**

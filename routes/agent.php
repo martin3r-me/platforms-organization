@@ -40,4 +40,6 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     // COMMS (AUSGANG): der Ausgangs-Motor — Inhalt rein, Org rendert Hausstil + sendet über M365
     // (Teams/Mail) als der Agent selbst. Transport-agnostisch, Terminal-Chat wird abgelöst.
     Route::post('/message', [AgentMessagingController::class, 'send'])->name('organization.api.agent.message');
+    // COMMS (EINGANG): der Eingangs-Sinn — EIN Posteingang aus Teams + Mail seit last-seen (pull).
+    Route::get('/messages', [AgentMessagingController::class, 'inbox'])->name('organization.api.agent.messages');
 });

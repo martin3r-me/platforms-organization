@@ -288,6 +288,57 @@ class AgentMessagingController extends Controller
     }
 
     /**
+     * GET /api/org/agent/roster — die Kollegen-Agenten (für gezielte laterale 1:1-DMs). Quelle = Org
+     * (andere agent-Entities), Adresse = deren User-E-Mail (= ihre M365-Box), Rolle = Job-Profil.
+     * Sich selbst NICHT gelistet. So weiß ein Agent, wen er direkt ansprechen kann.
+     */
+    public function roster(Request $request): JsonResponse
+    {
+        $agent = $request->user();
+        if (! $agent) {
+            return response()->json(['message' => 'Unauthenticated'], 401);
+        }
+        $selfId = (int) $agent->id;
+
+        $others = OrganizationEntity::query()->agents()
+            ->where('linked_user_id', '!=', $selfId)
+            ->whereNotNull('linked_user_id')
+            ->get();
+
+        $colleagues = [];
+        foreach ($others as $e) {
+            $uid = (int) $e->linked_user_id;
+            if ($uid < 1) {
+                continue;
+            }
+            // Nur aktive Agenten (die ein aktives Org-Profil haben) sind ansprechbar.
+            if (! ($e->agentProfile && $e->agentProfile->active)) {
+                continue;
+            }
+            $email = \Platform\Core\Models\User::query()->whereKey($uid)->value('email');
+            if (! $email) {
+                continue;
+            }
+            $role = null;
+            $jpClass = \Platform\People\Models\JobProfile::class;
+            if (class_exists($jpClass)) {
+                try {
+                    $role = $jpClass::query()->where('owner_entity_id', $e->id)->value('name');
+                } catch (\Throwable $ex) {
+                    $role = null;
+                }
+            }
+            $colleagues[] = [
+                'name' => $e->name,
+                'email' => $email,
+                'role' => $role,
+            ];
+        }
+
+        return response()->json(['data' => ['colleagues' => $colleagues]]);
+    }
+
+    /**
      * Graph-user-id des Empfängers aus SEINER eigenen Plattform-M365-Connection auflösen.
      * Kein Directory-Scope nötig; funktioniert nur für Leute, die selbst M365 verbunden haben.
      */

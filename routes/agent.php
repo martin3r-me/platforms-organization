@@ -42,4 +42,6 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::post('/message', [AgentMessagingController::class, 'send'])->name('organization.api.agent.message');
     // COMMS (EINGANG): der Eingangs-Sinn — EIN Posteingang aus Teams + Mail seit last-seen (pull).
     Route::get('/messages', [AgentMessagingController::class, 'inbox'])->name('organization.api.agent.messages');
+    // ROSTER: die Kollegen-Agenten (Adresse + Rolle) für gezielte laterale 1:1-DMs.
+    Route::get('/roster', [AgentMessagingController::class, 'roster'])->name('organization.api.agent.roster');
 });

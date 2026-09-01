@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Platform\Organization\Http\Controllers\Api\AgentChangeController;
 use Platform\Organization\Http\Controllers\Api\AgentEnvironmentController;
+use Platform\Organization\Http\Controllers\Api\AgentMessagingController;
 use Platform\Organization\Http\Controllers\Api\AgentOkrController;
 use Platform\Organization\Http\Controllers\Api\AgentPortfolioController;
 use Platform\Organization\Http\Controllers\Api\AgentPulseController;
@@ -36,4 +37,7 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::get('/environment', [AgentEnvironmentController::class, 'environment'])->name('organization.api.agent.environment');
     // PULSE: die operative Innen-Lage (was brennt / was kippt) für S3/S2 (Steward).
     Route::get('/pulse', [AgentPulseController::class, 'pulse'])->name('organization.api.agent.pulse');
+    // COMMS (AUSGANG): der Ausgangs-Motor — Inhalt rein, Org rendert Hausstil + sendet über M365
+    // (Teams/Mail) als der Agent selbst. Transport-agnostisch, Terminal-Chat wird abgelöst.
+    Route::post('/message', [AgentMessagingController::class, 'send'])->name('organization.api.agent.message');
 });

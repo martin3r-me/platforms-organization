@@ -152,6 +152,15 @@ class Index extends Component
             return collect();
         }
 
+        // Nur die Kontexte aufloesen, die in den geladenen Entries wirklich
+        // vorkommen (ein Monat/Team). Ohne diese Begrenzung wuerde die Map fuer
+        // ALLE trackbaren Objekte der ganzen Plattform gebaut → OOM.
+        $neededKeys = $entries
+            ->map(fn ($e) => ($e->context_type ?? '') . ':' . ($e->context_id ?? 0))
+            ->unique()
+            ->flip()
+            ->all(); // ['context_type:id' => index] als Array, fuer O(1)-isset-Lookup
+
         $cascades = EntityTimeResolver::getTimeTrackableCascades();
 
         // Alle EntityLinks laden via DimensionBridge
@@ -173,15 +182,18 @@ class Index extends Component
 
             [$fqcn, $childRelations] = $cascades[$morphAlias];
 
-            // Direkte Zuordnung: FQCN:ID → Entity
-            $map[$fqcn . ':' . $link->linkable_id] = $entity;
+            // Direkte Zuordnung: FQCN:ID → Entity — nur speichern, wenn benoetigt.
+            $directKey = $fqcn . ':' . $link->linkable_id;
+            if (isset($neededKeys[$directKey])) {
+                $map[$directKey] = $entity;
+            }
 
             // Child-Relations traversieren
             if (!empty($childRelations) && class_exists($fqcn)) {
                 $model = $fqcn::find($link->linkable_id);
                 if ($model) {
                     foreach ($childRelations as $relationPath) {
-                        $this->resolveRelationPathForMapping($model, $relationPath, $entity, $map);
+                        $this->resolveRelationPathForMapping($model, $relationPath, $entity, $map, $neededKeys);
                     }
                 }
             }
@@ -190,7 +202,12 @@ class Index extends Component
         return collect($map);
     }
 
-    protected function resolveRelationPathForMapping($model, string $path, $entity, array &$map): void
+    /**
+     * Traversiert eine (verschachtelte) Relation und ordnet nur die tatsaechlich
+     * benoetigten Blatt-Objekte (Keys aus $neededKeys) der Entity zu — damit die
+     * Map nicht mit dem gesamten Objektgraph (alle Kinder aller Links) vollaeuft.
+     */
+    protected function resolveRelationPathForMapping($model, string $path, $entity, array &$map, array $neededKeys): void
     {
         $segments = explode('.', $path);
         $currentModels = collect([$model]);
@@ -213,7 +230,9 @@ class Index extends Component
 
         foreach ($currentModels as $leafModel) {
             $leafKey = get_class($leafModel) . ':' . $leafModel->id;
-            $map[$leafKey] = $entity;
+            if (isset($neededKeys[$leafKey])) {
+                $map[$leafKey] = $entity;
+            }
         }
     }
 

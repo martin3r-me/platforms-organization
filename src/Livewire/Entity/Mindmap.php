@@ -669,21 +669,7 @@ class Mindmap extends Component
      */
     protected function buildLabelExpression($columns, string $table): \Illuminate\Database\Query\Expression
     {
-        // Single-column matches (in priority order)
-        foreach (['name', 'title', 'subject', 'label', 'display_name'] as $col) {
-            if ($columns->contains($col)) {
-                return DB::raw("COALESCE(NULLIF({$col}, ''), CONCAT('#', id)) as label");
-            }
-        }
-        // first_name + last_name
-        if ($columns->contains('first_name') && $columns->contains('last_name')) {
-            return DB::raw("COALESCE(NULLIF(TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))), ''), CONCAT('#', id)) as label");
-        }
-        // last fallback: email
-        if ($columns->contains('email')) {
-            return DB::raw("COALESCE(NULLIF(email, ''), CONCAT('#', id)) as label");
-        }
-        return DB::raw("CONCAT('#', id) as label");
+        return \Platform\Organization\Services\MorphLabelResolver::expression(collect($columns));
     }
 
     /**

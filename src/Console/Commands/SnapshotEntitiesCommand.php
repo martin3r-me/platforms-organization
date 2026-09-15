@@ -513,22 +513,7 @@ class SnapshotEntitiesCommand extends Command
                             $table = (new $modelClass)->getTable();
                             $columns = collect(DB::getSchemaBuilder()->getColumnListing($table));
 
-                            $labelExpr = null;
-                            foreach (['name', 'title', 'subject', 'label', 'display_name'] as $col) {
-                                if ($columns->contains($col)) {
-                                    $labelExpr = DB::raw("COALESCE(NULLIF({$col}, ''), CONCAT('#', id)) as label");
-                                    break;
-                                }
-                            }
-                            if (!$labelExpr && $columns->contains('first_name') && $columns->contains('last_name')) {
-                                $labelExpr = DB::raw("COALESCE(NULLIF(TRIM(CONCAT(COALESCE(first_name, ''), ' ', COALESCE(last_name, ''))), ''), CONCAT('#', id)) as label");
-                            }
-                            if (!$labelExpr && $columns->contains('email')) {
-                                $labelExpr = DB::raw("COALESCE(NULLIF(email, ''), CONCAT('#', id)) as label");
-                            }
-                            if (!$labelExpr) {
-                                $labelExpr = DB::raw("CONCAT('#', id) as label");
-                            }
+                            $labelExpr = \Platform\Organization\Services\MorphLabelResolver::expression($columns);
 
                             $query = DB::table($table)->whereIn('id', $ids);
                             if ($columns->contains('deleted_at')) {

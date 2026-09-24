@@ -437,6 +437,21 @@ class EntityLinkRegistry
                 'basis' => 'modulator_factor',
             ],
 
+            // Abgeleitet aus items_total/items_done (siehe computeMetricsBatch) — providerübergreifend,
+            // deshalb hier zentral statt in einem einzelnen EntityLinkProvider registriert.
+            'items_open' => [
+                'label' => 'Items (offen)',
+                'group' => 'work',
+                'direction' => 'down',
+                'unit' => 'count',
+                'pair' => 'items_total',
+                'dimension' => self::DIMENSION_COMPLEXITY,
+                'type' => self::TYPE_STOCK,
+                'aggregation_mode' => 'rolled_up',
+                'basis' => 'stichtag',
+                'subset_of' => 'items_total',
+            ],
+
             // Person-Entity Metriken
             'person_active_items' => [
                 'label' => 'Aktive Items (Person)',
@@ -618,6 +633,14 @@ class EntityLinkRegistry
                 foreach ($entityMetrics as $key => $value) {
                     $result[$entityId][$key] = ($result[$entityId][$key] ?? 0) + $value;
                 }
+            }
+        }
+
+        // items_open ist providerübergreifend abgeleitet (nicht additiv von einem einzelnen
+        // Provider gemeldet), deshalb erst nach der Summation über alle Provider berechnet.
+        foreach ($result as $entityId => $entityMetrics) {
+            if (array_key_exists('items_total', $entityMetrics) && array_key_exists('items_done', $entityMetrics)) {
+                $result[$entityId]['items_open'] = $entityMetrics['items_total'] - $entityMetrics['items_done'];
             }
         }
 

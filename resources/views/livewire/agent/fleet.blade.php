@@ -43,6 +43,21 @@
                             @if ($a['subscription']) · {{ $a['subscription'] }} @endif
                         </div>
 
+                        {{-- Woran arbeitet er GERADE (quer über dev+planner, aus den Lock-Signalen) --}}
+                        <div class="text-sm mb-3 rounded-lg border border-[var(--ui-border)] bg-[var(--ui-muted)] px-3 py-2">
+                            @if ($a['work'])
+                                <span class="font-semibold text-[var(--ui-fg)]">⚙ {{ $a['work']['title'] }}</span>
+                                <span class="text-[var(--ui-secondary)]">· {{ $a['work']['where'] }}@if ($a['work']['since_min'] !== null) · seit {{ $a['work']['since_min'] }} min @endif</span>
+                            @elseif ($a['last_event'])
+                                <span class="text-[var(--ui-secondary)]">{{ $a['last_event']['label'] }}@if ($a['last_event']['at']) · {{ $a['last_event']['at']->diffForHumans() }} @endif</span>
+                            @else
+                                <span class="text-[var(--ui-secondary)]">— nichts in Arbeit</span>
+                            @endif
+                            @if ($a['tracked_today_min'] > 0)
+                                <span class="text-neutral-400">· heute {{ $a['tracked_today_min'] }} min gebucht</span>
+                            @endif
+                        </div>
+
                         {{-- Kalibrierung --}}
                         <div class="text-sm mb-2">
                             @if ($a['calib_n'] > 0 && $a['calib_gap'] !== null)

@@ -6,30 +6,34 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Illuminate\Support\Facades\DB;
-use Platform\Organization\Models\OrganizationCoordinationMetric;
+use Platform\Organization\Models\OrganizationCoordinationEvent;
 
 /**
- * Comms/Koordinations-Sink: Parlan (hält den gefalteten Fabric-Stand) pusht pro HANDLE fertige
- * Koordinations-Kennzahlen; wir lösen Handle→User (users.email) auf und speichern den neuesten
- * Stand (eine Zeile je Handle, upsert). Die Org rechnet NICHTS selbst — sie nimmt an, was die
- * eine Quelle (die Fabric via Parlan) meldet, und snapshottet es wie jede andere Metrik.
+ * Comms/Koordinations-Sink: Parlan (hält den gefalteten Fabric-Stand) pusht ROHE Koordinations-
+ * Events (ein Event je verbindlicher Handlung). Wir lösen actor_handle→User (users.email) auf und
+ * speichern das Event idempotent (upsert über event_id). Die Org rechnet NICHTS live — der Snapshot
+ * aggregiert daraus die 7½-Dimensionen-Kennzahlen, wie terminal_messages → terminal-Metriken.
  *
- * Auth: auth:api mit einem Parlan-Service-Token (eigener Bot-User) — wie dev/helpdesk/agent.
+ * Auth: auth:api (Admin-/Service-Token) — wie dev/helpdesk/agent.
  */
 class CoordinationController extends Controller
 {
     public function ingest(Request $request): JsonResponse
     {
         $data = $request->validate([
-            'events' => ['required', 'array', 'max:500'],
-            'events.*.handle' => ['required', 'string', 'max:190'],
-            'events.*.metrics' => ['required', 'array'],
-            'events.*.reported_at' => ['nullable', 'date'],
+            'events' => ['required', 'array', 'max:1000'],
+            'events.*.event_id' => ['required', 'string', 'max:64'],
+            'events.*.actor_handle' => ['required', 'string', 'max:190'],
+            'events.*.counterpart_handle' => ['nullable', 'string', 'max:190'],
+            'events.*.kind' => ['required', 'string', 'max:32'],
+            'events.*.thread' => ['nullable', 'string', 'max:64'],
+            'events.*.latency_seconds' => ['nullable', 'integer', 'min:0'],
+            'events.*.occurred_at' => ['nullable', 'date'],
         ]);
 
-        // Handles → user_id in EINER Abfrage (Handle = E-Mail des Org-Users).
+        // actor_handles → user_id in EINER Abfrage (Handle = E-Mail des Org-Users).
         $handles = array_values(array_unique(array_map(
-            fn ($e) => strtolower(trim((string) $e['handle'])),
+            fn ($e) => strtolower(trim((string) $e['actor_handle'])),
             $data['events'],
         )));
         $usersByEmail = DB::table('users')
@@ -39,18 +43,23 @@ class CoordinationController extends Controller
         $stored = 0;
         $unresolved = [];
         foreach ($data['events'] as $e) {
-            $handle = strtolower(trim((string) $e['handle']));
+            $handle = strtolower(trim((string) $e['actor_handle']));
             $userId = $usersByEmail[$handle] ?? null;
             if ($userId === null) {
-                $unresolved[] = $handle; // kein Org-User zu diesem Handle → ehrlich zurückmelden
+                $unresolved[] = $handle; // kein Org-User → ehrlich zurückmelden, Event verwerfen
                 continue;
             }
-            OrganizationCoordinationMetric::updateOrCreate(
-                ['handle' => $handle],
+            OrganizationCoordinationEvent::updateOrCreate(
+                ['event_id' => (string) $e['event_id']],
                 [
-                    'user_id' => $userId,
-                    'metrics' => $e['metrics'],
-                    'reported_at' => $e['reported_at'] ?? now(),
+                    'actor_user_id' => $userId,
+                    'actor_handle' => $handle,
+                    'counterpart_handle' => isset($e['counterpart_handle']) ? strtolower(trim((string) $e['counterpart_handle'])) : null,
+                    'kind' => (string) $e['kind'],
+                    'thread' => $e['thread'] ?? null,
+                    'latency_seconds' => $e['latency_seconds'] ?? null,
+                    'occurred_at' => $e['occurred_at'] ?? now(),
+                    'created_at' => now(),
                 ],
             );
             $stored++;

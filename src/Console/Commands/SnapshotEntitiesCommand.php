@@ -253,26 +253,54 @@ class SnapshotEntitiesCommand extends Command
             Log::warning('Snapshot: Terminal metrics failed', ['error' => $e->getMessage()]);
         }
 
-        // 5d. TRAAN/Parlan-Koordinations-Kennzahlen pro Entität (von Parlan gepusht, per linked_user_id).
-        // Die Org rechnet nichts — sie nimmt den neuesten gemeldeten Stand und snapshottet ihn mit.
+        // 5d. TRAAN/Parlan-Koordination: aus den ROHEN Events (von Parlan gepusht) lokal in die 7d-
+        // Kennzahlen aggregieren — wie terminal_messages → terminal-Metriken. Re-aggregierbar, nicht
+        // ein eingefrorener Zählerstand. Zuordnung über actor_user_id = entity.linked_user_id.
         $coordMetrics = [];
         try {
-            if (Schema::hasTable('organization_coordination_metrics')) {
+            if (Schema::hasTable('organization_coordination_events')) {
                 $userIds = $entities->pluck('linked_user_id')->filter()->unique()->values()->all();
                 if ($userIds !== []) {
-                    $byUser = [];
-                    foreach (DB::table('organization_coordination_metrics')->whereIn('user_id', $userIds)->get(['user_id', 'metrics']) as $r) {
-                        $byUser[$r->user_id] = json_decode($r->metrics, true) ?: [];
+                    $since = Carbon::now()->subDays(7);
+                    $byUser = []; // uid => [dec, hand, latSum, latN, peers{}]
+                    $rows = DB::table('organization_coordination_events')
+                        ->whereIn('actor_user_id', $userIds)
+                        ->where('occurred_at', '>=', $since)
+                        ->get(['actor_user_id', 'kind', 'counterpart_handle', 'latency_seconds']);
+                    foreach ($rows as $r) {
+                        $u = $r->actor_user_id;
+                        if (! isset($byUser[$u])) {
+                            $byUser[$u] = ['dec' => 0, 'hand' => 0, 'latSum' => 0, 'latN' => 0, 'peers' => []];
+                        }
+                        if ($r->kind === 'decision') {
+                            $byUser[$u]['dec']++;
+                        } elseif ($r->kind === 'handoff_done') {
+                            $byUser[$u]['hand']++;
+                        }
+                        if ($r->latency_seconds !== null) {
+                            $byUser[$u]['latSum'] += (int) $r->latency_seconds;
+                            $byUser[$u]['latN']++;
+                        }
+                        if ($r->counterpart_handle) {
+                            $byUser[$u]['peers'][$r->counterpart_handle] = true;
+                        }
                     }
                     foreach ($entities as $entity) {
-                        if ($entity->linked_user_id && isset($byUser[$entity->linked_user_id])) {
-                            $coordMetrics[$entity->id] = $byUser[$entity->linked_user_id];
+                        $u = $entity->linked_user_id;
+                        if ($u && isset($byUser[$u])) {
+                            $a = $byUser[$u];
+                            $coordMetrics[$entity->id] = [
+                                'coord_decisions_7d' => $a['dec'],
+                                'coord_handoffs_done_7d' => $a['hand'],
+                                'coord_latency_days' => $a['latN'] > 0 ? round($a['latSum'] / $a['latN'] / 86400, 2) : null,
+                                'coord_peers_7d' => count($a['peers']),
+                            ];
                         }
                     }
                 }
             }
         } catch (\Throwable $e) {
-            Log::warning('Snapshot: Coordination metrics failed', ['error' => $e->getMessage()]);
+            Log::warning('Snapshot: Coordination aggregation failed', ['error' => $e->getMessage()]);
         }
 
         // 6. Cascade metrics through entity hierarchy

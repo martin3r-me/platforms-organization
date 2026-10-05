@@ -4,6 +4,7 @@ namespace Platform\Organization\Console\Commands;
 
 use Illuminate\Console\Command;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Platform\Organization\Models\OrganizationDimensionDefinition;
 use Platform\Organization\Models\OrganizationDimensionLink;
 use Platform\Organization\Models\OrganizationDimensionValue;
@@ -252,6 +253,28 @@ class SnapshotEntitiesCommand extends Command
             Log::warning('Snapshot: Terminal metrics failed', ['error' => $e->getMessage()]);
         }
 
+        // 5d. TRAAN/Parlan-Koordinations-Kennzahlen pro Entität (von Parlan gepusht, per linked_user_id).
+        // Die Org rechnet nichts — sie nimmt den neuesten gemeldeten Stand und snapshottet ihn mit.
+        $coordMetrics = [];
+        try {
+            if (Schema::hasTable('organization_coordination_metrics')) {
+                $userIds = $entities->pluck('linked_user_id')->filter()->unique()->values()->all();
+                if ($userIds !== []) {
+                    $byUser = [];
+                    foreach (DB::table('organization_coordination_metrics')->whereIn('user_id', $userIds)->get(['user_id', 'metrics']) as $r) {
+                        $byUser[$r->user_id] = json_decode($r->metrics, true) ?: [];
+                    }
+                    foreach ($entities as $entity) {
+                        if ($entity->linked_user_id && isset($byUser[$entity->linked_user_id])) {
+                            $coordMetrics[$entity->id] = $byUser[$entity->linked_user_id];
+                        }
+                    }
+                }
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Snapshot: Coordination metrics failed', ['error' => $e->getMessage()]);
+        }
+
         // 6. Cascade metrics through entity hierarchy
         $hierarchyService = new EntityHierarchyService();
         $childMap = $hierarchyService->buildChildMap($entities);
@@ -285,6 +308,15 @@ class SnapshotEntitiesCommand extends Command
             if (isset($terminalMetrics[$entity->id])) {
                 foreach ($terminalMetrics[$entity->id] as $key => $value) {
                     $metrics[$key] = $value;
+                }
+            }
+
+            // Merge coordination metrics (nur Skalare — die metrics-JSON kommt von extern)
+            if (isset($coordMetrics[$entity->id])) {
+                foreach ($coordMetrics[$entity->id] as $key => $value) {
+                    if ($value === null || is_scalar($value)) {
+                        $metrics[$key] = $value;
+                    }
                 }
             }
 

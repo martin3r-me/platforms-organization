@@ -601,6 +601,55 @@ class EntityLinkRegistry
                 'type' => self::TYPE_MODULATOR,
                 'basis' => 'modulator_factor',
             ],
+
+            // TRAAN/Parlan-Koordination — was die Mitglieder untereinander & mit Menschen abstimmen,
+            // als messbare Org-Substanz. Von Parlan pro Handle gepusht (siehe organization_coordination_metrics),
+            // vom Snapshot gemerged. Verbindlichkeit wird so zur Durchsatz-/Energie-/Qualitäts-Dimension.
+            'coord_decisions_7d' => [
+                'label' => 'Entscheidungen getroffen (7 Tage)',
+                'group' => 'coordination',
+                'direction' => 'up',
+                'unit' => 'count',
+                'dimension' => self::DIMENSION_THROUGHPUT,
+                'type' => self::TYPE_FLOW,
+                'basis' => 'window_7d',
+            ],
+            'coord_handoffs_done_7d' => [
+                'label' => 'Aufgaben erledigt (7 Tage)',
+                'group' => 'coordination',
+                'direction' => 'up',
+                'unit' => 'count',
+                'dimension' => self::DIMENSION_THROUGHPUT,
+                'type' => self::TYPE_FLOW,
+                'basis' => 'window_7d',
+            ],
+            'coord_latency_days' => [
+                'label' => 'Ø Antwort-/Entscheidungs-Latenz',
+                'group' => 'coordination',
+                'direction' => 'down',
+                'unit' => 'days',
+                'dimension' => self::DIMENSION_ENERGY,
+                'type' => self::TYPE_MODULATOR,
+                'basis' => 'modulator_factor',
+            ],
+            'coord_overdue_open' => [
+                'label' => 'Überfällige offene Vorgänge',
+                'group' => 'coordination',
+                'direction' => 'down',
+                'unit' => 'count',
+                'dimension' => self::DIMENSION_QUALITY,
+                'type' => self::TYPE_STOCK,
+                'basis' => 'stichtag',
+            ],
+            'coord_peers_7d' => [
+                'label' => 'Koordinations-Partner (7 Tage)',
+                'group' => 'coordination',
+                'direction' => 'neutral',
+                'unit' => 'count',
+                'dimension' => self::DIMENSION_ORG_CAPITAL,
+                'type' => self::TYPE_STOCK,
+                'basis' => 'window_7d',
+            ],
         ];
     }
 

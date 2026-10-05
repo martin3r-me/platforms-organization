@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Platform\Organization\Http\Controllers\Api\AgentChangeController;
+use Platform\Organization\Http\Controllers\Api\CoordinationController;
 use Platform\Organization\Http\Controllers\Api\AgentEnvironmentController;
 use Platform\Organization\Http\Controllers\Api\AgentMessagingController;
 use Platform\Organization\Http\Controllers\Api\AgentOkrController;
@@ -44,4 +45,10 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::get('/messages', [AgentMessagingController::class, 'inbox'])->name('organization.api.agent.messages');
     // ROSTER: die Kollegen-Agenten (Adresse + Rolle) für gezielte laterale 1:1-DMs.
     Route::get('/roster', [AgentMessagingController::class, 'roster'])->name('organization.api.agent.roster');
+});
+
+// COMMS-SINK: Parlan pusht Koordinations-Kennzahlen pro Handle in die Org (eigener Service-Token).
+// Kein Agenten-Self-Report — eine Quelle (die Fabric via Parlan) für Mensch- UND Agent-Events.
+Route::prefix('org/coordination')->middleware('auth:api')->group(function () {
+    Route::post('/events', [CoordinationController::class, 'ingest'])->name('organization.api.coordination.events');
 });

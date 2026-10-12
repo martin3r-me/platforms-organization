@@ -335,7 +335,9 @@ class SignalEvaluationService
 
     /**
      * Ratio evaluation: compare ratio of two metrics against a threshold.
-     * conditions: {"numerator": "items_done", "denominator": "items_total", "operator": "<", "value": 0.5}
+     * conditions: {"numerator": "items_done", "denominator": "items_total", "operator": "<", "value": 0.5,
+     *               "min_denominator": 5, "grace_days": 14}
+     * min_denominator: Mindestmenge im Nenner (Default 0 = aus); grace_days: Karenz für neu angelegte Entities (Default 0 = aus).
      */
     protected function evaluateRatio(array $conditions, array $entityIds): array
     {
@@ -343,6 +345,8 @@ class SignalEvaluationService
         $denominator = $conditions['denominator'] ?? null;
         $operator = $conditions['operator'] ?? '<';
         $threshold = $conditions['value'] ?? 0.5;
+        $minDenominator = (float) ($conditions['min_denominator'] ?? 0);
+        $graceDays = (int) ($conditions['grace_days'] ?? 0);
 
         if (! $numerator || ! $denominator) {
             return [];
@@ -350,13 +354,23 @@ class SignalEvaluationService
 
         $snapshots = $this->getLatestSnapshots($entityIds);
         $entities = $this->getEntityNames($entityIds);
+        $graceEntityIds = $graceDays > 0
+            ? OrganizationEntity::whereIn('id', $entityIds)
+                ->where('created_at', '>', now()->subDays($graceDays))
+                ->pluck('id')
+                ->all()
+            : [];
         $triggered = [];
 
         foreach ($snapshots as $entityId => $snapshot) {
             $numVal = $snapshot->metrics[$numerator] ?? 0;
             $denVal = $snapshot->metrics[$denominator] ?? 0;
 
-            if ($denVal == 0) {
+            if ($denVal == 0 || $denVal < $minDenominator) {
+                continue;
+            }
+
+            if (in_array($entityId, $graceEntityIds, true)) {
                 continue;
             }
 

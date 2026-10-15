@@ -65,8 +65,11 @@ wird registriert. Die restlichen 8 sind Follow-up für die jeweiligen Modul-Owne
 
 ### Deploy-Sequenz
 
-- **Deploy B (korrektiv, kein Verhaltensrisiko):** Alias-Registrierung ·
-  `perspective_id`-Spalte additiv · Cleanup der 9 Geister-Links.
+- **Deploy B (korrektiv, kein Verhaltensrisiko) — ✅ erledigt & verifiziert:**
+  Alias-Registrierung · `perspective_id`-Spalte additiv · Cleanup der 9 Geister-Links.
+  Audit-Gegenprobe: soft-deleted-Links 9→0, Unknowns 87→8 (nur noch Fremd-Modul-
+  Aliase correspondence_thread/commerce_article_category/okr_forecast).
+  **Follow-up (fremde Pakete):** diese 3 Module müssen ihren morph-Alias registrieren.
 - **Deploy C (Verhaltensänderung, erst nach Tests):** Cascade-Observer +
   `softDeletes` · perspective_id-Unique-Index (nach Dubletten-Audit) ·
   Morph-Guard Warn-Mode.

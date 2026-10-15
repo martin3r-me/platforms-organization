@@ -225,22 +225,29 @@ class DimensionLinkAuditService
     {
         $known = array_keys(Relation::morphMap());
 
+        // Aufschlüsselung je (linkable_type, Dimension) — zeigt, an welchen
+        // Dimensionen unauflösbare Typen hängen (Untersuchung vor Morph-Guard).
         $counts = OrganizationDimensionLink::query()
-            ->selectRaw('linkable_type, COUNT(*) as links')
-            ->groupBy('linkable_type')
+            ->selectRaw('linkable_type, dimension_definition_id, COUNT(*) as links')
+            ->groupBy('linkable_type', 'dimension_definition_id')
             ->get();
 
         $unknown = $counts->filter(
             fn ($r) => ! in_array($r->linkable_type, $known, true) && ! class_exists($r->linkable_type)
         )->values();
 
+        $defs = OrganizationDimensionDefinition::whereIn('id', $unknown->pluck('dimension_definition_id')->unique())
+            ->get()
+            ->keyBy('id');
+
         return $this->result(
             'Unbekannte linkable_type (kein Morph-Alias, keine Klasse)',
-            $unknown->sum('links'),
-            $unknown->take(self::SAMPLE_LIMIT)->map(fn ($r) => [
+            (int) $unknown->sum('links'),
+            $unknown->sortByDesc('links')->take(self::SAMPLE_LIMIT)->map(fn ($r) => [
                 'linkable_type' => $r->linkable_type,
+                'dimension'     => $defs->get($r->dimension_definition_id)?->key ?? ('def#' . $r->dimension_definition_id),
                 'links'         => $r->links,
-            ])->all()
+            ])->values()->all()
         );
     }
 

@@ -138,6 +138,11 @@ class OrganizationServiceProvider extends ServiceProvider
         $this->loadViewsFrom(__DIR__ . '/../resources/views', 'organization');
         $this->registerLivewireComponents();
         
+        // Observer: Value soft-delete → zugehörige Links hart entfernen (Cascade).
+        \Platform\Organization\Models\OrganizationDimensionValue::observe(
+            \Platform\Organization\Observers\DimensionValueObserver::class
+        );
+
         // Observer: Entity ↔ DimensionValue sync
         \Platform\Organization\Models\OrganizationEntity::observe(
             \Platform\Organization\Observers\OrganizationEntityDimensionObserver::class

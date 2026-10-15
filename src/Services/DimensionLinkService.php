@@ -4,6 +4,7 @@ namespace Platform\Organization\Services;
 
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 use Platform\Organization\Models\OrganizationDimensionDefinition;
 use Platform\Organization\Models\OrganizationDimensionLink;
 
@@ -195,6 +196,17 @@ class DimensionLinkService
     public function link(string $dimension, string $contextType, int $contextId, int $dimensionValueId, array $meta = []): bool
     {
         $contextType = self::resolveContextType($contextType);
+
+        // Morph-Guard (Warn-Mode): unauflösbarer linkable_type wird NICHT still
+        // gespeichert, sondern geloggt. Später kann daraus ein harter Reject werden
+        // (Härtungsplan Phase 5), sobald die Logs sauber sind.
+        if (!array_key_exists($contextType, Relation::morphMap()) && !class_exists($contextType)) {
+            Log::warning('[DimensionLink] linkable_type ist kein registrierter Morph-Alias und keine Klasse — per morphTo() nicht auflösbar.', [
+                'linkable_type' => $contextType,
+                'dimension' => $dimension,
+                'context_id' => $contextId,
+            ]);
+        }
 
         $def = OrganizationDimensionDefinition::findByKey($dimension);
         if (!$def) {

@@ -70,9 +70,23 @@ wird registriert. Die restlichen 8 sind Follow-up für die jeweiligen Modul-Owne
   Audit-Gegenprobe: soft-deleted-Links 9→0, Unknowns 87→8 (nur noch Fremd-Modul-
   Aliase correspondence_thread/commerce_article_category/okr_forecast).
   **Follow-up (fremde Pakete):** diese 3 Module müssen ihren morph-Alias registrieren.
-- **Deploy C (Verhaltensänderung, erst nach Tests):** Cascade-Observer +
-  `softDeletes` · perspective_id-Unique-Index (nach Dubletten-Audit) ·
-  Morph-Guard Warn-Mode.
+- **Deploy C (Prävention/Erzwingung) — umgesetzt, Verifikation ausstehend:**
+  - **Hard-Cascade-Observer** (`DimensionValueObserver`): Value soft-delete →
+    Links hart entfernen. Bewusst Hard-Delete statt softDeletes, weil Haupt-
+    Consumer (`EntityPulseSubjectCollector`, `FeedService`) Links per roher
+    `DB::table()` lesen und einen SoftDelete-Scope ignorieren würden; Hard-Delete
+    ist konsistent mit dem bestehenden FK-Cascade und braucht keine core-Edits.
+  - **Morph-Guard Warn-Mode** in `DimensionLinkService::link()`: unauflösbarer
+    `linkable_type` wird geloggt statt still gespeichert (Reject später, Phase 5).
+  - **Geparkt:** perspective_id-Unique-Index. Alle `perspective_id` sind aktuell
+    NULL; ein Unique-Index mit NULL-Spalte verhindert in MySQL keine Dubletten
+    (NULL ≠ NULL). Erst klären, ob das Perspective-Feature real genutzt wird.
+  - **Regressionsnetz:** Audit-Check „Links auf soft-gelöschte Values" muss nach
+    einem echten Value-Soft-Delete 0 bleiben.
+
+**Sicherheitsnetz:** Package hat keine Test-Infrastruktur (nicht die Hauskonvention;
+nur sovra-health hat Testbench). Statt ungetesteter Unit-Tests dient das Audit gegen
+Produktion als Regressionsnetz — es hat Deploy B empirisch verifiziert (9→0, 87→8).
 
 ---
 

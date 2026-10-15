@@ -41,6 +41,36 @@ Morph-Guard (Phase 5) auf Reject geht**, sonst werden legitime Writes blockiert.
 sauber (Materialisierung §8.2 damit optional), und die Mode-Invarianten (§4.3) sind
 heute erfüllt → DB-Constraints (§8.3) sind machbar, da kein Altbestand sie verletzt.
 
+### Untersuchung der 87 Unknowns (per Dimensions-Aufschlüsselung)
+
+| linkable_type | Dimension | Links | Zuständig |
+|---|---|---|---|
+| `organization_entity` | vsm-system | 79 | **organization selbst** — dokumentiertes Entity↔VSM-Muster, Alias nie registriert |
+| `correspondence_thread` | entity | 6 | fremdes Modul (correspondence) |
+| `commerce_article_category` | entity | 1 | fremdes Modul (commerce) |
+| `okr_forecast` | entity | 1 | fremdes Modul (okr) |
+
+→ Die 79 sind kein Dead Data. Alias `organization_entity` gehört dem Org-Paket und
+wird registriert. Die restlichen 8 sind Follow-up für die jeweiligen Modul-Owner.
+
+### Entscheidungen (2026-10-15)
+
+- **#1 Entity-Links:** `organization_entity`-Alias in `OrganizationServiceProvider`
+  registrieren (erledigt in Deploy B). Fremd-Modul-Aliase: Follow-up.
+- **#2 Soft-Delete:** Bestehende 9 Geister-Links bereinigen (Deploy B); künftig
+  Cascade-Observer (value soft-delete → Links mit-soft-deleten) in **Deploy C**,
+  nach Charakterisierungs-Tests, inkl. `softDeletes` auf der Links-Tabelle.
+- **#3 perspective_id:** additive Fix-Migration. Spalte + FK + Index in Deploy B;
+  der perspective_id-haltige **Unique-Index erst nach Dubletten-Audit** (Deploy C).
+
+### Deploy-Sequenz
+
+- **Deploy B (korrektiv, kein Verhaltensrisiko):** Alias-Registrierung ·
+  `perspective_id`-Spalte additiv · Cleanup der 9 Geister-Links.
+- **Deploy C (Verhaltensänderung, erst nach Tests):** Cascade-Observer +
+  `softDeletes` · perspective_id-Unique-Index (nach Dubletten-Audit) ·
+  Morph-Guard Warn-Mode.
+
 ---
 
 > **Status:** Vorschlag / Diskussionsgrundlage. Noch kein Code geändert.

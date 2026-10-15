@@ -67,6 +67,10 @@ class OrganizationServiceProvider extends ServiceProvider
         Relation::morphMap([
             'organization_role'               => \Platform\Organization\Models\OrganizationRole::class,
             'organization_role_assignment'    => \Platform\Organization\Models\OrganizationRoleAssignment::class,
+            // Entity selbst als Linkable (z.B. Entity ↔ VSM-System-Dimension).
+            // Alias war nie registriert → DimensionLinks auf Entities (linkable_type
+            // 'organization_entity') konnten per morphTo() nicht aufgelöst werden.
+            'organization_entity'             => \Platform\Organization\Models\OrganizationEntity::class,
         ]);
 
         // Org-Knoten als Zuweisungs-Ziel bereitstellen (entkoppelt via Core-Registry).

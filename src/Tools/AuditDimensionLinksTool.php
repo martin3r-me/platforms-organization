@@ -44,6 +44,23 @@ class AuditDimensionLinksTool implements ToolContract, ToolMetadataContract
         ];
     }
 
+    public function getMetadata(): array
+    {
+        return [
+            'category'      => 'read',
+            'tags'          => ['organization', 'dimensions', 'links', 'audit', 'integrity', 'diagnostics'],
+            'read_only'     => true,
+            'requires_auth' => true,
+            'requires_team' => true,
+            'risk_level'    => 'safe',
+            'idempotent'    => true,
+            // Diagnose-/Dev-Werkzeug: nicht im Always-On-Surface, aber über die
+            // Modul-Discovery (tools__GET module=organization) erreichbar.
+            'tier'          => 'specialized',
+            'intent'        => 'Read-only Integritäts-Audit der DimensionLinks (Invarianten-Check).',
+        ];
+    }
+
     public function execute(array $arguments, ToolContext $context): ToolResult
     {
         try {

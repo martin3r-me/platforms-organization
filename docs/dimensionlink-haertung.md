@@ -5,6 +5,44 @@ order: 99
 
 # DimensionLink – Härtungs- & Architektur-Plan
 
+## Phase-0-Audit · Ergebnis (Team BHG.DIGITAL, 2026-10-15)
+
+Gefahren über `organization.dimension_links.audit.GET` gegen Produktion.
+
+| Check | Ergebnis |
+|---|---|
+| Entity-Values ohne `source_entity_id` | ✅ 0 |
+| Entity-Values mit verwaister `source_entity_id` | ✅ 0 |
+| Prozent-Summe > 100 (`multi_percent`) | ✅ 0 |
+| Mehr als ein `is_primary` pro Gruppe | ✅ 0 |
+| Links auf soft-gelöschte Values | ⚠️ **9** |
+| Unbekannte `linkable_type` | ⚠️ **87** |
+
+**Befund 0 — Schema-Drift:** Die Produktiv-Tabelle `organization_dimension_links`
+hat **keine Spalte `perspective_id`**. Die Migration `2026_05_23_100003` legt sie an,
+no-oppt aber per `if (Schema::hasTable(...)) return;` auf der vorbestehenden Tabelle.
+→ Spalte **und** der `perspective_id`-haltige Unique-Index wurden nie angewendet.
+`percentage`/`is_primary` existieren dagegen. Phase 0 braucht einen Abgleich
+Produktiv-Schema ↔ Migrationen, bevor irgendeine Invariante erzwungen wird.
+
+**Befund 1 — 9 Links auf soft-gelöschte Values:** Drei gelöschte Entity-Values
+(`BHG.CONSULTING` #60, `BHG.IT` #221, `BROICH.AKADEMIE` #309) hängen noch an lebenden
+Objekten (brands, canvas×3, commerce_catalog×2, okr×2, project). Beweist, dass §4.4
+real auftritt → §8.4 muss entschieden werden (Cleanup + künftige Strategie).
+
+**Befund 2 — 87 unauflösbare `linkable_type`:** `organization_entity` (79),
+`correspondence_thread` (6), `commerce_article_category` (1), `okr_forecast` (1).
+Keiner dieser Aliase ist in der `morphMap` dieses Deployments registriert (nur
+`organization_role`/`_role_assignment`). Die 79 Entity-an-Entity-Links sind ein
+reales Nutzungsmuster ohne registrierten Alias → **muss geklärt sein, bevor der
+Morph-Guard (Phase 5) auf Reject geht**, sonst werden legitime Writes blockiert.
+
+**Entlastung:** Die 4 grünen Checks zeigen — Entity-Auflösung (§4.1) ist datenseitig
+sauber (Materialisierung §8.2 damit optional), und die Mode-Invarianten (§4.3) sind
+heute erfüllt → DB-Constraints (§8.3) sind machbar, da kein Altbestand sie verletzt.
+
+---
+
 > **Status:** Vorschlag / Diskussionsgrundlage. Noch kein Code geändert.
 > **Oberste Randbedingung:** Produktiv im Einsatz, mehrere Monate Echtdaten.
 > **Jede Maßnahme ist strikt additiv und abwärtskompatibel** — keine

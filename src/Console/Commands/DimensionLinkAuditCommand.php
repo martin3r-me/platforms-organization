@@ -24,11 +24,18 @@ class DimensionLinkAuditCommand extends Command
             $isWarn = $check['status'] === 'warn';
             $findings += $isWarn ? 1 : 0;
 
+            $status = match ($check['status']) {
+                'warn'    => '<fg=yellow>FUND</>',
+                'skipped' => '<fg=gray>SKIP</>',
+                default   => '<fg=green>OK</>',
+            };
+            $label = $check['label'] . (isset($check['note']) ? "  ({$check['note']})" : '');
+
             $summary[] = [
                 $code,
-                $check['label'],
+                $label,
                 $check['count'],
-                $isWarn ? '<fg=yellow>FUND</>' : '<fg=green>OK</>',
+                $status,
             ];
         }
 

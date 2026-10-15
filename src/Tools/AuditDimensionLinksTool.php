@@ -79,6 +79,9 @@ class AuditDimensionLinksTool implements ToolContract, ToolMetadataContract
                     'status' => $check['status'],
                     'count'  => $check['count'],
                 ];
+                if (isset($check['note'])) {
+                    $entry['note'] = $check['note'];
+                }
                 if ($includeSamples) {
                     $entry['samples'] = $check['samples'];
                 }

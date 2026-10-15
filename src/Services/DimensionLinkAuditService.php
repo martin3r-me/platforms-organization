@@ -3,6 +3,7 @@
 namespace Platform\Organization\Services;
 
 use Illuminate\Database\Eloquent\Relations\Relation;
+use Illuminate\Support\Facades\Schema;
 use Platform\Organization\Models\OrganizationDimensionDefinition;
 use Platform\Organization\Models\OrganizationDimensionLink;
 use Platform\Organization\Models\OrganizationDimensionValue;
@@ -41,6 +42,21 @@ class DimensionLinkAuditService
             'links_to_softdeleted_values'  => $this->linksToSoftDeletedValues(),
             'unknown_linkable_types'       => $this->unknownLinkableTypes(),
         ];
+    }
+
+    /**
+     * Gruppierungs-Spalten für Invarianten pro Linkable. perspective_id nur, wenn
+     * die Spalte in der (ggf. gedrifteten) Produktiv-Tabelle existiert.
+     *
+     * @return array<int,string>
+     */
+    private function groupColumns(): array
+    {
+        $cols = ['dimension_definition_id', 'linkable_type', 'linkable_id'];
+        if (Schema::hasColumn('organization_dimension_links', 'perspective_id')) {
+            $cols[] = 'perspective_id';
+        }
+        return $cols;
     }
 
     /**
@@ -108,16 +124,22 @@ class DimensionLinkAuditService
      */
     private function percentageOverflow(): array
     {
+        if (! Schema::hasColumn('organization_dimension_links', 'percentage')) {
+            return $this->skipped('Prozent-Summe > 100 (mode=multi_percent)', 'Spalte percentage fehlt (Schema-Drift)');
+        }
+
         $pctDefIds = OrganizationDimensionDefinition::where('mode', 'multi_percent')->pluck('id');
 
         if ($pctDefIds->isEmpty()) {
             return $this->result('Prozent-Summe > 100 (mode=multi_percent)', 0, []);
         }
 
+        $groupCols = $this->groupColumns();
+
         $rows = OrganizationDimensionLink::query()
             ->whereIn('dimension_definition_id', $pctDefIds)
-            ->selectRaw('dimension_definition_id, linkable_type, linkable_id, perspective_id, SUM(percentage) as pct_sum, COUNT(*) as links')
-            ->groupBy('dimension_definition_id', 'linkable_type', 'linkable_id', 'perspective_id')
+            ->selectRaw(implode(', ', $groupCols) . ', SUM(percentage) as pct_sum, COUNT(*) as links')
+            ->groupBy($groupCols)
             ->havingRaw('SUM(percentage) > 100')
             ->get();
 
@@ -127,7 +149,7 @@ class DimensionLinkAuditService
             $rows->take(self::SAMPLE_LIMIT)->map(fn ($r) => [
                 'def_id'        => $r->dimension_definition_id,
                 'linkable'      => $r->linkable_type . '#' . $r->linkable_id,
-                'perspective'   => $r->perspective_id,
+                'perspective'   => $r->perspective_id ?? null,
                 'pct_sum'       => $r->pct_sum,
                 'links'         => $r->links,
             ])->all()
@@ -140,9 +162,15 @@ class DimensionLinkAuditService
      */
     private function multiplePrimary(): array
     {
+        if (! Schema::hasColumn('organization_dimension_links', 'is_primary')) {
+            return $this->skipped('Mehr als ein is_primary pro Gruppe', 'Spalte is_primary fehlt (Schema-Drift)');
+        }
+
+        $groupCols = $this->groupColumns();
+
         $rows = OrganizationDimensionLink::query()
-            ->selectRaw('dimension_definition_id, linkable_type, linkable_id, perspective_id, SUM(is_primary) as primaries, COUNT(*) as links')
-            ->groupBy('dimension_definition_id', 'linkable_type', 'linkable_id', 'perspective_id')
+            ->selectRaw(implode(', ', $groupCols) . ', SUM(is_primary) as primaries, COUNT(*) as links')
+            ->groupBy($groupCols)
             ->havingRaw('SUM(is_primary) > 1')
             ->get();
 
@@ -152,7 +180,7 @@ class DimensionLinkAuditService
             $rows->take(self::SAMPLE_LIMIT)->map(fn ($r) => [
                 'def_id'      => $r->dimension_definition_id,
                 'linkable'    => $r->linkable_type . '#' . $r->linkable_id,
-                'perspective' => $r->perspective_id,
+                'perspective' => $r->perspective_id ?? null,
                 'primaries'   => $r->primaries,
                 'links'       => $r->links,
             ])->all()
@@ -224,6 +252,18 @@ class DimensionLinkAuditService
             'status'  => $count > 0 ? 'warn' : 'ok',
             'count'   => $count,
             'samples' => $samples,
+        ];
+    }
+
+    /** Check konnte wegen Schema-Drift nicht laufen — kein Fund, aber sichtbar. */
+    private function skipped(string $label, string $reason): array
+    {
+        return [
+            'label'   => $label,
+            'status'  => 'skipped',
+            'count'   => 0,
+            'samples' => [],
+            'note'    => $reason,
         ];
     }
 }

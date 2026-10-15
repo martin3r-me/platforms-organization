@@ -49,18 +49,34 @@
         @endif
     </div>
 
-    {{-- 1) Wissensgraph (Neocortex) --}}
+    {{-- 1) Wissensgraph (Neocortex) — navigierbarer 3D-Neuralraum, wie die Org-Mindmap --}}
     <div>
         <h4 class="text-xs font-semibold text-[var(--ui-secondary)] uppercase tracking-wide mb-1">Wissensgraph — Neocortex</h4>
-        <p class="text-[11px] text-[var(--ui-muted)] mb-2">Das <b>Wissen</b>: Fakten als Knoten, typisierte Relationen als Kanten. Fällt im Schlaf aus den Episoden aus (Konsolidierung).</p>
+        <p class="text-[11px] text-[var(--ui-muted)] mb-2">Das <b>Wissen</b>: Fakten als Knoten, typisierte Relationen als Kanten. Fällt im Schlaf aus den Episoden aus (Konsolidierung). Frei navigierbar — ziehen zum Drehen, scrollen zum Zoomen.</p>
         @if (count($graph['nodes']) === 0)
             <div class="rounded-lg border border-dashed border-[var(--ui-border)] p-6 text-center text-[11px] text-[var(--ui-muted)] italic">Noch keine Fakten konsolidiert — der Graph erscheint, sobald der Neocortex im Schlaf gewachsen ist.</div>
         @else
-            <div class="relative rounded-lg border border-[var(--ui-border)] bg-[var(--ui-surface)] overflow-hidden" style="height: 460px;">
-                <canvas class="brain-graph-canvas" data-eid="{{ $entity->id }}" style="width:100%; height:100%; display:block; cursor:grab;"></canvas>
+            <div class="relative rounded-lg border border-[var(--ui-border)] overflow-hidden" style="height: 70vh; min-height: 520px; background:#080c18;">
+                <div wire:ignore id="braingraph-3d-{{ $entity->id }}" class="absolute inset-0"></div>
                 <script type="application/json" id="bgdata-{{ $entity->id }}">@json($graph)</script>
-                <div class="bg-tip" style="position:absolute; pointer-events:none; display:none; z-index:10; max-width:280px; padding:6px 8px; border-radius:6px; background:rgba(15,18,20,.92); color:#e8e8e8; font-size:11px; line-height:1.35;"></div>
-                <div class="absolute bottom-2 left-2 text-[10px] text-[var(--ui-muted)] bg-[var(--ui-surface)]/70 rounded px-1.5 py-0.5">Top {{ count($graph['nodes']) }} Knoten · ziehen · über Knoten für Details</div>
+
+                {{-- Navigation (Google-Maps-Stil, wie die Mindmap) --}}
+                <div class="absolute top-3 right-3 z-20 flex gap-1">
+                    <div class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl flex overflow-hidden">
+                        <button type="button" data-bg-zoom="in" class="w-9 h-9 flex items-center justify-center text-gray-300 hover:bg-white/10 hover:text-white transition-colors text-lg font-light border-r border-gray-700/50">+</button>
+                        <button type="button" data-bg-zoom="out" class="w-9 h-9 flex items-center justify-center text-gray-300 hover:bg-white/10 hover:text-white transition-colors text-lg font-light">&minus;</button>
+                    </div>
+                    <button type="button" data-bg-fit title="Alles einpassen" class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl w-9 h-9 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
+                        @svg('heroicon-o-arrows-pointing-in', 'w-4 h-4')
+                    </button>
+                    <button type="button" data-bg-fs title="Vollbild" class="bg-gray-900/90 backdrop-blur border border-gray-700/50 rounded-lg shadow-2xl w-9 h-9 flex items-center justify-center text-gray-400 hover:bg-white/10 hover:text-white transition-colors">
+                        @svg('heroicon-o-arrows-pointing-out', 'w-4 h-4')
+                    </button>
+                </div>
+
+                <div class="absolute bottom-2 left-3 z-10 text-[10px] text-gray-400/80 bg-gray-900/60 rounded px-1.5 py-0.5 pointer-events-none">
+                    {{ count($graph['nodes']) }} Knoten · {{ count($graph['links']) }} Kanten · ziehen · scrollen · Knoten für Details
+                </div>
             </div>
         @endif
     </div>
@@ -303,102 +319,152 @@
     </div>
 
     @verbatim
-    <script>
-    (function () {
+    <script type="module">
+        import * as THREE from 'https://esm.sh/three@0.179.0';
+        import ForceGraph3D from 'https://esm.sh/3d-force-graph@1.80.0?deps=three@0.179.0';
+
         function trunc(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
         function hueOf(s) { var h = 0; s = String(s || ''); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h % 360; }
+        function colorOf(type, name) { return 'hsl(' + hueOf(type || name) + ',62%,62%)'; }
         function esc(s) { return String(s == null ? '' : s).replace(/[&<>"]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c]; }); }
 
-        function run(cv) {
-            if (cv.__bgStarted) return;
-            var el = document.getElementById('bgdata-' + cv.dataset.eid);
-            if (!el) return;
-            var data;
-            try { data = JSON.parse(el.textContent); } catch (e) { return; }
-            if (cv.clientWidth === 0 || cv.clientHeight === 0) { requestAnimationFrame(function () { run(cv); }); return; }
-            cv.__bgStarted = true;
-
-            var dpr = window.devicePixelRatio || 1;
-            var ctx = cv.getContext('2d');
-            var W = cv.clientWidth, H = cv.clientHeight;
-            cv.width = W * dpr; cv.height = H * dpr; ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
-
-            var raw = data.nodes || [], rawLinks = data.links || [];
-            var nodes = raw.map(function (n, i) {
-                var use = +n.use || 0;
-                return {
-                    name: n.name, type: n.type || '', note: n.note || '', use: use,
-                    r: 4 + Math.min(11, Math.sqrt(use + 1) * 2.2), hue: hueOf(n.type || n.name),
-                    x: W / 2 + (Math.cos(i) * 120) + (i % 7) * 8 - 24, y: H / 2 + (Math.sin(i) * 120) + (i % 5) * 8 - 20,
-                    dx: 0, dy: 0
-                };
-            });
-            var idx = {}; nodes.forEach(function (n, i) { idx[n.name] = i; });
-            var links = [];
-            rawLinks.forEach(function (l) { var s = idx[l.src], t = idx[l.dst]; if (s != null && t != null && s !== t) links.push({ s: s, t: t }); });
-
-            var N = nodes.length, alpha = 1, hoverNode = null, dragNode = null, frames = 0;
-            var tip = cv.parentNode.querySelector('.bg-tip');
-
-            function tick() {
-                var k = Math.sqrt((W * H) / Math.max(1, N)) * 0.85;
-                for (var i = 0; i < N; i++) { nodes[i].dx = 0; nodes[i].dy = 0; }
-                for (var i = 0; i < N; i++) for (var j = i + 1; j < N; j++) {
-                    var a = nodes[i], b = nodes[j], ex = a.x - b.x, ey = a.y - b.y, dist = Math.hypot(ex, ey) || 0.01;
-                    var rep = (k * k) / dist, ux = ex / dist, uy = ey / dist;
-                    a.dx += ux * rep; a.dy += uy * rep; b.dx -= ux * rep; b.dy -= uy * rep;
-                }
-                for (var m = 0; m < links.length; m++) {
-                    var a = nodes[links[m].s], b = nodes[links[m].t], ex = a.x - b.x, ey = a.y - b.y, dist = Math.hypot(ex, ey) || 0.01;
-                    var att = (dist * dist) / k, ux = ex / dist, uy = ey / dist;
-                    a.dx -= ux * att; a.dy -= uy * att; b.dx += ux * att; b.dy += uy * att;
-                }
-                var cx = W / 2, cy = H / 2;
-                for (var i = 0; i < N; i++) {
-                    var n = nodes[i]; if (n === dragNode) continue;
-                    n.dx += (cx - n.x) * 0.03; n.dy += (cy - n.y) * 0.03;
-                    var disp = Math.hypot(n.dx, n.dy) || 0.01, lim = Math.min(disp, alpha * k * 0.5);
-                    n.x += (n.dx / disp) * lim; n.y += (n.dy / disp) * lim;
-                    n.x = Math.max(n.r + 2, Math.min(W - n.r - 2, n.x)); n.y = Math.max(n.r + 2, Math.min(H - n.r - 2, n.y));
-                }
-            }
-            function draw() {
-                ctx.clearRect(0, 0, W, H);
-                ctx.strokeStyle = 'rgba(130,130,140,0.22)'; ctx.lineWidth = 1;
-                for (var m = 0; m < links.length; m++) { var a = nodes[links[m].s], b = nodes[links[m].t]; ctx.beginPath(); ctx.moveTo(a.x, a.y); ctx.lineTo(b.x, b.y); ctx.stroke(); }
-                for (var i = 0; i < N; i++) {
-                    var n = nodes[i], hot = (n === hoverNode);
-                    ctx.beginPath(); ctx.arc(n.x, n.y, n.r, 0, 6.2832);
-                    ctx.fillStyle = 'hsl(' + n.hue + ',58%,' + (hot ? 46 : 56) + '%)'; ctx.fill();
-                    if (hot) { ctx.lineWidth = 2; ctx.strokeStyle = '#111'; ctx.stroke(); }
-                    if (n.r >= 8 || hot) { ctx.fillStyle = 'rgba(20,20,24,0.85)'; ctx.font = '11px system-ui, sans-serif'; ctx.fillText(trunc(n.name, 24), n.x + n.r + 3, n.y + 4); }
-                }
-            }
-            function loop() { tick(); draw(); alpha *= 0.985; frames++; if (alpha > 0.02 && frames < 600) requestAnimationFrame(loop); else draw(); }
-            requestAnimationFrame(loop);
-
-            function at(evt) {
-                var rect = cv.getBoundingClientRect(), mx = evt.clientX - rect.left, my = evt.clientY - rect.top, best = null, bd = 1e9;
-                for (var i = 0; i < N; i++) { var n = nodes[i], d = Math.hypot(n.x - mx, n.y - my); if (d < n.r + 5 && d < bd) { bd = d; best = n; } }
-                return { n: best, mx: mx, my: my };
-            }
-            cv.addEventListener('mousemove', function (e) {
-                var h = at(e);
-                if (dragNode) { var rect = cv.getBoundingClientRect(); dragNode.x = e.clientX - rect.left; dragNode.y = e.clientY - rect.top; alpha = Math.max(alpha, 0.25); frames = 0; requestAnimationFrame(loop); return; }
-                hoverNode = h.n;
-                if (h.n) { tip.style.display = 'block'; tip.style.left = (h.mx + 12) + 'px'; tip.style.top = (h.my + 10) + 'px'; tip.innerHTML = '<b>' + esc(h.n.name) + '</b>' + (h.n.type ? ' <span style="opacity:.6">· ' + esc(h.n.type) + '</span>' : '') + (h.n.note ? '<br>' + esc(trunc(h.n.note, 160)) : ''); cv.style.cursor = 'pointer'; }
-                else { tip.style.display = 'none'; cv.style.cursor = 'grab'; }
-                draw();
-            });
-            cv.addEventListener('mousedown', function (e) { var h = at(e); if (h.n) { dragNode = h.n; cv.style.cursor = 'grabbing'; } });
-            window.addEventListener('mouseup', function () { dragNode = null; cv.style.cursor = 'grab'; });
-            cv.addEventListener('mouseleave', function () { hoverNode = null; tip.style.display = 'none'; draw(); });
+        // Text-Sprite als Knoten-Label (dunkle Pille, wie in der Mindmap)
+        function makeLabel(text, color) {
+            var canvas = document.createElement('canvas');
+            var ctx = canvas.getContext('2d');
+            var fs = 42, font = '600 ' + fs + 'px -apple-system, system-ui, sans-serif';
+            ctx.font = font;
+            var tw = ctx.measureText(text).width, padX = 18, padY = 12;
+            canvas.width = tw + padX * 2; canvas.height = fs + padY * 2;
+            var r = canvas.height / 2;
+            ctx.fillStyle = 'rgba(8,12,24,0.72)';
+            ctx.beginPath(); ctx.roundRect(0, 0, canvas.width, canvas.height, r); ctx.fill();
+            ctx.font = font; ctx.fillStyle = color || '#e8e8e8';
+            ctx.textAlign = 'center'; ctx.textBaseline = 'middle';
+            ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+            var tex = new THREE.CanvasTexture(canvas);
+            var sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, depthTest: false, transparent: true }));
+            sp.scale.set(canvas.width / 16, canvas.height / 16, 1);
+            return sp;
         }
 
-        function scan() { document.querySelectorAll('canvas.brain-graph-canvas').forEach(run); }
+        function init(container) {
+            if (container.__bgInit) return;
+            if (container.clientWidth === 0 || container.clientHeight === 0) return; // Tab noch versteckt
+            var eid = container.id.replace('braingraph-3d-', '');
+            var dataEl = document.getElementById('bgdata-' + eid);
+            if (!dataEl) return;
+            var data; try { data = JSON.parse(dataEl.textContent); } catch (e) { return; }
+            container.__bgInit = true;
+
+            var nodes = (data.nodes || []).map(function (n) {
+                var use = +n.use || 0;
+                return { id: n.name, name: n.name, type: n.type || '', note: n.note || '', use: use,
+                    val: 3 + Math.sqrt(use + 1) * 2, color: colorOf(n.type, n.name) };
+            });
+            var ids = {}; nodes.forEach(function (n) { ids[n.id] = true; });
+            var links = [];
+            (data.links || []).forEach(function (l) { if (ids[l.src] && ids[l.dst] && l.src !== l.dst) links.push({ source: l.src, target: l.dst }); });
+
+            var graph = ForceGraph3D()(container)
+                .backgroundColor('#080c18')
+                .showNavInfo(false)
+                .enableNodeDrag(true)
+                .nodeRelSize(1)
+                .graphData({ nodes: nodes, links: links })
+                .nodeThreeObject(function (node) {
+                    var g = new THREE.Group();
+                    var radius = node.val;
+                    g.add(new THREE.Mesh(
+                        new THREE.SphereGeometry(radius, 20, 20),
+                        new THREE.MeshPhongMaterial({ color: node.color, emissive: node.color, emissiveIntensity: 0.35, shininess: 80 })
+                    ));
+                    // weicher neuronaler Schein
+                    g.add(new THREE.Mesh(
+                        new THREE.SphereGeometry(radius * 1.9, 12, 12),
+                        new THREE.MeshBasicMaterial({ color: node.color, transparent: true, opacity: 0.12, depthWrite: false })
+                    ));
+                    var label = makeLabel(trunc(node.name, 28), node.color);
+                    label.position.y = -(radius + 3);
+                    label.name = 'label';
+                    label.visible = radius >= 6; // häufig abgerufene Fakten direkt beschriftet
+                    g.add(label);
+                    return g;
+                })
+                .nodeLabel(function (n) {
+                    var lines = ['<b style="color:' + n.color + '">' + esc(n.name) + '</b>'];
+                    if (n.type) lines.push('<span style="opacity:.7">' + esc(n.type) + '</span>');
+                    if (n.use) lines.push('<span style="opacity:.6">×' + n.use + ' abgerufen</span>');
+                    if (n.note) lines.push(esc(trunc(n.note, 180)));
+                    return '<div style="background:rgba(0,0,0,.85);color:#ccc;padding:6px 10px;border-radius:6px;font-size:11px;line-height:1.5;max-width:280px;text-align:left">' + lines.join('<br/>') + '</div>';
+                })
+                .linkColor(function () { return 'rgba(140,150,190,0.35)'; })
+                .linkWidth(0.5)
+                .linkOpacity(0.5)
+                .linkDirectionalParticles(2)
+                .linkDirectionalParticleWidth(0.8)
+                .linkDirectionalParticleSpeed(0.006)
+                .linkDirectionalParticleColor(function () { return '#9fb0ff'; })
+                .warmupTicks(60)
+                .cooldownTicks(140)
+                .d3AlphaDecay(0.018)
+                .d3VelocityDecay(0.28);
+
+            graph.d3Force('charge').strength(-120);
+            graph.d3Force('link').distance(42);
+
+            // Beleuchtung + Sternenfeld → „Gehirn im Raum"
+            var scene = graph.scene();
+            scene.add(new THREE.AmbientLight(0x445577, 0.7));
+            var dir = new THREE.DirectionalLight(0xffffff, 0.75); dir.position.set(100, 200, 150); scene.add(dir);
+            (function () {
+                var geo = new THREE.BufferGeometry(), pos = new Float32Array(1500 * 3);
+                for (var i = 0; i < 1500; i++) { pos[i * 3] = (Math.random() - .5) * 2200; pos[i * 3 + 1] = (Math.random() - .5) * 2200; pos[i * 3 + 2] = (Math.random() - .5) * 2200; }
+                geo.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+                scene.add(new THREE.Points(geo, new THREE.PointsMaterial({ color: 0x8888aa, size: .7, transparent: true, opacity: .5 })));
+            })();
+
+            graph.onEngineStop(function () { if (!container.__bgFitted) { container.__bgFitted = true; graph.zoomToFit(700, 50); } });
+
+            // Hover: Nachbar-Labels einblenden
+            graph.onNodeHover(function (node) {
+                graph.graphData().nodes.forEach(function (n) {
+                    if (!n.__threeObj) return;
+                    var l = n.__threeObj.getObjectByName('label');
+                    if (l) l.visible = (n.val >= 6) || (node && n.id === node.id);
+                });
+            });
+
+            // Steuerung (Zoom / Fit / Vollbild)
+            var panel = container.parentNode;
+            function camZoom(f) {
+                var c = graph.camera().position, t = (graph.controls() && graph.controls().target) || { x: 0, y: 0, z: 0 };
+                graph.cameraPosition({ x: t.x + (c.x - t.x) * f, y: t.y + (c.y - t.y) * f, z: t.z + (c.z - t.z) * f }, t, 350);
+            }
+            var zi = panel.querySelector('[data-bg-zoom="in"]'); if (zi) zi.addEventListener('click', function () { camZoom(0.7); });
+            var zo = panel.querySelector('[data-bg-zoom="out"]'); if (zo) zo.addEventListener('click', function () { camZoom(1.4); });
+            var ft = panel.querySelector('[data-bg-fit]'); if (ft) ft.addEventListener('click', function () { graph.zoomToFit(600, 50); });
+            var fb = panel.querySelector('[data-bg-fs]'); if (fb) fb.addEventListener('click', function () {
+                if (document.fullscreenElement) { document.exitFullscreen(); } else if (panel.requestFullscreen) { panel.requestFullscreen(); }
+            });
+
+            new ResizeObserver(function () { graph.width(container.clientWidth).height(container.clientHeight); }).observe(container);
+        }
+
+        function scan() {
+            document.querySelectorAll('[id^="braingraph-3d-"]').forEach(function (c) {
+                if (c.__bgInit) return;
+                if (c.clientWidth > 0 && c.clientHeight > 0) { init(c); return; }
+                // Tab versteckt (x-cloak/display:none) → warten, bis sichtbar
+                if (c.__bgObserved) return; c.__bgObserved = true;
+                var io = new IntersectionObserver(function (entries) {
+                    entries.forEach(function (e) { if (e.isIntersecting && e.target.clientWidth > 0) { init(e.target); io.disconnect(); } });
+                });
+                io.observe(c);
+            });
+        }
         document.addEventListener('livewire:navigated', scan);
         if (document.readyState !== 'loading') scan(); else document.addEventListener('DOMContentLoaded', scan);
-    })();
     </script>
     @endverbatim
 </div>

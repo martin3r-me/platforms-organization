@@ -51,6 +51,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 SyncEntityTypeCatalogCommand::class,
                 \Platform\Organization\Console\Commands\AuthzMaterializeCommand::class,
                 \Platform\Organization\Console\Commands\PurgeSignalsCommand::class,
+                \Platform\Organization\Console\Commands\DimensionLinkAuditCommand::class,
             ]);
         }
 
@@ -355,6 +356,7 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\ListDimensionLinksTool());
             $registry->register(new \Platform\Organization\Tools\LinkDimensionTool());
             $registry->register(new \Platform\Organization\Tools\UnlinkDimensionTool());
+            $registry->register(new \Platform\Organization\Tools\AuditDimensionLinksTool());
 
             // Relation Type Tools (Beziehungstypen - global)
             $registry->register(new \Platform\Organization\Tools\ListRelationTypesTool());

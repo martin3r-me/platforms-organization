@@ -70,7 +70,7 @@ wird registriert. Die restlichen 8 sind Follow-up für die jeweiligen Modul-Owne
   Audit-Gegenprobe: soft-deleted-Links 9→0, Unknowns 87→8 (nur noch Fremd-Modul-
   Aliase correspondence_thread/commerce_article_category/okr_forecast).
   **Follow-up (fremde Pakete):** diese 3 Module müssen ihren morph-Alias registrieren.
-- **Deploy C (Prävention/Erzwingung) — umgesetzt, Verifikation ausstehend:**
+- **Deploy C (Prävention/Erzwingung) — umgesetzt & live-verifiziert:**
   - **Hard-Cascade-Observer** (`DimensionValueObserver`): Value soft-delete →
     Links hart entfernen. Bewusst Hard-Delete statt softDeletes, weil Haupt-
     Consumer (`EntityPulseSubjectCollector`, `FeedService`) Links per roher
@@ -83,6 +83,9 @@ wird registriert. Die restlichen 8 sind Follow-up für die jeweiligen Modul-Owne
     (NULL ≠ NULL). Erst klären, ob das Perspective-Feature real genutzt wird.
   - **Regressionsnetz:** Audit-Check „Links auf soft-gelöschte Values" muss nach
     einem echten Value-Soft-Delete 0 bleiben.
+  - **Live-Test (2026-10-15):** Wegwerf-Entity unter #5 angelegt, Aufgabe #3549
+    daran verknüpft (1 Link), Entity gelöscht → Forward-Query 1→0 und Audit-Check
+    blieb 0 (ohne Observer wäre er 1 gewesen). Cascade empirisch bestätigt.
 
 **Sicherheitsnetz:** Package hat keine Test-Infrastruktur (nicht die Hauskonvention;
 nur sovra-health hat Testbench). Statt ungetesteter Unit-Tests dient das Audit gegen

@@ -6,6 +6,9 @@ use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Platform\Core\Livewire\Terminal\Concerns\WithTerminalContext;
 use Platform\Organization\Authz\DimensionLinkAuthorizer;
+use Platform\Organization\Models\OrganizationDimensionDefinition;
+use Platform\Organization\Models\OrganizationDimensionValue;
+use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Services\DimensionLinkService;
 
 /**
@@ -19,10 +22,14 @@ class DimensionLinks extends Component
 {
     use WithTerminalContext;
 
+    /** Suchbegriff des Add-Link-Pickers (entity-Dimension). */
+    public string $search = '';
+
     /** Computed-Cache leeren, wenn sich der Kontext ändert. */
     protected function onContextChanged(): void
     {
-        unset($this->groups, $this->canWrite);
+        $this->search = '';
+        unset($this->groups, $this->canWrite, $this->candidates);
     }
 
     /**
@@ -105,7 +112,93 @@ class DimensionLinks extends Component
             $dimValueId,
         );
 
-        unset($this->groups);
+        unset($this->groups, $this->candidates);
+    }
+
+    /**
+     * Add-Link-Picker (entity-Dimension): Organisationseinheiten, die der User
+     * beschreiben darf, optional nach Suchbegriff gefiltert, bereits verknüpfte
+     * ausgeschlossen. Leere Suche → kompakte Vorschlagsliste.
+     *
+     * @return array<int, array{id:int, name:string, code:?string}>
+     */
+    #[Computed]
+    public function candidates(): array
+    {
+        $user = auth()->user();
+        if (! $user || ! $this->hasContext() || ! $this->canWrite) {
+            return [];
+        }
+
+        $writable = (new DimensionLinkAuthorizer())->writableEntityIds($user);
+        if ($writable === []) {
+            return [];
+        }
+
+        // Bereits verknüpfte Entities ausschließen.
+        $linked = (new DimensionLinkService())
+            ->getLinked('entity', $this->contextType, (int) $this->contextId)
+            ->pluck('entity_id')
+            ->filter()
+            ->all();
+
+        $search = trim($this->search);
+        $limit = $search !== '' ? 20 : 8;
+
+        $query = OrganizationEntity::query()
+            ->whereIn('id', $writable)
+            ->where('is_active', true)
+            ->when($linked !== [], fn ($q) => $q->whereNotIn('id', $linked))
+            ->when($search !== '', fn ($q) => $q->where(function ($sub) use ($search) {
+                $sub->where('name', 'like', '%'.$search.'%')
+                    ->orWhere('code', 'like', '%'.$search.'%');
+            }))
+            ->orderBy('name')
+            ->limit($limit);
+
+        return $query->get(['id', 'name', 'code'])
+            ->map(fn ($e) => ['id' => (int) $e->id, 'name' => $e->name, 'code' => $e->code])
+            ->all();
+    }
+
+    /** Eine Organisationseinheit verknüpfen. Gated: Write auf Objekt + Entity. */
+    public function addLink(int $entityId): void
+    {
+        $user = auth()->user();
+        if (! $user || ! $this->hasContext() || ! $this->canWrite) {
+            return;
+        }
+
+        // Nur Entities, die der User beschreiben darf.
+        if (! in_array($entityId, (new DimensionLinkAuthorizer())->writableEntityIds($user), true)) {
+            return;
+        }
+
+        $def = OrganizationDimensionDefinition::findByKey('entity');
+        if (! $def || $def->value_source !== 'entity') {
+            return;
+        }
+
+        $dimValue = OrganizationDimensionValue::where('dimension_definition_id', $def->id)
+            ->where('metadata->source_entity_id', $entityId)
+            ->first();
+        if (! $dimValue) {
+            return;
+        }
+
+        (new DimensionLinkService())->link(
+            'entity',
+            $this->contextType,
+            (int) $this->contextId,
+            $dimValue->id,
+            [
+                'team_id'            => $user->currentTeam?->id,
+                'created_by_user_id' => $user->id,
+            ],
+        );
+
+        $this->search = '';
+        unset($this->groups, $this->candidates);
     }
 
     public function render()

@@ -3,6 +3,9 @@
         @if($this->hasContext())
             Verknüpfungen von
             <span class="text-[var(--t-text)] font-medium">{{ $contextSubject ?? ('#'.$contextId) }}</span>
+            @unless($this->canWrite)
+                <span class="ml-1 text-[9px] px-1 py-0.5 rounded bg-white/10 align-middle">nur Lesen</span>
+            @endunless
         @else
             Kein Objekt im Kontext.
         @endif
@@ -28,18 +31,20 @@
                                     <span class="ml-1 opacity-60">{{ $item['percentage'] }}%</span>
                                 @endif
                             </span>
-                            <button
-                                type="button"
-                                wire:click="unlink('{{ $group['key'] }}', {{ (int) $item['id'] }})"
-                                wire:confirm="Diese Verknüpfung entfernen?"
-                                class="shrink-0 text-[var(--t-text-muted)] hover:text-red-400 transition"
-                                title="Verknüpfung entfernen"
-                            >
-                                <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none"
-                                     viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
-                                </svg>
-                            </button>
+                            @if($this->canWrite)
+                                <button
+                                    type="button"
+                                    wire:click="unlink('{{ $group['key'] }}', {{ (int) $item['id'] }})"
+                                    wire:confirm="Diese Verknüpfung entfernen?"
+                                    class="shrink-0 text-[var(--t-text-muted)] hover:text-red-400 transition"
+                                    title="Verknüpfung entfernen"
+                                >
+                                    <svg class="w-3.5 h-3.5" xmlns="http://www.w3.org/2000/svg" fill="none"
+                                         viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 18 18 6M6 6l12 12"/>
+                                    </svg>
+                                </button>
+                            @endif
                         </li>
                     @endforeach
                 </ul>

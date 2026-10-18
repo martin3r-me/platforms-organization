@@ -5,6 +5,7 @@ namespace Platform\Organization\Livewire\Terminal;
 use Livewire\Attributes\Computed;
 use Livewire\Component;
 use Platform\Core\Livewire\Terminal\Concerns\WithTerminalContext;
+use Platform\Organization\Authz\DimensionLinkAuthorizer;
 use Platform\Organization\Services\DimensionLinkService;
 
 /**
@@ -21,29 +22,61 @@ class DimensionLinks extends Component
     /** Computed-Cache leeren, wenn sich der Kontext ändert. */
     protected function onContextChanged(): void
     {
-        unset($this->groups);
+        unset($this->groups, $this->canWrite);
+    }
+
+    /**
+     * Darf der aktuelle User die Verknüpfungen dieses Objekts verändern?
+     * Maßgeblich ist Write auf das Kontext-Objekt (wie die update()-Policy).
+     */
+    #[Computed]
+    public function canWrite(): bool
+    {
+        $user = auth()->user();
+        if (! $user || ! $this->hasContext()) {
+            return false;
+        }
+
+        return (new DimensionLinkAuthorizer())
+            ->canWriteContext($user, $this->contextType, (int) $this->contextId);
     }
 
     /**
      * Verknüpfungen des aktuellen Objekts, gruppiert je Dimension.
-     * Dimensionen ohne Links werden weggelassen.
+     * Entity-Links werden auf Entities gefiltert, die der User sehen darf.
+     * Dimensionen ohne (sichtbare) Links werden weggelassen.
      *
      * @return array<int, array{key:string, label:string, mode:string, items:array}>
      */
     #[Computed]
     public function groups(): array
     {
-        if (! $this->hasContext()) {
+        $user = auth()->user();
+        if (! $user || ! $this->hasContext()) {
             return [];
         }
+
+        // Nur Entities, die der User lesen darf (Read-Filter). Als Set für O(1).
+        $readable = array_flip((new DimensionLinkAuthorizer())->readableEntityIds($user));
 
         $service = new DimensionLinkService();
         $groups = [];
 
         foreach (DimensionLinkService::getDimensions() as $key => $cfg) {
-            $linked = $service->getLinked($key, $this->contextType, (int) $this->contextId);
+            $items = $service->getLinked($key, $this->contextType, (int) $this->contextId)
+                ->filter(function ($item) use ($readable) {
+                    // Entity-basierte Links: nur zeigen, wenn Entity lesbar.
+                    // Nicht-entity-Dimensionen (Enum-Werte) haben kein entity_id.
+                    if (! array_key_exists('entity_id', $item)) {
+                        return true;
+                    }
+                    $entityId = $item['entity_id'];
 
-            if ($linked->isEmpty()) {
+                    return $entityId !== null && isset($readable[$entityId]);
+                })
+                ->values();
+
+            if ($items->isEmpty()) {
                 continue;
             }
 
@@ -51,17 +84,17 @@ class DimensionLinks extends Component
                 'key'   => $key,
                 'label' => $cfg['label'] ?? $key,
                 'mode'  => $cfg['mode'] ?? 'single',
-                'items' => $linked->values()->all(),
+                'items' => $items->all(),
             ];
         }
 
         return $groups;
     }
 
-    /** Eine Verknüpfung entfernen. */
+    /** Eine Verknüpfung entfernen. Gated: Write auf das Kontext-Objekt. */
     public function unlink(string $dimension, int $dimValueId): void
     {
-        if (! $this->hasContext()) {
+        if (! $this->hasContext() || ! $this->canWrite) {
             return;
         }
 

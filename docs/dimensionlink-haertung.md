@@ -296,37 +296,56 @@ ab: Sie müssen vor und nach jeder Phase grün sein.
 
 ---
 
-## 5. Contract-Design in `core`
+## 5. API-Oberfläche (revidiert)
 
-Neues Interface in `core`, z.B. `Platform\Core\Contracts\DimensionLinkProvider`,
-das genau das abbildet, was die zentrale UI braucht — nichts Domänenspezifisches:
+**Verworfen:** der ursprünglich geplante core-seitige `DimensionLinkProvider`. Grund
+(siehe §6): die zentrale UI kommt als **Terminal-App aus `platforms-organization`**
+über den `TerminalApp`-Registry von core — core konsumiert DimensionLink nie selbst,
+also braucht es keinen core-Contract. Auch die MCP-Tools leben in organization und
+rufen `DimensionLinkService` direkt. Es gibt also keinen Konsumenten, der eine
+core-seitige Entkopplung bräuchte.
 
-- `dimensions(): array` — verfügbare Dimensionen (key, label, mode)
-- `linkedFor(string $contextType, int $contextId): Collection` — forward
-- `contextsFor(string $dimension, int $dimensionItemId): Collection` — reverse
-- `link(...) / unlink(...)` — mit denselben Metafeldern (percentage, is_primary, Zeitraum)
+**Gemeinsame Oberfläche ist `DimensionLinkService` selbst.** Als Skalierungs-Abschluss
+(nicht -Auftakt) bekommt er ein **org-internes** Interface
+`Platform\Organization\Contracts\DimensionLinkContract`, im `OrganizationServiceProvider`
+container-gebunden. Zweck: stabile, dokumentierte API für die vielen Konsumenten
+(MCP-Tools, Terminal-App, planner/sales/commerce/okr) + Decorator-Hook für
+Querschnittsbelange (Authz, Audit-Log, Caching). On-grain mit dem Framework-Muster
+„Contract + Registry".
 
-`platforms-organization` registriert seinen `DimensionLinkService` beim Boot als
-Implementierung dieses Contracts (Binding im `OrganizationServiceProvider`). Die
-bestehenden Tools/`DimensionLinker` bleiben unverändert — der Contract ist additiv
-obendrauf, kein Ersatz.
-
-**Abwärtskompatibilität:** bestehende direkte Importe von `DimensionLinkService`
-(planner, sales, commerce) bleiben gültig; sie können später optional auf den
-Contract migrieren, müssen aber nicht.
+**Reihenfolge (wichtig):** Interface NICHT jetzt — die Service-Oberfläche bewegt sich
+noch (Resolver, Guard, Mode-Validierung). Zuerst der Statik-Smell (statische
+`getDimensions/getDimension/resolveContextType` vs. Instanz-`getLinked/link/unlink`)
+entwirren, dann Interface extrahieren, binden, Konsumenten inkrementell (nicht-brechend)
+auf Injection umstellen. → **Phase 5.**
 
 ---
 
-## 6. Zentrale UI in `core`
+## 6. Zentrale UI als Terminal-App (revidiert)
 
-- Generische Livewire-Komponente in `core`, die **nur** gegen `DimensionLinkProvider`
-  arbeitet.
-- Rendert pro Kontext-Objekt die Dimensionen + Links; erlaubt Anhängen/Lösen,
-  Prozent-/Primary-Pflege gemäß Mode.
-- Kein Provider registriert → Komponente rendert leer/deaktiviert (keine harte
-  Abhängigkeit).
-- Die bestehende `DimensionLinker`-Komponente in organization bleibt bestehen; die
-  core-UI ist der neue zentrale Einstieg, kein Breaking Replacement.
+Die UI ist eine **Terminal-App im Core-Terminal**, beigesteuert von
+`platforms-organization` über `Platform\Core\Terminal\TerminalAppRegistry`
+(derselbe entkoppelte Weg wie `DemoTerminalApp`; der Dependency-Pfeil zeigt auf den
+`TerminalApp`-Contract, nie vom Shell ins Modul).
+
+**Mechanik (bereits vorhanden, nichts zu bauen am Event-System):** Jede Seite
+dispatcht im `rendered()` ein `comms`-Event `{model (FQCN), modelId, subject, url, …}`.
+Das Terminal setzt daraus seinen Kontext und broadcastet `terminal-context-changed`.
+Die App nutzt das Trait `WithTerminalContext` und bekommt `contextType` (FQCN) +
+`contextId` — genau das, was `DimensionLinkService::getLinked()` braucht
+(`resolveContextType()` bridged FQCN→Morph-Alias intern).
+
+**Bausteine (in organization):**
+- `Terminal/DimensionLinksTerminalApp` implements `TerminalApp` — Tab, `group='module'`,
+  `isAvailable = $context->hasContext()` (nur bei konkretem Objekt).
+- Livewire-Panel `Livewire/Terminal/DimensionLinks` (Trait `WithTerminalContext`),
+  Alias `organization.terminal.dimension-links`.
+- Registrierung des `TerminalApp` im `OrganizationServiceProvider::boot()` (try/catch,
+  wie `AudienceResolverRegistry`).
+
+**Scope v1:** Forward-Lesen — pro Dimension die verknüpften Werte des aktuellen
+Objekts anzeigen + Unlink. **Add-Link-Flow (Entity-Picker) = v2**, eigene UX-Runde.
+Die bestehende `DimensionLinker`-Komponente bleibt unverändert.
 
 ---
 

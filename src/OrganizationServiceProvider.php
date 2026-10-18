@@ -83,6 +83,17 @@ class OrganizationServiceProvider extends ServiceProvider
             // Registry (noch) nicht verfügbar (z.B. während Migrationen) — überspringen.
         }
 
+        // Terminal-App: DimensionLink-Verknüpfungen des Kontext-Objekts ins
+        // Core-Terminal einhängen (entkoppelt via Registry; Pfeil zeigt auf den
+        // TerminalApp-Contract, nicht vom Shell ins Modul).
+        try {
+            \Platform\Core\Terminal\TerminalAppRegistry::register(
+                new \Platform\Organization\Terminal\DimensionLinksTerminalApp()
+            );
+        } catch (\Throwable $e) {
+            // Terminal/Registry (noch) nicht verfügbar — überspringen.
+        }
+
         // Schritt 1: Config laden
         $this->mergeConfigFrom(__DIR__.'/../config/organization.php', 'organization');
         
@@ -151,6 +162,7 @@ class OrganizationServiceProvider extends ServiceProvider
         // Entity-Komponenten manuell registrieren (für Sicherheit)
         Livewire::component('organization.entity.modal-relations', \Platform\Organization\Livewire\Entity\ModalRelations::class);
         Livewire::component('organization.entity.person-activity', \Platform\Organization\Livewire\Entity\PersonActivity::class);
+        Livewire::component('organization.terminal.dimension-links', \Platform\Organization\Livewire\Terminal\DimensionLinks::class);
 
         // Tools registrieren (loose gekoppelt - für AI/Chat)
         $this->registerTools();

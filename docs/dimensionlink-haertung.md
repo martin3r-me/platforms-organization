@@ -294,6 +294,33 @@ für das heutige Verhalten von `DimensionLinkService` — forward/reverse, singl
 multi, Alias-Resolution, Entity-Auflösung. Diese Tests sichern Abwärtskompatibilität
 ab: Sie müssen vor und nach jeder Phase grün sein.
 
+### 4.6 Authz: Schreib- und Lesepfad ungeschützt (hohe Priorität)
+
+**Problem (verifiziert):** `DimensionLinkService::link/unlink`, die MCP-Tools
+(`LinkDimensionTool`/`UnlinkDimensionTool`), die `DimensionLinker`-Komponente und die
+neue Terminal-App machen **keine** Rechteprüfung. Lesepfade (`getLinked`) filtern
+nicht nach Sichtbarkeit. Brisanz: entity-`dimension_links` speisen die
+Authz-Materialisierung (`AuthzMaterializeCommand` Phase 2 → `authz_resource_link`),
+d.h. ungeprüftes Verknüpfen verschiebt Objekte im Sichtbarkeitsbaum.
+
+**Vorhandene, wiederzuverwendende API (core):**
+- `->visibleTo($user, $cap)` (Eloquent-Macro, `VisibilityScope`) — Query auf
+  sichtbare Ressourcen filtern (Picker/Read-View).
+- `AuthzResolver::may($user, $cap, $type, $id)` + `owns(...)` — Einzel-Check.
+- Level `read < write < manage` (`Capability`).
+
+**Maßnahme (on-grain mit Planner — Durchsetzung an den Grenzen, Service bleibt rein,
+damit System-/Seed-Aufrufer nicht brechen):**
+- **Read-View:** Links auf Entities filtern, die der User lesen darf.
+- **Unlink/Link:** nur bei `write`/`manage` auf Entity **und** Kontext-Objekt
+  (`may(...) || owns(...)`), Controls sonst ausblenden.
+- **Picker (v2):** Entities via `->visibleTo($user, 'write')`.
+- Ein gemeinsamer Authz-Helper, den Terminal-App, MCP-Tools und `DimensionLinker`
+  teilen (DRY), statt drei Einzelprüfungen.
+
+Reihenfolge: **v1-Authz-Retrofit sofort** (Read-Filter + Unlink-Gate, da v1 live &
+leaky), Picker-Gating zusammen mit v2.
+
 ---
 
 ## 5. API-Oberfläche (revidiert)

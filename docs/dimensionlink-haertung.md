@@ -374,6 +374,19 @@ Die App nutzt das Trait `WithTerminalContext` und bekommt `contextType` (FQCN) +
 Objekts anzeigen + Unlink. **Add-Link-Flow (Entity-Picker) = v2**, eigene UX-Runde.
 Die bestehende `DimensionLinker`-Komponente bleibt unverändert.
 
+**Status — ausgeliefert & live-verifiziert:**
+- v1: Forward-Lesen + Unlink, **authz-gated** (Read-Filter auf lesbare Entities,
+  Write-Gate via `DimensionLinkAuthorizer`).
+- v2: Hybrid-Picker (Suche + Vorschläge) für entity, `writableEntityIds`-gefiltert.
+- Herkunftspfad (Ancestors) an Links und Kandidaten.
+- v3: %-Aufteilung (multi_percent, inline + Σ-Balken), is_primary-Toggle,
+  Zeitraum (von–bis), UX-Politur. Service um setPercentage/setPrimary/setDates
+  erweitert.
+
+**Offen:** weitere Dimensionen im Picker (vsm-system/cost-driver), „zuletzt
+genutzt"-Vorschläge (Session-Store), **Authz-Gating auf MCP-Tools + DimensionLinker
+nachziehen** (derselbe Helper — schließt §4.6 überall, nicht nur im Terminal).
+
 ---
 
 ## 7. Migrationspfad in Phasen

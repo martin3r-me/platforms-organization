@@ -68,6 +68,7 @@ class DimensionLinks extends Component
 
         $service = new DimensionLinkService();
         $groups = [];
+        $entityIds = [];
 
         foreach (DimensionLinkService::getDimensions() as $key => $cfg) {
             $items = $service->getLinked($key, $this->contextType, (int) $this->contextId)
@@ -81,21 +82,89 @@ class DimensionLinks extends Component
 
                     return $entityId !== null && isset($readable[$entityId]);
                 })
-                ->values();
+                ->values()
+                ->all();
 
-            if ($items->isEmpty()) {
+            if ($items === []) {
                 continue;
+            }
+
+            foreach ($items as $item) {
+                if (! empty($item['entity_id'])) {
+                    $entityIds[] = (int) $item['entity_id'];
+                }
             }
 
             $groups[] = [
                 'key'   => $key,
                 'label' => $cfg['label'] ?? $key,
                 'mode'  => $cfg['mode'] ?? 'single',
-                'items' => $items->all(),
+                'items' => $items,
             ];
         }
 
+        // Herkunftspfad (Ancestors) je Entity anhängen.
+        $paths = $this->entityPaths($entityIds);
+        foreach ($groups as &$group) {
+            foreach ($group['items'] as &$item) {
+                if (! empty($item['entity_id'])) {
+                    $item['path'] = $paths[(int) $item['entity_id']] ?? [];
+                }
+            }
+            unset($item);
+        }
+        unset($group);
+
         return $groups;
+    }
+
+    /**
+     * Baut je Entity-ID den Ancestor-Pfad (Namen, root→Elter, ohne den Knoten
+     * selbst). Lädt Knoten + Vorfahren in wenigen whereIn-Batches (Tiefe), danach
+     * in-memory — vermeidet N+1 beim Hochlaufen des Baums.
+     *
+     * @param array<int, int> $ids
+     * @return array<int, array<int, string>>  entityId => [Ahnenname, …] (root zuerst)
+     */
+    private function entityPaths(array $ids): array
+    {
+        $ids = array_values(array_unique(array_map('intval', array_filter($ids))));
+        if ($ids === []) {
+            return [];
+        }
+
+        $nodes = [];      // id => (object) {id, name, parent_entity_id}
+        $toLoad = $ids;
+        $guard = 0;
+        while ($toLoad !== [] && $guard++ < 25) {
+            $rows = OrganizationEntity::whereIn('id', $toLoad)->get(['id', 'name', 'parent_entity_id']);
+            $toLoad = [];
+            foreach ($rows as $row) {
+                if (isset($nodes[$row->id])) {
+                    continue;
+                }
+                $nodes[$row->id] = $row;
+                $pid = $row->parent_entity_id;
+                if ($pid && ! isset($nodes[$pid])) {
+                    $toLoad[] = (int) $pid;
+                }
+            }
+            $toLoad = array_values(array_unique($toLoad));
+        }
+
+        $paths = [];
+        foreach ($ids as $id) {
+            $chain = [];
+            $pid = $nodes[$id]->parent_entity_id ?? null;
+            $depth = 0;
+            while ($pid && isset($nodes[$pid]) && $depth++ < 25) {
+                array_unshift($chain, $nodes[$pid]->name);
+                $pid = $nodes[$pid]->parent_entity_id;
+            }
+            $paths[$id] = $chain;
+        }
+
+        return $paths;
     }
 
     /** Eine Verknüpfung entfernen. Gated: Write auf das Kontext-Objekt. */
@@ -156,8 +225,16 @@ class DimensionLinks extends Component
             ->orderBy('name')
             ->limit($limit);
 
-        return $query->get(['id', 'name', 'code'])
-            ->map(fn ($e) => ['id' => (int) $e->id, 'name' => $e->name, 'code' => $e->code])
+        $rows = $query->get(['id', 'name', 'code']);
+        $paths = $this->entityPaths($rows->pluck('id')->all());
+
+        return $rows
+            ->map(fn ($e) => [
+                'id'   => (int) $e->id,
+                'name' => $e->name,
+                'code' => $e->code,
+                'path' => $paths[(int) $e->id] ?? [],
+            ])
             ->all();
     }
 

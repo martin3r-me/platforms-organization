@@ -21,16 +21,23 @@
                 <ul class="space-y-1">
                     @foreach($group['items'] as $item)
                         <li wire:key="dim-item-{{ $group['key'] }}-{{ $item['id'] }}"
-                            class="flex items-center justify-between gap-2 px-2 py-1 rounded bg-white/5 text-[12px]">
-                            <span class="truncate">
-                                {{ $item['name'] ?? ('#'.$item['id']) }}
-                                @if(!empty($item['is_primary']))
-                                    <span class="ml-1 text-[9px] px-1 py-0.5 rounded bg-white/10 align-middle">primary</span>
+                            class="flex items-start justify-between gap-2 px-2 py-1 rounded bg-white/5 text-[12px]">
+                            <div class="min-w-0 flex-1">
+                                <div class="truncate">
+                                    {{ $item['name'] ?? ('#'.$item['id']) }}
+                                    @if(!empty($item['is_primary']))
+                                        <span class="ml-1 text-[9px] px-1 py-0.5 rounded bg-white/10 align-middle">primary</span>
+                                    @endif
+                                    @if(!empty($item['percentage']))
+                                        <span class="ml-1 opacity-60">{{ $item['percentage'] }}%</span>
+                                    @endif
+                                </div>
+                                @if(!empty($item['path']))
+                                    <div class="truncate text-[10px] text-[var(--t-text-muted)] opacity-70">
+                                        {{ implode(' › ', $item['path']) }}
+                                    </div>
                                 @endif
-                                @if(!empty($item['percentage']))
-                                    <span class="ml-1 opacity-60">{{ $item['percentage'] }}%</span>
-                                @endif
-                            </span>
+                            </div>
                             @if($this->canWrite)
                                 <button
                                     type="button"
@@ -73,13 +80,20 @@
                 <ul class="mt-1.5 space-y-1">
                     @forelse($this->candidates as $cand)
                         <li wire:key="cand-{{ $cand['id'] }}"
-                            class="flex items-center justify-between gap-2 px-2 py-1 rounded hover:bg-white/5 text-[12px]">
-                            <span class="truncate">
-                                {{ $cand['name'] }}
-                                @if($cand['code'])
-                                    <span class="ml-1 opacity-50">{{ $cand['code'] }}</span>
+                            class="flex items-start justify-between gap-2 px-2 py-1 rounded hover:bg-white/5 text-[12px]">
+                            <div class="min-w-0 flex-1">
+                                <div class="truncate">
+                                    {{ $cand['name'] }}
+                                    @if($cand['code'])
+                                        <span class="ml-1 opacity-50">{{ $cand['code'] }}</span>
+                                    @endif
+                                </div>
+                                @if(!empty($cand['path']))
+                                    <div class="truncate text-[10px] text-[var(--t-text-muted)] opacity-70">
+                                        {{ implode(' › ', $cand['path']) }}
+                                    </div>
                                 @endif
-                            </span>
+                            </div>
                             <button
                                 type="button"
                                 wire:click="addLink({{ $cand['id'] }})"

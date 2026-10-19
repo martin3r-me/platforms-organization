@@ -119,6 +119,8 @@ class DimensionLinkService
                 'name' => $link->value?->name,
                 'percentage' => $link->percentage ? (float) $link->percentage : null,
                 'is_primary' => (bool) $link->is_primary,
+                'start_date' => $link->start_date?->format('Y-m-d'),
+                'end_date' => $link->end_date?->format('Y-m-d'),
             ];
 
             if ($isEntityBased) {
@@ -264,5 +266,85 @@ class DimensionLinkService
             ->where('linkable_type', $contextType)
             ->where('linkable_id', $contextId)
             ->delete() > 0;
+    }
+
+    /**
+     * Prozent-Anteil eines Links setzen (relevant bei mode=multi_percent).
+     * null entfernt den Wert.
+     */
+    public function setPercentage(string $dimension, string $contextType, int $contextId, int $dimensionValueId, ?float $percentage): bool
+    {
+        $link = $this->findLink($dimension, $contextType, $contextId, $dimensionValueId);
+        if (! $link) {
+            return false;
+        }
+
+        $link->percentage = $percentage === null ? null : round($percentage, 2);
+        $link->save();
+
+        return true;
+    }
+
+    /**
+     * Primär-Flag setzen. Bei true wird exklusiv gesetzt (alle anderen Links
+     * derselben Dimension+Linkable werden entprimärt).
+     */
+    public function setPrimary(string $dimension, string $contextType, int $contextId, int $dimensionValueId, bool $primary): bool
+    {
+        $contextType = self::resolveContextType($contextType);
+        $def = OrganizationDimensionDefinition::findByKey($dimension);
+        if (! $def) {
+            return false;
+        }
+
+        $base = OrganizationDimensionLink::where('dimension_definition_id', $def->id)
+            ->where('linkable_type', $contextType)
+            ->where('linkable_id', $contextId);
+
+        if ($primary) {
+            // Exklusiv: erst alle entprimären, dann den gewählten setzen.
+            (clone $base)->update(['is_primary' => false]);
+
+            return (clone $base)->where('dimension_value_id', $dimensionValueId)
+                ->update(['is_primary' => true]) > 0;
+        }
+
+        return (clone $base)->where('dimension_value_id', $dimensionValueId)
+            ->update(['is_primary' => false]) > 0;
+    }
+
+    /**
+     * Gültigkeitszeitraum eines Links setzen (null = unbegrenzt).
+     */
+    public function setDates(string $dimension, string $contextType, int $contextId, int $dimensionValueId, ?string $startDate, ?string $endDate): bool
+    {
+        $link = $this->findLink($dimension, $contextType, $contextId, $dimensionValueId);
+        if (! $link) {
+            return false;
+        }
+
+        $link->start_date = $startDate ?: null;
+        $link->end_date = $endDate ?: null;
+        $link->save();
+
+        return true;
+    }
+
+    /**
+     * Einen konkreten Link (Dimension + Linkable + Value) finden.
+     */
+    private function findLink(string $dimension, string $contextType, int $contextId, int $dimensionValueId): ?OrganizationDimensionLink
+    {
+        $contextType = self::resolveContextType($contextType);
+        $def = OrganizationDimensionDefinition::findByKey($dimension);
+        if (! $def) {
+            return null;
+        }
+
+        return OrganizationDimensionLink::where('dimension_definition_id', $def->id)
+            ->where('dimension_value_id', $dimensionValueId)
+            ->where('linkable_type', $contextType)
+            ->where('linkable_id', $contextId)
+            ->first();
     }
 }

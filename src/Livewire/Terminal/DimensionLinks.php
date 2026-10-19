@@ -25,10 +25,16 @@ class DimensionLinks extends Component
     /** Suchbegriff des Add-Link-Pickers (entity-Dimension). */
     public string $search = '';
 
+    /** Aktuell geöffneter Zeitraum-Editor als "dimension:dimValueId" (oder null). */
+    public ?string $datesOpen = null;
+    public ?string $editStart = null;
+    public ?string $editEnd = null;
+
     /** Computed-Cache leeren, wenn sich der Kontext ändert. */
     protected function onContextChanged(): void
     {
         $this->search = '';
+        $this->datesOpen = null;
         unset($this->groups, $this->canWrite, $this->candidates);
     }
 
@@ -95,11 +101,15 @@ class DimensionLinks extends Component
                 }
             }
 
+            $mode = $cfg['mode'] ?? 'single';
             $groups[] = [
-                'key'   => $key,
-                'label' => $cfg['label'] ?? $key,
-                'mode'  => $cfg['mode'] ?? 'single',
-                'items' => $items,
+                'key'         => $key,
+                'label'       => $cfg['label'] ?? $key,
+                'mode'        => $mode,
+                'items'       => $items,
+                'percent_sum' => $mode === 'multi_percent'
+                    ? round(array_sum(array_map(fn ($i) => (float) ($i['percentage'] ?? 0), $items)), 2)
+                    : null,
             ];
         }
 
@@ -182,6 +192,88 @@ class DimensionLinks extends Component
         );
 
         unset($this->groups, $this->candidates);
+    }
+
+    /** Prozent-Anteil eines Links setzen (multi_percent). */
+    public function setPercentage(string $dimension, int $dimValueId, $value): void
+    {
+        if (! $this->guardWrite()) {
+            return;
+        }
+
+        $pct = ($value === '' || $value === null) ? null : (float) $value;
+        (new DimensionLinkService())->setPercentage(
+            $dimension, $this->contextType, (int) $this->contextId, $dimValueId, $pct,
+        );
+
+        unset($this->groups);
+    }
+
+    /** Primär-Flag umschalten (exklusiv je Dimension+Objekt). */
+    public function togglePrimary(string $dimension, int $dimValueId): void
+    {
+        if (! $this->guardWrite()) {
+            return;
+        }
+
+        $current = $this->currentPrimary($dimension, $dimValueId);
+        (new DimensionLinkService())->setPrimary(
+            $dimension, $this->contextType, (int) $this->contextId, $dimValueId, ! $current,
+        );
+
+        unset($this->groups);
+    }
+
+    /** Zeitraum-Editor öffnen/schließen (seedet die Felder aus dem Link). */
+    public function toggleDates(string $dimension, int $dimValueId, ?string $start = null, ?string $end = null): void
+    {
+        $key = $dimension.':'.$dimValueId;
+        if ($this->datesOpen === $key) {
+            $this->datesOpen = null;
+
+            return;
+        }
+
+        $this->datesOpen = $key;
+        $this->editStart = $start ?: null;
+        $this->editEnd = $end ?: null;
+    }
+
+    /** Gültigkeitszeitraum speichern. */
+    public function saveDates(string $dimension, int $dimValueId): void
+    {
+        if (! $this->guardWrite()) {
+            return;
+        }
+
+        (new DimensionLinkService())->setDates(
+            $dimension, $this->contextType, (int) $this->contextId, $dimValueId,
+            $this->editStart ?: null, $this->editEnd ?: null,
+        );
+
+        $this->datesOpen = null;
+        unset($this->groups);
+    }
+
+    private function guardWrite(): bool
+    {
+        return auth()->user() !== null && $this->hasContext() && $this->canWrite;
+    }
+
+    private function currentPrimary(string $dimension, int $dimValueId): bool
+    {
+        foreach ($this->groups as $group) {
+            if ($group['key'] !== $dimension) {
+                continue;
+            }
+            foreach ($group['items'] as $item) {
+                if ((int) $item['id'] === $dimValueId) {
+                    return ! empty($item['is_primary']);
+                }
+            }
+        }
+
+        return false;
     }
 
     /**

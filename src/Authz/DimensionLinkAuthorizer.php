@@ -3,6 +3,8 @@
 namespace Platform\Organization\Authz;
 
 use Platform\Core\Authz\AuthzResolver;
+use Illuminate\Database\Eloquent\Model;
+use Illuminate\Support\Facades\Gate;
 use Platform\Core\Models\User;
 
 /**
@@ -52,6 +54,30 @@ class DimensionLinkAuthorizer
     {
         return $this->resolver->may($user, 'read', $contextType, $contextId)
             || $this->resolver->owns($user, $contextType, $contextId);
+    }
+
+    /**
+     * Darf der User dieses Objekt lesen? Gleiche Entscheidung wie das Modul:
+     * Policy mit view() (z. B. Ticket erbt vom Board) → sonst may()||owns()
+     * → sonst Team-Gleichheit (Module ohne Policy scopen nur per team_id).
+     * $teamIds = Session-Team und dessen Root-Team.
+     *
+     * @param array<int, int> $teamIds
+     */
+    public function canReadObject(User $user, Model $object, array $teamIds): bool
+    {
+        $policy = Gate::getPolicyFor($object);
+        if ($policy && method_exists($policy, 'view')) {
+            return Gate::forUser($user)->allows('view', $object);
+        }
+
+        if ($this->canReadContext($user, $object::class, (int) $object->getKey())) {
+            return true;
+        }
+
+        $teamId = $object->getAttribute('team_id');
+
+        return $teamId !== null && in_array((int) $teamId, $teamIds, true);
     }
 
     /**

@@ -100,7 +100,8 @@ class GetBriefTool implements ToolContract, ToolMetadataContract
 
                 $fqcn = Relation::getMorphedModel($alias);
                 $object = ($fqcn && class_exists($fqcn)) ? $fqcn::find($objectId) : null;
-                if (! $object || ! $authz->canReadContext($user, $fqcn, $objectId)) {
+                $teamIds = array_values(array_filter([(int) $resolved['team_id'], $rootTeamId]));
+                if (! $object || ! $authz->canReadObject($user, $object, $teamIds)) {
                     return ToolResult::error('NOT_FOUND', 'Objekt nicht gefunden oder kein Lesezugriff.');
                 }
 
@@ -326,16 +327,13 @@ class GetBriefTool implements ToolContract, ToolMetadataContract
 
     private function label(object $model): ?string
     {
-        if ($model instanceof HasDisplayName) {
-            return $model->getDisplayName();
-        }
         foreach (['title', 'name', 'subject'] as $attr) {
             if (! empty($model->{$attr})) {
                 return (string) $model->{$attr};
             }
         }
 
-        return null;
+        return $model instanceof HasDisplayName ? $model->getDisplayName() : null;
     }
 
     public function getMetadata(): array

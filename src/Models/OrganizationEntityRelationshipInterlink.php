@@ -4,7 +4,6 @@ namespace Platform\Organization\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Team;
@@ -72,15 +71,5 @@ class OrganizationEntityRelationshipInterlink extends Model
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function slaContracts(): BelongsToMany
-    {
-        return $this->belongsToMany(
-            OrganizationSlaContract::class,
-            'organization_eri_sla_contracts',
-            'entity_relationship_interlink_id',
-            'sla_contract_id'
-        )->withTimestamps();
     }
 }

@@ -401,12 +401,6 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\LinkInterlinkToRelationshipTool());
             $registry->register(new \Platform\Organization\Tools\UnlinkInterlinkFromRelationshipTool());
 
-            // SLA Contract Tools
-            $registry->register(new \Platform\Organization\Tools\ListSlaContractsTool());
-            $registry->register(new \Platform\Organization\Tools\CreateSlaContractTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateSlaContractTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteSlaContractTool());
-
             // Role Tools (Rollen-Katalog)
             $registry->register(new \Platform\Organization\Tools\ListRolesTool());
             $registry->register(new \Platform\Organization\Tools\CreateRoleTool());

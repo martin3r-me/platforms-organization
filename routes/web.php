@@ -17,8 +17,6 @@ use Platform\Organization\Livewire\Settings\InterlinkType\Index as InterlinkType
 use Platform\Organization\Livewire\Settings\InterlinkType\Show as InterlinkTypeShow;
 use Platform\Organization\Livewire\Interlink\Index as InterlinkIndex;
 use Platform\Organization\Livewire\Interlink\Show as InterlinkShow;
-use Platform\Organization\Livewire\SlaContract\Index as SlaContractIndex;
-use Platform\Organization\Livewire\SlaContract\Show as SlaContractShow;
 use Platform\Organization\Livewire\TimeEntries\Index as TimeEntriesIndex;
 use Platform\Organization\Livewire\PlannedTimes\Index as PlannedTimesIndex;
 use Platform\Organization\Livewire\Role\Index as RoleIndex;
@@ -106,10 +104,6 @@ Route::get('/settings/signal-definitions/{signalDefinition}', SignalDefinitionSh
 // Interlinks
 Route::get('/interlinks', InterlinkIndex::class)->name('organization.interlinks.index');
 Route::get('/interlinks/{interlink}', InterlinkShow::class)->name('organization.interlinks.show');
-
-// SLA-Verträge
-Route::get('/sla-contracts', SlaContractIndex::class)->name('organization.sla-contracts.index');
-Route::get('/sla-contracts/{slaContract}', SlaContractShow::class)->name('organization.sla-contracts.show');
 
 // Zeiten: Ist-Zeiten und Geplante Zeiten
 Route::get('/time-entries', TimeEntriesIndex::class)->name('organization.time-entries.index');

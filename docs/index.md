@@ -60,7 +60,6 @@ Prozesse dokumentieren, **wie** Arbeit erledigt wird — Schritt für Schritt, m
 | [Zeiterfassung](zeiterfassung) | Erfasste und geplante Stunden |
 | [Personen & Rollen](personen) | Stellenprofile und Rollenzuweisungen |
 | [Dimensionen](dimensionen) | VSM-Systeme; Kostenstellen als Fremd-ID an Entities |
-| [SLA-Verträge](sla) | Service Level Agreements |
 
 ---
 

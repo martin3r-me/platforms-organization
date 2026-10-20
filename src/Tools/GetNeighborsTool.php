@@ -236,7 +236,9 @@ class GetNeighborsTool implements ToolContract, ToolMetadataContract
             $linkCounts = EntityDimensionBridge::linkCountsByEntityAndType($nodeIds);
             $signalCounts = OrganizationSignal::whereIn('entity_id', $nodeIds)->actionable()
                 ->selectRaw('entity_id, count(*) as c')->groupBy('entity_id')->pluck('c', 'entity_id');
-            $childCounts = $this->entityQuery($rootTeamId, $includeInactive)->whereIn('parent_entity_id', $nodeIds)
+            $childCounts = OrganizationEntity::where('team_id', $rootTeamId)
+                ->when(! $includeInactive, fn ($q) => $q->where('is_active', true))
+                ->whereIn('parent_entity_id', $nodeIds)
                 ->selectRaw('parent_entity_id, count(*) as c')->groupBy('parent_entity_id')->pluck('c', 'parent_entity_id');
 
             $response = [

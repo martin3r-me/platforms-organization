@@ -17,10 +17,11 @@ class ObjectContextResolver
     /**
      * Parent fallback: morph alias → [fk_field, parent_morph_alias].
      * When an object has no direct entity link, resolve via its parent.
+     * fk_field darf ein Relationspfad sein (data_get), z. B. Issue → Board → Package.
      */
     public const PARENT_MAP = [
         'planner_task' => ['project_id', 'project'],
-        'dev_issue' => ['dev_board_id', 'dev_package'],
+        'dev_issue' => ['board.dev_package_id', 'dev_package'],
         'helpdesk_ticket' => ['helpdesk_board_id', 'helpdesk_board'],
         'change_action' => ['change_project_id', 'change_project'],
         'change_phase' => ['change_project_id', 'change_project'],
@@ -135,7 +136,7 @@ class ObjectContextResolver
             $fqcn = Relation::getMorphedModel($morphAlias);
 
             if ($fqcn && class_exists($fqcn)) {
-                $parentId = $fqcn::find($objectId)?->{$fkField};
+                $parentId = data_get($fqcn::find($objectId), $fkField);
                 if ($parentId) {
                     $links = EntityDimensionBridge::linksForLinkables(self::linkableTypes($parentAlias), [$parentId], true);
                     if ($links->isNotEmpty()) {

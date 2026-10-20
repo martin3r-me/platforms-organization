@@ -43,6 +43,26 @@ class Dashboard extends Component
         );
     }
 
+    /** Kachel-Daten 10 min je Team/Stream gecacht — Snapshots ändern sich nur 08:00/18:00. */
+    private const PANEL_CACHE_TTL = 600;
+
+    /** Messmodus: $wire.set('profile', true) → Zeiten je Kachel im HTML (#org-dashboard-timings). */
+    public bool $profile = false;
+    protected array $timings = [];
+
+    protected function panel(string $name, \Closure $compute): array
+    {
+        $start = microtime(true);
+        $key = 'organization:dashboard:' . $this->getTeamId() . ':' . ($this->dashboardStream ?? 'all') . ':' . $name;
+        $result = $this->profile ? $compute() : Cache::remember($key, self::PANEL_CACHE_TTL, $compute);
+        if ($this->profile) {
+            Cache::put($key, $result, self::PANEL_CACHE_TTL);
+            $this->timings[$name] = round((microtime(true) - $start) * 1000);
+        }
+
+        return $result;
+    }
+
     public function getTeamId(): ?int
     {
         $user = auth()->user();
@@ -69,6 +89,11 @@ class Dashboard extends Component
 
     #[Computed]
     public function teamSnapshotSummary(): array
+    {
+        return $this->panel('teamSnapshotSummary', fn () => $this->computeTeamSnapshotSummary());
+    }
+
+    protected function computeTeamSnapshotSummary(): array
     {
         $teamId = $this->getTeamId();
         if (!$teamId) {
@@ -117,6 +142,11 @@ class Dashboard extends Component
     #[Computed]
     public function teamMovement(): array
     {
+        return $this->panel('teamMovement', fn () => $this->computeTeamMovement());
+    }
+
+    protected function computeTeamMovement(): array
+    {
         $teamId = $this->getTeamId();
         if (!$teamId) {
             return [];
@@ -134,6 +164,11 @@ class Dashboard extends Component
 
     #[Computed]
     public function entityHealthOverview(): array
+    {
+        return $this->panel('entityHealthOverview', fn () => $this->computeEntityHealthOverview());
+    }
+
+    protected function computeEntityHealthOverview(): array
     {
         $teamId = $this->getTeamId();
         if (!$teamId) {
@@ -196,6 +231,11 @@ class Dashboard extends Component
     #[Computed]
     public function teamTimeAnalytics(): array
     {
+        return $this->panel('teamTimeAnalytics', fn () => $this->computeTeamTimeAnalytics());
+    }
+
+    protected function computeTeamTimeAnalytics(): array
+    {
         $teamId = $this->getTeamId();
         if (!$teamId) {
             return $this->emptyTimeAnalytics();
@@ -247,6 +287,11 @@ class Dashboard extends Component
     #[Computed]
     public function completionVelocity(): array
     {
+        return $this->panel('completionVelocity', fn () => $this->computeCompletionVelocity());
+    }
+
+    protected function computeCompletionVelocity(): array
+    {
         $teamId = $this->getTeamId();
         if (!$teamId) {
             return ['weekly_rates' => [], 'avg_per_week' => 0, 'trend' => 'stable'];
@@ -297,6 +342,11 @@ class Dashboard extends Component
 
     #[Computed]
     public function teamSnapshotTrend(): array
+    {
+        return $this->panel('teamSnapshotTrend', fn () => $this->computeTeamSnapshotTrend());
+    }
+
+    protected function computeTeamSnapshotTrend(): array
     {
         $teamId = $this->getTeamId();
         if (!$teamId) {
@@ -352,6 +402,11 @@ class Dashboard extends Component
 
     #[Computed]
     public function linkTypeDistribution(): array
+    {
+        return $this->panel('linkTypeDistribution', fn () => $this->computeLinkTypeDistribution());
+    }
+
+    protected function computeLinkTypeDistribution(): array
     {
         $teamId = $this->getTeamId();
         if (!$teamId) {
@@ -427,6 +482,11 @@ class Dashboard extends Component
     #[Computed]
     public function topEntitiesByActivity(): array
     {
+        return $this->panel('topEntitiesByActivity', fn () => $this->computeTopEntitiesByActivity());
+    }
+
+    protected function computeTopEntitiesByActivity(): array
+    {
         $teamId = $this->getTeamId();
         if (!$teamId) {
             return [];
@@ -484,6 +544,11 @@ class Dashboard extends Component
 
     #[Computed]
     public function personOverview(): array
+    {
+        return $this->panel('personOverview', fn () => $this->computePersonOverview());
+    }
+
+    protected function computePersonOverview(): array
     {
         $empty = ['persons' => [], 'totals' => [], 'metric_configs' => [], 'person_count' => 0];
 
@@ -567,6 +632,11 @@ class Dashboard extends Component
 
     #[Computed]
     public function insightStatements(): array
+    {
+        return $this->panel('insightStatements', fn () => $this->computeInsightStatements());
+    }
+
+    protected function computeInsightStatements(): array
     {
         $statements = [];
         $summary = $this->teamSnapshotSummary;
@@ -856,6 +926,11 @@ class Dashboard extends Component
     #[Computed]
     public function environmentRadar(): array
     {
+        return $this->panel('environmentRadar', fn () => $this->computeEnvironmentRadar());
+    }
+
+    protected function computeEnvironmentRadar(): array
+    {
         $teamId = $this->getTeamId();
         if (!$teamId) {
             return ['sources' => [], 'has_data' => false];
@@ -922,6 +997,11 @@ class Dashboard extends Component
             'sources' => $allSources,
             'has_data' => count($allSources) > 0,
         ];
+    }
+
+    public function timings(): array
+    {
+        return $this->timings;
     }
 
     public function render()

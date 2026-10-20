@@ -647,5 +647,8 @@
                 </div>
             </div>
         @endif
+        @if($profile)
+            <script type="application/json" id="org-dashboard-timings">{!! json_encode($this->timings()) !!}</script>
+        @endif
     </x-ui-page-container>
 </x-ui-page>

@@ -74,8 +74,19 @@ class EntityLinkRegistry
     public function contextParent(string $morphAlias, \Illuminate\Database\Eloquent\Model $object): ?array
     {
         $provider = $this->getProvider($morphAlias);
+        if ($provider instanceof HasContextParent) {
+            return $provider->contextParent($morphAlias, $object);
+        }
 
-        return $provider instanceof HasContextParent ? $provider->contextParent($morphAlias, $object) : null;
+        // Kind-Typen ohne eigenen Link-Alias (z. B. change_action): Provider fragen,
+        // die Eltern liefern — jeder antwortet nur für seine eigenen Typen.
+        foreach ($this->providers as $p) {
+            if ($p instanceof HasContextParent && ($parent = $p->contextParent($morphAlias, $object)) !== null) {
+                return $parent;
+            }
+        }
+
+        return null;
     }
 
     /**

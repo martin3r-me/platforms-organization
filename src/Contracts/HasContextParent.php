@@ -13,6 +13,9 @@ use Illuminate\Database\Eloquent\Model;
 interface HasContextParent
 {
     /**
+     * Für Aliase, die nicht zum eigenen Modul gehören, null zurückgeben —
+     * Kind-Typen ohne eigenen Link-Alias werden allen Providern gestellt.
+     *
      * @return array{0: string, 1: int}|null [parentMorphAlias, parentId] oder null, wenn kein Elter
      */
     public function contextParent(string $morphAlias, Model $object): ?array;

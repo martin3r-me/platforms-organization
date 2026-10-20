@@ -12,7 +12,6 @@ use Platform\Organization\Console\Commands\CleanupInferenceRunsCommand;
 use Platform\Organization\Console\Commands\DimensionCoverageCommand;
 use Platform\Organization\Console\Commands\DimensionScoreDiffCommand;
 use Platform\Organization\Console\Commands\EvaluateSignalsCommand;
-use Platform\Organization\Console\Commands\GenerateReportsCommand;
 use Platform\Organization\Console\Commands\ProcessInferenceTriggersCommand;
 use Platform\Organization\Console\Commands\ScheduleInferenceCommand;
 use Platform\Organization\Console\Commands\ScheduleSynthesisCommand;
@@ -35,7 +34,6 @@ class OrganizationServiceProvider extends ServiceProvider
         if ($this->app->runningInConsole()) {
             $this->commands([
                 SeedOrganizationData::class,
-                GenerateReportsCommand::class,
                 SnapshotEntitiesCommand::class,
                 EvaluateSignalsCommand::class,
                 ProcessInferenceTriggersCommand::class,
@@ -409,16 +407,6 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\ListEntityRelationshipInterlinksTool());
             $registry->register(new \Platform\Organization\Tools\LinkInterlinkToRelationshipTool());
             $registry->register(new \Platform\Organization\Tools\UnlinkInterlinkFromRelationshipTool());
-
-            // Report Type Tools (Berichtstypen)
-            $registry->register(new \Platform\Organization\Tools\ListReportTypesTool());
-            $registry->register(new \Platform\Organization\Tools\CreateReportTypeTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateReportTypeTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteReportTypeTool());
-
-            // Report Tools (Berichte)
-            $registry->register(new \Platform\Organization\Tools\ListReportsTool());
-            $registry->register(new \Platform\Organization\Tools\GenerateReportTool());
 
             // SLA Contract Tools
             $registry->register(new \Platform\Organization\Tools\ListSlaContractsTool());

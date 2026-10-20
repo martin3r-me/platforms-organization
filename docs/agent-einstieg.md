@@ -61,3 +61,14 @@ keine Kopie in organization.
 - recruiting hängt an `EntityLinkRegistry`, `EntityLinkProvider`, `HasMetricDefinitions` —
   diese Contracts nicht brechen.
 - Recursion immer mit Tiefenlimit (heute: `EntityHierarchyService` ohne Limit).
+
+## Objekttypen (lose gekoppelt)
+
+organization pflegt keine Typlisten fremder Module. `ObjectTypeRegistry` leitet
+alles aus den registrierten `EntityLinkProvider`n ab: Typ = Morph-Alias,
+Kurzname = Alias ohne Modul-Präfix, wenn eindeutig (`dev_issue` → `issue`;
+`board` ist mehrdeutig → nur Alias), Label aus `linkTypeConfig()`.
+Eltern-Verortung (Task → Projekt, Issue → Package, Ticket → Board) liefert das
+Modul über das optionale `HasContextParent`; der Resolver geht bis 3 Schritte
+hoch. `ObjectContextResolver::LEGACY_PARENTS` ist nur Übergangs-Rückfall.
+Fest verdrahtet bleiben nur `sprint`/`board` in `ContextTypeRegistry` (ohne Morph-Alias).

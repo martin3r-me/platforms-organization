@@ -29,7 +29,11 @@ class MyInquiries extends Component
             $query->where('status', $this->statusFilter);
         }
 
-        return $query->orderByDesc('created_at')->get();
+        // Erinnerte offene Inquiries zuerst — die Erinnerung ist der einzige Kanal (Portal).
+        return $query
+            ->orderByRaw("CASE WHEN reminded_at IS NOT NULL AND status IN ('pending', 'sent') THEN 0 ELSE 1 END")
+            ->orderByDesc('created_at')
+            ->get();
     }
 
     public function render()

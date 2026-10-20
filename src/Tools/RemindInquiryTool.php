@@ -21,7 +21,7 @@ class RemindInquiryTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'POST /organization/inquiries/{id}/remind - Sendet eine Erinnerung an unbeantwortete Empfänger.';
+        return 'POST /organization/inquiries/{id}/remind - Erinnert unbeantwortete Empfänger im Portal ("Meine Inquiries": Badge + nach oben sortiert). Kein E-Mail-/Push-Versand.';
     }
 
     public function getSchema(): array
@@ -78,13 +78,12 @@ class RemindInquiryTool implements ToolContract, ToolMetadataContract
             foreach ($pendingRecipients as $recipient) {
                 $recipient->update(['reminded_at' => now()]);
                 $reminded++;
-                // TODO: Send actual notification (email/portal/whatsapp)
             }
 
             return ToolResult::success([
                 'inquiry_id' => $inquiry->id,
                 'reminded' => $reminded,
-                'message' => "{$reminded} Empfänger erinnert.",
+                'message' => "{$reminded} Empfänger im Portal erinnert (kein E-Mail-Versand).",
             ]);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Erinnern: ' . $e->getMessage());

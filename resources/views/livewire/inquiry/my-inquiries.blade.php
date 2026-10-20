@@ -86,6 +86,9 @@
                             <x-ui-badge variant="{{ match($recipient->status) { 'pending' => 'warning', 'answered' => 'success', 'timeout' => 'danger', default => 'secondary' } }}">
                                 {{ match($recipient->status) { 'pending' => 'Offen', 'answered' => 'Beantwortet', 'timeout' => 'Timeout', default => ucfirst($recipient->status) } }}
                             </x-ui-badge>
+                            @if($recipient->reminded_at && in_array($recipient->status, ['pending', 'sent']))
+                                <x-ui-badge variant="danger" size="xs" class="ml-1" title="Erinnert am {{ $recipient->reminded_at->format('d.m.Y H:i') }}">Erinnert</x-ui-badge>
+                            @endif
                         </x-ui-table-cell>
                         <x-ui-table-cell compact="true">
                             <span class="text-sm text-[var(--ui-muted)]">{{ ($inquiry?->depth ?? 0) + 1 }}</span>

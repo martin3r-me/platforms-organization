@@ -56,7 +56,6 @@ class OrganizationServiceProvider extends ServiceProvider
         $this->app->singleton(\Platform\Organization\Services\EntityLinkRegistry::class);
         $this->app->singleton(\Platform\Organization\Services\PersonActivityRegistry::class);
         $this->app->singleton(\Platform\Organization\Services\InferencePromptService::class);
-        $this->app->singleton(\Platform\Organization\Services\MilestoneContributorRegistry::class);
     }
 
     public function boot(): void
@@ -258,12 +257,6 @@ class OrganizationServiceProvider extends ServiceProvider
         // und ggf. VSM-Ebene hochsetzen oder in aeussere Perspektive aggregieren.
         Schedule::command('organization:escalate-signals')
             ->hourly()
-            ->withoutOverlapping();
-
-        // Ops-Room Snapshot: einmal taeglich kurz vor Mitternacht,
-        // damit der Tag vollstaendig erfasst ist (Algedonics um 23:00 zaehlen mit).
-        Schedule::command('organization:snapshot-ops-room')
-            ->dailyAt('23:55')
             ->withoutOverlapping();
 
         // Process inference triggers: every minute (cheap polling)
@@ -506,7 +499,7 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\ListEnvironmentSnapshotsTool());
             $registry->register(new \Platform\Organization\Tools\RateEnvironmentSourceTool());
 
-            // Strategy Layer (Aggregat, Mission/Vision, Forecasts, FocusAreas, VisionImages, Obstacles, Milestones, MilestoneContributions)
+            // Strategy Layer (Aggregat, Mission/Vision, Forecasts, FocusAreas, VisionImages, Obstacles, Milestones)
             $registry->register(new \Platform\Organization\Tools\ListStrategiesTool());
             $registry->register(new \Platform\Organization\Tools\UpdateStrategyTool());
             $registry->register(new \Platform\Organization\Tools\ListStrategicDocumentsTool());
@@ -534,8 +527,6 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\CreateMilestoneTool());
             $registry->register(new \Platform\Organization\Tools\UpdateMilestoneTool());
             $registry->register(new \Platform\Organization\Tools\DeleteMilestoneTool());
-            $registry->register(new \Platform\Organization\Tools\CreateMilestoneContributionTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteMilestoneContributionTool());
             $registry->register(new \Platform\Organization\Tools\GetEntityStrategyTool());
 
         } catch (\Throwable $e) {

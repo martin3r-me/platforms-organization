@@ -4,7 +4,6 @@ namespace Platform\Organization\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
-use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Platform\ActivityLog\Traits\LogsActivity;
 use Platform\Core\Contracts\HasDisplayName;
@@ -106,10 +105,5 @@ class OrganizationMilestone extends Model implements HasDisplayName
     public function user(): BelongsTo
     {
         return $this->belongsTo(User::class);
-    }
-
-    public function contributions(): HasMany
-    {
-        return $this->hasMany(OrganizationMilestoneContribution::class, 'milestone_id');
     }
 }

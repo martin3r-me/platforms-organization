@@ -149,21 +149,4 @@ class OrganizationEntityType extends Model
         ->ordered()
         ->get();
     }
-
-    /**
-     * Beziehung zu Model Mappings
-     */
-    public function modelMappings()
-    {
-        return $this->hasMany(OrganizationEntityTypeModelMapping::class, 'entity_type_id');
-    }
-
-    /**
-     * Aktive Model Mappings
-     */
-    public function activeModelMappings()
-    {
-        return $this->hasMany(OrganizationEntityTypeModelMapping::class, 'entity_type_id')
-            ->where('is_active', true);
-    }
 }

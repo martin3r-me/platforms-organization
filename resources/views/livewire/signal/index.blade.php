@@ -16,7 +16,7 @@
             <div class="p-6 space-y-6">
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Suche</h3>
-                    <x-ui-input-text name="search" wire:model.live="search" placeholder="Suche Signale..." class="w-full" size="sm" />
+                    <x-ui-input-text name="search" wire:model.live.debounce.400ms="search" placeholder="Suche Signale..." class="w-full" size="sm" />
                 </div>
                 <div>
                     <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>
@@ -188,7 +188,7 @@
                 @if($view === 'archive')
                     <x-ui-table-header-cell compact="true" class="w-8">
                         @php
-                            $visibleIds = $this->signals->pluck('id')->all();
+                            $visibleIds = $this->signals->take($limit)->pluck('id')->all();
                             $allSelected = ! empty($visibleIds) && count(array_intersect($visibleIds, $selectedIds)) === count($visibleIds);
                         @endphp
                         <input
@@ -211,7 +211,7 @@
             </x-ui-table-header>
 
             <x-ui-table-body>
-                @forelse($this->signals as $signal)
+                @forelse($this->signals->take($limit) as $signal)
                     @php
                         $isFocused = in_array($signal->id, $focusedIds, true);
                     @endphp
@@ -369,5 +369,10 @@
                 @endforelse
             </x-ui-table-body>
         </x-ui-table>
+        @if($this->signals->count() > $limit)
+            <div class="mt-3 text-center">
+                <x-ui-button variant="secondary-ghost" size="sm" wire:click="loadMore">Weitere laden</x-ui-button>
+            </div>
+        @endif
     </x-ui-page-container>
 </x-ui-page>

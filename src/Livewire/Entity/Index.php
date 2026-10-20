@@ -70,17 +70,9 @@ class Index extends Component
         $teamId = auth()->user()->currentTeam->id;
 
         $query = OrganizationEntity::query()
-            ->with([
-                'type.group',
-                'parent',
-                'children.type.group',
-                'team',
-                'user',
-                'relationsFrom.relationType',
-                'relationsFrom.toEntity.type',
-                'relationsTo.relationType',
-                'relationsTo.fromEntity.type'
-            ])
+            // Der Baum entsteht aus childrenByParent; von den Beziehungen braucht die Zeile nur die Anzahl.
+            ->with('type.group')
+            ->withCount(['relationsFrom', 'relationsTo'])
             ->forTeam($teamId);
 
         // Suche
@@ -272,16 +264,26 @@ class Index extends Component
     {
         $teamId = auth()->user()->currentTeam->id;
 
-        $all = OrganizationEntity::forTeam($teamId)->get();
+        $counts = OrganizationEntity::forTeam($teamId)
+            ->selectRaw('SUM(is_active = 1) as active, SUM(is_active = 0) as inactive, COUNT(*) as total')
+            ->toBase()
+            ->first();
+
+        $byType = OrganizationEntity::query()
+            ->where('organization_entities.team_id', $teamId)
+            ->where('organization_entities.is_active', true)
+            ->join('organization_entity_types as t', 't.id', '=', 'organization_entities.entity_type_id')
+            ->toBase()
+            ->selectRaw('t.name, COUNT(*) as c')
+            ->groupBy('t.name')
+            ->pluck('c', 'name')
+            ->map(fn ($c) => (int) $c);
 
         return [
-            'total' => $all->count(),
-            'active' => $all->where('is_active', true)->count(),
-            'inactive' => $all->where('is_active', false)->count(),
-            'by_type' => $all->where('is_active', true)
-                ->load('type')
-                ->groupBy('type.name')
-                ->map->count(),
+            'total' => (int) ($counts->total ?? 0),
+            'active' => (int) ($counts->active ?? 0),
+            'inactive' => (int) ($counts->inactive ?? 0),
+            'by_type' => $byType,
         ];
     }
 

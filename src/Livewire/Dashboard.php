@@ -15,6 +15,7 @@ use Platform\Organization\Services\PersonActivityRegistry;
 use Platform\Organization\Services\SnapshotMovementService;
 use Platform\Organization\Services\EnvironmentMovementService;
 use Platform\Organization\Models\OrganizationEnvironmentSource;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -764,23 +765,18 @@ class Dashboard extends Component
         ];
     }
 
+    /** Request-Memo für Snapshot-Abfragen (mehrere Kacheln fragen dieselben Stichtage ab). */
+    protected array $snapshotMemo = [];
+
+    private const SNAPSHOT_CACHE_TTL = 600; // Snapshots entstehen 08:00/18:00 — 10 min Verzug ist unkritisch
+
     /**
      * Get the latest snapshot for each entity.
      * Returns: [entity_id => OrganizationEntitySnapshot]
      */
     protected function getLatestSnapshotsForEntities($entityIds): array
     {
-        // Subquery for max snapshot_date per entity
-        $latestDates = OrganizationEntitySnapshot::whereIn('entity_id', $entityIds)
-            ->select('entity_id', DB::raw('MAX(snapshot_date) as max_date'))
-            ->groupBy('entity_id');
-
-        $snapshots = OrganizationEntitySnapshot::joinSub($latestDates, 'latest', function ($join) {
-            $join->on('organization_entity_snapshots.entity_id', '=', 'latest.entity_id')
-                 ->on('organization_entity_snapshots.snapshot_date', '=', 'latest.max_date');
-        })->get();
-
-        return $snapshots->keyBy('entity_id')->all();
+        return $this->snapshotsAtOrBefore($entityIds, null);
     }
 
     /**
@@ -789,18 +785,32 @@ class Dashboard extends Component
      */
     protected function getSnapshotsNearDate($entityIds, Carbon $date): array
     {
-        // Get snapshot on or just before the target date
-        $nearDates = OrganizationEntitySnapshot::whereIn('entity_id', $entityIds)
-            ->where('snapshot_date', '<=', $date->toDateString())
-            ->select('entity_id', DB::raw('MAX(snapshot_date) as max_date'))
-            ->groupBy('entity_id');
+        return $this->snapshotsAtOrBefore($entityIds, $date->toDateString());
+    }
 
-        $snapshots = OrganizationEntitySnapshot::joinSub($nearDates, 'near', function ($join) {
-            $join->on('organization_entity_snapshots.entity_id', '=', 'near.entity_id')
-                 ->on('organization_entity_snapshots.snapshot_date', '=', 'near.max_date');
-        })->get();
+    /**
+     * Jüngster Snapshot je Entity am/vor $date (null = überhaupt). Gemerkt pro
+     * Request und gecacht über Requests (vorher ~16 identische Scans je Render).
+     */
+    protected function snapshotsAtOrBefore($entityIds, ?string $date): array
+    {
+        $ids = collect($entityIds)->map(fn ($id) => (int) $id)->sort()->values()->all();
+        if ($ids === []) {
+            return [];
+        }
+        $key = 'organization:dashboard-snapshots:' . md5(implode(',', $ids)) . ':' . ($date ?? 'latest');
 
-        return $snapshots->keyBy('entity_id')->all();
+        return $this->snapshotMemo[$key] ??= Cache::remember($key, self::SNAPSHOT_CACHE_TTL, function () use ($ids, $date) {
+            $maxDates = OrganizationEntitySnapshot::whereIn('entity_id', $ids)
+                ->when($date, fn ($q) => $q->where('snapshot_date', '<=', $date))
+                ->select('entity_id', DB::raw('MAX(snapshot_date) as max_date'))
+                ->groupBy('entity_id');
+
+            return OrganizationEntitySnapshot::joinSub($maxDates, 'near', function ($join) {
+                $join->on('organization_entity_snapshots.entity_id', '=', 'near.entity_id')
+                     ->on('organization_entity_snapshots.snapshot_date', '=', 'near.max_date');
+            })->get()->keyBy('entity_id')->all();
+        });
     }
 
     protected function aggregateSnapshotMetrics(array $snapshots): array

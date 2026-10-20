@@ -13,6 +13,10 @@ class Index extends Component
     public const VIEW_ARCHIVE = 'archive';
 
     public $search = '';
+
+    /** Anzahl geladener Signale — das Archiv kann groß werden. */
+    public int $limit = self::PAGE;
+    private const PAGE = 100;
     public $statusFilter = '';
     public $severityFilter = '';
     public $sourceFilter = '';
@@ -203,7 +207,20 @@ class Index extends Component
         // Archive sorts by resolved_at (when available), otherwise created_at — gives meaningful chronology
         $orderColumn = $this->view === self::VIEW_ARCHIVE ? 'resolved_at' : 'created_at';
 
-        return $query->orderByRaw("COALESCE({$orderColumn}, created_at) DESC")->get();
+        return $query->orderByRaw("COALESCE({$orderColumn}, created_at) DESC")->limit($this->limit + 1)->get();
+    }
+
+    public function loadMore(): void
+    {
+        $this->limit += self::PAGE;
+    }
+
+    /** Neuer Filter → wieder bei der ersten Seite beginnen. */
+    public function updated(string $property): void
+    {
+        if (in_array($property, ['search', 'statusFilter', 'severityFilter', 'sourceFilter', 'focusOnly', 'view'], true)) {
+            $this->limit = self::PAGE;
+        }
     }
 
     public function render()

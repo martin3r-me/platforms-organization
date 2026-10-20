@@ -53,8 +53,8 @@
     {{-- Relationen --}}
     <x-ui-table-cell compact="true">
         @php
-            $relationsFromCount = $entity->relationsFrom->count();
-            $relationsToCount = $entity->relationsTo->count();
+            $relationsFromCount = $entity->relations_from_count ?? $entity->relationsFrom->count();
+            $relationsToCount = $entity->relations_to_count ?? $entity->relationsTo->count();
             $totalRelations = $relationsFromCount + $relationsToCount;
         @endphp
         @if($totalRelations > 0)

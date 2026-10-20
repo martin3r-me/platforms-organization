@@ -381,17 +381,43 @@ class EntityDimensionBridge
      */
     public static function linkCountsByEntityAndType(array $entityIds): array
     {
-        $links = static::linksForEntities($entityIds);
-        $reverseMorphMap = array_flip(Relation::morphMap());
+        $defIds = static::allEntitySourcedDefIds();
+        if (empty($defIds) || empty($entityIds)) {
+            return [];
+        }
 
+        static::ensureMaps();
+
+        $dimValueIds = [];
+        foreach ($defIds as $defId) {
+            foreach ($entityIds as $eid) {
+                if ($dvId = static::$allEntityToDimValue[$defId][$eid] ?? null) {
+                    $dimValueIds[] = $dvId;
+                }
+            }
+        }
+        if (empty($dimValueIds)) {
+            return [];
+        }
+
+        // Zählen in SQL statt jede Link-Zeile als Model zu laden
+        $rows = OrganizationDimensionLink::whereIn('dimension_definition_id', $defIds)
+            ->whereIn('dimension_value_id', $dimValueIds)
+            ->toBase()
+            ->select('dimension_definition_id', 'dimension_value_id', 'linkable_type')
+            ->selectRaw('COUNT(*) as c')
+            ->groupBy('dimension_definition_id', 'dimension_value_id', 'linkable_type')
+            ->get();
+
+        $reverseMorphMap = array_flip(Relation::morphMap());
         $result = [];
-        foreach ($links as $link) {
-            $eid = $link->entity_id;
+        foreach ($rows as $row) {
+            $eid = static::$allDimValueToEntity[$row->dimension_definition_id][$row->dimension_value_id] ?? null;
             if (!$eid) {
                 continue;
             }
-            $type = $reverseMorphMap[$link->linkable_type] ?? $link->linkable_type;
-            $result[$eid][$type] = ($result[$eid][$type] ?? 0) + 1;
+            $type = $reverseMorphMap[$row->linkable_type] ?? $row->linkable_type;
+            $result[$eid][$type] = ($result[$eid][$type] ?? 0) + (int) $row->c;
         }
 
         return $result;

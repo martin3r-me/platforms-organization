@@ -358,6 +358,7 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\GetEntitySummaryTool());
             $registry->register(new \Platform\Organization\Tools\ResolveContextTool());
             $registry->register(new \Platform\Organization\Tools\GetBriefTool());
+            $registry->register(new \Platform\Organization\Tools\GetNeighborsTool());
             $registry->register(new \Platform\Organization\Tools\LinkEntityTool());
 
             // Dimension Link Tools (generisch für alle Dimensionen)

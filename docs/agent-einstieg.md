@@ -29,6 +29,11 @@ sind danach nur noch für CRUD da.
 | `organization.search.GET` | Entities + verlinkte Objekte finden; später semantisch über `EmbeddingStoreContract` (Core). |
 | `organization.neighbors.GET(id, depth≤2, edge_types)` | Kinder, Relationships, Interlinks, Links — mit Limits. |
 
+Stand: `brief` und `neighbors` live (2026-10-20). Objekt-Lesezugriff in beiden wie
+das Modul selbst: Policy `view` → `may`/`owns` → Team-Gleichheit
+(`DimensionLinkAuthorizer::canReadObject`). `neighbors` liefert nodes + edges
+(Limit je Kante/Knoten, max. 50 Knoten), konkrete Objekte nur fürs Zentrum.
+
 Begleitend:
 - `core.context.GET` verweist auf `brief` als nächsten Schritt.
 - Claim-Payloads in dev/planner/helpdesk rufen `brief` mit.

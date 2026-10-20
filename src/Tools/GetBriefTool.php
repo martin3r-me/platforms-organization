@@ -142,6 +142,7 @@ class GetBriefTool implements ToolContract, ToolMetadataContract
                 $response['message'] = 'Objekt ist keiner (lesbaren) Organisationseinheit zugeordnet. Verknüpfen mit organization.dimension_links.POST.';
             }
             $response['next'] = [
+                'organization.neighbors.GET' => 'Umfeld im Org-Graphen: Eltern, Kinder, Beziehungen, verknüpfte Objekte',
                 'organization.entity.detail.GET' => 'Alle verknüpften Objekte einer Entity',
                 'organization.strategy.GET' => 'Vollständige Strategie eines Carriers',
                 'organization.signals.GET' => 'Signale filtern/bearbeiten',

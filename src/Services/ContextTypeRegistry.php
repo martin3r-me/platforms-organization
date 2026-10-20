@@ -12,28 +12,23 @@ namespace Platform\Organization\Services;
 class ContextTypeRegistry
 {
     /**
-     * Mapping: Kurzform → vollqualifizierter Model-Klassenname.
-     *
-     * Wird für Tool-Schema-Dokumentation, Kurzform-Auflösung und Lookup verwendet.
+     * Typen ohne Morph-Alias (nicht verknüpfbar, aber buchbar). Alles andere
+     * kommt aus ObjectTypeRegistry (= registrierte EntityLinkProvider).
      */
-    protected static array $map = [
-        'project' => 'Platform\Planner\Models\PlannerProject',
-        'task' => 'Platform\Planner\Models\PlannerTask',
-        'ticket' => 'Platform\Helpdesk\Models\HelpdeskTicket',
-        'company' => 'Platform\Crm\Models\CrmCompany',
+    protected static array $extra = [
         'sprint' => 'Platform\Planner\Models\PlannerSprint',
-        'change_project' => 'Platform\Change\Models\ChangeProject',
-        'issue' => 'Platform\Dev\Models\DevIssue',
-        'package' => 'Platform\Dev\Models\DevPackage',
         'board' => 'Platform\Dev\Models\DevBoard',
-        'okr' => 'Platform\Okr\Models\Okr',
     ];
 
+    /** Zusätzlich beworbene, nicht zeit-kaskadierende Typen. */
+    protected const ADVERTISED = ['crm_company', 'change_project'];
+
     /**
-     * Löst einen context_type auf: akzeptiert Kurzformen UND vollqualifizierte Klassennamen.
+     * Löst einen context_type auf: akzeptiert Kurzformen, Morph-Aliase UND
+     * vollqualifizierte Klassennamen.
      *
      * @param string|null $contextType Kurzform (z.B. 'project') oder voller Klassenname
-     * @return string|null Vollqualifizierter Klassenname oder null bei leerem Input
+     * @return string|null Vollqualifizierter Klassenname oder null bei leerem/unbekanntem Input
      */
     public static function resolve(?string $contextType): ?string
     {
@@ -41,10 +36,13 @@ class ContextTypeRegistry
             return null;
         }
 
-        // Prüfe ob Kurzform bekannt ist (case-insensitive)
         $lower = strtolower(trim($contextType));
-        if (isset(static::$map[$lower])) {
-            return static::$map[$lower];
+        if (isset(static::$extra[$lower])) {
+            return static::$extra[$lower];
+        }
+
+        if ($alias = ObjectTypeRegistry::resolve($contextType)) {
+            return ObjectTypeRegistry::modelClass($alias) ?? \Illuminate\Database\Eloquent\Relations\Relation::getMorphedModel($alias);
         }
 
         // Bereits ein vollqualifizierter Klassenname → direkt zurückgeben
@@ -52,28 +50,39 @@ class ContextTypeRegistry
             return $contextType;
         }
 
-        // Unbekannter Wert → null (wird vom Aufrufer als Fehler behandelt)
         return null;
     }
 
     /**
-     * Gibt alle erlaubten Kurzformen zurück.
+     * Gibt alle beworbenen Kurzformen zurück: zeiterfassbare Typen der Provider
+     * (timeTrackableCascades) + ADVERTISED + Extras.
      *
      * @return string[]
      */
     public static function shortNames(): array
     {
-        return array_keys(static::$map);
+        return array_keys(static::map());
     }
 
     /**
-     * Gibt das vollständige Mapping zurück (Kurzform → Klassenname).
+     * Gibt das Mapping zurück (Kurzform → Klassenname).
      *
      * @return array<string, string>
      */
     public static function map(): array
     {
-        return static::$map;
+        $map = [];
+        $aliases = array_merge(
+            array_keys(app(EntityLinkRegistry::class)->allTimeTrackableCascades()),
+            static::ADVERTISED,
+        );
+        foreach ($aliases as $alias) {
+            if ($class = ObjectTypeRegistry::modelClass($alias)) {
+                $map[ObjectTypeRegistry::displayName($alias)] = $class;
+            }
+        }
+
+        return $map + static::$extra;
     }
 
     /**
@@ -84,7 +93,7 @@ class ContextTypeRegistry
     public static function shortNamesDescription(): string
     {
         $parts = [];
-        foreach (static::$map as $short => $class) {
+        foreach (static::map() as $short => $class) {
             $parts[] = "\"{$short}\" ({$class})";
         }
 
@@ -99,7 +108,7 @@ class ContextTypeRegistry
     public static function lookupEntries(): array
     {
         $entries = [];
-        foreach (static::$map as $short => $class) {
+        foreach (static::map() as $short => $class) {
             $entries[] = [
                 'short' => $short,
                 'class' => $class,

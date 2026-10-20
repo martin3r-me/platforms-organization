@@ -10,41 +10,12 @@ use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Models\OrganizationDimensionDefinition;
 use Platform\Organization\Models\OrganizationDimensionValue;
 use Platform\Organization\Services\DimensionLinkService;
+use Platform\Organization\Services\ObjectTypeRegistry;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
 class LinkEntityTool implements ToolContract, ToolMetadataContract
 {
     use ResolvesOrganizationTeam;
-
-    /**
-     * Friendly short names → morph alias.
-     */
-    protected const ALIAS_MAP = [
-        'project' => 'project', 'planner_project' => 'project',
-        'task' => 'planner_task', 'planner_task' => 'planner_task',
-        'package' => 'dev_package', 'dev_package' => 'dev_package',
-        'issue' => 'dev_issue', 'dev_issue' => 'dev_issue',
-        'okr' => 'okr',
-        'canvas' => 'canvas', 'bmc_canvas' => 'bmc_canvas', 'pc_canvas' => 'pc_canvas',
-        'contact' => 'crm_contact', 'crm_contact' => 'crm_contact',
-        'company' => 'crm_company', 'crm_company' => 'crm_company',
-        'ticket' => 'helpdesk_ticket', 'helpdesk_ticket' => 'helpdesk_ticket',
-        'helpdesk_board' => 'helpdesk_board',
-        'employee' => 'hcm_employee', 'hcm_employee' => 'hcm_employee',
-        'thread' => 'correspondence_thread', 'correspondence_thread' => 'correspondence_thread',
-        'recording' => 'whisper_recording', 'whisper_recording' => 'whisper_recording',
-        'note' => 'notes_note', 'notes_note' => 'notes_note',
-        'spreadsheet' => 'sheets_spreadsheet', 'sheets_spreadsheet' => 'sheets_spreadsheet',
-        'presentation' => 'slides_presentation', 'slides_presentation' => 'slides_presentation',
-        'applicant' => 'rec_applicant', 'rec_applicant' => 'rec_applicant',
-        'position' => 'rec_position', 'rec_position' => 'rec_position',
-        'process' => 'organization_process', 'organization_process' => 'organization_process',
-        'change_project' => 'change_project',
-        'bank_account_group' => 'drip_bank_account_group', 'drip_bank_account_group' => 'drip_bank_account_group',
-        'bank_transaction' => 'drip_bank_transaction', 'drip_bank_transaction' => 'drip_bank_transaction',
-        'brand' => 'brands_brand', 'brands_brand' => 'brands_brand',
-        'seo_url' => 'seo_url', 'seo_url_list' => 'seo_url_list',
-    ];
 
     public function getName(): string
     {
@@ -90,15 +61,11 @@ class LinkEntityTool implements ToolContract, ToolMetadataContract
             $objectType = $arguments['object_type'];
             $objectId = (int) $arguments['object_id'];
 
-            // Resolve friendly name → morph alias
-            $morphAlias = self::ALIAS_MAP[$objectType] ?? null;
-
-            if (!$morphAlias && Relation::getMorphedModel($objectType)) {
-                $morphAlias = $objectType;
-            }
+            // Kurzname / Alias / FQCN → Morph-Alias (aus den registrierten Providern)
+            $morphAlias = ObjectTypeRegistry::resolve($objectType);
 
             if (!$morphAlias) {
-                return ToolResult::error('UNKNOWN_TYPE', "Unbekannter object_type '{$objectType}'. Bekannte Typen: project, package, task, issue, ticket, canvas, thread, contact, okr, note, employee, applicant, brand, process.");
+                return ToolResult::error('UNKNOWN_TYPE', "Unbekannter object_type '{$objectType}'. Bekannte Typen: " . implode(', ', ObjectTypeRegistry::knownTypes()));
             }
 
             // Resolve entity_id → dimension_value_id

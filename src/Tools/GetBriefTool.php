@@ -17,6 +17,7 @@ use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Services\EntityStrategyPresenter;
 use Platform\Organization\Services\ObjectContextResolver;
+use Platform\Organization\Services\ObjectTypeRegistry;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
 /**
@@ -107,7 +108,7 @@ class GetBriefTool implements ToolContract, ToolMetadataContract
 
                 ['links' => $links, 'resolved_via' => $resolvedVia] = ObjectContextResolver::entityLinks($alias, $objectId);
                 $response['object'] = [
-                    'type' => $alias,
+                    'type' => ObjectTypeRegistry::displayName($alias),
                     'id' => $objectId,
                     'label' => $this->label($object),
                     'resolved_via' => $resolvedVia,

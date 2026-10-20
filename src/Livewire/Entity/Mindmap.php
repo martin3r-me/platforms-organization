@@ -590,16 +590,10 @@ class Mindmap extends Component
 
     protected function humanMorphType(string $type): string
     {
-        return match ($type) {
-            'project'         => 'Projekt',
-            'planner_project' => 'Projekt',
-            'planner_task'    => 'Task',
-            'task'            => 'Task',
-            'canvas'          => 'Canvas',
-            'helpdesk_ticket' => 'Ticket',
-            'ticket'          => 'Ticket',
-            default           => ucfirst(str_replace('_', ' ', $type)),
-        };
+        $alias = \Platform\Organization\Services\ObjectTypeRegistry::resolve($type) ?? $type;
+
+        return \Platform\Organization\Services\ObjectTypeRegistry::label($alias, singular: true)
+            ?? ucfirst(str_replace('_', ' ', $type));
     }
 
     /**

@@ -8,18 +8,21 @@ use Illuminate\Support\Collection;
 /**
  * Löst ein beliebiges Modul-Objekt (Projekt, Task, Ticket, …) auf die
  * verknüpften Entities auf — direkt über DimensionLinks oder, falls das Objekt
- * selbst nicht verortet ist, über sein Parent-Objekt (Task → Projekt).
+ * selbst nicht verortet ist, über sein Eltern-Objekt (HasContextParent im Modul).
+ * Typnamen kommen aus ObjectTypeRegistry.
  *
  * Gemeinsame Basis für organization.context.resolve.GET und organization.brief.GET.
  */
 class ObjectContextResolver
 {
+    private const MAX_PARENT_HOPS = 3;
+
     /**
-     * Parent fallback: morph alias → [fk_field, parent_morph_alias].
-     * When an object has no direct entity link, resolve via its parent.
-     * fk_field darf ein Relationspfad sein (data_get), z. B. Issue → Board → Package.
+     * Übergangs-Rückfall, solange ein Modul HasContextParent noch nicht
+     * implementiert (Deploy-Reihenfolge). Entfernen, sobald planner/dev/
+     * helpdesk/change ausgerollt sind. fk_field darf ein Relationspfad sein.
      */
-    public const PARENT_MAP = [
+    private const LEGACY_PARENTS = [
         'planner_task' => ['project_id', 'project'],
         'dev_issue' => ['board.dev_package_id', 'dev_package'],
         'helpdesk_ticket' => ['helpdesk_board_id', 'helpdesk_board'],
@@ -28,125 +31,64 @@ class ObjectContextResolver
     ];
 
     /**
-     * Friendly short names → morph alias.
-     * Allows callers to use intuitive names without knowing the exact morph alias.
-     */
-    public const ALIAS_MAP = [
-        // Planner
-        'project' => 'project',
-        'planner_project' => 'project',
-        'task' => 'planner_task',
-        'planner_task' => 'planner_task',
-        // Dev
-        'package' => 'dev_package',
-        'dev_package' => 'dev_package',
-        'issue' => 'dev_issue',
-        'dev_issue' => 'dev_issue',
-        // OKR
-        'okr' => 'okr',
-        // Canvas
-        'canvas' => 'canvas',
-        'bmc_canvas' => 'bmc_canvas',
-        'pc_canvas' => 'pc_canvas',
-        // CRM
-        'contact' => 'crm_contact',
-        'crm_contact' => 'crm_contact',
-        'company' => 'crm_company',
-        'crm_company' => 'crm_company',
-        // Helpdesk
-        'ticket' => 'helpdesk_ticket',
-        'helpdesk_ticket' => 'helpdesk_ticket',
-        'helpdesk_board' => 'helpdesk_board',
-        // HCM
-        'employee' => 'hcm_employee',
-        'hcm_employee' => 'hcm_employee',
-        // Correspondence
-        'thread' => 'correspondence_thread',
-        'correspondence_thread' => 'correspondence_thread',
-        // Whisper
-        'recording' => 'whisper_recording',
-        'whisper_recording' => 'whisper_recording',
-        // Notes / Sheets / Slides
-        'note' => 'notes_note',
-        'notes_note' => 'notes_note',
-        'spreadsheet' => 'sheets_spreadsheet',
-        'sheets_spreadsheet' => 'sheets_spreadsheet',
-        'presentation' => 'slides_presentation',
-        'slides_presentation' => 'slides_presentation',
-        // Recruiting
-        'applicant' => 'rec_applicant',
-        'rec_applicant' => 'rec_applicant',
-        'position' => 'rec_position',
-        'rec_position' => 'rec_position',
-        // Process
-        'process' => 'organization_process',
-        'organization_process' => 'organization_process',
-        // Change
-        'change_project' => 'change_project',
-        // Drip
-        'bank_account_group' => 'drip_bank_account_group',
-        'drip_bank_account_group' => 'drip_bank_account_group',
-        'bank_transaction' => 'drip_bank_transaction',
-        'drip_bank_transaction' => 'drip_bank_transaction',
-        // Brands
-        'brand' => 'brands_brand',
-        'brands_brand' => 'brands_brand',
-        // SEO
-        'seo_url' => 'seo_url',
-        'seo_url_list' => 'seo_url_list',
-    ];
-
-    /**
-     * Friendly name / Morph-Alias / FQCN → Morph-Alias, oder null.
+     * Kurzname / Morph-Alias / FQCN → Morph-Alias, oder null.
      */
     public static function resolveAlias(string $objectType): ?string
     {
-        if (isset(self::ALIAS_MAP[$objectType])) {
-            return self::ALIAS_MAP[$objectType];
-        }
-        if (Relation::getMorphedModel($objectType)) {
-            return $objectType;
-        }
-        $reverse = array_flip(Relation::morphMap());
-
-        return $reverse[$objectType] ?? null;
+        return ObjectTypeRegistry::resolve($objectType);
     }
 
     /** @return string[] */
     public static function knownTypes(): array
     {
-        $types = array_keys(array_unique(self::ALIAS_MAP));
-        sort($types);
-
-        return $types;
+        return ObjectTypeRegistry::knownTypes();
     }
 
     /**
-     * Entity-Links des Objekts (mit eager-geladener Entity), inkl. Parent-Fallback.
+     * Entity-Links des Objekts (mit eager-geladener Entity). Ist das Objekt
+     * selbst nicht verortet, wird die Eltern-Kette (laut Modul) bis zu
+     * MAX_PARENT_HOPS Schritte hochgegangen.
      *
      * @return array{links: Collection, resolved_via: ?string}
      */
     public static function entityLinks(string $morphAlias, int $objectId): array
     {
-        $links = EntityDimensionBridge::linksForLinkables(self::linkableTypes($morphAlias), [$objectId], true);
-        $resolvedVia = null;
+        $alias = $morphAlias;
+        $id = $objectId;
 
-        if ($links->isEmpty() && isset(self::PARENT_MAP[$morphAlias])) {
-            [$fkField, $parentAlias] = self::PARENT_MAP[$morphAlias];
-            $fqcn = Relation::getMorphedModel($morphAlias);
-
-            if ($fqcn && class_exists($fqcn)) {
-                $parentId = data_get($fqcn::find($objectId), $fkField);
-                if ($parentId) {
-                    $links = EntityDimensionBridge::linksForLinkables(self::linkableTypes($parentAlias), [$parentId], true);
-                    if ($links->isNotEmpty()) {
-                        $resolvedVia = $parentAlias;
-                    }
-                }
+        for ($hop = 0; $hop <= self::MAX_PARENT_HOPS; $hop++) {
+            $links = EntityDimensionBridge::linksForLinkables(self::linkableTypes($alias), [$id], true);
+            if ($links->isNotEmpty()) {
+                return ['links' => $links, 'resolved_via' => $hop === 0 ? null : $alias];
             }
+
+            $parent = self::parentOf($alias, $id);
+            if (! $parent) {
+                break;
+            }
+            [$alias, $id] = $parent;
         }
 
-        return ['links' => $links, 'resolved_via' => $resolvedVia];
+        return ['links' => collect(), 'resolved_via' => null];
+    }
+
+    /** @return array{0: string, 1: int}|null */
+    private static function parentOf(string $alias, int $id): ?array
+    {
+        $class = ObjectTypeRegistry::modelClass($alias);
+        $object = $class ? $class::find($id) : null;
+        if (! $object) {
+            return null;
+        }
+
+        $parent = app(EntityLinkRegistry::class)->contextParent($alias, $object);
+        if ($parent === null && isset(self::LEGACY_PARENTS[$alias])) {
+            [$fkField, $parentAlias] = self::LEGACY_PARENTS[$alias];
+            $parentId = data_get($object, $fkField);
+            $parent = $parentId ? [$parentAlias, (int) $parentId] : null;
+        }
+
+        return $parent && $parent[1] ? [(string) $parent[0], (int) $parent[1]] : null;
     }
 
     /** DB kann Alias oder FQCN als linkable_type halten. */

@@ -3,6 +3,7 @@
 namespace Platform\Organization\Services;
 
 use Platform\Organization\Contracts\EntityLinkProvider;
+use Platform\Organization\Contracts\HasContextParent;
 use Platform\Organization\Contracts\HasCostDriverMetrics;
 use Platform\Organization\Contracts\HasMetricDefinitions;
 use Platform\Organization\Contracts\HasPersonMetrics;
@@ -53,6 +54,28 @@ class EntityLinkRegistry
     public function getProvider(string $morphAlias): ?EntityLinkProvider
     {
         return $this->aliasMap[$morphAlias] ?? null;
+    }
+
+    /**
+     * Alle Morph-Aliase, die ein Provider handhabt (= verknüpfbare Objekttypen).
+     *
+     * @return string[]
+     */
+    public function allMorphAliases(): array
+    {
+        return array_keys($this->aliasMap);
+    }
+
+    /**
+     * Eltern-Objekt laut Modul (HasContextParent), sonst null.
+     *
+     * @return array{0: string, 1: int}|null
+     */
+    public function contextParent(string $morphAlias, \Illuminate\Database\Eloquent\Model $object): ?array
+    {
+        $provider = $this->getProvider($morphAlias);
+
+        return $provider instanceof HasContextParent ? $provider->contextParent($morphAlias, $object) : null;
     }
 
     /**

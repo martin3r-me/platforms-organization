@@ -78,8 +78,8 @@ class DeleteEntityTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'Entity hat untergeordnete Entities und kann nicht gelöscht werden. Verschiebe oder lösche zuerst die Children.');
             }
 
-            // Safety: Contexts (Module Entities) vorhanden?
-            if ($entity->contexts()->exists()) {
+            // Safety: verknüpfte Modul-Objekte (DimensionLinks) vorhanden?
+            if (\Platform\Organization\Services\EntityDimensionBridge::totalLinkCount([$entity->id]) > 0) {
                 return ToolResult::error('VALIDATION_ERROR', 'Entity hat verknüpfte Module-Entities. Setze stattdessen is_active=false oder entferne zuerst die Verknüpfungen.');
             }
 

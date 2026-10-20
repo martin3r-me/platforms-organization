@@ -4,7 +4,6 @@ namespace Platform\Organization;
 
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\ServiceProvider;
-use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
@@ -98,7 +97,7 @@ class OrganizationServiceProvider extends ServiceProvider
         if (
             config()->has('organization.routing') &&
             config()->has('organization.navigation') &&
-            Schema::hasTable('modules')
+            PlatformCore::modulesTableExists()
         ) {
             PlatformCore::registerModule([
                 'key'        => 'organization',

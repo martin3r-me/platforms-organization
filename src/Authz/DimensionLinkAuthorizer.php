@@ -45,6 +45,16 @@ class DimensionLinkAuthorizer
     }
 
     /**
+     * Darf der User das Kontext-Objekt lesen? (für Briefings/Orientierung)
+     * $contextType = FQCN, wie in authz_resource_link gespeichert.
+     */
+    public function canReadContext(User $user, string $contextType, int $contextId): bool
+    {
+        return $this->resolver->may($user, 'read', $contextType, $contextId)
+            || $this->resolver->owns($user, $contextType, $contextId);
+    }
+
+    /**
      * Darf der User das Kontext-Objekt verändern (Links anhängen/lösen)?
      * Objekt-Write ist das maßgebliche Recht — man editiert die Zuordnungen
      * genau dieses Objekts (analog zur update()-Policy des Moduls).

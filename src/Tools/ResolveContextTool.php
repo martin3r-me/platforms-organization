@@ -2,100 +2,18 @@
 
 namespace Platform\Organization\Tools;
 
-use Illuminate\Database\Eloquent\Relations\Relation;
 use Platform\Core\Contracts\ToolContract;
 use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Services\EntityDimensionBridge;
+use Platform\Organization\Services\ObjectContextResolver;
 use Platform\Organization\Services\EntityLinkRegistry;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
 class ResolveContextTool implements ToolContract, ToolMetadataContract
 {
     use ResolvesOrganizationTeam;
-
-    /**
-     * Friendly short names → morph alias.
-     * Allows callers to use intuitive names without knowing the exact morph alias.
-     */
-    /**
-     * Parent fallback: morph alias → [fk_field, parent_morph_alias].
-     * When an object has no direct entity link, resolve via its parent.
-     */
-    protected const PARENT_MAP = [
-        'planner_task' => ['project_id', 'project'],
-        'dev_issue' => ['dev_board_id', 'dev_package'],
-        'helpdesk_ticket' => ['helpdesk_board_id', 'helpdesk_board'],
-        'change_action' => ['change_project_id', 'change_project'],
-        'change_phase' => ['change_project_id', 'change_project'],
-    ];
-
-    protected const ALIAS_MAP = [
-        // Planner
-        'project' => 'project',
-        'planner_project' => 'project',
-        'task' => 'planner_task',
-        'planner_task' => 'planner_task',
-        // Dev
-        'package' => 'dev_package',
-        'dev_package' => 'dev_package',
-        'issue' => 'dev_issue',
-        'dev_issue' => 'dev_issue',
-        // OKR
-        'okr' => 'okr',
-        // Canvas
-        'canvas' => 'canvas',
-        'bmc_canvas' => 'bmc_canvas',
-        'pc_canvas' => 'pc_canvas',
-        // CRM
-        'contact' => 'crm_contact',
-        'crm_contact' => 'crm_contact',
-        'company' => 'crm_company',
-        'crm_company' => 'crm_company',
-        // Helpdesk
-        'ticket' => 'helpdesk_ticket',
-        'helpdesk_ticket' => 'helpdesk_ticket',
-        'helpdesk_board' => 'helpdesk_board',
-        // HCM
-        'employee' => 'hcm_employee',
-        'hcm_employee' => 'hcm_employee',
-        // Correspondence
-        'thread' => 'correspondence_thread',
-        'correspondence_thread' => 'correspondence_thread',
-        // Whisper
-        'recording' => 'whisper_recording',
-        'whisper_recording' => 'whisper_recording',
-        // Notes / Sheets / Slides
-        'note' => 'notes_note',
-        'notes_note' => 'notes_note',
-        'spreadsheet' => 'sheets_spreadsheet',
-        'sheets_spreadsheet' => 'sheets_spreadsheet',
-        'presentation' => 'slides_presentation',
-        'slides_presentation' => 'slides_presentation',
-        // Recruiting
-        'applicant' => 'rec_applicant',
-        'rec_applicant' => 'rec_applicant',
-        'position' => 'rec_position',
-        'rec_position' => 'rec_position',
-        // Process
-        'process' => 'organization_process',
-        'organization_process' => 'organization_process',
-        // Change
-        'change_project' => 'change_project',
-        // Drip
-        'bank_account_group' => 'drip_bank_account_group',
-        'drip_bank_account_group' => 'drip_bank_account_group',
-        'bank_transaction' => 'drip_bank_transaction',
-        'drip_bank_transaction' => 'drip_bank_transaction',
-        // Brands
-        'brand' => 'brands_brand',
-        'brands_brand' => 'brands_brand',
-        // SEO
-        'seo_url' => 'seo_url',
-        'seo_url_list' => 'seo_url_list',
-    ];
 
     public function getName(): string
     {
@@ -137,62 +55,12 @@ class ResolveContextTool implements ToolContract, ToolMetadataContract
             $objectType = $arguments['object_type'];
             $objectId = (int) $arguments['object_id'];
 
-            // Resolve friendly name → morph alias
-            $morphAlias = self::ALIAS_MAP[$objectType] ?? null;
-
-            // If not in our map, check if it's a valid morph alias directly
-            if (!$morphAlias && Relation::getMorphedModel($objectType)) {
-                $morphAlias = $objectType;
-            }
-
-            // Last resort: check if it's a FQCN
+            $morphAlias = ObjectContextResolver::resolveAlias($objectType);
             if (!$morphAlias) {
-                $reverseMorphMap = array_flip(Relation::morphMap());
-                if (isset($reverseMorphMap[$objectType])) {
-                    $morphAlias = $reverseMorphMap[$objectType];
-                }
+                return ToolResult::error('UNKNOWN_TYPE', "Unbekannter object_type '{$objectType}'. Bekannte Typen: " . implode(', ', ObjectContextResolver::knownTypes()));
             }
 
-            if (!$morphAlias) {
-                $knownTypes = array_keys(array_unique(self::ALIAS_MAP));
-                sort($knownTypes);
-                return ToolResult::error('UNKNOWN_TYPE', "Unbekannter object_type '{$objectType}'. Bekannte Typen: " . implode(', ', $knownTypes));
-            }
-
-            // Get the FQCN to query the linkable_type (DB may store alias or FQCN)
-            $fqcn = Relation::getMorphedModel($morphAlias);
-            $linkableTypes = [$morphAlias];
-            if ($fqcn) {
-                $linkableTypes[] = $fqcn;
-            }
-
-            // Find linked entities via dimension bridge
-            $links = EntityDimensionBridge::linksForLinkables($linkableTypes, [$objectId], true);
-            $resolvedVia = null;
-
-            // Parent fallback: if no direct link, try resolving via parent object
-            if ($links->isEmpty() && isset(self::PARENT_MAP[$morphAlias])) {
-                [$fkField, $parentAlias] = self::PARENT_MAP[$morphAlias];
-
-                // Load the object to get its parent FK
-                if ($fqcn && class_exists($fqcn)) {
-                    $object = $fqcn::find($objectId);
-                    $parentId = $object?->{$fkField};
-
-                    if ($parentId) {
-                        $parentFqcn = Relation::getMorphedModel($parentAlias);
-                        $parentLinkableTypes = [$parentAlias];
-                        if ($parentFqcn) {
-                            $parentLinkableTypes[] = $parentFqcn;
-                        }
-
-                        $links = EntityDimensionBridge::linksForLinkables($parentLinkableTypes, [$parentId], true);
-                        if ($links->isNotEmpty()) {
-                            $resolvedVia = $parentAlias;
-                        }
-                    }
-                }
-            }
+            ['links' => $links, 'resolved_via' => $resolvedVia] = ObjectContextResolver::entityLinks($morphAlias, $objectId);
 
             if ($links->isEmpty()) {
                 return ToolResult::success([

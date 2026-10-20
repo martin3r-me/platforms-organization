@@ -18,19 +18,6 @@ class ObjectContextResolver
     private const MAX_PARENT_HOPS = 3;
 
     /**
-     * Übergangs-Rückfall, solange ein Modul HasContextParent noch nicht
-     * implementiert (Deploy-Reihenfolge). Entfernen, sobald planner/dev/
-     * helpdesk/change ausgerollt sind. fk_field darf ein Relationspfad sein.
-     */
-    private const LEGACY_PARENTS = [
-        'planner_task' => ['project_id', 'project'],
-        'dev_issue' => ['board.dev_package_id', 'dev_package'],
-        'helpdesk_ticket' => ['helpdesk_board_id', 'helpdesk_board'],
-        'change_action' => ['change_project_id', 'change_project'],
-        'change_phase' => ['change_project_id', 'change_project'],
-    ];
-
-    /**
      * Kurzname / Morph-Alias / FQCN → Morph-Alias, oder null.
      */
     public static function resolveAlias(string $objectType): ?string
@@ -82,11 +69,6 @@ class ObjectContextResolver
         }
 
         $parent = app(EntityLinkRegistry::class)->contextParent($alias, $object);
-        if ($parent === null && isset(self::LEGACY_PARENTS[$alias])) {
-            [$fkField, $parentAlias] = self::LEGACY_PARENTS[$alias];
-            $parentId = data_get($object, $fkField);
-            $parent = $parentId ? [$parentAlias, (int) $parentId] : null;
-        }
 
         return $parent && $parent[1] ? [(string) $parent[0], (int) $parent[1]] : null;
     }

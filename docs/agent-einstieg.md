@@ -70,5 +70,5 @@ Kurzname = Alias ohne Modul-Präfix, wenn eindeutig (`dev_issue` → `issue`;
 `board` ist mehrdeutig → nur Alias), Label aus `linkTypeConfig()`.
 Eltern-Verortung (Task → Projekt, Issue → Package, Ticket → Board) liefert das
 Modul über das optionale `HasContextParent`; der Resolver geht bis 3 Schritte
-hoch. `ObjectContextResolver::LEGACY_PARENTS` ist nur Übergangs-Rückfall.
+hoch.
 Fest verdrahtet bleiben nur `sprint`/`board` in `ContextTypeRegistry` (ohne Morph-Alias).

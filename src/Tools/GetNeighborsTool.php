@@ -13,6 +13,7 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\EntityDimensionBridge;
+use Platform\Organization\Services\ObjectTypeRegistry;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
 /**
@@ -30,6 +31,7 @@ class GetNeighborsTool implements ToolContract, ToolMetadataContract
     private const EDGE_TYPES = ['parent', 'children', 'relationships', 'links'];
     private const MAX_DEPTH = 2;
     private const DEFAULT_LIMIT = 10;
+    private const DEFAULT_LIMIT_DEPTH2 = 5;
     private const MAX_LIMIT = 25;
     private const MAX_NODES = 50;
 
@@ -65,7 +67,7 @@ class GetNeighborsTool implements ToolContract, ToolMetadataContract
                 ],
                 'limit' => [
                     'type' => 'integer',
-                    'description' => 'Max. Einträge je Kantenart und Knoten (Default 10, max 25).',
+                    'description' => 'Max. Einträge je Kantenart und Knoten (Default 10, bei depth=2: 5; max 25).',
                 ],
                 'include_inactive' => [
                     'type' => 'boolean',
@@ -91,7 +93,9 @@ class GetNeighborsTool implements ToolContract, ToolMetadataContract
 
             $centerId = (int) ($arguments['entity_id'] ?? 0);
             $depth = max(1, min(self::MAX_DEPTH, (int) ($arguments['depth'] ?? 1)));
-            $limit = max(1, min(self::MAX_LIMIT, (int) ($arguments['limit'] ?? self::DEFAULT_LIMIT)));
+            // Tiefe 2 fächert stark auf → kleineres Default-Limit je Kante.
+            $defaultLimit = $depth > 1 ? self::DEFAULT_LIMIT_DEPTH2 : self::DEFAULT_LIMIT;
+            $limit = max(1, min(self::MAX_LIMIT, (int) ($arguments['limit'] ?? $defaultLimit)));
             $edgeTypes = array_values(array_intersect(self::EDGE_TYPES, (array) ($arguments['edge_types'] ?? self::EDGE_TYPES)));
             if ($edgeTypes === []) {
                 $edgeTypes = self::EDGE_TYPES;
@@ -299,14 +303,18 @@ class GetNeighborsTool implements ToolContract, ToolMetadataContract
         foreach ($byType as $storedType => $links) {
             $alias = $reverseMorphMap[$storedType] ?? $storedType;
             $class = Relation::getMorphedModel($storedType) ?? $storedType;
-            $entry = ['type' => $alias, 'total' => $links->count()];
+            $entry = ['type' => ObjectTypeRegistry::displayName($alias), 'total' => $links->count()];
 
             if (class_exists($class)) {
                 $ids = $links->pluck('linkable_id')->map(fn ($id) => (int) $id)->unique()->values();
                 $items = [];
                 $hidden = 0;
                 // Mehr laden als angezeigt, damit nicht lesbare Objekte das Limit nicht leeren.
-                foreach ($class::whereIn((new $class)->getKeyName(), $ids->take($limit * 3)->all())->get() as $obj) {
+                $probe = $ids->take($limit * 3)->all();
+                $found = $class::whereIn((new $class)->getKeyName(), $probe)->get();
+                // Links auf gelöschte Objekte (verwaist) ausweisen statt still zu verschlucken.
+                $missing = count($probe) - $found->count();
+                foreach ($found as $obj) {
                     if (count($items) >= $limit) {
                         break;
                     }
@@ -320,6 +328,9 @@ class GetNeighborsTool implements ToolContract, ToolMetadataContract
                 if ($hidden > 0) {
                     $entry['hidden'] = $hidden;
                 }
+                if ($missing > 0) {
+                    $entry['missing'] = $missing;
+                }
             }
 
             $result[] = $entry;
@@ -332,7 +343,7 @@ class GetNeighborsTool implements ToolContract, ToolMetadataContract
 
     private function label(object $model): ?string
     {
-        foreach (['title', 'name', 'subject'] as $attr) {
+        foreach (['title', 'name', 'subject', 'label', 'url'] as $attr) {
             if (! empty($model->{$attr})) {
                 return mb_strimwidth((string) $model->{$attr}, 0, 120, '…');
             }

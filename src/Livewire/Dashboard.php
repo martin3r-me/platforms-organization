@@ -43,8 +43,16 @@ class Dashboard extends Component
         );
     }
 
-    /** Kachel-Daten 10 min je Team/Stream gecacht — Snapshots ändern sich nur 08:00/18:00. */
+    /** Live-Kacheln (Zeiten, Links, Insights): 10 min je Team/Stream. */
     private const PANEL_CACHE_TTL = 600;
+
+    /**
+     * Rein snapshot-basierte Kacheln: gültig bis zum nächsten Snapshot-Lauf —
+     * SnapshotEntitiesCommand setzt danach SNAPSHOT_VERSION_KEY neu.
+     */
+    private const SNAPSHOT_PANELS = ['teamSnapshotSummary', 'teamMovement', 'entityHealthOverview', 'completionVelocity', 'teamSnapshotTrend', 'topEntitiesByActivity', 'personOverview'];
+    private const SNAPSHOT_CACHE_TTL = 43200;
+    public const SNAPSHOT_VERSION_KEY = 'organization:snapshots:version';
 
     /** Messmodus: $wire.set('profile', true) → Zeiten je Kachel im HTML (#org-dashboard-timings). */
     public bool $profile = false;
@@ -53,10 +61,13 @@ class Dashboard extends Component
     protected function panel(string $name, \Closure $compute): array
     {
         $start = microtime(true);
-        $key = 'organization:dashboard:' . $this->getTeamId() . ':' . ($this->dashboardStream ?? 'all') . ':' . $name;
-        $result = $this->profile ? $compute() : Cache::remember($key, self::PANEL_CACHE_TTL, $compute);
+        $snapshotBased = in_array($name, self::SNAPSHOT_PANELS, true);
+        $ttl = $snapshotBased ? self::SNAPSHOT_CACHE_TTL : self::PANEL_CACHE_TTL;
+        $key = 'organization:dashboard:' . $this->getTeamId() . ':' . ($this->dashboardStream ?? 'all') . ':' . $name
+            . ($snapshotBased ? ':v' . Cache::get(self::SNAPSHOT_VERSION_KEY, 0) : '');
+        $result = $this->profile ? $compute() : Cache::remember($key, $ttl, $compute);
         if ($this->profile) {
-            Cache::put($key, $result, self::PANEL_CACHE_TTL);
+            Cache::put($key, $result, $ttl);
             $this->timings[$name] = round((microtime(true) - $start) * 1000);
         }
 
@@ -838,7 +849,6 @@ class Dashboard extends Component
     /** Request-Memo für Snapshot-Abfragen (mehrere Kacheln fragen dieselben Stichtage ab). */
     protected array $snapshotMemo = [];
 
-    private const SNAPSHOT_CACHE_TTL = 600; // Snapshots entstehen 08:00/18:00 — 10 min Verzug ist unkritisch
 
     /**
      * Get the latest snapshot for each entity.
@@ -868,7 +878,8 @@ class Dashboard extends Component
         if ($ids === []) {
             return [];
         }
-        $key = 'organization:dashboard-snapshots:' . md5(implode(',', $ids)) . ':' . ($date ?? 'latest');
+        $key = 'organization:dashboard-snapshots:' . md5(implode(',', $ids)) . ':' . ($date ?? 'latest')
+            . ':v' . Cache::get(self::SNAPSHOT_VERSION_KEY, 0);
 
         return $this->snapshotMemo[$key] ??= Cache::remember($key, self::SNAPSHOT_CACHE_TTL, function () use ($ids, $date) {
             $maxDates = OrganizationEntitySnapshot::whereIn('entity_id', $ids)

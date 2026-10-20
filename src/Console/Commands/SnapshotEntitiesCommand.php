@@ -420,6 +420,9 @@ class SnapshotEntitiesCommand extends Command
         // 8. Structure snapshots per team
         $this->createTeamStructureSnapshots($entities, $today, $period, $entityDef);
 
+        // Dashboard-Kacheln auf Snapshot-Basis ungültig machen (Cache-Version)
+        \Illuminate\Support\Facades\Cache::forever(\Platform\Organization\Livewire\Dashboard::SNAPSHOT_VERSION_KEY, now()->timestamp);
+
         return self::SUCCESS;
     }
 

@@ -122,16 +122,3 @@ Route::get('/roles', RoleIndex::class)->name('organization.roles.index');
 Route::get('/environment-sources', EnvironmentSourceIndex::class)->name('organization.environment-sources.index');
 Route::get('/environment-snapshots', EnvironmentSnapshotIndex::class)->name('organization.environment-snapshots.index');
 Route::get('/environment-snapshots/{snapshot}', EnvironmentSnapshotShow::class)->name('organization.environment-snapshots.show');
-
-// Error Tracking Test (temporär)
-Route::get('/test-error/{type?}', function (string $type = 'exception') {
-    return match ($type) {
-        '500' => abort(500, 'Organization Test: Simulated 500 Internal Server Error'),
-        '404' => abort(404, 'Organization Test: Simulated 404 Not Found'),
-        '403' => abort(403, 'Organization Test: Simulated 403 Forbidden'),
-        'runtime' => throw new \RuntimeException('Organization Test: Simulated RuntimeException'),
-        'logic' => throw new \LogicException('Organization Test: Simulated LogicException'),
-        'db' => throw new \Illuminate\Database\QueryException('mysql', 'SELECT * FROM non_existent_table', [], new \Exception('Table not found')),
-        default => throw new \Platform\Organization\Exceptions\OrganizationTestException('Organization Test: Simulated exception at ' . now()->toIso8601String()),
-    };
-})->name('organization.test-error');

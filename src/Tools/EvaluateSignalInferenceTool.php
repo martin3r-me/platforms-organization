@@ -12,7 +12,6 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationMemoryEntry;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Models\OrganizationSignalInferencePrompt;
-use Platform\Organization\Models\OrganizationVsmFunction;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
@@ -102,13 +101,6 @@ class EvaluateSignalInferenceTool implements ToolContract, ToolMetadataContract
 
                 $entityIdList = $entities->pluck('id')->all();
 
-                // 3. Load VSM functions per entity (batch)
-                $vsmFunctionsByEntity = [];
-                foreach ($entityIdList as $eid) {
-                    $vsmFunctions = OrganizationVsmFunction::getForEntityWithHierarchy($rootTeamId, $eid);
-                    $vsmFunctionsByEntity[$eid] = $vsmFunctions->pluck('code')->all();
-                }
-
                 // 4. Load latest snapshots (batch)
                 $latestSnapshots = $this->getLatestSnapshots($entityIdList);
 
@@ -122,7 +114,6 @@ class EvaluateSignalInferenceTool implements ToolContract, ToolMetadataContract
                         'id' => $entity->id,
                         'name' => $entity->name,
                         'type' => $entity->type?->code,
-                        'vsm_functions' => $vsmFunctionsByEntity[$entity->id] ?? [],
                         'parent' => $entity->parent?->name,
                         'snapshot_latest' => $latestSnapshots[$entity->id] ?? null,
                         'movement_7d' => $movementBatch[$entity->id] ?? null,

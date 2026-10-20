@@ -625,7 +625,6 @@ PROMPT;
             $name = $entity['name'];
             $type = $entity['type'] ?? '?';
             $parent = $entity['parent'] ?? '-';
-            $vsm = ! empty($entity['vsm_functions']) ? implode(',', $entity['vsm_functions']) : '-';
 
             // Snapshot: extract key metrics only (non-null, non-zero)
             $snapshotSummary = '-';
@@ -657,7 +656,7 @@ PROMPT;
                 }
             }
 
-            $lines[] = "#{$id} {$name} [{$type}] parent={$parent} vsm={$vsm} | snap: {$snapshotSummary} | mov7d: {$movementSummary}";
+            $lines[] = "#{$id} {$name} [{$type}] parent={$parent} | snap: {$snapshotSummary} | mov7d: {$movementSummary}";
         }
 
         return implode("\n", $lines);

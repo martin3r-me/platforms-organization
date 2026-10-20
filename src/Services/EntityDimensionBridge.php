@@ -4,6 +4,7 @@ namespace Platform\Organization\Services;
 
 use Illuminate\Database\Eloquent\Relations\Relation;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Platform\Organization\Models\OrganizationDimensionDefinition;
 use Platform\Organization\Models\OrganizationDimensionLink;
 use Platform\Organization\Models\OrganizationDimensionValue;
@@ -67,24 +68,36 @@ class EntityDimensionBridge
             return;
         }
 
-        $values = OrganizationDimensionValue::whereIn('dimension_definition_id', $defIds)->get();
+        // Request-übergreifend gecacht (lief auf fast jeder Seite: alle Werte aller Teams
+        // als Models + JSON-Decode). Invalidierung über OrganizationDimensionValue-Events → flush().
+        sort($defIds);
+        $cached = Cache::get(self::CACHE_KEY);
+        $rows = ($cached['def_ids'] ?? null) === $defIds ? $cached['rows'] : null;
+        if ($rows === null) {
+            $rows = OrganizationDimensionValue::query()
+                ->whereIn('dimension_definition_id', $defIds)
+                ->whereNotNull('metadata')
+                ->toBase()
+                ->selectRaw("id, dimension_definition_id, JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.source_entity_id')) as source_entity_id")
+                ->get()
+                ->filter(fn ($r) => (int) $r->source_entity_id > 0)
+                ->map(fn ($r) => [(int) $r->id, (int) $r->dimension_definition_id, (int) $r->source_entity_id])
+                ->values()
+                ->all();
+            Cache::put(self::CACHE_KEY, ['def_ids' => $defIds, 'rows' => $rows], self::CACHE_TTL);
+        }
         $entityDefId = static::definitionId();
 
-        foreach ($values as $v) {
-            $sourceEntityId = $v->metadata['source_entity_id'] ?? null;
-            if (!$sourceEntityId) {
-                continue;
-            }
-
+        foreach ($rows as [$id, $defId, $sourceEntityId]) {
             // Primary entity dimension maps (backward compatible)
-            if ($v->dimension_definition_id === $entityDefId) {
-                static::$entityToDimValue[$sourceEntityId] = $v->id;
-                static::$dimValueToEntity[$v->id] = $sourceEntityId;
+            if ($defId === $entityDefId) {
+                static::$entityToDimValue[$sourceEntityId] = $id;
+                static::$dimValueToEntity[$id] = $sourceEntityId;
             }
 
             // All entity-sourced dimension maps
-            static::$allEntityToDimValue[$v->dimension_definition_id][$sourceEntityId] = $v->id;
-            static::$allDimValueToEntity[$v->dimension_definition_id][$v->id] = $sourceEntityId;
+            static::$allEntityToDimValue[$defId][$sourceEntityId] = $id;
+            static::$allDimValueToEntity[$defId][$id] = $sourceEntityId;
         }
     }
 
@@ -111,8 +124,12 @@ class EntityDimensionBridge
     /**
      * Reset cached maps (for testing or long-running processes).
      */
+    private const CACHE_KEY = 'organization:entity-dim-maps';
+    private const CACHE_TTL = 600;
+
     public static function flush(): void
     {
+        Cache::forget(self::CACHE_KEY);
         static::$entityDefId = null;
         static::$entityToDimValue = null;
         static::$dimValueToEntity = null;
@@ -439,10 +456,7 @@ class EntityDimensionBridge
             'metadata' => ['source_entity_id' => $entityId],
         ]);
 
-        // Update cache
-        static::$entityToDimValue[$entityId] = $dv->id;
-        static::$dimValueToEntity[$dv->id] = $entityId;
-
+        // Maps hat das saved-Event geleert; sie bauen sich beim nächsten Zugriff neu auf.
         return $dv->id;
     }
 }

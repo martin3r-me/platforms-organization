@@ -5,6 +5,7 @@ namespace Platform\Organization\Livewire\Entity;
 use Livewire\Component;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
+use Livewire\Attributes\Renderless;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityVsmAssignment;
 use Platform\Organization\Models\OrganizationPerspectiveTeam;
@@ -535,18 +536,13 @@ class Show extends Component
 
     public function mount(OrganizationEntity $entity)
     {
+        // Nur was Kopf/Sidebar direkt brauchen — Livewire lädt diese Relationen bei
+        // jedem Request neu. Beziehungen kommen über die Computeds relationsFrom/To.
         $this->entity = $entity->load([
             'type.group',
-            'parent',
-            'children.type',
-            'children.children',
-            'team',
-            'user',
+            'parent.type',
+            'children',
             'linkedUser',
-            'relationsFrom.toEntity.type',
-            'relationsFrom.relationType',
-            'relationsTo.fromEntity.type',
-            'relationsTo.relationType'
         ]);
         $this->loadForm();
     }
@@ -1124,19 +1120,37 @@ class Show extends Component
         return $this->getTimeSummaryForEntity($this->entity, $resolver);
     }
 
+    /** Kontext-Paare des Teilbaums — einmal pro Request, geteilt von Summe und Monatsverlauf. */
+    #[Computed]
+    public function cascadedContextPairs(): array
+    {
+        return (new EntityTimeResolver())->resolveContextPairs($this->entity, includeChildEntities: true);
+    }
+
     #[Computed]
     public function cascadedTimeSummary(): array
     {
-        $resolver = new EntityTimeResolver();
-        return $this->getTimeSummaryForEntity($this->entity, $resolver, includeChildren: true);
+        try {
+            $row = (new EntityTimeResolver())
+                ->queryForPairs(\Platform\Organization\Models\OrganizationTimeEntry::query(), $this->cascadedContextPairs)
+                ->selectRaw('COALESCE(SUM(minutes), 0) as total_minutes, COALESCE(SUM(CASE WHEN is_billed = 1 THEN minutes ELSE 0 END), 0) as billed_minutes')
+                ->first();
+
+            return [
+                'total_minutes' => (int) ($row?->total_minutes ?? 0),
+                'billed_minutes' => (int) ($row?->billed_minutes ?? 0),
+            ];
+        } catch (\Exception $e) {
+            return ['total_minutes' => 0, 'billed_minutes' => 0];
+        }
     }
 
     #[Computed]
     public function monthlyTimeData(): array
     {
         try {
-            $resolver = new EntityTimeResolver();
-            $query = $resolver->buildTimeEntryQuery($this->entity, includeChildEntities: true);
+            $query = (new EntityTimeResolver())
+                ->queryForPairs(\Platform\Organization\Models\OrganizationTimeEntry::query(), $this->cascadedContextPairs);
 
             $dbRows = $query
                 ->selectRaw("DATE_FORMAT(work_date, '%Y-%m') as month")
@@ -1430,22 +1444,29 @@ class Show extends Component
         ];
     }
 
+    /** Nachfahren-IDs einmal pro Request (vorher je Kennzahl ein eigener CTE). */
+    #[Computed]
+    public function descendantIds(): array
+    {
+        return $this->getDescendantEntityIds($this->entity->id);
+    }
+
     #[Computed]
     public function totalDescendantCount(): int
     {
-        return count($this->getDescendantEntityIds($this->entity->id));
+        return count($this->descendantIds);
     }
 
     #[Computed]
     public function totalLinkCount(): int
     {
-        $ids = array_merge([$this->entity->id], $this->getDescendantEntityIds($this->entity->id));
-        return EntityDimensionBridge::totalLinkCount($ids);
+        return EntityDimensionBridge::totalLinkCount(array_merge([$this->entity->id], $this->descendantIds));
     }
 
+    #[Renderless]
     public function loadChildNodes(int $entityId): array
     {
-        $entity = OrganizationEntity::findOrFail($entityId);
+        $entity = OrganizationEntity::where('team_id', $this->entity->team_id)->findOrFail($entityId);
         $children = $entity->children()
             ->with('type')
             ->get();
@@ -1766,6 +1787,7 @@ class Show extends Component
         return $provider?->extractMetadata($type, $linkable) ?? [];
     }
 
+    #[Renderless]
     public function loadEntireTree(): array
     {
         // Load all descendants of the current entity
@@ -1780,12 +1802,12 @@ class Show extends Component
             ->orderBy('name')
             ->get();
 
-        $byParent = $allEntities->groupBy('parent_entity_id');
+        // Ein Batch für alle Knoten statt einer Runde je Elterngruppe
+        $nodes = $this->buildNodesForEntities($allEntities);
 
-        // Build nodes for each parent group using batch approach
         $result = [];
-        foreach ($byParent as $parentId => $children) {
-            $result[$parentId] = $this->buildNodesForEntities($children);
+        foreach ($allEntities->values() as $i => $entity) {
+            $result[$entity->parent_entity_id][] = $nodes[$i];
         }
 
         return $result;

@@ -40,15 +40,44 @@ class EntityTimeResolver
      */
     public function resolveContextPairs(OrganizationEntity $entity, bool $includeChildEntities = false): array
     {
-        $pairs = [];
+        // Gebündelt statt rekursiv pro Entity/Link/Objekt (war N+1, tausende Queries bei großen Teilbäumen).
+        $descendants = $includeChildEntities ? $this->activeDescendantIds($entity->id) : [];
 
-        $this->collectPairsForEntity($entity, $pairs);
+        return $this->resolveContextPairsBatch([$entity->id], [$entity->id => $descendants])[$entity->id] ?? [];
+    }
 
-        if ($includeChildEntities) {
-            $this->collectPairsForChildEntities($entity, $pairs);
+    /**
+     * Baut eine Query auf beliebige Modelle (TimeEntry, TimePlanned, …) für vorab aufgelöste Paare.
+     */
+    public function queryForPairs(Builder $query, array $pairs): Builder
+    {
+        return $this->applyContextPairsToQuery($query, $pairs);
+    }
+
+    private const MAX_DEPTH = 25;
+
+    /**
+     * Aktive Nachfahren, ebenenweise (eine Query je Ebene). Wie bisher: der
+     * Abstieg endet an inaktiven Entities.
+     *
+     * @return int[]
+     */
+    protected function activeDescendantIds(int $entityId): array
+    {
+        $all = [];
+        $frontier = [$entityId];
+        for ($depth = 0; $frontier !== [] && $depth < self::MAX_DEPTH; $depth++) {
+            $frontier = OrganizationEntity::whereIn('parent_entity_id', $frontier)
+                ->where('is_active', true)
+                ->pluck('id')
+                ->map(fn ($id) => (int) $id)
+                ->diff($all)
+                ->values()
+                ->all();
+            $all = array_merge($all, $frontier);
         }
 
-        return $pairs;
+        return $all;
     }
 
     /**
@@ -69,55 +98,6 @@ class EntityTimeResolver
         $pairs = $this->resolveContextPairs($entity, $includeChildEntities);
 
         return $this->applyContextPairsToQuery(OrganizationTimePlanned::query(), $pairs);
-    }
-
-    /**
-     * Sammelt Context-Paare für eine einzelne Entity (ohne Children) über EntityLinks.
-     */
-    protected function collectPairsForEntity(OrganizationEntity $entity, array &$pairs): void
-    {
-        $cascades = static::getTimeTrackableCascades();
-
-        $links = EntityDimensionBridge::linksForEntity($entity->id);
-
-        foreach ($links as $link) {
-            $morphAlias = $link->linkable_type;
-
-            if (! isset($cascades[$morphAlias])) {
-                continue;
-            }
-
-            [$fqcn, $childRelations] = $cascades[$morphAlias];
-
-            // Das linkable Model selbst als Context-Paar
-            $pairs[$fqcn][] = $link->linkable_id;
-
-            // Child-Relations folgen
-            if (! empty($childRelations)) {
-                $this->collectChildRelationPairs($fqcn, $link->linkable_id, $childRelations, $pairs);
-            }
-        }
-    }
-
-    /**
-     * Folgt Child-Relations und sammelt Kind-Model Context-Paare.
-     *
-     * Unterstützt verschachtelte Relationen wie "tasks", "projectSlots.tasks"
-     */
-    protected function collectChildRelationPairs(string $modelClass, int $modelId, array $relations, array &$pairs): void
-    {
-        if (! class_exists($modelClass)) {
-            return;
-        }
-
-        $model = $modelClass::find($modelId);
-        if (! $model) {
-            return;
-        }
-
-        foreach ($relations as $relationPath) {
-            $this->resolveRelationPath($model, $relationPath, $pairs);
-        }
     }
 
     /**
@@ -427,19 +407,6 @@ class EntityTimeResolver
         unset($summary);
 
         return $result;
-    }
-
-    /**
-     * Sammelt Context-Paare für alle Child-Entities (rekursiv).
-     */
-    protected function collectPairsForChildEntities(OrganizationEntity $entity, array &$pairs): void
-    {
-        $children = $entity->children()->where('is_active', true)->get();
-
-        foreach ($children as $child) {
-            $this->collectPairsForEntity($child, $pairs);
-            $this->collectPairsForChildEntities($child, $pairs);
-        }
     }
 
     /**

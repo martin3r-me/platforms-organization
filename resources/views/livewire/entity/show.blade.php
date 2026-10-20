@@ -214,8 +214,8 @@
                 @endif
             </div>
 
-            {{-- Tab Navigation --}}
-            <div x-data="{ tab: @entangle('activeTab') }">
+            {{-- Tab Navigation — nur der aktive Tab wird serverseitig gerendert (@if je Tab), Wechsel per entangle.live --}}
+            <div x-data="{ tab: @entangle('activeTab').live }">
                 <div class="border-b border-[var(--ui-border)] mb-6">
                     <nav class="flex gap-1 -mb-px">
                         <button
@@ -406,9 +406,11 @@
                             @endif
                         </button>
                     </nav>
+                    <div wire:loading.delay wire:target="activeTab" class="py-2 text-xs text-[var(--ui-muted)]">Lädt…</div>
                 </div>
 
                 {{-- Tab: Analyse --}}
+                @if($activeTab === 'analyse')
                 <div x-show="tab === 'analyse'" x-cloak>
                     @if($analyseLoaded)
                         <div class="space-y-6">
@@ -735,8 +737,10 @@
                         </div>
                     @endif
                 </div>
+                @endif
 
                 {{-- Tab: Hierarchie --}}
+                @if($activeTab === 'hierarchy')
                 <div x-show="tab === 'hierarchy'" x-cloak x-data="{
                     linkConfig: {{ Js::from(collect($this->linkTypeConfig)->map(fn($c) => ['label' => $c['label'], 'icon' => $c['icon']])) }},
                     linkIconSvgs: {{ Js::from($this->linkTypeIconSvgs) }},
@@ -892,8 +896,10 @@
                         </div>
                     </div>
                 </div>
+                @endif
 
                 {{-- Tab: Daten --}}
+                @if($activeTab === 'data')
                 <div x-show="tab === 'data'" x-cloak>
                     <div class="space-y-6">
                         {{-- Grunddaten --}}
@@ -995,8 +1001,10 @@
 
                     </div>
                 </div>
+                @endif
 
                 {{-- Tab: Relations --}}
+                @if($activeTab === 'relations')
                 <div x-show="tab === 'relations'" x-cloak>
                     <div class="space-y-6">
                         {{-- Intro --}}
@@ -1117,16 +1125,20 @@
                         </div>
                     </div>
                 </div>
+                @endif
 
                 {{-- Tab: Person --}}
                 @if($this->hasLinkedUser)
+                    @if($activeTab === 'person')
                     <div x-show="tab === 'person'" x-cloak>
                         <livewire:organization.entity.person-activity :entity="$entity" :key="'person-activity-'.$entity->id" />
                     </div>
+                    @endif
                 @endif
 
                 {{-- Tab: Module (an/aus pro Person) --}}
                 @if($this->hasLinkedUser)
+                    @if($activeTab === 'modules')
                     <div x-show="tab === 'modules'" x-cloak>
                         <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                             <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1 flex items-center gap-2">
@@ -1175,9 +1187,11 @@
                             </table>
                         </div>
                     </div>
+                    @endif
                 @endif
 
                 {{-- Tab: Signale --}}
+                @if($activeTab === 'signals')
                 <div x-show="tab === 'signals'" x-cloak>
                     <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
                         {{-- Header with filter --}}
@@ -1360,19 +1374,25 @@
                         @endif
                     </div>
                 </div>
+                @endif
 
                 {{-- Tab: Agent (KI-Worker als Org-Mitglied) — Runtime-Config + Token + Status --}}
                 @if($this->isAgentEntity)
+                    @if($activeTab === 'agent')
                     <div x-show="tab === 'agent'" x-cloak>
                         @livewire(\Platform\Organization\Livewire\Agent\ProfilePanel::class, ['entity' => $entity], key('agent-panel-'.$entity->id))
                     </div>
+                    @endif
+                    @if($activeTab === 'braingraph')
                     <div x-show="tab === 'braingraph'" x-cloak>
                         @livewire(\Platform\Organization\Livewire\Agent\BrainGraph::class, ['entity' => $entity], key('agent-braingraph-'.$entity->id))
                     </div>
+                    @endif
                 @endif
 
                 {{-- Tab: System-Agent --}}
                 @if($this->isSystemAgent)
+                    @if($activeTab === 'agent')
                     <div x-show="tab === 'agent'" x-cloak>
                         <div class="space-y-6">
                             {{-- Agent-Status + Toggle --}}
@@ -1513,10 +1533,12 @@
                             </div>
                         </div>
                     </div>
+                    @endif
                 @endif
 
                 {{-- Tab: VSM-Matrix --}}
                 @if($this->isCarrierEntity)
+                    @if($activeTab === 'vsm')
                     <div x-show="tab === 'vsm'" x-cloak>
                         <div class="space-y-4">
                             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-5">
@@ -1591,8 +1613,10 @@
                             @endforeach
                         </div>
                     </div>
+                    @endif
 
                     {{-- Tab: Strategie (Mission/Vision + Forecasts + Fokusraeume + Transformation-Map) --}}
+                    @if($activeTab === 'strategy')
                     <div x-show="tab === 'strategy'" x-cloak>
                         @php $strategy = $this->strategy; @endphp
                         @if($strategy === null)
@@ -2031,8 +2055,10 @@
                             @endforeach
                         @endif
                     </div>
+                    @endif
 
                     {{-- Tab: Perspektive ↔ Teams --}}
+                    @if($activeTab === 'perspective')
                     <div x-show="tab === 'perspective'" x-cloak>
                         <div class="space-y-4">
                             <div class="bg-white rounded-lg border border-[var(--ui-border)] p-5">
@@ -2119,9 +2145,11 @@
                             </div>
                         </div>
                     </div>
+                    @endif
                 @endif
 
                 {{-- Tab: Berichte (Verbalization-Feeds) --}}
+                @if($activeTab === 'reports')
                 <div x-show="tab === 'reports'" x-cloak>
                     {{-- Puls-Widget: live gerechneter Zustand ohne LLM-Prosa --}}
                     @php $pulse = $this->entityPulseSnapshot; @endphp
@@ -2382,6 +2410,7 @@
                         </div>
                     @endif
                 </div>
+                @endif
             </div>
         </div>
     <!-- Create Team Modal -->

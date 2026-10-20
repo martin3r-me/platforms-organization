@@ -40,6 +40,12 @@ class OrganizationDimensionValue extends Model
                 $model->uuid = $uuid;
             }
         });
+
+        // Entity↔DimValue-Maps sind request-übergreifend gecacht → bei jeder Änderung verwerfen.
+        $flush = fn () => \Platform\Organization\Services\EntityDimensionBridge::flush();
+        static::saved($flush);
+        static::deleted($flush);
+        static::restored($flush);
     }
 
     public function definition()

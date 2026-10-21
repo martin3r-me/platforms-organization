@@ -4,6 +4,7 @@ namespace Platform\Organization\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Platform\ActivityLog\Traits\LogsActivity;
 use Platform\Core\Contracts\HasDisplayName;
@@ -70,6 +71,12 @@ class OrganizationMilestone extends Model implements HasDisplayName
                 );
             }
         });
+
+        // Beiträge sind lose gekoppelt (kein FK/Cascade): beim ENDGÜLTIGEN Löschen selbst abräumen.
+        // Soft-Delete lässt sie stehen, damit ein Wiederherstellen die Ausrichtung behält.
+        static::forceDeleted(function (self $model) {
+            OrganizationMilestoneContribution::query()->where('milestone_id', $model->id)->delete();
+        });
     }
 
     public function getDisplayName(): ?string
@@ -100,6 +107,12 @@ class OrganizationMilestone extends Model implements HasDisplayName
     public function team(): BelongsTo
     {
         return $this->belongsTo(Team::class);
+    }
+
+    /** Was zahlt auf diesen Meilenstein ein (Objectives / Key Results). */
+    public function contributions(): HasMany
+    {
+        return $this->hasMany(OrganizationMilestoneContribution::class, 'milestone_id');
     }
 
     public function user(): BelongsTo

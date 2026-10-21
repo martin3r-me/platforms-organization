@@ -522,6 +522,10 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\CreateMilestoneTool());
             $registry->register(new \Platform\Organization\Tools\UpdateMilestoneTool());
             $registry->register(new \Platform\Organization\Tools\DeleteMilestoneTool());
+            // Ausrichtung: Objectives / Key Results zahlen auf Meilensteine ein.
+            $registry->register(new \Platform\Organization\Tools\ListMilestoneContributionsTool());
+            $registry->register(new \Platform\Organization\Tools\CreateMilestoneContributionTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteMilestoneContributionTool());
             $registry->register(new \Platform\Organization\Tools\GetEntityStrategyTool());
 
         } catch (\Throwable $e) {

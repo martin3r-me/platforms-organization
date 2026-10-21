@@ -6,6 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationMilestoneContribution;
 use Platform\Organization\Services\EntityDimensionBridge;
 
 /**
@@ -27,6 +28,9 @@ class AgentOkrController extends Controller
 
     /** Erster gesehener Zyklus (für Start/Ende in der Antwort — Basis der Quartals-Rituale im Daemon). */
     private $cycleModel = null;
+
+    /** Ausrichtung: Morph-Alias → Objekt-ID → Beiträge auf Meilensteine (pro Ladung gesammelt vorgeladen). */
+    private array $alignments = [];
 
     /**
      * GET /api/org/agent/okrs — persönliches OKR (voll) + zugewiesene Objectives (im OKR-Kontext).
@@ -88,6 +92,7 @@ class AgentOkrController extends Controller
             return [];
         }
         $objs = $this->activeObjectives($objectiveClass)->whereIn('okr_id', $okrIds)->orderBy('order')->get();
+        $this->preloadAlignments($objs);
         $out = [];
         foreach ($objs as $o) {
             $this->captureCycle($o, $cycleLabel);
@@ -109,6 +114,7 @@ class AgentOkrController extends Controller
         if ($mine->isEmpty()) {
             return [];
         }
+        $this->preloadAlignments($mine);
 
         $okrIds = $mine->pluck('okr_id')->map(fn ($v) => (int) $v)->unique()->values()->all();
 
@@ -182,11 +188,14 @@ class AgentOkrController extends Controller
                 'checkins' => (int) ($kr->performances_count ?? 0),
                 'linked_work' => (int) ($kr->contexts_count ?? 0),
                 'metric_driven' => $kr->isMetricDriven(),
+                // Ausrichtung: auf welche Meilensteine der Transformations-Map zahlt das KR ein?
+                'contributes_to' => $this->alignmentFor($kr),
             ];
         }
         return [
             'title' => (string) $o->title,
             'description' => (string) ($o->description ?? ''),
+            'contributes_to' => $this->alignmentFor($o),
             'key_results' => $krs,
         ];
     }
@@ -206,6 +215,44 @@ class AgentOkrController extends Controller
         } catch (\Throwable $e) {
             // ignore
         }
+    }
+
+    /**
+     * Beiträge auf Meilensteine für diese Objectives und ihre KRs in EINER Query vorladen.
+     * Typ-Aliase kommen vom Objekt selbst (getMorphClass) — organization nennt keine fremden Typen.
+     */
+    private function preloadAlignments($objectives): void
+    {
+        $ids = [];
+        foreach ($objectives as $o) {
+            $ids[$o->getMorphClass()][] = (int) $o->id;
+            foreach ($o->keyResults as $kr) {
+                $ids[$kr->getMorphClass()][] = (int) $kr->id;
+            }
+        }
+        if (empty($ids)) {
+            return;
+        }
+        try {
+            $rows = OrganizationMilestoneContribution::query()
+                ->with(['milestone.focusArea', 'milestone.entity'])
+                ->where(function ($w) use ($ids) {
+                    foreach ($ids as $alias => $list) {
+                        $w->orWhere(fn ($x) => $x->where('linkable_type', $alias)->whereIn('linkable_id', array_values(array_unique($list))));
+                    }
+                })
+                ->get();
+            foreach ($rows as $c) {
+                $this->alignments[$c->linkable_type][(int) $c->linkable_id][] = $c->toAlignmentArray();
+            }
+        } catch (\Throwable $e) {
+            // Ausrichtung ist ein Zusatz — ohne sie weiter.
+        }
+    }
+
+    private function alignmentFor($model): array
+    {
+        return $this->alignments[$model->getMorphClass()][(int) $model->id] ?? [];
     }
 
     /** Datum als ISO-8601 (Carbon oder String), sonst null. */

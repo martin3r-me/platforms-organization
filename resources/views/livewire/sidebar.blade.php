@@ -10,7 +10,7 @@
 
     {{-- Ausgeklappt: gruppierte Navigation --}}
     <div x-show="!collapsed">
-        @foreach($sections as $section)
+        @foreach($nav as $section)
             @php($muted = $section['muted'] ?? false)
             <x-ui-sidebar-list :label="$section['label'] . (! empty($section['note']) ? ' · ' . $section['note'] : '')">
                 @foreach($section['items'] as $item)
@@ -30,7 +30,7 @@
 
     {{-- Eingeklappt: nur Icons, Gruppen durch Hairlines getrennt --}}
     <div x-show="collapsed" x-cloak>
-        @foreach($sections as $section)
+        @foreach($nav as $section)
             <div class="px-2 py-2 border-b border-[color:var(--nx-line)] flex flex-col gap-1">
                 @foreach($section['items'] as $item)
                     <a href="{{ route($item['route']) }}" wire:navigate title="{{ $item['label'] }}"

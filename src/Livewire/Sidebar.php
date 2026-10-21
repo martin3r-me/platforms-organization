@@ -101,8 +101,10 @@ class Sidebar extends Component
             $this->sections = $this->buildSections();
         }
 
+        // Eigener Name: Livewire reicht die Property $sections ebenfalls an die View
+        // und würde eine gleichnamige Variable überdecken.
         return view('organization::livewire.sidebar', [
-            'sections' => $this->markActive($this->sections),
+            'nav' => $this->markActive($this->sections),
         ])->layout('platform::layouts.app');
     }
 }

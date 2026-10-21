@@ -1,150 +1,120 @@
+@php
+    $opts = fn ($items) => $items->map(fn ($i) => ['value' => $i->id, 'label' => $i->name])->values()->all();
+    $hours = fn ($m) => number_format($m / 60, 2, ',', '.') . ' h';
+    $alle = $this->plannedTimes;
+    $zeilen = $alle->take($limit);
+@endphp
+
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
-    </x-slot>
-
-    <x-slot name="actionbar">
-        <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Geplante Zeiten'],
-        ]" />
+        <x-ui-page-navbar title="Plan-Zeiten" icon="heroicon-o-calendar" />
     </x-slot>
 
     <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Filter" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Suche</h3>
-                    <x-ui-input-text wire:model.live="search" name="search" placeholder="Suche nach Notizen, Benutzer, Team..." class="w-full" size="sm" />
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>
-                    <div class="space-y-3">
-                        <x-ui-input-select wire:model.live="selectedTeamId" name="selectedTeamId" label="Team" :options="$this->availableTeams->pluck('name', 'id')->toArray()" :nullable="true" nullLabel="– Alle Teams –" size="sm" />
-                        <x-ui-input-select wire:model.live="selectedUserId" name="selectedUserId" label="Benutzer" :options="$this->availableUsers->pluck('name', 'id')->toArray()" :nullable="true" nullLabel="– Alle Benutzer –" size="sm" />
-                        <div class="flex items-center">
-                            <input type="checkbox" wire:model.live="showInactiveOnly" id="showInactiveOnly" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                            <label for="showInactiveOnly" class="ml-2 text-sm text-[var(--ui-secondary)]">Nur inaktive</label>
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Statistiken</h3>
-                    <div class="space-y-3">
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <div class="flex items-center justify-between mb-2">
-                                <span class="text-xs text-[var(--ui-muted)]">Gesamt geplant</span>
-                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ number_format($this->totalPlannedMinutes / 60, 2, ',', '.') }}h</span>
-                            </div>
-                            <div class="text-xs text-[var(--ui-muted)]">{{ number_format($this->totalPlannedMinutes, 0, ',', '.') }} Minuten</div>
-                        </div>
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <div class="flex items-center justify-between">
-                                <span class="text-xs text-[var(--ui-muted)]">Einträge</span>
-                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ $this->plannedTimes->count() }}</span>
-                            </div>
-                        </div>
-                    </div>
+        <x-ui-page-sidebar title="Filter" width="w-64" :defaultOpen="true" side="left">
+            <div class="flex flex-col gap-3 p-3">
+                <x-nx-input-select name="selectedTeamId" label="Team" size="sm" wire:model.live="selectedTeamId"
+                    :options="$opts($this->availableTeams)" nullable nullLabel="Alle" />
+                <x-nx-input-select name="selectedUserId" label="Person" size="sm" wire:model.live="selectedUserId"
+                    :options="$opts($this->availableUsers)" nullable nullLabel="Alle" />
+                <div class="border-t border-[color:var(--nx-line)] pt-3">
+                    <x-nx-input-checkbox label="Nur inaktive" wire:model.live="showInactiveOnly" />
                 </div>
             </div>
         </x-ui-page-sidebar>
     </x-slot>
 
-    <x-ui-page-container>
-        <x-ui-table compact="true">
-            <x-ui-table-header>
-                <x-ui-table-header-cell compact="true">Benutzer</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Team</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Kontext</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Geplante Zeit</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Notiz</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Erstellt</x-ui-table-header-cell>
-            </x-ui-table-header>
-            
-            <x-ui-table-body>
-                @forelse($this->plannedTimes as $planned)
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true">
-                            <div class="flex items-center gap-2">
-                                @if($planned->user && $planned->user->avatar)
-                                    <img src="{{ $planned->user->avatarUrl() }}" loading="lazy" alt="{{ $planned->user->name ?? 'User' }}" class="w-8 h-8 rounded-full object-cover" />
-                                @else
-                                    <div class="w-8 h-8 rounded-full bg-[var(--ui-primary-5)] flex items-center justify-center text-xs font-medium text-[var(--ui-primary)]">
-                                        {{ strtoupper(substr($planned->user->name ?? 'U', 0, 1)) }}
-                                    </div>
-                                @endif
-                                <div>
-                                    <div class="text-sm font-medium text-[var(--ui-secondary)]">
-                                        {{ $planned->user->name ?? 'Unbekannt' }}
-                                    </div>
-                                    <div class="text-xs text-[var(--ui-muted)]">
-                                        {{ $planned->user->email ?? '' }}
-                                    </div>
-                                </div>
-                            </div>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <div class="text-sm text-[var(--ui-secondary)]">
-                                {{ $planned->team->name ?? 'Unbekannt' }}
-                            </div>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($planned->context)
-                                <div class="text-sm text-[var(--ui-secondary)]">
-                                    {{ class_basename($planned->context_type) }}
-                                </div>
-                                <div class="text-xs text-[var(--ui-muted)]">
-                                    {{ $planned->context->name ?? $planned->context->title ?? 'Unbekannt' }}
-                                </div>
-                            @else
-                                <span class="text-xs text-[var(--ui-muted)]">–</span>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <div class="text-sm font-medium text-[var(--ui-secondary)]">
-                                {{ number_format($planned->planned_minutes / 60, 2, ',', '.') }}h
-                            </div>
-                            <div class="text-xs text-[var(--ui-muted)]">
-                                {{ number_format($planned->planned_minutes, 0, ',', '.') }} Min
-                            </div>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($planned->is_active)
-                                <x-ui-badge variant="success" size="xs">Aktiv</x-ui-badge>
-                            @else
-                                <x-ui-badge variant="secondary" size="xs">Inaktiv</x-ui-badge>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($planned->note)
-                                <div class="text-sm text-[var(--ui-secondary)] max-w-xs truncate" title="{{ $planned->note }}">
-                                    {{ Str::limit($planned->note, 50) }}
-                                </div>
-                            @else
-                                <span class="text-xs text-[var(--ui-muted)]">–</span>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <div class="text-sm text-[var(--ui-secondary)]">
-                                {{ $planned->created_at->format('d.m.Y') }}
-                            </div>
-                            <div class="text-xs text-[var(--ui-muted)]">
-                                {{ $planned->created_at->format('H:i') }}
-                            </div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @empty
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="7" class="text-center py-8">
-                            <div class="text-sm text-[var(--ui-muted)]">
-                                Keine geplanten Zeiten gefunden.
-                            </div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @endforelse
-            </x-ui-table-body>
-        </x-ui-table>
+    <x-slot name="actionbar">
+        <x-ui-page-actionbar :breadcrumbs="[
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Plan-Zeiten'],
+        ]">
+            <x-slot name="left">
+                <div class="w-64">
+                    <x-nx-input-text name="search" size="sm" placeholder="Notiz, Person oder Team…" wire:model.live.debounce.400ms="search" />
+                </div>
+            </x-slot>
+        </x-ui-page-actionbar>
+    </x-slot>
+
+    <x-ui-page-container width="contained">
+        <div class="space-y-5">
+            <h1 class="m-0 text-2xl font-semibold tracking-tight text-[color:var(--nx-text)]">Plan-Zeiten</h1>
+
+            <x-nx-stat-grid cols="2">
+                <x-nx-stat label="Geplant" :value="$hours($this->totalPlannedMinutes)" icon="heroicon-o-calendar" />
+                <x-nx-stat label="Einträge" :value="number_format($alle->count(), 0, ',', '.')" icon="heroicon-o-queue-list" />
+            </x-nx-stat-grid>
+
+            <x-nx-card flush>
+                @if ($alle->isEmpty())
+                    <x-nx-empty icon="heroicon-o-calendar">Keine geplanten Zeiten gefunden.</x-nx-empty>
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-xs text-[color:var(--nx-muted)]">
+                                    <th class="border-b border-[color:var(--nx-line)] px-4 py-2.5 text-left font-medium">Person</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-left font-medium">Kontext</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-left font-medium">Notiz</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-right font-medium">Geplant</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-right font-medium">Erstellt</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-4 py-2.5 text-right font-medium">Status</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($zeilen as $p)
+                                    @php($ctx = $p->context)
+                                    <tr wire:key="pt-{{ $p->id }}" class="border-b border-[color:var(--nx-line)] last:border-0 hover:bg-[color:var(--nx-hover)]">
+                                        <td class="whitespace-nowrap px-4 py-1.5">
+                                            <div class="flex items-center gap-2">
+                                                @if ($p->user?->avatar)
+                                                    <img src="{{ $p->user->avatarUrl() }}" loading="lazy" alt="" class="h-6 w-6 rounded-[6px] object-cover" />
+                                                @else
+                                                    <span class="flex h-6 w-6 items-center justify-center rounded-[6px] bg-[color:var(--nx-accent-soft)] text-[10px] font-medium">{{ mb_strtoupper(mb_substr($p->user->name ?? '?', 0, 1)) }}</span>
+                                                @endif
+                                                <div class="min-w-0">
+                                                    <div class="text-[color:var(--nx-text)]">{{ $p->user->name ?? 'Unbekannt' }}</div>
+                                                    <div class="text-xs text-[color:var(--nx-faint)]">{{ $p->team->name ?? '' }}</div>
+                                                </div>
+                                            </div>
+                                        </td>
+                                        <td class="max-w-[16rem] px-3 py-1.5">
+                                            @if ($ctx)
+                                                <div class="truncate text-[color:var(--nx-text)]">{{ $ctx->name ?? $ctx->title ?? 'Unbekannt' }}</div>
+                                                <div class="text-xs text-[color:var(--nx-faint)]">{{ class_basename($p->context_type) }}</div>
+                                            @else
+                                                <span class="text-[color:var(--nx-faint)]">–</span>
+                                            @endif
+                                        </td>
+                                        <td class="max-w-xs px-3 py-1.5">
+                                            @if ($p->note)
+                                                <div class="truncate text-[color:var(--nx-muted)]" title="{{ $p->note }}">{{ $p->note }}</div>
+                                            @else
+                                                <span class="text-[color:var(--nx-faint)]">–</span>
+                                            @endif
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-1.5 text-right font-medium tabular-nums text-[color:var(--nx-text)]">{{ $hours($p->planned_minutes) }}</td>
+                                        <td class="whitespace-nowrap px-3 py-1.5 text-right tabular-nums text-[color:var(--nx-muted)]">{{ $p->created_at->format('d.m.Y') }}</td>
+                                        <td class="whitespace-nowrap px-4 py-1.5 text-right">
+                                            <x-nx-badge :variant="$p->is_active ? 'success' : 'neutral'" dot>{{ $p->is_active ? 'Aktiv' : 'Inaktiv' }}</x-nx-badge>
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    @if ($alle->count() > $zeilen->count())
+                        <div class="flex items-center justify-between border-t border-[color:var(--nx-line)] px-4 py-2.5">
+                            <span class="text-xs text-[color:var(--nx-faint)]">{{ $zeilen->count() }} von {{ $alle->count() }}</span>
+                            <x-nx-button size="sm" wire:click="loadMore">
+                                <span wire:loading.remove wire:target="loadMore">Weitere laden</span>
+                                <span wire:loading wire:target="loadMore">Lädt…</span>
+                            </x-nx-button>
+                        </div>
+                    @endif
+                @endif
+            </x-nx-card>
+        </div>
     </x-ui-page-container>
 </x-ui-page>
-

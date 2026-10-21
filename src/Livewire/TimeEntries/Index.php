@@ -21,6 +21,11 @@ class Index extends Component
     public $dateTo = null;
     public $showBilledOnly = false;
 
+    /** Sichtbare Tage der Tabelle; Summen und Einheiten-Übersicht zählen immer den ganzen Zeitraum. */
+    public int $daysShown = self::DAYS_PAGE;
+
+    private const DAYS_PAGE = 7;
+
     public function mount()
     {
         $this->dateFrom = now()->startOfMonth()->format('Y-m-d');
@@ -222,14 +227,19 @@ class Index extends Component
     /**
      * Prüft ob ein Heroicon existiert, gibt den Namen zurück oder null als Fallback.
      */
+    private array $heroiconMemo = [];
+
     protected function resolveHeroicon(string $iconName): ?string
     {
+        if (array_key_exists($iconName, $this->heroiconMemo)) {
+            return $this->heroiconMemo[$iconName];
+        }
+
         try {
-            $factory = app(\BladeUI\Icons\Factory::class);
-            $factory->svg('heroicon-o-' . $iconName);
-            return $iconName;
+            app(\BladeUI\Icons\Factory::class)->svg('heroicon-o-' . $iconName);
+            return $this->heroiconMemo[$iconName] = $iconName;
         } catch (\Exception $e) {
-            return null;
+            return $this->heroiconMemo[$iconName] = null;
         }
     }
 
@@ -427,16 +437,28 @@ class Index extends Component
         return $this->totalAmountCents - $this->totalBilledAmountCents;
     }
 
-    public function updatedSearch() {}
+    #[Computed]
+    public function visibleDateGroups()
+    {
+        return $this->timeEntriesGroupedByDateAndEntity->take($this->daysShown);
+    }
+
+    public function loadMoreDays(): void
+    {
+        $this->daysShown += self::DAYS_PAGE;
+    }
+
+    public function updated($property): void
+    {
+        if ($property !== 'daysShown') {
+            $this->daysShown = self::DAYS_PAGE;
+        }
+    }
+
     public function updatedSelectedEntityTypeId()
     {
         $this->selectedEntityId = null;
     }
-    public function updatedSelectedEntityId() {}
-    public function updatedSelectedUserId() {}
-    public function updatedDateFrom() {}
-    public function updatedDateTo() {}
-    public function updatedShowBilledOnly() {}
 
     public function render()
     {

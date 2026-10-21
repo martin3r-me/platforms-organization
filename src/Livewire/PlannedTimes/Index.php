@@ -15,6 +15,11 @@ class Index extends Component
     public $selectedUserId = null;
     public $showInactiveOnly = false;
 
+    /** Sichtbare Zeilen; Summen zählen immer alle Treffer. */
+    public int $limit = self::PAGE;
+
+    private const PAGE = 100;
+
     #[Computed]
     public function rootTeam()
     {
@@ -140,24 +145,16 @@ class Index extends Component
         return $this->plannedTimes->sum('planned_minutes');
     }
 
-    public function updatedSearch()
+    public function loadMore(): void
     {
-        // Trigger recomputation
+        $this->limit += self::PAGE;
     }
 
-    public function updatedSelectedTeamId()
+    public function updated($property): void
     {
-        // Trigger recomputation
-    }
-
-    public function updatedSelectedUserId()
-    {
-        // Trigger recomputation
-    }
-
-    public function updatedShowInactiveOnly()
-    {
-        // Trigger recomputation
+        if ($property !== 'limit') {
+            $this->limit = self::PAGE;
+        }
     }
 
     public function render()

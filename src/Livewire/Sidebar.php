@@ -14,81 +14,87 @@ class Sidebar extends Component
     }
 
     /**
-     * Sidebar navigation structure — Schritt 1 der IA-Restrukturierung.
+     * Navigation der Organisation. Gruppen: Übersicht · Organisation · Zeit ·
+     * Maschinenraum (org-intern) · Reporting (wandert ins reporting-Modul) ·
+     * Einstellungen. Abgesetzte Gruppen sind 'muted' und tragen eine 'note'.
      *
-     * Gruppen spiegeln die Klassifikation „Betreiben / Organisation / Maschinenraum":
-     * front-of-house (Betreiben, Organisation, Zeit & Kosten) vs. abgesetzte,
-     * org-interne bzw. abwandernde Bereiche (Maschinenraum, Reporting).
-     *
-     * NICHTS wird entfernt oder verschoben — alle 25 Zugänge bleiben lauffähig.
-     * Abwandernde Ziele werden nur MARKIERT (lebende Migrations-Landkarte):
-     *   - Gruppe: 'note' (z. B. „→ eigenes Modul") + 'muted' (optisch abgesetzt)
-     *   - Item:   'migrates' => 'reporting' | 'home' (Marker-Pille am Item)
-     *
-     * Each item: route, label, icon, match (URL-Substring fürs Active-Highlighting),
-     *            optional migrates.
+     * Item: route, label, icon, match (Regex auf den Pfad fürs Aktiv-Highlight),
+     * optional migrates (Ziel-Modul, als leiser Hinweis).
      */
     protected function buildSections(): array
     {
         return [
             [
-                'label' => 'Betreiben',
+                'label' => 'Übersicht',
                 'items' => [
-                    ['route' => 'organization.dashboard', 'label' => 'Dashboard', 'icon' => 'chart-bar', 'match' => '/organization$|/organization/$'],
-                    ['route' => 'organization.signals.index', 'label' => 'Signale', 'icon' => 'bell-alert', 'match' => '/signals'],
-                    ['route' => 'organization.my-inquiries.index', 'label' => 'Meine Inquiries', 'icon' => 'inbox', 'match' => '/my-inquiries', 'migrates' => 'home'],
-                    ['route' => 'organization.ops-room', 'label' => 'Ops-Room (VSM)', 'icon' => 'squares-2x2', 'match' => '/ops-room'],
-                    ['route' => 'organization.pulse', 'label' => 'Pulse', 'icon' => 'signal', 'match' => '/pulse'],
-                    ['route' => 'organization.agents.index', 'label' => 'Agenten', 'icon' => 'cpu-chip', 'match' => '/agents'],
+                    ['route' => 'organization.dashboard', 'label' => 'Dashboard', 'icon' => 'home', 'match' => '^/organization/?$'],
+                    ['route' => 'organization.signals.index', 'label' => 'Signale', 'icon' => 'bell-alert', 'match' => '^/organization/signals'],
+                    ['route' => 'organization.ops-room', 'label' => 'Ops-Room', 'icon' => 'squares-2x2', 'match' => '^/organization/ops-room'],
+                    ['route' => 'organization.pulse', 'label' => 'Pulse', 'icon' => 'signal', 'match' => '^/organization/pulse'],
+                    ['route' => 'organization.my-inquiries.index', 'label' => 'Meine Rückfragen', 'icon' => 'inbox', 'match' => '^/organization/my-inquiries', 'migrates' => 'home'],
                 ],
             ],
             [
                 'label' => 'Organisation',
                 'items' => [
-                    ['route' => 'organization.entities.index', 'label' => 'Organisationseinheiten', 'icon' => 'building-office', 'match' => '/entities'],
-                    ['route' => 'organization.interlinks.index', 'label' => 'Interlinks', 'icon' => 'arrows-right-left', 'match' => '/interlinks'],
-                    ['route' => 'organization.roles.index', 'label' => 'Rollen', 'icon' => 'user-group', 'match' => '/roles'],
+                    ['route' => 'organization.entities.index', 'label' => 'Einheiten', 'icon' => 'building-office', 'match' => '^/organization/entities'],
+                    ['route' => 'organization.roles.index', 'label' => 'Rollen', 'icon' => 'user-group', 'match' => '^/organization/roles'],
+                    ['route' => 'organization.agents.index', 'label' => 'Agenten', 'icon' => 'cpu-chip', 'match' => '^/organization/agents'],
+                    ['route' => 'organization.interlinks.index', 'label' => 'Schnittstellen', 'icon' => 'arrows-right-left', 'match' => '^/organization/interlinks'],
                 ],
             ],
             [
-                'label' => 'Zeit & Kosten',
+                'label' => 'Zeit',
                 'items' => [
-                    ['route' => 'organization.time-entries.index', 'label' => 'Ist-Zeiten', 'icon' => 'clock', 'match' => '/time-entries'],
-                    ['route' => 'organization.planned-times.index', 'label' => 'Geplante Zeiten', 'icon' => 'calendar', 'match' => '/planned-times'],
+                    ['route' => 'organization.time-entries.index', 'label' => 'Ist-Zeiten', 'icon' => 'clock', 'match' => '^/organization/time-entries'],
+                    ['route' => 'organization.planned-times.index', 'label' => 'Geplante Zeiten', 'icon' => 'calendar', 'match' => '^/organization/planned-times'],
                 ],
             ],
             [
                 'label' => 'Maschinenraum',
-                'note' => 'org-intern · Engine',
+                'note' => 'org-intern',
                 'muted' => true,
                 'items' => [
-                    ['route' => 'organization.inference-runs.index', 'label' => 'Inference Runs', 'icon' => 'play', 'match' => '/inference-runs'],
-                    ['route' => 'organization.memory.index', 'label' => 'Memory', 'icon' => 'circle-stack', 'match' => '/memory'],
-                    ['route' => 'organization.environment-sources.index', 'label' => 'Umwelt-Quellen', 'icon' => 'globe-alt', 'match' => '/environment-sources'],
-                    ['route' => 'organization.environment-snapshots.index', 'label' => 'Umwelt-Snapshots', 'icon' => 'camera', 'match' => '/environment-snapshots'],
-                    ['route' => 'organization.inquiries.index', 'label' => 'Inquiries (Admin)', 'icon' => 'question-mark-circle', 'match' => '/inquiries'],
+                    ['route' => 'organization.inference-runs.index', 'label' => 'Inference-Läufe', 'icon' => 'play', 'match' => '^/organization/inference-runs'],
+                    ['route' => 'organization.memory.index', 'label' => 'Memory', 'icon' => 'circle-stack', 'match' => '^/organization/memory'],
+                    ['route' => 'organization.environment-sources.index', 'label' => 'Umwelt-Quellen', 'icon' => 'globe-alt', 'match' => '^/organization/environment-sources'],
+                    ['route' => 'organization.environment-snapshots.index', 'label' => 'Umwelt-Snapshots', 'icon' => 'camera', 'match' => '^/organization/environment-snapshots'],
+                    ['route' => 'organization.inquiries.index', 'label' => 'Rückfragen (Admin)', 'icon' => 'question-mark-circle', 'match' => '^/organization/inquiries'],
                 ],
             ],
             [
                 'label' => 'Reporting',
-                'note' => '→ eigenes Modul',
+                'note' => '→ reporting',
                 'muted' => true,
                 'items' => [
-                    ['route' => 'core.verbalization.factory', 'label' => 'Baukasten', 'icon' => 'squares-2x2', 'match' => '/verbalization/factory', 'migrates' => 'reporting'],
-                    ['route' => 'organization.synthesis-reports.index', 'label' => 'Synthesis Reports', 'icon' => 'document-text', 'match' => '/synthesis-reports', 'migrates' => 'reporting'],
-                    ['route' => 'organization.settings.synthesis-prompts.index', 'label' => 'Synthesis Prompts', 'icon' => 'document-text', 'match' => '/settings/synthesis-prompts', 'migrates' => 'reporting'],
+                    ['route' => 'core.verbalization.factory', 'label' => 'Baukasten', 'icon' => 'wrench-screwdriver', 'match' => '/verbalization/factory'],
+                    ['route' => 'organization.synthesis-reports.index', 'label' => 'Synthese-Berichte', 'icon' => 'document-text', 'match' => '^/organization/synthesis-reports'],
+                    ['route' => 'organization.settings.synthesis-prompts.index', 'label' => 'Synthese-Prompts', 'icon' => 'chat-bubble-left-right', 'match' => '^/organization/settings/synthesis-prompts'],
                 ],
             ],
             [
                 'label' => 'Einstellungen',
                 'items' => [
-                    ['route' => 'organization.settings.entity-types.index', 'label' => 'Entity Types', 'icon' => 'cube', 'match' => '/settings/entity-types'],
-                    ['route' => 'organization.settings.relation-types.index', 'label' => 'Relation Types', 'icon' => 'arrows-right-left', 'match' => '/settings/relation-types'],
-                    ['route' => 'organization.settings.signal-definitions.index', 'label' => 'Signaldefinitionen', 'icon' => 'bell-alert', 'match' => '/settings/signal-definitions'],
-                    ['route' => 'organization.settings.inference-prompts.index', 'label' => 'Inference Prompts', 'icon' => 'cpu-chip', 'match' => '/settings/inference-prompts'],
+                    ['route' => 'organization.settings.entity-types.index', 'label' => 'Einheitstypen', 'icon' => 'cube', 'match' => '^/organization/settings/entity-type'],
+                    ['route' => 'organization.settings.relation-types.index', 'label' => 'Beziehungstypen', 'icon' => 'link', 'match' => '^/organization/settings/relation-types'],
+                    ['route' => 'organization.settings.signal-definitions.index', 'label' => 'Signal-Definitionen', 'icon' => 'adjustments-horizontal', 'match' => '^/organization/settings/signal-definitions'],
+                    ['route' => 'organization.settings.inference-prompts.index', 'label' => 'Inference-Prompts', 'icon' => 'sparkles', 'match' => '^/organization/settings/inference-prompts'],
                 ],
             ],
         ];
+    }
+
+    /** Aktiv-Markierung serverseitig — wire:navigate rendert das Layout je Seite neu. */
+    protected function markActive(array $sections): array
+    {
+        $path = '/' . ltrim(request()->path(), '/');
+        foreach ($sections as &$section) {
+            foreach ($section['items'] as &$item) {
+                $item['active'] = (bool) preg_match('#' . $item['match'] . '#', $path);
+            }
+        }
+
+        return $sections;
     }
 
     public function render()
@@ -99,7 +105,7 @@ class Sidebar extends Component
         }
 
         return view('organization::livewire.sidebar', [
-            'sections' => $this->sections,
+            'sections' => $this->markActive($this->sections),
         ])->layout('platform::layouts.app');
     }
 }

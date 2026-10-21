@@ -52,15 +52,15 @@
                 break;
 
             case 'boolean_done':
-                if ($val) $metaParts[] = '<span class="text-green-600">erledigt</span>';
+                if ($val) $metaParts[] = '<span class="text-[color:var(--nx-success)]">erledigt</span>';
                 break;
 
             case 'boolean_active':
-                if ($val === false) $metaParts[] = '<span class="text-amber-600">inaktiv</span>';
+                if ($val === false) $metaParts[] = '<span class="text-[color:var(--nx-warning)]">inaktiv</span>';
                 break;
 
             case 'boolean_published':
-                if ($val) $metaParts[] = '<span class="text-green-600">veröffentlicht</span>';
+                if ($val) $metaParts[] = '<span class="text-[color:var(--nx-success)]">veröffentlicht</span>';
                 break;
 
             case 'boolean_pinned':
@@ -68,7 +68,7 @@
                 break;
 
             case 'boolean_frog':
-                if ($val) $metaParts[] = '<span class="text-green-700">🐸</span>';
+                if ($val) $metaParts[] = '<span class="text-[color:var(--nx-success)]">🐸</span>';
                 break;
 
             case 'badge':
@@ -78,5 +78,5 @@
     }
 @endphp
 @if(!empty($metaParts))
-    <span class="inline-flex items-center gap-1.5 text-[10px] text-[var(--ui-muted)] flex-shrink-0">{!! implode(' · ', $metaParts) !!}</span>
+    <span class="inline-flex items-center gap-1.5 text-[10px] text-[color:var(--nx-muted)] flex-shrink-0">{!! implode(' · ', $metaParts) !!}</span>
 @endif

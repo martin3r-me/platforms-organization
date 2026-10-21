@@ -1,796 +1,261 @@
+@php
+    $fmtMin = fn ($min) => intdiv((int) $min, 60) . ':' . str_pad(abs((int) $min % 60), 2, '0', STR_PAD_LEFT) . ' h';
+
+    $vsmClass = $entity->type->vsm_class;
+    $vsmChip = match ($vsmClass) {
+        'carrier' => ['Carrier', 'Lebensfähiges System (VSM) — kann eigene Perspektive sein'],
+        'actor' => ['Actor', 'Füllt VSM-Funktionen aus, empfängt Signale'],
+        'observed' => ['Observed', 'Umwelt — wird von S4 beobachtet'],
+        default => null,
+    };
+
+    $childCount = $entity->children->count();
+    $descendantCount = $this->totalDescendantCount;
+    $linkCount = $this->totalLinkCount;
+    $cascaded = $this->cascadedTimeSummary;
+    $openMinutes = $cascaded['total_minutes'] - $cascaded['billed_minutes'];
+    $analysis = $this->snapshotAnalysis;
+    $contextSummary = $this->contextSummary;
+
+    $healthMeta = [
+        'progressing' => ['Fortschreitend', 'var(--nx-success)'],
+        'stalled' => ['Stagnierend', 'var(--nx-warning)'],
+        'at_risk' => ['Gefährdet', 'var(--nx-danger)'],
+        'completed' => ['Abgeschlossen', 'var(--nx-info)'],
+    ];
+
+    // Tabs: Inhalt zuerst, Konfiguration („Einstellungen") zuletzt.
+    $tabs = [];
+    $tabs[] = ['key' => 'hierarchy', 'label' => 'Struktur', 'icon' => 'heroicon-o-rectangle-group', 'badge' => $descendantCount ?: null];
+    $tabs[] = ['key' => 'links', 'label' => 'Verknüpft', 'icon' => 'heroicon-o-link', 'badge' => $linkCount ?: null];
+    $tabs[] = ['key' => 'analyse', 'label' => 'Analyse', 'icon' => 'heroicon-o-chart-bar-square', 'click' => '$wire.loadAnalyseData()'];
+    $tabs[] = ['key' => 'relations', 'label' => 'Beziehungen', 'icon' => 'heroicon-o-arrows-right-left'];
+    $tabs[] = ['key' => 'signals', 'label' => 'Signale', 'icon' => 'heroicon-o-bell-alert', 'badge' => $this->openSignalCount ?: null, 'badgeVariant' => 'danger'];
+    if ($this->hasLinkedUser) {
+        $tabs[] = ['key' => 'person', 'label' => 'Person', 'icon' => 'heroicon-o-user'];
+    }
+    if ($this->isCarrierEntity) {
+        $vacancyCount = collect($this->vsmMatrix)->where('is_vacant', true)->count();
+        $tabs[] = ['key' => 'strategy', 'label' => 'Strategie', 'icon' => 'heroicon-o-flag'];
+        $tabs[] = ['key' => 'vsm', 'label' => 'VSM', 'icon' => 'heroicon-o-squares-2x2', 'badge' => $vacancyCount ?: null, 'badgeVariant' => 'warning', 'title' => $vacancyCount ? $vacancyCount . ' unbesetzte Zellen' : null];
+    }
+    if ($this->isAgentEntity) {
+        $tabs[] = ['key' => 'agent', 'label' => 'Agent', 'icon' => 'heroicon-o-sparkles'];
+        $tabs[] = ['key' => 'braingraph', 'label' => 'Gehirn', 'icon' => 'heroicon-o-cpu-chip'];
+    } elseif ($this->isSystemAgent) {
+        $unhealthyCount = $this->agentPrompts->filter(fn ($p) => in_array($p->health_status, ['stale', 'error']))->count();
+        $tabs[] = ['key' => 'agent', 'label' => 'Agent', 'icon' => 'heroicon-o-cpu-chip', 'badge' => $unhealthyCount ?: null, 'badgeVariant' => 'danger'];
+    }
+    $tabs[] = ['key' => 'reports', 'label' => 'Berichte', 'icon' => 'heroicon-o-document-text'];
+    $tabs[] = ['key' => 'activity', 'label' => 'Aktivität', 'icon' => 'heroicon-o-clock'];
+    $tabs[] = ['key' => 'data', 'label' => 'Einstellungen', 'icon' => 'heroicon-o-cog-6-tooth'];
+
+    $sevVariant = fn ($s) => match ($s) {
+        'critical', 'algedonic' => 'danger',
+        'warning' => 'warning',
+        default => 'info',
+    };
+    $sevLabel = fn ($s) => match ($s) {
+        'critical' => 'Kritisch',
+        'algedonic' => 'Algedonisch',
+        'warning' => 'Warnung',
+        default => 'Info',
+    };
+    $statusBadge = fn ($s) => match ($s) {
+        'open' => ['warning', 'Offen'],
+        'acknowledged' => ['info', 'Bestätigt'],
+        'resolved' => ['success', 'Gelöst'],
+        'dismissed' => ['neutral', 'Verworfen'],
+        default => ['neutral', ucfirst((string) $s)],
+    };
+
+    $crumbs = [['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+               ['label' => 'Einheiten', 'href' => route('organization.entities.index')]];
+    if ($entity->parent) {
+        $crumbs[] = ['label' => $entity->parent->name, 'href' => route('organization.entities.show', $entity->parent)];
+    }
+    $crumbs[] = ['label' => $entity->name];
+
+    $field = 'block w-full rounded-[6px] border border-[color:var(--nx-line-strong)] bg-[color:var(--nx-surface)] px-2.5 py-1.5 text-sm text-[color:var(--nx-text)] focus:border-[color:var(--nx-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--nx-accent)]';
+@endphp
+
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar :title="$entity->name" icon="heroicon-o-building-office" />
     </x-slot>
 
     <x-slot name="actionbar">
-        <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Einheiten', 'href' => route('organization.entities.index')],
-            ['label' => $entity->name ?? 'Details'],
-        ]">
-            @if($this->isDirty())
-                <x-ui-button variant="secondary-ghost" size="sm" wire:click="loadForm">
-                    @svg('heroicon-o-x-mark', 'w-4 h-4')
-                    <span>Abbrechen</span>
-                </x-ui-button>
-                <x-ui-button variant="primary" size="sm" wire:click="save">
-                    @svg('heroicon-o-check', 'w-4 h-4')
-                    <span>Speichern</span>
-                </x-ui-button>
-            @else
-                <x-ui-button variant="ghost" size="sm" wire:click="edit">
-                    @svg('heroicon-o-pencil', 'w-4 h-4')
-                    <span>Bearbeiten</span>
-                </x-ui-button>
-                <x-ui-button variant="ghost" size="sm" href="{{ route('organization.entities.mindmap', $entity) }}">
-                    @svg('heroicon-o-globe-alt', 'w-4 h-4')
-                    <span>Mindmap</span>
-                </x-ui-button>
-                <x-ui-button variant="ghost" size="sm" href="{{ route('organization.entities.board', $entity) }}">
-                    @svg('heroicon-o-squares-2x2', 'w-4 h-4')
-                    <span>VSM Board</span>
-                </x-ui-button>
-                <x-ui-button variant="primary" size="sm" wire:click="openCreateTeamModal">
-                    @svg('heroicon-o-user-group', 'w-4 h-4')
-                    <span>Team erstellen</span>
-                </x-ui-button>
-            @endif
+        <x-ui-page-actionbar :breadcrumbs="$crumbs">
+            <div class="flex items-center gap-2">
+                @if ($this->isDirty())
+                    <x-nx-button variant="primary" size="sm" wire:click="save">
+                        @svg('heroicon-o-check', 'w-4 h-4')
+                        <span>Speichern</span>
+                    </x-nx-button>
+                @endif
+                <x-nx-dropdown>
+                    @if ($this->isDirty())
+                        <x-nx-dropdown-item wire:click="loadForm">
+                            @svg('heroicon-o-arrow-uturn-left', 'w-4 h-4')
+                            Änderungen verwerfen
+                        </x-nx-dropdown-item>
+                        <x-nx-dropdown-divider />
+                    @endif
+                    <x-nx-dropdown-item :href="route('organization.entities.mindmap', $entity)">
+                        @svg('heroicon-o-globe-alt', 'w-4 h-4')
+                        Mindmap
+                    </x-nx-dropdown-item>
+                    <x-nx-dropdown-item :href="route('organization.entities.board', $entity)">
+                        @svg('heroicon-o-squares-2x2', 'w-4 h-4')
+                        VSM-Board
+                    </x-nx-dropdown-item>
+                    <x-nx-dropdown-divider />
+                    <x-nx-dropdown-item wire:click="openCreateTeamModal">
+                        @svg('heroicon-o-user-group', 'w-4 h-4')
+                        Plattform-Team daraus erstellen
+                    </x-nx-dropdown-item>
+                </x-nx-dropdown>
+            </div>
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Informationen" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Details</h3>
-                    <div class="space-y-3">
-                        @if($entity->parent)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Übergeordnet</span>
-                                <a href="{{ route('organization.entities.show', $entity->parent) }}" class="block text-sm font-medium text-[var(--ui-primary)] hover:underline">{{ $entity->parent->name }}</a>
-                                <div class="text-xs text-[var(--ui-muted)]">{{ $entity->parent->type->name }}</div>
-                            </div>
-                        @endif
-                        @if($entity->linkedUser)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Verantwortlich</span>
-                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity->linkedUser->name }}</div>
-                            </div>
-                        @endif
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <span class="text-xs text-[var(--ui-muted)]">Erstellt</span>
-                            <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity->created_at->format('d.m.Y H:i') }}</div>
-                        </div>
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <span class="text-xs text-[var(--ui-muted)]">Aktualisiert</span>
-                            <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entity->updated_at->format('d.m.Y H:i') }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </x-ui-page-sidebar>
-    </x-slot>
+    <x-ui-page-container width="contained">
+        <div class="space-y-5">
+            @if (session()->has('message'))
+                <x-nx-callout variant="success">{{ session('message') }}</x-nx-callout>
+            @endif
+            @if (session()->has('error'))
+                <x-nx-callout variant="danger">{{ session('error') }}</x-nx-callout>
+            @endif
 
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <livewire:organization.activity-feed :entityId="$entity->id" />
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-ui-page-container>
-        @if (session()->has('message'))
-            <div class="mb-4 p-4 bg-green-100 border border-green-400 text-green-700 rounded">
-                {{ session('message') }}
-            </div>
-        @endif
-
-        @if (session()->has('error'))
-            <div class="mb-4 p-4 bg-red-100 border border-red-400 text-red-700 rounded">
-                {{ session('error') }}
-            </div>
-        @endif
-
-        <div class="space-y-6">
-            {{-- ═══ Block A: Hero Card — Compact ═══ --}}
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                {{-- Row 1: Name + Badges --}}
-                <div class="flex items-center gap-3 flex-wrap">
-                    <h1 class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $entity->name }}</h1>
-                    <x-ui-badge variant="secondary" size="sm">{{ $entity->type->name }}</x-ui-badge>
-                    @php $vsmClass = $entity->type->vsm_class; @endphp
-                    @if($vsmClass === 'carrier')
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20" title="Carrier — lebensfähiges System (VSM). Kann eigene Perspektive sein.">
-                            @svg('heroicon-o-cube-transparent', 'w-3 h-3 mr-1')
-                            Carrier · Perspektive möglich
-                        </span>
-                    @elseif($vsmClass === 'actor')
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-slate-100 text-slate-700 ring-1 ring-inset ring-slate-600/20" title="Actor — füllt VSM-Funktionen aus, empfängt Signale. Keine eigene Perspektive.">Actor</span>
-                    @elseif($vsmClass === 'observed')
-                        <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20" title="Observed — Umwelt-Entity. Wird von S4 beobachtet, keine eigene Perspektive.">Observed</span>
+            {{-- Kopf: Identität, Einordnung, Kennzahlen --}}
+            <div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <h1 class="m-0 text-2xl font-semibold tracking-tight text-[color:var(--nx-text)]">{{ $entity->name }}</h1>
+                    <x-nx-badge>{{ $entity->type->name }}</x-nx-badge>
+                    @if ($vsmChip)
+                        <span title="{{ $vsmChip[1] }}"><x-nx-badge :variant="$vsmClass === 'carrier' ? 'success' : 'neutral'">{{ $vsmChip[0] }}</x-nx-badge></span>
                     @endif
-                    @if($entity->is_active)
-                        <x-ui-badge variant="success" size="sm">Aktiv</x-ui-badge>
-                    @else
-                        <x-ui-badge variant="danger" size="sm">Inaktiv</x-ui-badge>
-                    @endif
-                    @if($entity->code)
-                        <span class="text-sm text-[var(--ui-muted)] font-mono">{{ $entity->code }}</span>
+                    @unless ($entity->is_active)
+                        <x-nx-badge variant="danger" dot>Inaktiv</x-nx-badge>
+                    @endunless
+                    @if ($entity->code)
+                        <span class="font-mono text-xs text-[color:var(--nx-faint)]">{{ $entity->code }}</span>
                     @endif
                 </div>
 
-                {{-- Row 2: Description --}}
-                @if($entity->description)
-                    <p class="mt-2 text-sm text-[var(--ui-muted)] max-w-2xl line-clamp-2">{{ $entity->description }}</p>
+                <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[color:var(--nx-muted)]">
+                    @if ($entity->parent)
+                        <span>in <a href="{{ route('organization.entities.show', $entity->parent) }}" wire:navigate class="font-medium text-[color:var(--nx-text)] hover:underline">{{ $entity->parent->name }}</a></span>
+                    @endif
+                    @if ($entity->linkedUser)
+                        <span>verantwortlich: <span class="font-medium text-[color:var(--nx-text)]">{{ $entity->linkedUser->name }}</span></span>
+                    @endif
+                    <span title="angelegt {{ $entity->created_at->format('d.m.Y H:i') }}">aktualisiert {{ $entity->updated_at->diffForHumans() }}</span>
+                </div>
+
+                @if ($entity->description)
+                    <p class="mb-0 mt-2 max-w-3xl text-sm text-[color:var(--nx-muted)] line-clamp-3">{{ $entity->description }}</p>
                 @endif
 
-                {{-- Row 3: Inline Stats --}}
-                @php
-                    $childCount = $entity->children->count();
-                    $descendantCount = $this->totalDescendantCount;
-                    $linkCount = $this->totalLinkCount;
-                    $cascaded = $this->cascadedTimeSummary;
-                    $totalHours = intdiv($cascaded['total_minutes'], 60);
-                    $totalMins = $cascaded['total_minutes'] % 60;
-                    $openMinutes = $cascaded['total_minutes'] - $cascaded['billed_minutes'];
-                    $openHours = intdiv($openMinutes, 60);
-                    $openMins = abs($openMinutes % 60);
-                @endphp
-                <div class="mt-4 flex items-center gap-6 flex-wrap">
-                    <div class="flex items-center gap-1.5">
-                        @svg('heroicon-o-rectangle-group', 'w-4 h-4 text-[var(--ui-muted)]')
-                        <span class="text-sm font-semibold text-[var(--ui-secondary)]">{{ $childCount }}</span>
-                        <span class="text-xs text-[var(--ui-muted)]">Einheiten{{ $descendantCount > $childCount ? ' (' . $descendantCount . ' gesamt)' : '' }}</span>
-                    </div>
-                    <div class="flex items-center gap-1.5">
-                        @svg('heroicon-o-link', 'w-4 h-4 text-[var(--ui-muted)]')
-                        <span class="text-sm font-semibold text-[var(--ui-secondary)]">{{ $linkCount }}</span>
-                        <span class="text-xs text-[var(--ui-muted)]">Verknüpfungen</span>
-                    </div>
-                    <div class="flex items-center gap-1.5">
-                        @svg('heroicon-o-clock', 'w-4 h-4 text-[var(--ui-muted)]')
-                        <span class="text-sm font-semibold text-[var(--ui-secondary)]">{{ $totalHours }}:{{ str_pad($totalMins, 2, '0', STR_PAD_LEFT) }}h</span>
-                        <span class="text-xs text-[var(--ui-muted)]">gesamt</span>
-                    </div>
-                    @if($openMinutes > 0)
-                        <div class="flex items-center gap-1.5">
-                            <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-                            <span class="text-sm font-semibold text-amber-600">{{ $openHours }}:{{ str_pad($openMins, 2, '0', STR_PAD_LEFT) }}h</span>
-                            <span class="text-xs text-[var(--ui-muted)]">offen</span>
-                        </div>
+                <div class="mt-4 flex flex-wrap items-center gap-x-6 gap-y-2 text-sm">
+                    <button type="button" x-on:click="$wire.set('activeTab', 'hierarchy')" class="inline-flex items-baseline gap-1.5 hover:underline">
+                        <span class="font-semibold tabular-nums text-[color:var(--nx-text)]">{{ $childCount }}</span>
+                        <span class="text-xs text-[color:var(--nx-muted)]">Untereinheiten{{ $descendantCount > $childCount ? ' (' . $descendantCount . ' gesamt)' : '' }}</span>
+                    </button>
+                    <button type="button" x-on:click="$wire.set('activeTab', 'links')" class="inline-flex items-baseline gap-1.5 hover:underline">
+                        <span class="font-semibold tabular-nums text-[color:var(--nx-text)]">{{ $linkCount }}</span>
+                        <span class="text-xs text-[color:var(--nx-muted)]">Verknüpfungen</span>
+                    </button>
+                    <span class="inline-flex items-baseline gap-1.5">
+                        <span class="font-semibold tabular-nums text-[color:var(--nx-text)]">{{ $fmtMin($cascaded['total_minutes']) }}</span>
+                        <span class="text-xs text-[color:var(--nx-muted)]">erfasst</span>
+                    </span>
+                    @if ($openMinutes > 0)
+                        <span class="inline-flex items-baseline gap-1.5">
+                            <span class="font-semibold tabular-nums text-[color:var(--nx-warning)]">{{ $fmtMin($openMinutes) }}</span>
+                            <span class="text-xs text-[color:var(--nx-muted)]">nicht abgerechnet</span>
+                        </span>
                     @endif
                 </div>
 
-                {{-- Row 4: Health Progress Bar --}}
-                @php $analysis = $this->snapshotAnalysis; @endphp
-                @if(!empty($analysis))
+                @if (! empty($analysis))
                     @php
-                        $healthColors = [
-                            'progressing' => ['bar' => 'bg-green-500', 'text' => 'text-green-700', 'icon' => 'heroicon-o-arrow-trending-up', 'label' => 'Fortschreitend'],
-                            'stalled' => ['bar' => 'bg-amber-500', 'text' => 'text-amber-700', 'icon' => 'heroicon-o-pause-circle', 'label' => 'Stagnierend'],
-                            'at_risk' => ['bar' => 'bg-red-500', 'text' => 'text-red-700', 'icon' => 'heroicon-o-exclamation-triangle', 'label' => 'Gefährdet'],
-                            'completed' => ['bar' => 'bg-blue-500', 'text' => 'text-blue-700', 'icon' => 'heroicon-o-check-circle', 'label' => 'Abgeschlossen'],
-                        ];
-                        $hc = $healthColors[$analysis['health_status']] ?? $healthColors['progressing'];
+                        [$hLabel, $hColor] = $healthMeta[$analysis['health_status']] ?? $healthMeta['progressing'];
                         $pct = (int) $analysis['completion_rate'];
                     @endphp
-                    <div class="mt-4 flex items-center gap-4">
-                        <div class="flex items-center gap-1.5 flex-shrink-0">
-                            @svg($hc['icon'], 'w-4 h-4 ' . $hc['text'])
-                            <span class="text-xs font-medium {{ $hc['text'] }}">{{ $hc['label'] }}</span>
+                    <div class="mt-3 flex max-w-3xl items-center gap-3 text-xs">
+                        <span class="w-24 shrink-0 font-medium" style="color: {{ $hColor }}">{{ $hLabel }}</span>
+                        <div class="h-1.5 flex-1 overflow-hidden rounded-full bg-[color:var(--nx-accent-soft)]">
+                            <div class="h-full rounded-full" style="width: {{ $pct }}%; background: {{ $hColor }}"></div>
                         </div>
-                        <div class="flex-1 h-2 bg-gray-100 rounded-full overflow-hidden">
-                            <div class="h-full {{ $hc['bar'] }} rounded-full transition-all" style="width: {{ $pct }}%"></div>
-                        </div>
-                        <span class="text-xs font-semibold {{ $hc['text'] }} flex-shrink-0">{{ $pct }}%</span>
-                        <div class="flex items-center gap-3 text-xs text-[var(--ui-muted)] flex-shrink-0">
-                            <span>{{ $analysis['items_done'] }}/{{ $analysis['items_total'] }}</span>
-                            @if($analysis['velocity_daily_avg'] > 0)
-                                <span>{{ $analysis['velocity_daily_avg'] }}/d</span>
-                            @endif
-                            @if($analysis['estimated_days_remaining'] !== null)
-                                <span>~{{ $analysis['estimated_days_remaining'] }}d</span>
-                            @endif
-                        </div>
+                        <span class="shrink-0 tabular-nums text-[color:var(--nx-muted)]">
+                            {{ $pct }} % · {{ $analysis['items_done'] }}/{{ $analysis['items_total'] }}
+                            @if ($analysis['velocity_daily_avg'] > 0) · {{ $analysis['velocity_daily_avg'] }}/Tag @endif
+                            @if ($analysis['estimated_days_remaining'] !== null) · noch ~{{ $analysis['estimated_days_remaining'] }} Tage @endif
+                        </span>
                     </div>
                 @endif
 
-                {{-- Row 5: Context Summary Strip --}}
-                @php $contextSummary = $this->contextSummary; @endphp
-                @if(!empty($contextSummary))
-                    <div class="mt-4 flex items-center gap-2 flex-wrap">
-                        @foreach($contextSummary as $ctx)
-                            <button
-                                type="button"
-                                x-data
-                                @click="$wire.set('activeTab', 'relations')"
-                                class="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/30 hover:bg-[var(--ui-muted-10)] hover:text-[var(--ui-secondary)] transition-colors cursor-pointer"
-                            >
-                                {{ $ctx['label'] }}
-                                <span class="font-bold text-[var(--ui-secondary)]">{{ $ctx['count'] }}</span>
+                @if (! empty($contextSummary))
+                    <div class="mt-3 flex flex-wrap gap-1.5">
+                        @foreach ($contextSummary as $ctx)
+                            <button type="button" x-on:click="$wire.set('activeTab', 'links')"
+                                class="inline-flex items-center gap-1 rounded-full bg-[color:var(--nx-accent-soft)] px-2 py-0.5 text-xs text-[color:var(--nx-muted)] transition-colors hover:text-[color:var(--nx-text)]">
+                                {{ $ctx['label'] }} <span class="font-semibold tabular-nums text-[color:var(--nx-text)]">{{ $ctx['count'] }}</span>
                             </button>
                         @endforeach
                     </div>
                 @endif
             </div>
 
-            {{-- Tab Navigation — nur der aktive Tab wird serverseitig gerendert (@if je Tab), Wechsel per entangle.live --}}
+            {{-- Tabs — nur der aktive Tab wird serverseitig gerendert (@if je Tab), Wechsel per entangle.live --}}
             <div x-data="{ tab: @entangle('activeTab').live }">
-                <div class="border-b border-[var(--ui-border)] mb-6">
-                    <nav class="flex gap-1 -mb-px">
-                        <button
-                            @click="tab = 'hierarchy'"
-                            :class="tab === 'hierarchy'
-                                ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
-                                : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                            class="px-4 py-2.5 text-sm transition-colors"
-                        >
-                            @svg('heroicon-o-rectangle-group', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
-                            Hierarchie
-                        </button>
-                        <button
-                            @click="tab = 'analyse'; $wire.loadAnalyseData()"
-                            :class="tab === 'analyse'
-                                ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
-                                : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                            class="px-4 py-2.5 text-sm transition-colors"
-                        >
-                            @svg('heroicon-o-chart-bar-square', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
-                            Analyse
-                        </button>
-                        <button
-                            @click="tab = 'data'"
-                            :class="tab === 'data'
-                                ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
-                                : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                            class="px-4 py-2.5 text-sm transition-colors"
-                        >
-                            @svg('heroicon-o-document-text', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
-                            Daten
-                        </button>
-                        <button
-                            @click="tab = 'relations'"
-                            :class="tab === 'relations'
-                                ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
-                                : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                            class="px-4 py-2.5 text-sm transition-colors"
-                        >
-                            @svg('heroicon-o-link', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
-                            Relations
-                        </button>
-                        @if($this->isAgentEntity)
-                            <button
-                                @click="tab = 'agent'"
-                                :class="tab === 'agent'
-                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
-                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                                class="px-4 py-2.5 text-sm transition-colors"
-                            >
-                                @svg('heroicon-o-sparkles', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
-                                Agent
-                            </button>
-                            <button
-                                @click="tab = 'braingraph'"
-                                :class="tab === 'braingraph'
-                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
-                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                                class="px-4 py-2.5 text-sm transition-colors"
-                                title="Das Innenleben des Agenten: Wissensgraph, Genom, Zustand, Selbstmodell, Episoden (gepushter Snapshot)"
-                            >
-                                @svg('heroicon-o-cpu-chip', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
-                                Gehirn
-                            </button>
-                        @endif
-                        @if($this->isCarrierEntity)
-                            @php
-                                $vsmMatrix = $this->vsmMatrix;
-                                $vacancyCount = collect($vsmMatrix)->where('is_vacant', true)->count();
-                                $perspectiveTeamCount = count($this->perspectiveTeamAssignments);
-                            @endphp
-                            <button
-                                @click="tab = 'vsm'"
-                                :class="tab === 'vsm'
-                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
-                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                                class="px-4 py-2.5 text-sm transition-colors flex items-center gap-1.5"
-                                title="VSM-Zellen-Besetzung aus Sicht dieser Carrier-Entity"
-                            >
-                                @svg('heroicon-o-squares-2x2', 'w-4 h-4 inline-block -mt-0.5')
-                                VSM
-                                @if($vacancyCount > 0)
-                                    <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-amber-700 bg-amber-100 ring-1 ring-inset ring-amber-600/20 rounded-full" title="{{ $vacancyCount }} unbesetzte Zellen">{{ $vacancyCount }}</span>
+                <div class="mb-5 border-b border-[color:var(--nx-line)]">
+                    <nav class="-mb-px flex gap-1 overflow-x-auto">
+                        @foreach ($tabs as $t)
+                            <button type="button"
+                                x-on:click="tab = '{{ $t['key'] }}'{{ isset($t['click']) ? '; ' . $t['click'] : '' }}"
+                                :class="tab === '{{ $t['key'] }}' ? 'border-[color:var(--nx-text)] text-[color:var(--nx-text)] font-medium' : 'border-transparent text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]'"
+                                class="inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap border-b-2 px-3 py-2 text-sm transition-colors"
+                                @if (! empty($t['title'])) title="{{ $t['title'] }}" @endif>
+                                @svg($t['icon'], 'w-4 h-4')
+                                {{ $t['label'] }}
+                                @if (! empty($t['badge']))
+                                    <x-nx-badge :variant="$t['badgeVariant'] ?? 'neutral'">{{ $t['badge'] }}</x-nx-badge>
                                 @endif
                             </button>
-                            <button
-                                @click="tab = 'perspective'"
-                                :class="tab === 'perspective'
-                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
-                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                                class="px-4 py-2.5 text-sm transition-colors flex items-center gap-1.5"
-                                title="Welche Plattform-Teams sehen diese Perspektive als Standard?"
-                            >
-                                @svg('heroicon-o-user-group', 'w-4 h-4 inline-block -mt-0.5')
-                                Teams
-                                @if($perspectiveTeamCount > 0)
-                                    <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold text-[var(--ui-muted)] bg-gray-100 ring-1 ring-inset ring-gray-300 rounded-full">{{ $perspectiveTeamCount }}</span>
-                                @endif
-                            </button>
-                            @php $strategyTabData = $this->strategy; @endphp
-                            <button
-                                @click="tab = 'strategy'"
-                                :class="tab === 'strategy'
-                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
-                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                                class="px-4 py-2.5 text-sm transition-colors flex items-center gap-1.5"
-                                title="Strategische Dokumente, Fokusraeume und Transformations-Map"
-                            >
-                                @svg('heroicon-o-flag', 'w-4 h-4 inline-block -mt-0.5')
-                                Strategie
-                                @if($strategyTabData && ($strategyTabData['milestone_total'] ?? 0) > 0)
-                                    <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold text-[var(--ui-muted)] bg-gray-100 ring-1 ring-inset ring-gray-300 rounded-full">{{ $strategyTabData['milestone_total'] }}</span>
-                                @endif
-                            </button>
-                        @endif
-                        @if($this->isSystemAgent)
-                            @php
-                                $agentPrompts = $this->agentPrompts;
-                                $unhealthyCount = $agentPrompts->filter(fn ($p) => in_array($p->health_status, ['stale', 'error']))->count();
-                            @endphp
-                            <button
-                                @click="tab = 'agent'"
-                                :class="tab === 'agent'
-                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
-                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                                class="px-4 py-2.5 text-sm transition-colors flex items-center gap-1.5"
-                                title="System-Agent: Inference-Prompts und letzte Runs"
-                            >
-                                @svg('heroicon-o-cpu-chip', 'w-4 h-4 inline-block -mt-0.5')
-                                Agent
-                                @if($unhealthyCount > 0)
-                                    <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-red-700 bg-red-100 ring-1 ring-inset ring-red-600/20 rounded-full" title="{{ $unhealthyCount }} Prompts unhealthy">{{ $unhealthyCount }}</span>
-                                @endif
-                            </button>
-                        @endif
-                        @if($this->hasLinkedUser)
-                            <button
-                                @click="tab = 'person'"
-                                :class="tab === 'person'
-                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
-                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                                class="px-4 py-2.5 text-sm transition-colors"
-                            >
-                                @svg('heroicon-o-user', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
-                                Person
-                            </button>
-                        @endif
-                        @if($this->hasLinkedUser)
-                            <button
-                                @click="tab = 'modules'"
-                                :class="tab === 'modules'
-                                    ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
-                                    : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                                class="px-4 py-2.5 text-sm transition-colors"
-                            >
-                                @svg('heroicon-o-squares-2x2', 'w-4 h-4 inline-block mr-1.5 -mt-0.5')
-                                Module
-                            </button>
-                        @endif
-                        <button
-                            @click="tab = 'signals'"
-                            :class="tab === 'signals'
-                                ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
-                                : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                            class="px-4 py-2.5 text-sm transition-colors flex items-center gap-1.5"
-                        >
-                            @svg('heroicon-o-bell-alert', 'w-4 h-4 inline-block -mt-0.5')
-                            Signale
-                            @php
-                                $openSignalCount = \Platform\Organization\Models\OrganizationSignal::where('entity_id', $this->entity->id)->where('status', 'open')->count();
-                            @endphp
-                            @if($openSignalCount > 0)
-                                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-white bg-red-500 rounded-full">{{ $openSignalCount }}</span>
-                            @endif
-                        </button>
-                        <button
-                            @click="tab = 'reports'"
-                            :class="tab === 'reports'
-                                ? 'border-b-2 border-[var(--ui-primary)] text-[var(--ui-primary)] font-semibold'
-                                : 'border-b-2 border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:border-[var(--ui-border)]'"
-                            class="px-4 py-2.5 text-sm transition-colors flex items-center gap-1.5"
-                        >
-                            @svg('heroicon-o-document-text', 'w-4 h-4 inline-block -mt-0.5')
-                            Berichte
-                            @php $reportsCount = count($this->verbalizationFeeds); @endphp
-                            @if($reportsCount > 0)
-                                <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-semibold text-[var(--ui-secondary)] bg-[var(--ui-surface-2)] rounded-full">{{ $reportsCount }}</span>
-                            @endif
-                        </button>
+                        @endforeach
                     </nav>
-                    <div wire:loading.delay wire:target="activeTab" class="py-2 text-xs text-[var(--ui-muted)]">Lädt…</div>
+                    <div wire:loading.delay wire:target="activeTab" class="py-2 text-xs text-[color:var(--nx-faint)]">Lädt…</div>
                 </div>
 
-                {{-- Tab: Analyse --}}
-                @if($activeTab === 'analyse')
-                <div x-show="tab === 'analyse'" x-cloak>
-                    @if($analyseLoaded)
-                        <div class="space-y-6">
-                            {{-- Dimensionen-Radar --}}
-                            @php $radar = $this->dimensionRadar; @endphp
-                            @if(!empty($radar))
-                                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                                    <h2 class="text-sm font-semibold text-[var(--ui-secondary)] mb-4">7&frac12; Dimensionen</h2>
-                                    @include('organization::livewire.entity.partials.dimension-radar', ['radar' => $radar])
-                                </div>
-                            @endif
-
-                            {{-- Bewegung (7 Tage) --}}
-                            @php $movement = $this->movement; @endphp
-                            @if(!empty($movement['metrics']))
-                                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6" x-data="{ movementGrouping: 'dimension' }">
-                                    <div class="flex items-center justify-between mb-4">
-                                        <div class="flex items-center gap-3">
-                                            <h2 class="text-sm font-semibold text-[var(--ui-secondary)]">Bewegung (7 Tage)</h2>
-                                            <div class="flex bg-[var(--ui-muted-5)] rounded p-0.5 border border-[var(--ui-border)]/30">
-                                                <button @click="movementGrouping = 'dimension'"
-                                                    class="px-2 py-0.5 text-[10px] rounded transition-colors"
-                                                    :class="movementGrouping === 'dimension' ? 'bg-white text-[var(--ui-secondary)] shadow-sm' : 'text-[var(--ui-muted)]'">
-                                                    Dimension
-                                                </button>
-                                                <button @click="movementGrouping = 'module'"
-                                                    class="px-2 py-0.5 text-[10px] rounded transition-colors"
-                                                    :class="movementGrouping === 'module' ? 'bg-white text-[var(--ui-secondary)] shadow-sm' : 'text-[var(--ui-muted)]'">
-                                                    Modul
-                                                </button>
-                                            </div>
-                                        </div>
-                                        <div class="flex gap-1">
-                                            <button wire:click="$set('movementStream', null)"
-                                                class="px-2 py-1 text-[10px] rounded transition-colors {{ !$movementStream ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]' }}">
-                                                Alle
-                                            </button>
-                                            @foreach($this->availableStreams as $stream)
-                                                <button wire:click="$set('movementStream', '{{ $stream }}')"
-                                                    class="px-2 py-1 text-[10px] rounded transition-colors {{ $movementStream === $stream ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]' }}">
-                                                    {{ ucfirst($stream) }}
-                                                </button>
-                                            @endforeach
-                                        </div>
-                                    </div>
-
-                                    {{-- Compact Delta Badges --}}
-                                    @php
-                                        $nonZero = collect($movement['metrics'])->filter(fn($m) => $m['delta'] != 0)->take(5);
-                                    @endphp
-                                    @if($nonZero->isNotEmpty())
-                                        <div class="flex items-center gap-2 flex-wrap mb-4">
-                                            @foreach($nonZero as $m)
-                                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs font-medium
-                                                    {{ $m['sentiment'] === 'positive' ? 'bg-green-50 text-green-700 border border-green-200' : '' }}
-                                                    {{ $m['sentiment'] === 'negative' ? 'bg-red-50 text-red-700 border border-red-200' : '' }}
-                                                    {{ $m['sentiment'] === 'neutral' ? 'bg-gray-50 text-gray-600 border border-gray-200' : '' }}
-                                                ">
-                                                    {{ $m['delta_formatted'] }} {{ $m['label'] }}
-                                                </span>
-                                            @endforeach
-                                        </div>
-                                    @endif
-
-                                    {{-- Full Metric Grid --}}
-                                    @php
-                                        $totalMetrics = collect($movement['metrics'])->filter(fn($m) => $m['current'] > 0 || $m['previous'] > 0)->count();
-                                        $dimensionLabels = \Platform\Organization\Services\EntityLinkRegistry::allDimensions();
-                                    @endphp
-                                    @if($movementStream || $totalMetrics > 5)
-                                        <div x-show="movementGrouping === 'dimension'">
-                                            @foreach($movement['metrics_by_dimension'] as $dimKey => $metrics)
-                                                <div class="mb-3">
-                                                    <div class="text-[10px] font-medium text-[var(--ui-muted)] uppercase mb-1.5">
-                                                        {{ $dimensionLabels[$dimKey]['label'] ?? ucfirst($dimKey) }}
-                                                    </div>
-                                                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                                        @foreach($metrics as $m)
-                                                            @if($m['current'] != 0 || $m['previous'] != 0)
-                                                                <div class="py-2 px-2.5 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/20">
-                                                                    <div class="text-sm font-bold text-[var(--ui-text)]">
-                                                                        {{ $m['current_formatted'] }}
-                                                                        @if($m['delta'] != 0)
-                                                                            <span class="text-[10px] ml-1
-                                                                                {{ $m['sentiment'] === 'positive' ? 'text-green-600' : '' }}
-                                                                                {{ $m['sentiment'] === 'negative' ? 'text-red-600' : '' }}
-                                                                                {{ $m['sentiment'] === 'neutral' ? 'text-[var(--ui-muted)]' : '' }}
-                                                                            ">{{ $m['delta_formatted'] }}</span>
-                                                                        @endif
-                                                                    </div>
-                                                                    <div class="text-[10px] text-[var(--ui-muted)]">{{ $m['label'] }}</div>
-                                                                    @if($m['ratio'])
-                                                                        <div class="mt-1 h-1 bg-[var(--ui-border)]/30 rounded-full overflow-hidden">
-                                                                            <div class="h-full bg-blue-500 rounded-full" style="width: {{ min($m['ratio'], 100) }}%"></div>
-                                                                        </div>
-                                                                    @endif
-                                                                </div>
-                                                            @endif
-                                                        @endforeach
-                                                    </div>
-                                                </div>
-                                            @endforeach
-                                        </div>
-
-                                        <div x-show="movementGrouping === 'module'" x-cloak>
-                                            @foreach($movement['metrics_by_group'] as $groupKey => $metrics)
-                                                <div class="mb-3">
-                                                    <div class="text-[10px] font-medium text-[var(--ui-muted)] uppercase mb-1.5">
-                                                        {{ ucfirst($groupKey) }}
-                                                    </div>
-                                                    <div class="grid grid-cols-2 md:grid-cols-3 gap-2">
-                                                        @foreach($metrics as $m)
-                                                            @if($m['current'] != 0 || $m['previous'] != 0)
-                                                                <div class="py-2 px-2.5 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/20">
-                                                                    <div class="text-sm font-bold text-[var(--ui-text)]">
-                                                                        {{ $m['current_formatted'] }}
-                                                                        @if($m['delta'] != 0)
-                                                                            <span class="text-[10px] ml-1
-                                                                                {{ $m['sentiment'] === 'positive' ? 'text-green-600' : '' }}
-                                                                                {{ $m['sentiment'] === 'negative' ? 'text-red-600' : '' }}
-                                                                                {{ $m['sentiment'] === 'neutral' ? 'text-[var(--ui-muted)]' : '' }}
-                                                                            ">{{ $m['delta_formatted'] }}</span>
-                                                                        @endif
-                                                                    </div>
-                                                                    <div class="text-[10px] text-[var(--ui-muted)]">{{ $m['label'] }}</div>
-                                                                    @if($m['ratio'])
-                                                                        <div class="mt-1 h-1 bg-[var(--ui-border)]/30 rounded-full overflow-hidden">
-                                                                            <div class="h-full bg-blue-500 rounded-full" style="width: {{ min($m['ratio'], 100) }}%"></div>
-                                                                        </div>
-                                                                    @endif
-                                                                </div>
-                                                            @endif
-                                                        @endforeach
-                                                    </div>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    @endif
-                                </div>
-                            @endif
-
-                            {{-- Trends (14d + 12 Monate) --}}
-                            @php
-                                $trend = $this->snapshotTrend;
-                                $monthlyData = $this->monthlyTimeData;
-                                $chartMonths = $monthlyData['months'] ?? [];
-                                $monthlyMax = $monthlyData['max_minutes'] ?? 0;
-                                $hasTrend = !empty($trend) && count($trend['snapshots'] ?? []) >= 1;
-                                $hasMonthly = $monthlyMax > 0;
-                            @endphp
-                            @if($hasTrend || $hasMonthly)
-                                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6"
-                                     x-data="{ trendTab: '{{ $hasTrend ? '14d' : '12m' }}' }">
-                                    <div class="flex items-center gap-4 mb-4 border-b border-[var(--ui-border)]/40 -mx-6 px-6 pb-3">
-                                        @if($hasTrend)
-                                            <button @click="trendTab = '14d'"
-                                                class="text-sm font-medium transition-colors pb-1"
-                                                :class="trendTab === '14d' ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]'">
-                                                14 Tage
-                                            </button>
-                                        @endif
-                                        @if($hasMonthly)
-                                            <button @click="trendTab = '12m'"
-                                                class="text-sm font-medium transition-colors pb-1"
-                                                :class="trendTab === '12m' ? 'text-[var(--ui-primary)] border-b-2 border-[var(--ui-primary)]' : 'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]'">
-                                                12 Monate
-                                            </button>
-                                        @endif
-                                    </div>
-
-                                    @if($hasTrend)
-                                        <div x-show="trendTab === '14d'" x-cloak>
-                                            <div class="flex items-center justify-end gap-3 mb-3">
-                                                <div class="flex items-center gap-1.5">
-                                                    <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-                                                    <span class="text-[10px] text-[var(--ui-muted)]">Items erledigt</span>
-                                                </div>
-                                                <div class="flex items-center gap-1.5">
-                                                    <span class="w-2 h-2 rounded-full bg-blue-200"></span>
-                                                    <span class="text-[10px] text-[var(--ui-muted)]">Items gesamt</span>
-                                                </div>
-                                                <div class="flex items-center gap-1.5">
-                                                    <span class="w-2 h-2 rounded-full bg-violet-400"></span>
-                                                    <span class="text-[10px] text-[var(--ui-muted)]">Stunden</span>
-                                                </div>
-                                            </div>
-                                            <div class="flex items-end gap-1" style="height: 160px;" x-data="{ tooltip: null }">
-                                                @foreach($trend['snapshots'] as $idx => $snap)
-                                                    @php
-                                                        $maxItems = max($trend['max_items_total'], 1);
-                                                        $maxMin = max($trend['max_minutes'], 1);
-                                                        $totalH = round(($snap['items_total'] / $maxItems) * 130);
-                                                        $doneH = $snap['items_total'] > 0 ? max(1, round(($snap['items_done'] / $maxItems) * 130)) : 0;
-                                                        $timeH = $snap['time_total_minutes'] > 0 ? max(2, round(($snap['time_total_minutes'] / $maxMin) * 130)) : 0;
-                                                    @endphp
-                                                    <div class="flex-1 flex flex-col items-center h-full justify-end gap-px relative"
-                                                         @mouseenter="tooltip = {{ $idx }}"
-                                                         @mouseleave="tooltip = null">
-                                                        <div x-show="tooltip === {{ $idx }}" x-cloak
-                                                             class="absolute bottom-full mb-2 px-2.5 py-1.5 rounded-lg bg-[var(--ui-secondary)] text-white text-[10px] whitespace-nowrap z-10 shadow-lg pointer-events-none"
-                                                             x-transition.opacity>
-                                                            {{ $snap['date'] }} {{ $snap['period'] }}: {{ $snap['items_done'] }}/{{ $snap['items_total'] }} Items,
-                                                            {{ intdiv($snap['time_total_minutes'], 60) }}:{{ str_pad($snap['time_total_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h
-                                                        </div>
-                                                        <div class="w-full flex gap-px justify-center flex-1 items-end">
-                                                            <div class="flex-1 flex flex-col justify-end">
-                                                                @if($snap['items_total'] > 0)
-                                                                    <div class="w-full bg-blue-200 rounded-t" style="height: {{ $totalH }}px;">
-                                                                        <div class="w-full bg-blue-500 rounded-t" style="height: {{ $doneH }}px;"></div>
-                                                                    </div>
-                                                                @else
-                                                                    <div class="w-full bg-[var(--ui-border)]/20 rounded-t" style="height: 1px;"></div>
-                                                                @endif
-                                                            </div>
-                                                            <div class="flex-1 flex flex-col justify-end">
-                                                                @if($snap['time_total_minutes'] > 0)
-                                                                    <div class="w-full bg-violet-400 rounded-t" style="height: {{ $timeH }}px;"></div>
-                                                                @else
-                                                                    <div class="w-full bg-[var(--ui-border)]/20 rounded-t" style="height: 1px;"></div>
-                                                                @endif
-                                                            </div>
-                                                        </div>
-                                                        @if($idx === 0 || $idx === count($trend['snapshots']) - 1 || $idx % 4 === 0)
-                                                            <div class="text-[9px] text-[var(--ui-muted)] mt-0.5 leading-none">{{ $snap['date'] }}</div>
-                                                        @else
-                                                            <div class="h-[11px]"></div>
-                                                        @endif
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        </div>
-                                    @endif
-
-                                    @if($hasMonthly)
-                                        <div x-show="trendTab === '12m'" x-cloak x-data="{ tooltip: null }">
-                                            <div class="flex items-center justify-end gap-3 mb-3">
-                                                <div class="flex items-center gap-1.5">
-                                                    <span class="w-2 h-2 rounded-full bg-green-500"></span>
-                                                    <span class="text-[10px] text-[var(--ui-muted)]">abgerechnet</span>
-                                                </div>
-                                                <div class="flex items-center gap-1.5">
-                                                    <span class="w-2 h-2 rounded-full bg-amber-400"></span>
-                                                    <span class="text-[10px] text-[var(--ui-muted)]">offen</span>
-                                                </div>
-                                            </div>
-                                            <div class="flex items-end gap-1.5" style="height: 136px;">
-                                                @foreach($chartMonths as $idx => $m)
-                                                    <div class="flex-1 flex flex-col items-center h-full relative"
-                                                         @mouseenter="tooltip = {{ $idx }}"
-                                                         @mouseleave="tooltip = null">
-                                                        <div x-show="tooltip === {{ $idx }}" x-cloak
-                                                             class="absolute bottom-full mb-2 px-2.5 py-1.5 rounded-lg bg-[var(--ui-secondary)] text-white text-[10px] whitespace-nowrap z-10 shadow-lg pointer-events-none"
-                                                             x-transition.opacity>
-                                                            {{ $m['label'] }} {{ $m['year'] }}:
-                                                            {{ intdiv($m['total_minutes'], 60) }}:{{ str_pad($m['total_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h
-                                                            ({{ intdiv($m['billed_minutes'], 60) }}:{{ str_pad($m['billed_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h abgerechnet,
-                                                            {{ intdiv($m['open_minutes'], 60) }}:{{ str_pad($m['open_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h offen)
-                                                        </div>
-                                                        <div class="w-full flex flex-col justify-end flex-1 rounded-t overflow-hidden">
-                                                            @if($m['total_minutes'] > 0)
-                                                                @php
-                                                                    $barHeight = round(($m['total_minutes'] / $monthlyMax) * 120);
-                                                                    $billedHeight = $m['billed_minutes'] > 0 ? max(2, round(($m['billed_minutes'] / $monthlyMax) * 120)) : 0;
-                                                                    $openHeight = $m['open_minutes'] > 0 ? max(2, $barHeight - $billedHeight) : 0;
-                                                                    if ($billedHeight + $openHeight > $barHeight && $barHeight > 4) {
-                                                                        $billedHeight = $barHeight - $openHeight;
-                                                                    }
-                                                                @endphp
-                                                                <div class="w-full flex flex-col justify-end mt-auto">
-                                                                    @if($m['open_minutes'] > 0)
-                                                                        <div class="w-full bg-amber-400 rounded-t" style="height: {{ $openHeight }}px;"></div>
-                                                                    @endif
-                                                                    @if($m['billed_minutes'] > 0)
-                                                                        <div class="w-full bg-green-500 {{ $m['open_minutes'] <= 0 ? 'rounded-t' : '' }}" style="height: {{ $billedHeight }}px;"></div>
-                                                                    @endif
-                                                                </div>
-                                                            @else
-                                                                <div class="w-full mt-auto">
-                                                                    <div class="w-full bg-[var(--ui-border)]/20 rounded-t" style="height: 1px;"></div>
-                                                                </div>
-                                                            @endif
-                                                        </div>
-                                                        <div class="text-[10px] text-[var(--ui-muted)] mt-1 leading-none">{{ $m['label'] }}</div>
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        </div>
-                                    @endif
-                                </div>
-                            @endif
-
-                            {{-- KPI Insights --}}
-                            @if(!empty($analysis['insights'] ?? []))
-                                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                                    <h2 class="text-sm font-semibold text-[var(--ui-secondary)] mb-3">Erkenntnisse</h2>
-                                    <div class="space-y-2">
-                                        @foreach($analysis['insights'] as $insight)
-                                            <div class="flex items-start gap-2 text-sm">
-                                                @if($insight['type'] === 'success')
-                                                    @svg('heroicon-o-arrow-trending-up', 'w-4 h-4 text-green-600 flex-shrink-0 mt-0.5')
-                                                @elseif($insight['type'] === 'warning')
-                                                    @svg('heroicon-o-exclamation-triangle', 'w-4 h-4 text-amber-600 flex-shrink-0 mt-0.5')
-                                                @else
-                                                    @svg('heroicon-o-information-circle', 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0 mt-0.5')
-                                                @endif
-                                                <span class="@if($insight['type'] === 'success') text-green-700 @elseif($insight['type'] === 'warning') text-amber-700 @else text-[var(--ui-muted)] @endif">
-                                                    {{ $insight['text'] }}
-                                                </span>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                </div>
-                            @endif
-                        </div>
-                    @else
-                        <div class="p-8 text-center">
-                            <div class="inline-flex items-center gap-2 text-sm text-[var(--ui-muted)]">
-                                <svg class="w-4 h-4 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                                Analyse-Daten werden geladen...
-                            </div>
-                        </div>
-                    @endif
-                </div>
-                @endif
-
-                {{-- Tab: Hierarchie --}}
-                @if($activeTab === 'hierarchy')
-                <div x-show="tab === 'hierarchy'" x-cloak x-data="{
-                    linkConfig: {{ Js::from(collect($this->linkTypeConfig)->map(fn($c) => ['label' => $c['label'], 'icon' => $c['icon']])) }},
-                    linkIconSvgs: {{ Js::from($this->linkTypeIconSvgs) }},
-                    displayRules: {{ Js::from($this->displayRules) }}
-                }">
-                    <div class="space-y-6">
-                        {{-- ═══ Section 1: Organisationsstruktur (nur Kind-Entities) ═══ --}}
-                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] flex items-center gap-2">
-                                    @svg('heroicon-o-rectangle-group', 'w-4 h-4 text-[var(--ui-primary)]')
-                                    Organisationsstruktur
-                                    @if(count($this->treeNodes) > 0)
-                                        <span class="text-xs font-normal text-[var(--ui-muted)]">({{ $this->totalDescendantCount }} Einheiten)</span>
-                                    @endif
-                                </h3>
-                                @if(count($this->treeNodes) > 0)
-                                    <div class="flex gap-2" x-data>
-                                        <button
-                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border border-[var(--ui-border)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)] transition-colors"
-                                            @click="$store.tree.allExpanded ? $store.tree.collapseAll() : $store.tree.expandAll($wire)"
-                                            :disabled="$store.tree.loading"
-                                        >
-                                            <template x-if="$store.tree.loading">
-                                                <svg class="w-3.5 h-3.5 animate-spin" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
-                                                    <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                                                    <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                                </svg>
-                                            </template>
-                                            <template x-if="!$store.tree.loading">
-                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
-                                                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 3.75v4.5m0-4.5h4.5m-4.5 0L9 9M3.75 20.25v-4.5m0 4.5h4.5m-4.5 0L9 15M20.25 3.75h-4.5m4.5 0v4.5m0-4.5L15 9m5.25 11.25h-4.5m4.5 0v-4.5m0 4.5L15 15" />
-                                                </svg>
-                                            </template>
-                                            <span x-text="$store.tree.allExpanded ? 'Einklappen' : 'Alle aufklappen'"></span>
-                                        </button>
-                                    </div>
-                                @endif
-                            </div>
-
-                            @if(count($this->treeNodes) > 0)
-                                <div class="space-y-6">
-                                    @foreach($this->treeNodes as $section)
+                {{-- ═══ Struktur: Untereinheiten ═══ --}}
+                @if ($activeTab === 'hierarchy')
+                    <div x-data="{
+                        linkConfig: {{ Js::from(collect($this->linkTypeConfig)->map(fn($c) => ['label' => $c['label'], 'icon' => $c['icon']])) }},
+                        linkIconSvgs: {{ Js::from($this->linkTypeIconSvgs) }},
+                        displayRules: {{ Js::from($this->displayRules) }}
+                    }">
+                        <x-nx-panel flush title="Untereinheiten" :subtitle="count($this->treeNodes) > 0 ? $descendantCount . ' im Teilbaum, inkl. Zeiten und Verknüpfungen' : null">
+                            @if (count($this->treeNodes) > 0)
+                                <x-slot name="actions">
+                                    <button type="button" x-data
+                                        class="inline-flex items-center gap-1.5 rounded-[6px] px-2 py-1 text-xs font-medium text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)] hover:text-[color:var(--nx-text)]"
+                                        x-on:click="$store.tree.allExpanded ? $store.tree.collapseAll() : $store.tree.expandAll($wire)"
+                                        :disabled="$store.tree.loading">
+                                        <span x-show="$store.tree.loading">Lädt…</span>
+                                        <span x-show="!$store.tree.loading" x-text="$store.tree.allExpanded ? 'Einklappen' : 'Alle aufklappen'"></span>
+                                    </button>
+                                </x-slot>
+                                <div class="space-y-4 p-3">
+                                    @foreach ($this->treeNodes as $section)
                                         <div>
-                                            <div class="flex items-center gap-2 mb-2 px-1">
-                                                <h4 class="text-xs font-bold text-[var(--ui-muted)] uppercase tracking-wider">{{ $section['group_name'] }}</h4>
-                                                <span class="text-[10px] text-[var(--ui-muted)]">({{ count($section['nodes']) }})</span>
+                                            <div class="mb-1 flex items-center gap-2 px-2 text-xs font-medium text-[color:var(--nx-faint)]">
+                                                {{ $section['group_name'] }} <span>{{ count($section['nodes']) }}</span>
                                             </div>
-                                            <div class="space-y-1">
-                                                @foreach($section['nodes'] as $node)
+                                            <div class="space-y-0.5">
+                                                @foreach ($section['nodes'] as $node)
                                                     @include('organization::livewire.entity.partials.tree-node', ['node' => $node, 'depth' => 0])
                                                 @endforeach
                                             </div>
@@ -798,89 +263,48 @@
                                     @endforeach
                                 </div>
                             @else
-                                <div class="py-6 text-center rounded-lg border border-dashed border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                                    @svg('heroicon-o-rectangle-group', 'w-6 h-6 text-[var(--ui-muted)] mx-auto mb-2')
-                                    <p class="text-sm text-[var(--ui-muted)]">Keine Untereinheiten vorhanden</p>
-                                </div>
+                                <x-nx-empty icon="heroicon-o-rectangle-group">Keine Untereinheiten.</x-nx-empty>
                             @endif
-                        </div>
+                        </x-nx-panel>
+                    </div>
+                @endif
 
-                        {{-- ═══ Section 2: Verknüpfungen (eigene Links dieser Entity) ═══ --}}
-                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                            <div class="flex items-center justify-between mb-4">
-                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] flex items-center gap-2">
-                                    @svg('heroicon-o-link', 'w-4 h-4 text-[var(--ui-primary)]')
-                                    Verknüpfungen
-                                    @if(count($this->rootEntityLinks) > 0)
-                                        @php $totalLinkItems = collect($this->rootEntityLinks)->sum(fn($g) => count($g['items'])); @endphp
-                                        <span class="text-xs font-normal text-[var(--ui-muted)]">({{ $totalLinkItems }})</span>
-                                    @endif
-                                </h3>
-                                @if(count($this->rootEntityLinks) > 0)
-                                    <div class="flex gap-2" x-data>
-                                        <button
-                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-md border transition-colors"
-                                            :class="$store.tree.showDone ? 'border-green-300 text-green-700 bg-green-50 hover:bg-green-100' : 'border-[var(--ui-border)] text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-[var(--ui-muted-5)]'"
-                                            @click="$store.tree.showDone = !$store.tree.showDone"
-                                        >
-                                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5">
-                                                <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75 11.25 15 15 9.75M21 12a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
-                                            </svg>
-                                            <span x-text="$store.tree.showDone ? 'Erledigte ausblenden' : 'Erledigte anzeigen'"></span>
-                                        </button>
-                                    </div>
-                                @endif
-                            </div>
-
-                            @if(count($this->rootEntityLinks) > 0)
-                                @php
-                                    $rootCascaded = $this->cascadedTimeSummary;
-                                    $rootTotalMin = $rootCascaded['total_minutes'];
-                                    $rootBilledMin = $rootCascaded['billed_minutes'];
-                                    $rootOpenMin = $rootTotalMin - $rootBilledMin;
-                                @endphp
-
-                                {{-- Time summary bar --}}
-                                @if($rootTotalMin > 0)
-                                    <div class="flex items-center gap-4 mb-4 pb-3 border-b border-[var(--ui-border)]/30">
-                                        @svg('heroicon-o-clock', 'w-4 h-4 text-[var(--ui-muted)]')
-                                        <span class="text-xs text-[var(--ui-muted)]">Gesamt:</span>
-                                        <span class="text-sm font-semibold text-[var(--ui-secondary)]">{{ intdiv($rootTotalMin, 60) }}:{{ str_pad($rootTotalMin % 60, 2, '0', STR_PAD_LEFT) }}h</span>
-                                        @if($rootOpenMin > 0)
-                                            <span class="text-xs text-amber-600 font-medium">{{ intdiv($rootOpenMin, 60) }}:{{ str_pad($rootOpenMin % 60, 2, '0', STR_PAD_LEFT) }}h offen</span>
-                                        @endif
-                                    </div>
-                                @endif
-
-                                {{-- Link groups --}}
-                                <div class="space-y-1">
-                                    @foreach($this->rootEntityLinks as $group)
+                {{-- ═══ Verknüpft: Objekte, die an dieser Einheit hängen ═══ --}}
+                @if ($activeTab === 'links')
+                    <div x-data="{
+                        linkConfig: {{ Js::from(collect($this->linkTypeConfig)->map(fn($c) => ['label' => $c['label'], 'icon' => $c['icon']])) }},
+                        linkIconSvgs: {{ Js::from($this->linkTypeIconSvgs) }},
+                        displayRules: {{ Js::from($this->displayRules) }}
+                    }">
+                        @php
+                            $rootLinks = $this->rootEntityLinks;
+                            $totalLinkItems = collect($rootLinks)->sum(fn ($g) => count($g['items']));
+                        @endphp
+                        <x-nx-panel flush title="Verknüpft" :subtitle="count($rootLinks) > 0 ? $totalLinkItems . ' Objekte direkt an ' . $entity->name . ($cascaded['total_minutes'] > 0 ? ' · ' . $fmtMin($cascaded['total_minutes']) . ' im Teilbaum erfasst' : '') : null">
+                            @if (count($rootLinks) > 0)
+                                <x-slot name="actions">
+                                    <button type="button" x-data x-on:click="$store.tree.showDone = !$store.tree.showDone"
+                                        class="rounded-[6px] px-2 py-1 text-xs font-medium hover:bg-[color:var(--nx-hover)]"
+                                        :class="$store.tree.showDone ? 'text-[color:var(--nx-text)]' : 'text-[color:var(--nx-muted)]'"
+                                        x-text="$store.tree.showDone ? 'Erledigte ausblenden' : 'Erledigte anzeigen'"></button>
+                                </x-slot>
+                                <div class="p-2">
+                                    @foreach ($rootLinks as $group)
                                         <div x-data="{ groupOpen: false, init() { this.$watch('$store.tree.allExpanded', v => this.groupOpen = v); } }">
-                                            {{-- Group Header --}}
-                                            <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2.5 px-3 cursor-pointer"
-                                                @click="groupOpen = !groupOpen">
-                                                <div class="flex items-center gap-2">
-                                                    <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                                                        <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
-                                                            class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200"
-                                                            :class="{ 'rotate-90': groupOpen }">
-                                                            <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
-                                                        </svg>
-                                                    </div>
-                                                    @svg('heroicon-o-' . (app('safe-svg')->resolve($group['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
-                                                    <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $group['label'] }}</span>
-                                                    <span class="inline-flex items-center justify-center min-w-[1.25rem] h-5 px-1.5 text-xs font-bold text-[var(--ui-secondary)] bg-[var(--ui-muted-5)] rounded-full">{{ count($group['items']) }}</span>
-                                                    @if(($group['group_logged_minutes'] ?? 0) > 0)
-                                                        <span class="text-xs text-[var(--ui-muted)] ml-auto flex-shrink-0">
-                                                            {{ intdiv($group['group_logged_minutes'], 60) }}:{{ str_pad($group['group_logged_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h
-                                                        </span>
-                                                    @endif
-                                                </div>
+                                            <div class="flex cursor-pointer items-center gap-2 rounded-[6px] px-2 py-2 hover:bg-[color:var(--nx-hover)]" x-on:click="groupOpen = !groupOpen">
+                                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
+                                                    class="h-4 w-4 shrink-0 text-[color:var(--nx-faint)] transition-transform duration-200" :class="{ 'rotate-90': groupOpen }">
+                                                    <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
+                                                </svg>
+                                                @svg('heroicon-o-' . (app('safe-svg')->resolve($group['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 shrink-0 text-[color:var(--nx-muted)]')
+                                                <span class="text-sm font-medium text-[color:var(--nx-text)]">{{ $group['label'] }}</span>
+                                                <x-nx-badge>{{ count($group['items']) }}</x-nx-badge>
+                                                @if (($group['group_logged_minutes'] ?? 0) > 0)
+                                                    <span class="ml-auto shrink-0 text-xs tabular-nums text-[color:var(--nx-muted)]">{{ $fmtMin($group['group_logged_minutes']) }}</span>
+                                                @endif
                                             </div>
-
-                                            {{-- Group Items --}}
-                                            <div x-show="groupOpen" x-collapse x-cloak class="ml-7 border-l-2 border-[var(--ui-border)]/20">
-                                                @foreach($group['items'] as $link)
+                                            <div x-show="groupOpen" x-collapse x-cloak class="ml-5 border-l border-[color:var(--nx-line)]">
+                                                @foreach ($group['items'] as $link)
                                                     @include('organization::livewire.entity.partials.link-item', ['link' => $link, 'group' => $group])
                                                 @endforeach
                                             </div>
@@ -888,199 +312,250 @@
                                     @endforeach
                                 </div>
                             @else
-                                <div class="py-6 text-center rounded-lg border border-dashed border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                                    @svg('heroicon-o-link', 'w-6 h-6 text-[var(--ui-muted)] mx-auto mb-2')
-                                    <p class="text-sm text-[var(--ui-muted)]">Keine Verknüpfungen vorhanden</p>
-                                </div>
+                                <x-nx-empty icon="heroicon-o-link">Noch nichts verknüpft. Projekte, Tickets usw. hängen Module oder Agenten per <code class="text-xs">organization.entity.link.POST</code> an.</x-nx-empty>
                             @endif
-                        </div>
+                        </x-nx-panel>
                     </div>
-                </div>
                 @endif
 
-                {{-- Tab: Daten --}}
-                @if($activeTab === 'data')
-                <div x-show="tab === 'data'" x-cloak>
-                    <div class="space-y-6">
-                        {{-- Grunddaten --}}
-                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                            <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Grunddaten</h2>
-                            <div class="space-y-4">
-                                <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required />
-                                <x-ui-input-text name="code" label="Code" wire:model.live="form.code" placeholder="Optional: Code oder Nummer" />
-                                <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" />
-                                <x-ui-input-select
-                                    name="entity_type_id"
-                                    label="Typ"
-                                    :options="$this->entityTypes->flatten()"
-                                    optionValue="id"
-                                    optionLabel="name"
-                                    :nullable="false"
-                                    wire:model.live="form.entity_type_id"
-                                    required
-                                />
-                                <x-ui-input-select
-                                    name="parent_entity_id"
-                                    label="Übergeordnete Einheit (optional)"
-                                    :options="$this->parentEntities"
-                                    optionValue="id"
-                                    optionLabel="name"
-                                    :nullable="true"
-                                    nullLabel="Keine übergeordnete Einheit"
-                                    wire:model.live="form.parent_entity_id"
-                                />
-                                <x-ui-input-select
-                                    name="linked_user_id"
-                                    label="Verknüpfter User (optional)"
-                                    :options="$this->teamUsers"
-                                    optionValue="id"
-                                    optionLabel="name"
-                                    :nullable="true"
-                                    nullLabel="Kein User verknüpft"
-                                    wire:model.live="form.linked_user_id"
-                                />
-                                <div class="flex items-center">
-                                    <input type="checkbox" wire:model.live="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                                    <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
-                                </div>
-                            </div>
-                        </div>
+                {{-- ═══ Analyse ═══ --}}
+                @if ($activeTab === 'analyse')
+                    @if ($analyseLoaded)
+                        <div class="space-y-5">
+                            @php $radar = $this->dimensionRadar; @endphp
+                            @if (! empty($radar))
+                                <x-nx-panel title="7½ Dimensionen">
+                                    @include('organization::livewire.entity.partials.dimension-radar', ['radar' => $radar])
+                                </x-nx-panel>
+                            @endif
 
-                        {{-- Identifier / Fremd-IDs (Kostenstelle, DATEV, Buchungskonto, …) --}}
-                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                            <div class="flex items-start justify-between gap-3 mb-1">
-                                <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Identifier</h2>
-                                <x-ui-button variant="ghost" size="sm" wire:click="addIdentifier">
-                                    @svg('heroicon-o-plus', 'w-4 h-4')
-                                    <span>Identifier hinzufügen</span>
-                                </x-ui-button>
-                            </div>
-                            <p class="text-xs text-[var(--ui-muted)] mb-4">
-                                Fremd-IDs dieser Einheit in anderen Systemen. Jede Einheit IST faktisch ihre eigene Kostenstelle — die Kostenstelle ist nur das System <code class="bg-[var(--ui-muted-5)] px-1 rounded">kostenstelle</code>.
-                            </p>
-
-                            <datalist id="org-known-systems">
-                                @foreach(\Platform\Organization\Models\OrganizationEntityExternalId::KNOWN_SYSTEMS as $sysKey => $sysLabel)
-                                    <option value="{{ $sysKey }}">{{ $sysLabel }}</option>
-                                @endforeach
-                            </datalist>
-
-                            @if(empty($identifiers))
-                                <div class="py-6 text-center rounded-lg border border-dashed border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                                    @svg('heroicon-o-identification', 'w-6 h-6 text-[var(--ui-muted)] mx-auto mb-2')
-                                    <p class="text-sm text-[var(--ui-muted)]">Noch keine Identifier hinterlegt</p>
-                                </div>
-                            @else
-                                <div class="space-y-3">
-                                    <div class="hidden md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_auto] gap-2 px-1 text-[10px] uppercase tracking-wider text-[var(--ui-muted)] font-semibold">
-                                        <span>System</span><span>Wert</span><span>Label (optional)</span><span></span>
-                                    </div>
-                                    @foreach($identifiers as $i => $identifier)
-                                        <div wire:key="identifier-{{ $i }}" class="grid grid-cols-1 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_auto] gap-2 items-start">
-                                            <input type="text" list="org-known-systems"
-                                                   wire:model.live="identifiers.{{ $i }}.system"
-                                                   placeholder="z.B. kostenstelle"
-                                                   class="w-full text-sm rounded-md border-[var(--ui-border)] focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                                            <input type="text"
-                                                   wire:model.live="identifiers.{{ $i }}.value"
-                                                   placeholder="z.B. KST-4200"
-                                                   class="w-full text-sm rounded-md border-[var(--ui-border)] focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                                            <input type="text"
-                                                   wire:model.live="identifiers.{{ $i }}.label"
-                                                   placeholder="Anzeigename"
-                                                   class="w-full text-sm rounded-md border-[var(--ui-border)] focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                                            <button type="button" wire:click="removeIdentifier({{ $i }})"
-                                                    class="justify-self-start md:justify-self-center p-2 rounded-md text-red-500 hover:bg-red-50" title="Entfernen">
-                                                @svg('heroicon-o-trash', 'w-4 h-4')
-                                            </button>
+                            @php $movement = $this->movement; @endphp
+                            @if (! empty($movement['metrics']))
+                                @php
+                                    $nonZero = collect($movement['metrics'])->filter(fn ($m) => $m['delta'] != 0)->take(5);
+                                    $totalMetrics = collect($movement['metrics'])->filter(fn ($m) => $m['current'] > 0 || $m['previous'] > 0)->count();
+                                    $dimensionLabels = \Platform\Organization\Services\EntityLinkRegistry::allDimensions();
+                                    $pill = fn ($on) => 'rounded-[6px] px-2 py-0.5 text-xs ' . ($on ? 'bg-[color:var(--nx-active)] font-medium text-[color:var(--nx-text)]' : 'text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]');
+                                    $sentColor = fn ($s) => $s === 'positive' ? 'text-[color:var(--nx-success)]' : ($s === 'negative' ? 'text-[color:var(--nx-danger)]' : 'text-[color:var(--nx-muted)]');
+                                @endphp
+                                <x-nx-panel title="Bewegung" subtitle="letzte 7 Tage" x-data="{ movementGrouping: 'dimension' }">
+                                    <x-slot name="actions">
+                                        <div class="flex gap-1">
+                                            <button type="button" x-on:click="movementGrouping = 'dimension'" class="rounded-[6px] px-2 py-0.5 text-xs" :class="movementGrouping === 'dimension' ? 'bg-[color:var(--nx-active)] font-medium text-[color:var(--nx-text)]' : 'text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]'">nach Dimension</button>
+                                            <button type="button" x-on:click="movementGrouping = 'module'" class="rounded-[6px] px-2 py-0.5 text-xs" :class="movementGrouping === 'module' ? 'bg-[color:var(--nx-active)] font-medium text-[color:var(--nx-text)]' : 'text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]'">nach Modul</button>
                                         </div>
-                                    @endforeach
-                                </div>
+                                    </x-slot>
+
+                                    <div class="mb-3 flex flex-wrap gap-1">
+                                        <button type="button" wire:click="$set('movementStream', null)" class="{{ $pill(! $movementStream) }}">Alle</button>
+                                        @foreach ($this->availableStreams as $stream)
+                                            <button type="button" wire:click="$set('movementStream', '{{ $stream }}')" class="{{ $pill($movementStream === $stream) }}">{{ ucfirst($stream) }}</button>
+                                        @endforeach
+                                    </div>
+
+                                    @if ($nonZero->isNotEmpty())
+                                        <div class="mb-4 flex flex-wrap gap-1.5">
+                                            @foreach ($nonZero as $m)
+                                                <x-nx-badge :variant="$m['sentiment'] === 'positive' ? 'success' : ($m['sentiment'] === 'negative' ? 'danger' : 'neutral')">{{ $m['delta_formatted'] }} {{ $m['label'] }}</x-nx-badge>
+                                            @endforeach
+                                        </div>
+                                    @endif
+
+                                    @if ($movementStream || $totalMetrics > 5)
+                                        @foreach (['dimension' => $movement['metrics_by_dimension'], 'module' => $movement['metrics_by_group']] as $grouping => $groups)
+                                            <div x-show="movementGrouping === '{{ $grouping }}'" @if ($grouping === 'module') x-cloak @endif>
+                                                @foreach ($groups as $gKey => $metrics)
+                                                    <div class="mb-3">
+                                                        <div class="mb-1.5 text-xs font-medium text-[color:var(--nx-faint)]">{{ $grouping === 'dimension' ? ($dimensionLabels[$gKey]['label'] ?? ucfirst($gKey)) : ucfirst($gKey) }}</div>
+                                                        <div class="grid grid-cols-2 gap-2 md:grid-cols-3">
+                                                            @foreach ($metrics as $m)
+                                                                @if ($m['current'] != 0 || $m['previous'] != 0)
+                                                                    <div class="rounded-[6px] border border-[color:var(--nx-line)] px-2.5 py-2">
+                                                                        <div class="text-sm font-semibold tabular-nums text-[color:var(--nx-text)]">
+                                                                            {{ $m['current_formatted'] }}
+                                                                            @if ($m['delta'] != 0)<span class="ml-1 text-[11px] font-medium {{ $sentColor($m['sentiment']) }}">{{ $m['delta_formatted'] }}</span>@endif
+                                                                        </div>
+                                                                        <div class="text-[11px] text-[color:var(--nx-muted)]">{{ $m['label'] }}</div>
+                                                                        @if ($m['ratio'])
+                                                                            <div class="mt-1 h-1 overflow-hidden rounded-full bg-[color:var(--nx-accent-soft)]">
+                                                                                <div class="h-full rounded-full bg-[color:var(--nx-accent)]" style="width: {{ min($m['ratio'], 100) }}%"></div>
+                                                                            </div>
+                                                                        @endif
+                                                                    </div>
+                                                                @endif
+                                                            @endforeach
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        @endforeach
+                                    @endif
+                                </x-nx-panel>
+                            @endif
+
+                            @php
+                                $trend = $this->snapshotTrend;
+                                $monthlyData = $this->monthlyTimeData;
+                                $chartMonths = $monthlyData['months'] ?? [];
+                                $monthlyMax = $monthlyData['max_minutes'] ?? 0;
+                                $hasTrend = ! empty($trend) && count($trend['snapshots'] ?? []) >= 1;
+                                $hasMonthly = $monthlyMax > 0;
+                            @endphp
+                            @if ($hasTrend || $hasMonthly)
+                                <x-nx-panel title="Verlauf" x-data="{ trendTab: '{{ $hasTrend ? '14d' : '12m' }}' }">
+                                    <x-slot name="actions">
+                                        <div class="flex gap-1">
+                                            @if ($hasTrend)
+                                                <button type="button" x-on:click="trendTab = '14d'" class="rounded-[6px] px-2 py-0.5 text-xs" :class="trendTab === '14d' ? 'bg-[color:var(--nx-active)] font-medium text-[color:var(--nx-text)]' : 'text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]'">14 Tage</button>
+                                            @endif
+                                            @if ($hasMonthly)
+                                                <button type="button" x-on:click="trendTab = '12m'" class="rounded-[6px] px-2 py-0.5 text-xs" :class="trendTab === '12m' ? 'bg-[color:var(--nx-active)] font-medium text-[color:var(--nx-text)]' : 'text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]'">12 Monate</button>
+                                            @endif
+                                        </div>
+                                    </x-slot>
+
+                                    @if ($hasTrend)
+                                        <div x-show="trendTab === '14d'" x-cloak>
+                                            <div class="mb-3 flex items-center justify-end gap-3 text-[11px] text-[color:var(--nx-muted)]">
+                                                <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-[color:var(--nx-accent)]"></span>erledigt</span>
+                                                <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-[color:var(--nx-accent-soft)]"></span>gesamt</span>
+                                                <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-[color:var(--nx-info)]"></span>Stunden</span>
+                                            </div>
+                                            <div class="flex items-end gap-1" style="height: 160px;" x-data="{ tip: null }">
+                                                @foreach ($trend['snapshots'] as $idx => $snap)
+                                                    @php
+                                                        $maxItems = max($trend['max_items_total'], 1);
+                                                        $maxMin = max($trend['max_minutes'], 1);
+                                                        $totalH = round(($snap['items_total'] / $maxItems) * 130);
+                                                        $doneH = $snap['items_total'] > 0 ? max(1, round(($snap['items_done'] / $maxItems) * 130)) : 0;
+                                                        $timeH = $snap['time_total_minutes'] > 0 ? max(2, round(($snap['time_total_minutes'] / $maxMin) * 130)) : 0;
+                                                        $lastIdx = count($trend['snapshots']) - 1;
+                                                    @endphp
+                                                    <div class="relative flex h-full flex-1 flex-col items-center justify-end gap-px" x-on:mouseenter="tip = {{ $idx }}" x-on:mouseleave="tip = null">
+                                                        <div x-show="tip === {{ $idx }}" x-cloak class="pointer-events-none absolute bottom-full z-10 mb-2 whitespace-nowrap rounded-[6px] border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] px-2 py-1 text-[11px] text-[color:var(--nx-text)] shadow-sm">
+                                                            {{ $snap['date'] }} {{ $snap['period'] }}: {{ $snap['items_done'] }}/{{ $snap['items_total'] }} · {{ $fmtMin($snap['time_total_minutes']) }}
+                                                        </div>
+                                                        <div class="flex w-full flex-1 items-end justify-center gap-px">
+                                                            <div class="flex flex-1 flex-col justify-end">
+                                                                @if ($snap['items_total'] > 0)
+                                                                    <div class="flex w-full flex-col justify-end rounded-t-[3px] bg-[color:var(--nx-accent-soft)]" style="height: {{ $totalH }}px;">
+                                                                        <div class="w-full rounded-t-[3px] bg-[color:var(--nx-accent)]" style="height: {{ $doneH }}px;"></div>
+                                                                    </div>
+                                                                @else
+                                                                    <div class="h-px w-full bg-[color:var(--nx-line)]"></div>
+                                                                @endif
+                                                            </div>
+                                                            <div class="flex flex-1 flex-col justify-end">
+                                                                @if ($snap['time_total_minutes'] > 0)
+                                                                    <div class="w-full rounded-t-[3px] bg-[color:var(--nx-info)] opacity-70" style="height: {{ $timeH }}px;"></div>
+                                                                @else
+                                                                    <div class="h-px w-full bg-[color:var(--nx-line)]"></div>
+                                                                @endif
+                                                            </div>
+                                                        </div>
+                                                        <div class="mt-0.5 h-[11px] text-[9px] leading-none text-[color:var(--nx-faint)]">
+                                                            @if ($idx === 0 || $idx === $lastIdx || $idx % 4 === 0){{ $snap['date'] }}@endif
+                                                        </div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endif
+
+                                    @if ($hasMonthly)
+                                        <div x-show="trendTab === '12m'" x-cloak x-data="{ tip: null }">
+                                            <div class="mb-3 flex items-center justify-end gap-3 text-[11px] text-[color:var(--nx-muted)]">
+                                                <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-[color:var(--nx-success)]"></span>abgerechnet</span>
+                                                <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-[color:var(--nx-warning)]"></span>offen</span>
+                                            </div>
+                                            <div class="flex items-end gap-1.5" style="height: 136px;">
+                                                @foreach ($chartMonths as $idx => $m)
+                                                    @php
+                                                        $barHeight = $m['total_minutes'] > 0 ? round(($m['total_minutes'] / $monthlyMax) * 120) : 0;
+                                                        $billedHeight = $m['billed_minutes'] > 0 ? max(2, round(($m['billed_minutes'] / $monthlyMax) * 120)) : 0;
+                                                        $openHeight = $m['open_minutes'] > 0 ? max(2, $barHeight - $billedHeight) : 0;
+                                                        if ($billedHeight + $openHeight > $barHeight && $barHeight > 4) {
+                                                            $billedHeight = $barHeight - $openHeight;
+                                                        }
+                                                    @endphp
+                                                    <div class="relative flex h-full flex-1 flex-col items-center" x-on:mouseenter="tip = {{ $idx }}" x-on:mouseleave="tip = null">
+                                                        <div x-show="tip === {{ $idx }}" x-cloak class="pointer-events-none absolute bottom-full z-10 mb-2 whitespace-nowrap rounded-[6px] border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] px-2 py-1 text-[11px] text-[color:var(--nx-text)] shadow-sm">
+                                                            {{ $m['label'] }} {{ $m['year'] }}: {{ $fmtMin($m['total_minutes']) }} ({{ $fmtMin($m['billed_minutes']) }} abgerechnet, {{ $fmtMin($m['open_minutes']) }} offen)
+                                                        </div>
+                                                        <div class="flex w-full flex-1 flex-col justify-end overflow-hidden rounded-t-[3px]">
+                                                            @if ($m['total_minutes'] > 0)
+                                                                @if ($m['open_minutes'] > 0)<div class="w-full bg-[color:var(--nx-warning)] opacity-80" style="height: {{ $openHeight }}px;"></div>@endif
+                                                                @if ($m['billed_minutes'] > 0)<div class="w-full bg-[color:var(--nx-success)] opacity-80" style="height: {{ $billedHeight }}px;"></div>@endif
+                                                            @else
+                                                                <div class="h-px w-full bg-[color:var(--nx-line)]"></div>
+                                                            @endif
+                                                        </div>
+                                                        <div class="mt-1 text-[10px] leading-none text-[color:var(--nx-faint)]">{{ $m['label'] }}</div>
+                                                    </div>
+                                                @endforeach
+                                            </div>
+                                        </div>
+                                    @endif
+                                </x-nx-panel>
+                            @endif
+
+                            @if (! empty($analysis['insights'] ?? []))
+                                <x-nx-panel title="Erkenntnisse">
+                                    <ul class="m-0 list-none space-y-1.5 p-0 text-sm">
+                                        @foreach ($analysis['insights'] as $insight)
+                                            <li @class([
+                                                'text-[color:var(--nx-success)]' => $insight['type'] === 'success',
+                                                'text-[color:var(--nx-warning)]' => $insight['type'] === 'warning',
+                                                'text-[color:var(--nx-text)]' => ! in_array($insight['type'], ['success', 'warning']),
+                                            ])>{{ $insight['text'] }}</li>
+                                        @endforeach
+                                    </ul>
+                                </x-nx-panel>
+                            @endif
+
+                            @if (empty($radar) && empty($movement['metrics']) && ! $hasTrend && ! $hasMonthly)
+                                <x-nx-card flush><x-nx-empty icon="heroicon-o-chart-bar-square">Noch keine Kennzahlen — die Snapshots laufen nachts.</x-nx-empty></x-nx-card>
                             @endif
                         </div>
-
-                    </div>
-                </div>
+                    @else
+                        <div class="py-8 text-center text-sm text-[color:var(--nx-muted)]">Analyse wird geladen…</div>
+                    @endif
                 @endif
 
-                {{-- Tab: Relations --}}
-                @if($activeTab === 'relations')
-                <div x-show="tab === 'relations'" x-cloak>
-                    <div class="space-y-6">
-                        {{-- Intro --}}
-                        <div class="bg-[var(--ui-info-5)] border border-[var(--ui-info-20)] rounded-lg p-4">
-                            <h4 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1">Beziehungen & Schnittstellen</h4>
-                            <p class="text-sm text-[var(--ui-muted)]">
-                                <strong>Beziehungen</strong> beschreiben, wie Organisationseinheiten zusammenhängen (z.B. "liefert an", "beauftragt").
-                                An jede Beziehung können <strong>Schnittstellen</strong> gehängt werden — die konkreten Berührungspunkte: Verträge, Ticketsysteme, Datenflüsse, APIs.
-                                Pro Beziehung sind <strong>mehrere Schnittstellen</strong> möglich.
-                            </p>
-                        </div>
-
-                        {{-- Ausgehende Beziehungen --}}
-                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                            <div class="flex items-center justify-between mb-1">
-                                <h3 class="text-sm font-semibold text-[var(--ui-secondary)] flex items-center gap-2">
-                                    @svg('heroicon-o-arrow-right', 'w-4 h-4 text-[var(--ui-primary)]')
-                                    Ausgehende Beziehungen
-                                    <span class="text-xs font-normal text-[var(--ui-muted)]">({{ $this->relationsFrom->count() }})</span>
-                                </h3>
-                                <x-ui-button variant="primary" size="sm" wire:click="$toggle('relationFormShow')">
+                {{-- ═══ Beziehungen ═══ --}}
+                @if ($activeTab === 'relations')
+                    <div class="space-y-5">
+                        <x-nx-panel flush title="Ausgehend" :subtitle="$this->relationsFrom->count() . ' · von ' . $entity->name . ' zu anderen Einheiten'">
+                            <x-slot name="actions">
+                                <x-nx-button size="sm" wire:click="$toggle('relationFormShow')">
                                     @svg('heroicon-o-plus', 'w-4 h-4')
-                                    <span>Neue Beziehung</span>
-                                </x-ui-button>
-                            </div>
-                            <p class="text-xs text-[var(--ui-muted)] mb-4">Von <strong>{{ $entity->name }}</strong> ausgehende Beziehungen zu anderen Einheiten.</p>
+                                    <span>Beziehung</span>
+                                </x-nx-button>
+                            </x-slot>
 
-                            {{-- Neue Beziehung erstellen (inline) --}}
-                            @if($relationFormShow)
-                                <div class="border border-[var(--ui-border)]/60 rounded-lg p-4 mb-4 bg-[var(--ui-muted-5)]">
-                                    <h4 class="text-xs font-semibold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Neue Beziehung</h4>
-                                    <div class="grid grid-cols-2 gap-3 mb-3">
-                                        <div>
-                                            <x-ui-input-select
-                                                name="relation_to_entity_id"
-                                                label="Ziel-Einheit"
-                                                :options="$this->availableRelationEntities->map(fn($e) => ['value' => (string) $e->id, 'label' => $e->name . ' (' . ($e->type->name ?? '') . ')'])->toArray()"
-                                                nullable
-                                                nullLabel="– Einheit auswählen –"
-                                                wire:model.live="relationForm.to_entity_id"
-                                            />
-                                            <p class="text-xs text-[var(--ui-muted)] mt-1">Mit welcher Einheit besteht die Beziehung?</p>
-                                            @error('relationForm.to_entity_id') <p class="text-xs text-[var(--ui-danger)] mt-1">{{ $message }}</p> @enderror
-                                        </div>
-                                        <div>
-                                            <x-ui-input-select
-                                                name="relation_type_id"
-                                                label="Art der Beziehung"
-                                                :options="$this->availableRelationTypes->map(fn($t) => ['value' => (string) $t->id, 'label' => $t->name])->toArray()"
-                                                nullable
-                                                nullLabel="– Beziehungstyp auswählen –"
-                                                wire:model.live="relationForm.relation_type_id"
-                                            />
-                                            <p class="text-xs text-[var(--ui-muted)] mt-1">z.B. "liefert an", "beauftragt", "ist Dienstleister für"</p>
-                                            @error('relationForm.relation_type_id') <p class="text-xs text-[var(--ui-danger)] mt-1">{{ $message }}</p> @enderror
-                                        </div>
+                            @if ($relationFormShow)
+                                <div class="space-y-3 border-b border-[color:var(--nx-line)] bg-[color:var(--nx-bg)] p-4">
+                                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                        <x-nx-input-select name="relation_to_entity_id" label="Ziel-Einheit" size="sm"
+                                            :options="$this->availableRelationEntities->map(fn($e) => ['value' => (string) $e->id, 'label' => $e->name . ' (' . ($e->type->name ?? '') . ')'])->toArray()"
+                                            nullable nullLabel="– auswählen –" wire:model.live="relationForm.to_entity_id" errorKey="relationForm.to_entity_id" />
+                                        <x-nx-input-select name="relation_type_id" label="Art" size="sm" hint="z. B. liefert an, beauftragt"
+                                            :options="$this->availableRelationTypes->map(fn($t) => ['value' => (string) $t->id, 'label' => $t->name])->toArray()"
+                                            nullable nullLabel="– auswählen –" wire:model.live="relationForm.relation_type_id" errorKey="relationForm.relation_type_id" />
                                     </div>
-                                    <div class="grid grid-cols-2 gap-3 mb-3">
-                                        <x-ui-input-text name="relation_valid_from" label="Gültig von (optional)" type="date" wire:model.live="relationForm.valid_from" />
-                                        <x-ui-input-text name="relation_valid_to" label="Gültig bis (optional)" type="date" wire:model.live="relationForm.valid_to" />
+                                    <div class="grid grid-cols-2 gap-3">
+                                        <x-nx-input-date name="relation_valid_from" label="Gültig von" size="sm" wire:model.live="relationForm.valid_from" />
+                                        <x-nx-input-date name="relation_valid_to" label="Gültig bis" size="sm" wire:model.live="relationForm.valid_to" />
                                     </div>
                                     <div class="flex gap-2">
-                                        <x-ui-button variant="primary" size="sm" wire:click="createRelation">
-                                            @svg('heroicon-o-check', 'w-4 h-4')
-                                            <span>Erstellen</span>
-                                        </x-ui-button>
-                                        <x-ui-button variant="secondary-ghost" size="sm" wire:click="$set('relationFormShow', false)">
-                                            Abbrechen
-                                        </x-ui-button>
+                                        <x-nx-button variant="primary" size="sm" wire:click="createRelation">Anlegen</x-nx-button>
+                                        <x-nx-button variant="ghost" size="sm" wire:click="$set('relationFormShow', false)">Abbrechen</x-nx-button>
                                     </div>
                                 </div>
                             @endif
 
-                            {{-- Liste --}}
-                            <div class="space-y-2">
-                                @forelse($this->relationsFrom as $relation)
+                            <div class="space-y-2 p-3">
+                                @forelse ($this->relationsFrom as $relation)
                                     @include('organization::livewire.entity.partials.relation-card-inline', [
                                         'relation' => $relation,
                                         'direction' => 'from',
@@ -1088,26 +563,14 @@
                                         'otherEntity' => $relation->toEntity,
                                     ])
                                 @empty
-                                    <div class="p-6 text-center rounded-lg border border-dashed border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                                        @svg('heroicon-o-arrow-right', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
-                                        <p class="text-sm font-medium text-[var(--ui-secondary)] mb-0.5">Keine ausgehenden Beziehungen</p>
-                                        <p class="text-xs text-[var(--ui-muted)]">Klicke "Neue Beziehung" um eine Beziehung zu einer anderen Einheit zu erstellen.</p>
-                                    </div>
+                                    <p class="m-0 px-1 py-2 text-sm text-[color:var(--nx-faint)]">Keine ausgehenden Beziehungen.</p>
                                 @endforelse
                             </div>
-                        </div>
+                        </x-nx-panel>
 
-                        {{-- Eingehende Beziehungen --}}
-                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                            <h3 class="text-sm font-semibold text-[var(--ui-secondary)] flex items-center gap-2 mb-1">
-                                @svg('heroicon-o-arrow-left', 'w-4 h-4 text-[var(--ui-info)]')
-                                Eingehende Beziehungen
-                                <span class="text-xs font-normal text-[var(--ui-muted)]">({{ $this->relationsTo->count() }})</span>
-                            </h3>
-                            <p class="text-xs text-[var(--ui-muted)] mb-4">Beziehungen, die von anderen Einheiten auf <strong>{{ $entity->name }}</strong> zeigen.</p>
-
-                            <div class="space-y-2">
-                                @forelse($this->relationsTo as $relation)
+                        <x-nx-panel flush title="Eingehend" :subtitle="$this->relationsTo->count() . ' · von anderen Einheiten zu ' . $entity->name">
+                            <div class="space-y-2 p-3">
+                                @forelse ($this->relationsTo as $relation)
                                     @include('organization::livewire.entity.partials.relation-card-inline', [
                                         'relation' => $relation,
                                         'direction' => 'to',
@@ -1115,509 +578,232 @@
                                         'otherEntity' => $relation->fromEntity,
                                     ])
                                 @empty
-                                    <div class="p-6 text-center rounded-lg border border-dashed border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                                        @svg('heroicon-o-arrow-left', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
-                                        <p class="text-sm font-medium text-[var(--ui-secondary)] mb-0.5">Keine eingehenden Beziehungen</p>
-                                        <p class="text-xs text-[var(--ui-muted)]">Andere Einheiten können Beziehungen zu dieser Entity anlegen.</p>
-                                    </div>
+                                    <p class="m-0 px-1 py-2 text-sm text-[color:var(--nx-faint)]">Keine eingehenden Beziehungen.</p>
                                 @endforelse
                             </div>
-                        </div>
+                        </x-nx-panel>
+
+                        <p class="m-0 text-xs text-[color:var(--nx-faint)]">
+                            Beziehungen beschreiben, wie Einheiten zusammenhängen. An jede Beziehung lassen sich Schnittstellen hängen — Verträge, Ticketsysteme, Datenflüsse.
+                        </p>
                     </div>
-                </div>
                 @endif
 
-                {{-- Tab: Person --}}
-                @if($this->hasLinkedUser)
-                    @if($activeTab === 'person')
-                    <div x-show="tab === 'person'" x-cloak>
-                        <livewire:organization.entity.person-activity :entity="$entity" :key="'person-activity-'.$entity->id" />
-                    </div>
-                    @endif
-                @endif
-
-                {{-- Tab: Module (an/aus pro Person) --}}
-                @if($this->hasLinkedUser)
-                    @if($activeTab === 'modules')
-                    <div x-show="tab === 'modules'" x-cloak>
-                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                            <h3 class="text-sm font-semibold text-[var(--ui-secondary)] mb-1 flex items-center gap-2">
-                                @svg('heroicon-o-squares-2x2', 'w-4 h-4 text-[var(--ui-primary)]')
-                                Modul-Zugang
-                            </h3>
-                            <p class="text-xs text-[var(--ui-muted)] mb-4">
-                                Steuert, welche Module dieser Person zur Verfügung stehen (an/aus).
-                                Lese-/Schreibrechte auf Inhalte werden separat über die Organisationsstruktur geregelt.
-                            </p>
-
-                            @unless($this->canManageModuleAccess)
-                                <div class="mb-4 text-xs text-amber-700 bg-amber-50 border border-amber-200 rounded px-3 py-2">
-                                    Nur Team-Admins können Modul-Zugänge ändern.
-                                </div>
-                            @endunless
-
-                            <table class="w-full text-sm">
-                                <thead>
-                                    <tr class="text-xs text-[var(--ui-muted)] uppercase">
-                                        <th class="text-left py-1 px-2">Modul</th>
-                                        <th class="text-right py-1 px-2 w-24">Zugang</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    @foreach($this->moduleAccessRows as $mod)
-                                        <tr class="border-t border-[var(--ui-border)]" wire:key="mod-access-{{ $mod['key'] }}">
-                                            <td class="py-2 px-2 font-medium text-[var(--ui-secondary)]">
-                                                {{ $mod['title'] }}
-                                                <span class="ml-1 text-xs font-normal text-[var(--ui-muted)]">{{ $mod['key'] }}</span>
-                                            </td>
-                                            <td class="py-2 px-2 text-right">
-                                                <button
-                                                    type="button"
-                                                    wire:click="toggleModule('{{ $mod['key'] }}')"
-                                                    @disabled(! $this->canManageModuleAccess)
-                                                    class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors disabled:opacity-40 {{ $mod['enabled'] ? 'bg-[var(--ui-primary)]' : 'bg-gray-300' }}"
-                                                    title="{{ $mod['enabled'] ? 'Deaktivieren' : 'Aktivieren' }}"
-                                                >
-                                                    <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform {{ $mod['enabled'] ? 'translate-x-6' : 'translate-x-1' }}"></span>
-                                                </button>
-                                            </td>
-                                        </tr>
-                                    @endforeach
-                                </tbody>
-                            </table>
-                        </div>
-                    </div>
-                    @endif
-                @endif
-
-                {{-- Tab: Signale --}}
-                @if($activeTab === 'signals')
-                <div x-show="tab === 'signals'" x-cloak>
-                    <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                        {{-- Header with filter --}}
-                        <div class="flex items-center justify-between mb-4">
-                            <h3 class="text-sm font-semibold text-[var(--ui-secondary)] flex items-center gap-2">
-                                @svg('heroicon-o-bell-alert', 'w-4 h-4 text-[var(--ui-primary)]')
-                                Algedonic Alerts
-                            </h3>
-                            <select
-                                wire:model.live="signalStatusFilter"
-                                class="rounded-md border-gray-300 shadow-sm text-xs py-1.5 px-3"
-                            >
-                                <option value="">Alle</option>
-                                <option value="open">Offen</option>
-                                <option value="acknowledged">Bestätigt</option>
-                                <option value="resolved">Gelöst</option>
-                                <option value="dismissed">Verworfen</option>
-                            </select>
-                        </div>
-
-                        @if($this->entitySignals->isEmpty())
-                            <div class="text-center py-8">
-                                @svg('heroicon-o-bell-slash', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
-                                <p class="text-sm text-[var(--ui-muted)]">Keine Signale{{ $signalStatusFilter ? ' mit Status "' . $signalStatusFilter . '"' : '' }}.</p>
+                {{-- ═══ Signale ═══ --}}
+                @if ($activeTab === 'signals')
+                    <x-nx-panel flush title="Signale">
+                        <x-slot name="actions">
+                            <div class="w-40">
+                                <x-nx-input-select name="signalStatusFilter" size="sm" wire:model.live="signalStatusFilter" nullable nullLabel="Alle"
+                                    :options="[['value' => 'open', 'label' => 'Offen'], ['value' => 'acknowledged', 'label' => 'Bestätigt'], ['value' => 'resolved', 'label' => 'Gelöst'], ['value' => 'dismissed', 'label' => 'Verworfen']]" />
                             </div>
+                        </x-slot>
+
+                        @if ($this->entitySignals->isEmpty())
+                            <x-nx-empty icon="heroicon-o-bell-slash">Keine Signale{{ $signalStatusFilter ? ' mit diesem Status' : '' }}.</x-nx-empty>
                         @else
-                            <div class="space-y-3">
-                                @foreach($this->entitySignals as $signal)
-                                    <div class="border border-[var(--ui-border)] rounded-lg p-4" wire:key="signal-{{ $signal->id }}">
-                                        <div class="flex items-start justify-between gap-4">
-                                            {{-- Left: Severity + Definition + Pattern --}}
-                                            <div class="flex items-start gap-3 min-w-0 flex-1">
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium flex-shrink-0
-                                                    @if($signal->severity === 'critical') bg-red-100 text-red-800
-                                                    @elseif($signal->severity === 'warning') bg-amber-100 text-amber-800
-                                                    @else bg-blue-100 text-blue-800
-                                                    @endif
-                                                ">
-                                                    {{ ucfirst($signal->severity) }}
-                                                </span>
-                                                <div class="min-w-0">
-                                                    <div class="flex items-center gap-2 flex-wrap">
-                                                        <a href="{{ route('organization.signals.show', $signal) }}" class="text-sm font-medium text-[var(--ui-primary)] hover:underline">
-                                                            {{ $signal->definition?->name ?? 'Unbekannt' }}
-                                                        </a>
-                                                        @if($signal->definition?->pattern_type)
-                                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-xs bg-gray-100 text-gray-600">
-                                                                @switch($signal->definition->pattern_type)
-                                                                    @case('threshold') Schwellenwert @break
-                                                                    @case('trend') Trend @break
-                                                                    @case('cross_dimension') Kreuz-Dimension @break
-                                                                    @case('ratio') Verhältnis @break
-                                                                    @default {{ $signal->definition->pattern_type }}
-                                                                @endswitch
-                                                            </span>
-                                                        @endif
+                            @foreach ($this->entitySignals as $signal)
+                                @php
+                                    [$stV, $stL] = $statusBadge($signal->status);
+                                    $isOverdue = $signal->deadline_at && $signal->status === 'open' && $signal->deadline_at->isPast();
+                                    $pattern = match ($signal->definition?->pattern_type) {
+                                        'threshold' => 'Schwellenwert',
+                                        'trend' => 'Trend',
+                                        'cross_dimension' => 'Kreuz-Dimension',
+                                        'ratio' => 'Verhältnis',
+                                        default => $signal->definition?->pattern_type,
+                                    };
+                                @endphp
+                                <div wire:key="signal-{{ $signal->id }}" class="flex items-start gap-4 border-b border-[color:var(--nx-line)] px-4 py-3 last:border-0">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex flex-wrap items-center gap-1.5">
+                                            <x-nx-badge :variant="$sevVariant($signal->severity)">{{ $sevLabel($signal->severity) }}</x-nx-badge>
+                                            <a href="{{ route('organization.signals.show', $signal) }}" wire:navigate class="text-sm font-medium text-[color:var(--nx-text)] hover:underline">{{ $signal->definition?->name ?? 'Signal' }}</a>
+                                            @if ($pattern)<span class="text-xs text-[color:var(--nx-faint)]">{{ $pattern }}</span>@endif
+                                        </div>
+                                        <p class="mb-0 mt-1 text-sm text-[color:var(--nx-muted)]">{{ $signal->message }}</p>
+
+                                        <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[color:var(--nx-faint)]">
+                                            @if ($signal->vsm_level)<span title="VSM-Ebene">{{ strtoupper(str_replace('_', '', $signal->vsm_level)) }}</span>@endif
+                                            @if ($signal->current_owner_entity_id)
+                                                <span title="Owner">{{ $signal->currentOwner?->name ?? '#' . $signal->current_owner_entity_id }}</span>
+                                            @elseif ($signal->status === 'open')
+                                                <span class="text-[color:var(--nx-warning)]">ohne Owner</span>
+                                            @endif
+                                            @if ($signal->deadline_at)
+                                                <span class="{{ $isOverdue ? 'text-[color:var(--nx-danger)]' : '' }}" title="{{ $signal->deadline_at->format('d.m.Y H:i') }}">{{ $isOverdue ? 'überfällig' : 'fällig' }} {{ $signal->deadline_at->diffForHumans() }}</span>
+                                            @endif
+                                            @if ($signal->escalated_at)<span class="text-[color:var(--nx-warning)]">eskaliert</span>@endif
+                                            @if ($signal->source_type === 'aggregation')<span>aggregiert</span>@endif
+                                            @if ($signal->createdByAgent)<span>von {{ $signal->createdByAgent->name }}</span>@endif
+                                            @if ($signal->trigger_metrics)
+                                                <span x-data="{ open: false }">
+                                                    <button type="button" x-on:click="open = !open" class="hover:text-[color:var(--nx-text)] hover:underline" x-text="open ? 'Werte ausblenden' : 'Auslösende Werte'"></button>
+                                                    <div x-show="open" x-cloak class="mt-1.5 rounded-[6px] bg-[color:var(--nx-bg)] p-2 font-mono text-[11px] text-[color:var(--nx-muted)]">
+                                                        @foreach ($signal->trigger_metrics as $key => $value)
+                                                            <div>{{ $key }}: {{ is_array($value) ? json_encode($value) : $value }}</div>
+                                                        @endforeach
                                                     </div>
-                                                    <p class="text-sm text-[var(--ui-muted)] mt-1">{{ $signal->message }}</p>
-
-                                                    {{-- Trigger Metrics (expandable) --}}
-                                                    @if($signal->trigger_metrics)
-                                                        <div x-data="{ showMetrics: false }" class="mt-1.5">
-                                                            <button @click="showMetrics = !showMetrics" class="text-xs text-[var(--ui-primary)] hover:underline flex items-center gap-1">
-                                                                @svg('heroicon-o-chart-bar', 'w-3 h-3')
-                                                                <span x-text="showMetrics ? 'Metriken ausblenden' : 'Metriken anzeigen'"></span>
-                                                            </button>
-                                                            <div x-show="showMetrics" x-cloak class="mt-1.5 text-xs text-[var(--ui-muted)] bg-gray-50 rounded p-2 font-mono">
-                                                                @foreach($signal->trigger_metrics as $key => $value)
-                                                                    <div>{{ $key }}: {{ is_array($value) ? json_encode($value) : $value }}</div>
-                                                                @endforeach
-                                                            </div>
-                                                        </div>
-                                                    @endif
-
-                                                    {{-- Routing-Zeile: VSM-Level, Owner, Deadline, Eskalations-/Aggregations-Marker --}}
-                                                    @php
-                                                        $isOverdue = $signal->deadline_at && $signal->status === 'open' && $signal->deadline_at->isPast();
-                                                    @endphp
-                                                    @if($signal->vsm_level || $signal->current_owner_entity_id || $signal->deadline_at || $signal->escalated_at || $signal->source_type === 'aggregation' || $signal->createdByAgent)
-                                                        <div class="mt-2 flex flex-wrap items-center gap-1.5 text-xs">
-                                                            @if($signal->vsm_level)
-                                                                <span class="inline-flex items-center px-1.5 py-0.5 rounded font-medium bg-indigo-100 text-indigo-700" title="VSM-Ebene">
-                                                                    {{ strtoupper(str_replace('_', '', $signal->vsm_level)) }}
-                                                                </span>
-                                                            @endif
-
-                                                            @if($signal->current_owner_entity_id)
-                                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-gray-100 text-gray-700" title="Aktueller Owner">
-                                                                    @svg('heroicon-o-user-circle', 'w-3 h-3')
-                                                                    {{ $signal->currentOwner?->name ?? '#'.$signal->current_owner_entity_id }}
-                                                                </span>
-                                                            @elseif($signal->status === 'open')
-                                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-700" title="Kein Owner zugewiesen">
-                                                                    @svg('heroicon-o-user-circle', 'w-3 h-3')
-                                                                    vakant
-                                                                </span>
-                                                            @endif
-
-                                                            @if($signal->deadline_at)
-                                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded {{ $isOverdue ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-700' }}" title="Deadline {{ $signal->deadline_at->format('d.m.Y H:i') }}">
-                                                                    @svg('heroicon-o-clock', 'w-3 h-3')
-                                                                    {{ $isOverdue ? 'überfällig' : 'fällig' }} {{ $signal->deadline_at->diffForHumans() }}
-                                                                </span>
-                                                            @endif
-
-                                                            @if($signal->escalated_at)
-                                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-orange-100 text-orange-800" title="Zuletzt eskaliert {{ $signal->escalated_at->format('d.m.Y H:i') }}">
-                                                                    @svg('heroicon-o-arrow-trending-up', 'w-3 h-3')
-                                                                    eskaliert
-                                                                </span>
-                                                            @endif
-
-                                                            @if($signal->source_type === 'aggregation')
-                                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-purple-100 text-purple-800" title="Aus Aggregation eingehender Perspektive">
-                                                                    @svg('heroicon-o-arrows-pointing-in', 'w-3 h-3')
-                                                                    aggregiert
-                                                                </span>
-                                                            @endif
-
-                                                            @if($signal->createdByAgent)
-                                                                <span class="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-sky-50 text-sky-700" title="Erzeugt durch Agent">
-                                                                    @svg('heroicon-o-cpu-chip', 'w-3 h-3')
-                                                                    {{ $signal->createdByAgent->name }}
-                                                                </span>
-                                                            @endif
-                                                        </div>
-                                                    @endif
-                                                </div>
-                                            </div>
-
-                                            {{-- Right: Status + Time + Actions --}}
-                                            <div class="flex flex-col items-end gap-2 flex-shrink-0">
-                                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-                                                    @if($signal->status === 'open') bg-yellow-100 text-yellow-800
-                                                    @elseif($signal->status === 'acknowledged') bg-blue-100 text-blue-800
-                                                    @elseif($signal->status === 'resolved') bg-green-100 text-green-800
-                                                    @else bg-gray-100 text-gray-600
-                                                    @endif
-                                                ">
-                                                    @switch($signal->status)
-                                                        @case('open') Offen @break
-                                                        @case('acknowledged') Bestätigt @break
-                                                        @case('resolved') Gelöst @break
-                                                        @case('dismissed') Verworfen @break
-                                                    @endswitch
                                                 </span>
-                                                <span class="text-xs text-[var(--ui-muted)]">{{ $signal->created_at->format('d.m.Y H:i') }}</span>
-
-                                                @if($signal->status === 'resolved' && $signal->resolvedByUser)
-                                                    <span class="text-xs text-[var(--ui-muted)]">von {{ $signal->resolvedByUser->name }}</span>
+                                            @endif
+                                        </div>
+                                    </div>
+                                    <div class="flex shrink-0 flex-col items-end gap-1.5">
+                                        <x-nx-badge :variant="$stV" dot>{{ $stL }}</x-nx-badge>
+                                        <span class="text-xs tabular-nums text-[color:var(--nx-faint)]">{{ $signal->created_at->format('d.m.Y') }}</span>
+                                        @if ($signal->status === 'resolved' && $signal->resolvedByUser)
+                                            <span class="text-xs text-[color:var(--nx-faint)]">von {{ $signal->resolvedByUser->name }}</span>
+                                        @endif
+                                        @if (in_array($signal->status, ['open', 'acknowledged']))
+                                            <div class="mt-0.5 flex gap-1">
+                                                @if ($signal->status === 'open')
+                                                    <x-nx-button size="sm" wire:click="acknowledgeSignal({{ $signal->id }})">Bestätigen</x-nx-button>
+                                                @else
+                                                    <x-nx-button size="sm" wire:click="resolveSignal({{ $signal->id }})">Lösen</x-nx-button>
                                                 @endif
-
-                                                {{-- Action Buttons --}}
-                                                <div class="flex items-center gap-1.5 mt-1">
-                                                    @if($signal->status === 'open')
-                                                        <button wire:click="acknowledgeSignal({{ $signal->id }})" class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border border-blue-300 text-blue-700 bg-blue-50 hover:bg-blue-100 transition-colors">
-                                                            @svg('heroicon-o-check', 'w-3 h-3')
-                                                            Bestätigen
-                                                        </button>
-                                                        <button wire:click="dismissSignal({{ $signal->id }})" class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors">
-                                                            @svg('heroicon-o-x-mark', 'w-3 h-3')
-                                                            Verwerfen
-                                                        </button>
-                                                    @elseif($signal->status === 'acknowledged')
-                                                        <button wire:click="resolveSignal({{ $signal->id }})" class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border border-green-300 text-green-700 bg-green-50 hover:bg-green-100 transition-colors">
-                                                            @svg('heroicon-o-check-circle', 'w-3 h-3')
-                                                            Lösen
-                                                        </button>
-                                                        <button wire:click="dismissSignal({{ $signal->id }})" class="inline-flex items-center gap-1 px-2 py-1 text-xs font-medium rounded border border-gray-300 text-gray-600 hover:bg-gray-100 transition-colors">
-                                                            @svg('heroicon-o-x-mark', 'w-3 h-3')
-                                                            Verwerfen
-                                                        </button>
-                                                    @endif
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        @endif
-                    </div>
-                </div>
-                @endif
-
-                {{-- Tab: Agent (KI-Worker als Org-Mitglied) — Runtime-Config + Token + Status --}}
-                @if($this->isAgentEntity)
-                    @if($activeTab === 'agent')
-                    <div x-show="tab === 'agent'" x-cloak>
-                        @livewire(\Platform\Organization\Livewire\Agent\ProfilePanel::class, ['entity' => $entity], key('agent-panel-'.$entity->id))
-                    </div>
-                    @endif
-                    @if($activeTab === 'braingraph')
-                    <div x-show="tab === 'braingraph'" x-cloak>
-                        @livewire(\Platform\Organization\Livewire\Agent\BrainGraph::class, ['entity' => $entity], key('agent-braingraph-'.$entity->id))
-                    </div>
-                    @endif
-                @endif
-
-                {{-- Tab: System-Agent --}}
-                @if($this->isSystemAgent)
-                    @if($activeTab === 'agent')
-                    <div x-show="tab === 'agent'" x-cloak>
-                        <div class="space-y-6">
-                            {{-- Agent-Status + Toggle --}}
-                            <div class="bg-white rounded-lg border {{ $entity->is_active ? 'border-[var(--ui-border)]' : 'border-red-200' }} p-4">
-                                <div class="flex items-center justify-between gap-4">
-                                    <div class="flex items-center gap-3 min-w-0">
-                                        @if($entity->is_active)
-                                            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 flex-shrink-0" title="Aktiv"></span>
-                                            <div class="min-w-0">
-                                                <div class="text-sm font-semibold text-[var(--ui-secondary)]">Agent aktiv</div>
-                                                <p class="text-xs text-[var(--ui-muted)] mt-0.5">Inference-Prompts laufen gemaess ihrem Schedule.</p>
-                                            </div>
-                                        @else
-                                            @svg('heroicon-o-pause-circle', 'w-5 h-5 text-red-600 flex-shrink-0')
-                                            <div class="min-w-0">
-                                                <div class="text-sm font-semibold text-red-900">Agent inaktiv</div>
-                                                <p class="text-xs text-red-800 mt-0.5">Inference-Prompts werden vom Worker uebersprungen, auch wenn sie selbst aktiv sind.</p>
+                                                <x-nx-button size="sm" variant="ghost" wire:click="dismissSignal({{ $signal->id }})">Verwerfen</x-nx-button>
                                             </div>
                                         @endif
                                     </div>
-                                    <x-ui-button
-                                        variant="{{ $entity->is_active ? 'danger-outline' : 'success' }}"
-                                        size="sm"
-                                        wire:click="toggleEntityActive"
-                                        wire:confirm="{{ $entity->is_active ? 'Agent wirklich deaktivieren? Seine Prompts laufen dann nicht mehr.' : 'Agent wieder aktivieren?' }}"
-                                    >
-                                        @if($entity->is_active)
-                                            @svg('heroicon-o-pause', 'w-4 h-4')
-                                            <span>Deaktivieren</span>
-                                        @else
-                                            @svg('heroicon-o-play', 'w-4 h-4')
-                                            <span>Aktivieren</span>
-                                        @endif
-                                    </x-ui-button>
-                                </div>
-                            </div>
-                            {{-- Inference-Prompts --}}
-                            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                                <div class="flex items-center justify-between mb-4">
-                                    <h2 class="text-base font-semibold text-[var(--ui-secondary)]">Inference-Prompts</h2>
-                                    <span class="text-xs text-[var(--ui-muted)]">{{ $this->agentPrompts->count() }} Prompts</span>
-                                </div>
-
-                                @if($this->agentPrompts->isEmpty())
-                                    <div class="text-sm text-[var(--ui-muted)] py-3">
-                                        Diesem Agent ist noch kein Prompt zugewiesen. Verbinde via
-                                        <code class="text-[10px] font-mono px-1 py-0.5 bg-[var(--ui-muted-5)] rounded">organization.signal_inference_prompts.PUT</code>
-                                        mit <code class="text-[10px] font-mono px-1 py-0.5 bg-[var(--ui-muted-5)] rounded">agent_entity_id={{ $entity->id }}</code>.
-                                    </div>
-                                @else
-                                    <div class="space-y-2">
-                                        @foreach($this->agentPrompts as $prompt)
-                                            @php
-                                                $health = $prompt->health_status;
-                                                $healthVariant = match($health) {
-                                                    'healthy' => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-700', 'ring' => 'ring-emerald-600/20', 'dot' => 'bg-emerald-500'],
-                                                    'stale' => ['bg' => 'bg-amber-50', 'text' => 'text-amber-700', 'ring' => 'ring-amber-600/20', 'dot' => 'bg-amber-500'],
-                                                    'error' => ['bg' => 'bg-red-50', 'text' => 'text-red-700', 'ring' => 'ring-red-600/20', 'dot' => 'bg-red-500'],
-                                                    default => ['bg' => 'bg-slate-50', 'text' => 'text-slate-600', 'ring' => 'ring-slate-600/15', 'dot' => 'bg-slate-400'],
-                                                };
-                                            @endphp
-                                            <div class="border border-[var(--ui-border)]/40 rounded-md p-3">
-                                                <div class="flex items-start justify-between gap-3">
-                                                    <div class="min-w-0 flex-1">
-                                                        <div class="flex items-center gap-2 mb-1">
-                                                            <span class="w-2 h-2 rounded-full {{ $healthVariant['dot'] }}"></span>
-                                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/10">{{ strtoupper(str_replace('_star', '*', $prompt->vsm_system)) }}</span>
-                                                            <a href="{{ route('organization.settings.inference-prompts.show', $prompt) }}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate">{{ $prompt->name }}</a>
-                                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium {{ $healthVariant['bg'] }} {{ $healthVariant['text'] }} ring-1 ring-inset {{ $healthVariant['ring'] }}">{{ $health }}</span>
-                                                        </div>
-                                                        <div class="flex items-center gap-3 text-[11px] text-[var(--ui-muted)] flex-wrap">
-                                                            <span>Interval: {{ $prompt->schedule_interval_hours ?? 72 }}h</span>
-                                                            @if($prompt->last_evaluated_at)
-                                                                <span title="{{ $prompt->last_evaluated_at->format('d.m.Y H:i:s') }}">Letzter Run: {{ $prompt->last_evaluated_at->diffForHumans() }}</span>
-                                                            @else
-                                                                <span class="text-amber-700">Noch nie gelaufen</span>
-                                                            @endif
-                                                            <span>Runs: {{ $prompt->run_count ?? 0 }}</span>
-                                                            <span>Severity: {{ $prompt->default_severity }}</span>
-                                                        </div>
-                                                        @if($prompt->description)
-                                                            <p class="text-xs text-[var(--ui-muted)] mt-1.5 line-clamp-2">{{ $prompt->description }}</p>
-                                                        @endif
-                                                        @if($prompt->last_error)
-                                                            <div class="mt-2 p-2 bg-red-50 border border-red-200 rounded">
-                                                                <div class="text-[10px] font-bold text-red-900 uppercase tracking-wider mb-0.5">Letzter Fehler</div>
-                                                                <pre class="text-[11px] text-red-900 font-mono whitespace-pre-wrap break-words">{{ $prompt->last_error }}</pre>
-                                                            </div>
-                                                        @endif
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                @endif
-                            </div>
-
-                            {{-- Letzte Runs --}}
-                            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                                <div class="flex items-center justify-between mb-4">
-                                    <h2 class="text-base font-semibold text-[var(--ui-secondary)]">Letzte Runs</h2>
-                                    <a href="{{ route('organization.inference-runs.index') }}" class="text-xs text-[var(--ui-primary)] hover:underline">Alle Runs →</a>
-                                </div>
-
-                                @if($this->agentRecentRuns->isEmpty())
-                                    <div class="text-sm text-[var(--ui-muted)] py-3">
-                                        Noch keine Runs für diesen Agent.
-                                    </div>
-                                @else
-                                    <div class="space-y-1.5">
-                                        @foreach($this->agentRecentRuns as $run)
-                                            @php
-                                                $runVariant = match($run->status) {
-                                                    'completed' => ['bg' => 'bg-emerald-50', 'text' => 'text-emerald-700', 'ring' => 'ring-emerald-600/20'],
-                                                    'failed' => ['bg' => 'bg-red-50', 'text' => 'text-red-700', 'ring' => 'ring-red-600/20'],
-                                                    'running' => ['bg' => 'bg-amber-50', 'text' => 'text-amber-700', 'ring' => 'ring-amber-600/20'],
-                                                    default => ['bg' => 'bg-slate-50', 'text' => 'text-slate-600', 'ring' => 'ring-slate-600/15'],
-                                                };
-                                            @endphp
-                                            <a href="{{ route('organization.inference-runs.show', $run) }}" class="block border border-[var(--ui-border)]/40 rounded-md p-2.5 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition">
-                                                <div class="flex items-center gap-3">
-                                                    <span class="text-xs font-mono text-[var(--ui-muted)] tabular-nums w-12">#{{ $run->id }}</span>
-                                                    <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium {{ $runVariant['bg'] }} {{ $runVariant['text'] }} ring-1 ring-inset {{ $runVariant['ring'] }}">{{ $run->status }}</span>
-                                                    <span class="text-xs text-[var(--ui-muted)]" title="{{ $run->created_at->format('d.m.Y H:i:s') }}">{{ $run->created_at->diffForHumans() }}</span>
-                                                    <div class="flex items-center gap-3 ml-auto text-[11px] text-[var(--ui-muted)]">
-                                                        <span title="Signale">{{ $run->signals_created ?? 0 }} sig</span>
-                                                        <span title="Entities">{{ $run->entities_analyzed ?? 0 }} ent</span>
-                                                        @if($run->duration_ms > 0)
-                                                            <span class="tabular-nums">{{ $run->duration_ms < 1000 ? $run->duration_ms.'ms' : number_format($run->duration_ms / 1000, 1, ',', '').'s' }}</span>
-                                                        @endif
-                                                    </div>
-                                                    @svg('heroicon-o-chevron-right', 'w-3.5 h-3.5 text-[var(--ui-muted)]')
-                                                </div>
-                                            </a>
-                                        @endforeach
-                                    </div>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                    @endif
-                @endif
-
-                {{-- Tab: VSM-Matrix --}}
-                @if($this->isCarrierEntity)
-                    @if($activeTab === 'vsm')
-                    <div x-show="tab === 'vsm'" x-cloak>
-                        <div class="space-y-4">
-                            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-5">
-                                <div class="flex items-start justify-between mb-3">
-                                    <div>
-                                        <h2 class="text-base font-semibold text-[var(--ui-secondary)]">VSM-Zellen-Besetzung</h2>
-                                        <p class="text-xs text-[var(--ui-muted)] mt-0.5">
-                                            Aus Sicht <span class="font-medium text-[var(--ui-secondary)]">{{ $entity->name }}</span> — wer fuellt welche System-Funktion aus?
-                                            Mehrfachbesetzung pro Zelle erlaubt.
-                                        </p>
-                                    </div>
-                                    @php
-                                        $matrix = $this->vsmMatrix;
-                                        $occupied = collect($matrix)->where('is_vacant', false)->count();
-                                        $total = count($matrix);
-                                    @endphp
-                                    <div class="text-right shrink-0">
-                                        <div class="text-2xl font-bold text-[var(--ui-secondary)]">{{ $occupied }}/{{ $total }}</div>
-                                        <div class="text-[10px] text-[var(--ui-muted)] uppercase tracking-wider">besetzt</div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            @foreach($matrix as $code => $cell)
-                                <div class="bg-white rounded-lg border {{ $cell['is_vacant'] ? 'border-amber-200' : 'border-[var(--ui-border)]' }} p-4">
-                                    <div class="flex items-center justify-between mb-3">
-                                        <div class="flex items-center gap-3 min-w-0">
-                                            <span class="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/10 shrink-0">
-                                                @svg('heroicon-o-' . (app('safe-svg')->resolve($cell['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-5 h-5')
-                                            </span>
-                                            <div class="min-w-0">
-                                                <div class="text-sm font-semibold text-[var(--ui-secondary)]">{{ $cell['label'] }}</div>
-                                                <div class="text-xs text-[var(--ui-muted)] truncate">{{ $cell['description'] }}</div>
-                                            </div>
-                                        </div>
-                                        <x-ui-button variant="ghost" size="sm" wire:click="openVsmAssignmentModal('{{ $code }}')">
-                                            @svg('heroicon-o-plus', 'w-4 h-4')
-                                            <span>Zuweisen</span>
-                                        </x-ui-button>
-                                    </div>
-
-                                    @if($cell['is_vacant'])
-                                        <div class="px-3 py-2 bg-amber-50 text-amber-800 text-xs rounded-md ring-1 ring-inset ring-amber-600/15">
-                                            Vakant — diese Zelle ist unbesetzt.
-                                        </div>
-                                    @else
-                                        <div class="flex flex-wrap gap-2">
-                                            @foreach($cell['assignments'] as $a)
-                                                <div class="inline-flex items-center gap-2 pl-2.5 pr-1 py-1 rounded-full bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40 {{ $a['is_active_today'] ? '' : 'opacity-50' }}">
-                                                    @svg('heroicon-o-user-circle', 'w-3.5 h-3.5 text-[var(--ui-muted)]')
-                                                    <a href="{{ route('organization.entities.show', $a['assigned_entity_id']) }}" class="text-xs font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline">{{ $a['assigned_name'] }}</a>
-                                                    @if($a['scope'])
-                                                        <span class="text-[10px] text-[var(--ui-muted)]" title="Scope">· {{ $a['scope'] }}</span>
-                                                    @endif
-                                                    @if(!$a['is_active_today'])
-                                                        <span class="text-[10px] text-amber-700" title="Auserhalb des Gueltigkeits-Zeitraums">inaktiv</span>
-                                                    @endif
-                                                    <button
-                                                        type="button"
-                                                        wire:click="removeVsmAssignment({{ $a['id'] }})"
-                                                        wire:confirm="Zuordnung {{ $a['assigned_name'] }} entfernen?"
-                                                        class="ml-0.5 w-5 h-5 inline-flex items-center justify-center rounded-full text-[var(--ui-muted)] hover:text-red-600 hover:bg-red-50 transition-colors"
-                                                        title="Entfernen"
-                                                    >
-                                                        @svg('heroicon-o-x-mark', 'w-3 h-3')
-                                                    </button>
-                                                </div>
-                                            @endforeach
-                                        </div>
-                                    @endif
                                 </div>
                             @endforeach
-                        </div>
-                    </div>
-                    @endif
+                        @endif
+                    </x-nx-panel>
+                @endif
 
-                    {{-- Tab: Strategie (Mission/Vision + Forecasts + Fokusraeume + Transformation-Map) --}}
-                    @if($activeTab === 'strategy')
-                    <div x-show="tab === 'strategy'" x-cloak>
+                {{-- ═══ Person ═══ --}}
+                @if ($this->hasLinkedUser && $activeTab === 'person')
+                    <livewire:organization.entity.person-activity :entity="$entity" :key="'person-activity-'.$entity->id" />
+                @endif
+
+                {{-- ═══ Agent (KI-Worker) ═══ --}}
+                @if ($this->isAgentEntity)
+                    @if ($activeTab === 'agent')
+                        @livewire(\Platform\Organization\Livewire\Agent\ProfilePanel::class, ['entity' => $entity], key('agent-panel-'.$entity->id))
+                    @endif
+                    @if ($activeTab === 'braingraph')
+                        @livewire(\Platform\Organization\Livewire\Agent\BrainGraph::class, ['entity' => $entity], key('agent-braingraph-'.$entity->id))
+                    @endif
+                @endif
+
+                {{-- ═══ System-Agent ═══ --}}
+                @if ($this->isSystemAgent && ! $this->isAgentEntity && $activeTab === 'agent')
+                    <div class="space-y-5">
+                        <x-nx-callout :variant="$entity->is_active ? 'success' : 'danger'" :title="$entity->is_active ? 'Agent aktiv' : 'Agent inaktiv'">
+                            {{ $entity->is_active ? 'Die Inference-Prompts laufen nach ihrem Zeitplan.' : 'Der Worker überspringt die Prompts, auch wenn sie selbst aktiv sind.' }}
+                            <x-slot name="action">
+                                <x-nx-button size="sm" :variant="$entity->is_active ? 'danger' : 'primary'" wire:click="toggleEntityActive"
+                                    wire:confirm="{{ $entity->is_active ? 'Agent wirklich deaktivieren? Seine Prompts laufen dann nicht mehr.' : 'Agent wieder aktivieren?' }}">
+                                    {{ $entity->is_active ? 'Deaktivieren' : 'Aktivieren' }}
+                                </x-nx-button>
+                            </x-slot>
+                        </x-nx-callout>
+
+                        <x-nx-panel flush title="Inference-Prompts" :subtitle="$this->agentPrompts->count() . ' zugewiesen'">
+                            @forelse ($this->agentPrompts as $prompt)
+                                @php
+                                    $hv = match ($prompt->health_status) { 'healthy' => 'success', 'stale' => 'warning', 'error' => 'danger', default => 'neutral' };
+                                @endphp
+                                <div class="border-b border-[color:var(--nx-line)] px-4 py-3 last:border-0">
+                                    <div class="flex flex-wrap items-center gap-2">
+                                        <x-nx-badge>{{ strtoupper(str_replace('_star', '*', $prompt->vsm_system)) }}</x-nx-badge>
+                                        <a href="{{ route('organization.settings.inference-prompts.show', $prompt) }}" wire:navigate class="truncate text-sm font-medium text-[color:var(--nx-text)] hover:underline">{{ $prompt->name }}</a>
+                                        <x-nx-badge :variant="$hv" dot>{{ $prompt->health_status }}</x-nx-badge>
+                                    </div>
+                                    <div class="mt-1 flex flex-wrap gap-x-3 text-xs text-[color:var(--nx-faint)]">
+                                        <span>alle {{ $prompt->schedule_interval_hours ?? 72 }} h</span>
+                                        @if ($prompt->last_evaluated_at)
+                                            <span title="{{ $prompt->last_evaluated_at->format('d.m.Y H:i:s') }}">zuletzt {{ $prompt->last_evaluated_at->diffForHumans() }}</span>
+                                        @else
+                                            <span class="text-[color:var(--nx-warning)]">noch nie gelaufen</span>
+                                        @endif
+                                        <span>{{ $prompt->run_count ?? 0 }} Läufe</span>
+                                        <span>Schwere {{ $prompt->default_severity }}</span>
+                                    </div>
+                                    @if ($prompt->description)
+                                        <p class="mb-0 mt-1.5 line-clamp-2 text-xs text-[color:var(--nx-muted)]">{{ $prompt->description }}</p>
+                                    @endif
+                                    @if ($prompt->last_error)
+                                        <pre class="mb-0 mt-2 whitespace-pre-wrap break-words rounded-[6px] bg-[rgba(224,49,49,.08)] p-2 font-mono text-[11px] text-[color:var(--nx-danger)]">{{ $prompt->last_error }}</pre>
+                                    @endif
+                                </div>
+                            @empty
+                                <x-nx-empty icon="heroicon-o-cpu-chip">Noch kein Prompt zugewiesen — per <code class="text-xs">organization.signal_inference_prompts.PUT</code> mit <code class="text-xs">agent_entity_id={{ $entity->id }}</code>.</x-nx-empty>
+                            @endforelse
+                        </x-nx-panel>
+
+                        <x-nx-panel flush title="Letzte Läufe">
+                            <x-slot name="actions">
+                                <a href="{{ route('organization.inference-runs.index') }}" wire:navigate class="text-xs font-medium text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">Alle</a>
+                            </x-slot>
+                            @forelse ($this->agentRecentRuns as $run)
+                                @php
+                                    $rv = match ($run->status) { 'completed' => 'success', 'failed' => 'danger', 'running' => 'warning', default => 'neutral' };
+                                @endphp
+                                <a href="{{ route('organization.inference-runs.show', $run) }}" wire:navigate class="flex items-center gap-3 border-b border-[color:var(--nx-line)] px-4 py-2 text-sm last:border-0 hover:bg-[color:var(--nx-hover)]">
+                                    <span class="w-12 font-mono text-xs tabular-nums text-[color:var(--nx-faint)]">#{{ $run->id }}</span>
+                                    <x-nx-badge :variant="$rv" dot>{{ $run->status }}</x-nx-badge>
+                                    <span class="text-xs text-[color:var(--nx-muted)]" title="{{ $run->created_at->format('d.m.Y H:i:s') }}">{{ $run->created_at->diffForHumans() }}</span>
+                                    <span class="ml-auto flex gap-3 text-xs tabular-nums text-[color:var(--nx-faint)]">
+                                        <span>{{ $run->signals_created ?? 0 }} Signale</span>
+                                        <span>{{ $run->entities_analyzed ?? 0 }} Einheiten</span>
+                                        @if ($run->duration_ms > 0)<span>{{ $run->duration_ms < 1000 ? $run->duration_ms . ' ms' : number_format($run->duration_ms / 1000, 1, ',', '') . ' s' }}</span>@endif
+                                    </span>
+                                </a>
+                            @empty
+                                <x-nx-empty icon="heroicon-o-play">Noch keine Läufe.</x-nx-empty>
+                            @endforelse
+                        </x-nx-panel>
+                    </div>
+                @endif
+
+                {{-- ═══ VSM-Besetzung ═══ --}}
+                @if ($this->isCarrierEntity && $activeTab === 'vsm')
+                    @php
+                        $matrix = $this->vsmMatrix;
+                        $occupied = collect($matrix)->where('is_vacant', false)->count();
+                    @endphp
+                    <x-nx-panel flush title="VSM-Besetzung" :subtitle="'Aus Sicht ' . $entity->name . ' — wer füllt welche Systemfunktion aus? ' . $occupied . ' von ' . count($matrix) . ' besetzt'">
+                        @foreach ($matrix as $code => $cell)
+                            <div class="flex flex-col gap-2 border-b border-[color:var(--nx-line)] px-4 py-3 last:border-0 md:flex-row md:items-start">
+                                <div class="flex min-w-0 items-start gap-3 md:w-72 md:shrink-0">
+                                    <span class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-[6px] bg-[color:var(--nx-accent-soft)] text-[color:var(--nx-muted)]">
+                                        @svg('heroicon-o-' . (app('safe-svg')->resolve($cell['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4')
+                                    </span>
+                                    <div class="min-w-0">
+                                        <div class="text-sm font-medium text-[color:var(--nx-text)]">{{ $cell['label'] }}</div>
+                                        <div class="text-xs text-[color:var(--nx-faint)]">{{ $cell['description'] }}</div>
+                                    </div>
+                                </div>
+                                <div class="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+                                    @if ($cell['is_vacant'])
+                                        <x-nx-badge variant="warning">vakant</x-nx-badge>
+                                    @else
+                                        @foreach ($cell['assignments'] as $a)
+                                            <span class="inline-flex items-center gap-1.5 rounded-full border border-[color:var(--nx-line)] py-0.5 pl-2.5 pr-1 text-xs {{ $a['is_active_today'] ? '' : 'opacity-50' }}">
+                                                <a href="{{ route('organization.entities.show', $a['assigned_entity_id']) }}" wire:navigate class="font-medium text-[color:var(--nx-text)] hover:underline">{{ $a['assigned_name'] }}</a>
+                                                @if ($a['scope'])<span class="text-[color:var(--nx-faint)]">· {{ $a['scope'] }}</span>@endif
+                                                @if (! $a['is_active_today'])<span class="text-[color:var(--nx-warning)]" title="außerhalb des Gültigkeitszeitraums">inaktiv</span>@endif
+                                                <button type="button" wire:click="removeVsmAssignment({{ $a['id'] }})" wire:confirm="Zuordnung {{ $a['assigned_name'] }} entfernen?"
+                                                    class="inline-flex h-5 w-5 items-center justify-center rounded-full text-[color:var(--nx-faint)] hover:bg-[color:var(--nx-hover)] hover:text-[color:var(--nx-danger)]" title="Entfernen">
+                                                    @svg('heroicon-o-x-mark', 'w-3 h-3')
+                                                </button>
+                                            </span>
+                                        @endforeach
+                                    @endif
+                                    <button type="button" wire:click="openVsmAssignmentModal('{{ $code }}')"
+                                        class="inline-flex items-center gap-1 rounded-[6px] px-1.5 py-0.5 text-xs text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)] hover:text-[color:var(--nx-text)]">
+                                        @svg('heroicon-o-plus', 'w-3.5 h-3.5') zuweisen
+                                    </button>
+                                </div>
+                            </div>
+                        @endforeach
+                    </x-nx-panel>
+                @endif
+
+                {{-- ═══ Strategie: Mission, Vision, Fokusräume, Transformation Map, Regnosen ═══ --}}
+                @if ($this->isCarrierEntity && $activeTab === 'strategy')
+                    <div>
                         @php $strategy = $this->strategy; @endphp
                         @if($strategy === null)
                             <x-nx-card>
@@ -1648,17 +834,13 @@
                                 }
                             @endphp
 
-                            {{-- Kennzahlen-Übersicht --}}
+                            {{-- Kennzahlen: nur was nicht ohnehin unten als Abschnitt steht --}}
                             <div class="mb-8">
                                 <x-nx-stat-grid :cols="4">
-                                    <x-nx-stat label="Mission" :value="$strategy['mission'] ? 'aktiv' : '—'" icon="heroicon-o-flag" />
-                                    <x-nx-stat label="Vision" :value="$strategy['vision'] ? 'aktiv' : '—'" icon="heroicon-o-sparkles" />
-                                    <x-nx-stat label="Regnosen" :value="count($strategy['forecasts'])" hint="Rückblick a. d. Zukunft" icon="heroicon-o-map" />
                                     <x-nx-stat label="Fokusräume" :value="$totalFA" icon="heroicon-o-squares-2x2" />
                                     <x-nx-stat label="Zielbilder" :value="$totalVI" icon="heroicon-o-photo" />
                                     <x-nx-stat label="Hindernisse" :value="$totalOb" icon="heroicon-o-exclamation-triangle" />
                                     <x-nx-stat label="Meilensteine" :value="$totalMS" icon="heroicon-o-flag" />
-                                    <x-nx-stat label="Entity" :value="$entity->name" icon="heroicon-o-building-office-2" />
                                 </x-nx-stat-grid>
                             </div>
 
@@ -2055,472 +1237,288 @@
                             @endforeach
                         @endif
                     </div>
-                    @endif
-
-                    {{-- Tab: Perspektive ↔ Teams --}}
-                    @if($activeTab === 'perspective')
-                    <div x-show="tab === 'perspective'" x-cloak>
-                        <div class="space-y-4">
-                            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-5">
-                                <div class="flex items-start justify-between mb-3">
-                                    <div>
-                                        <h2 class="text-base font-semibold text-[var(--ui-secondary)]">Plattform-Teams, die diese Perspektive sehen</h2>
-                                        <p class="text-xs text-[var(--ui-muted)] mt-0.5 max-w-2xl leading-relaxed">
-                                            Mitglieder eines hier hinterlegten Plattform-Teams können <span class="font-medium text-[var(--ui-secondary)]">{{ $entity->name }}</span> als VSM-Sicht nutzen. Die Markierung <span class="font-medium text-amber-700">Standard für dieses Team</span> sagt, ob diese Perspektive für das jeweilige Team die Default-Sicht ist — wichtig z.B. fürs Algedonic-Routing, wenn ein Mitarbeiter nie explizit eine Perspektive gewählt hat.
-                                        </p>
-                                    </div>
-                                </div>
-
-                                @php
-                                    $perspectiveTeams = $this->perspectiveTeamAssignments;
-                                    $availableTeams = $this->perspectiveAvailableTeams;
-                                @endphp
-
-                                @if(empty($perspectiveTeams))
-                                    <div class="rounded-md border border-dashed border-[var(--ui-border)] bg-gray-50/60 p-4 text-sm text-[var(--ui-muted)]">
-                                        Noch keine Teams zugeordnet. Wähle unten ein Team, um diese Perspektive für dessen Mitglieder verfügbar zu machen.
-                                    </div>
-                                @else
-                                    <div class="divide-y divide-[var(--ui-border)] rounded-md border border-[var(--ui-border)] overflow-hidden">
-                                        @foreach($perspectiveTeams as $pt)
-                                            <div class="flex items-center gap-3 px-3 py-2.5 hover:bg-gray-50/60 transition">
-                                                @svg('heroicon-o-user-group', 'w-4 h-4 text-[var(--ui-muted)]')
-                                                <div class="flex-1 min-w-0">
-                                                    <div class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $pt['team_name'] }}</div>
-                                                    @if(!empty($pt['parent_name']))
-                                                        <div class="text-[10px] text-[var(--ui-muted)] tracking-wider truncate">↳ {{ $pt['parent_name'] }}</div>
-                                                    @endif
-                                                </div>
-                                                @if($pt['is_default'])
-                                                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-100 text-amber-800 whitespace-nowrap" title="Diese Perspektive ist die Default-Sicht des Teams {{ $pt['team_name'] }}">
-                                                        @svg('heroicon-s-star', 'w-3 h-3')
-                                                        Standard für dieses Team
-                                                    </span>
-                                                @else
-                                                    <button
-                                                        type="button"
-                                                        wire:click="markPerspectiveTeamDefault({{ $pt['id'] }})"
-                                                        class="text-xs text-[var(--ui-muted)] hover:text-amber-700 hover:underline whitespace-nowrap"
-                                                        title="Als Default-Sicht des Teams {{ $pt['team_name'] }} setzen">
-                                                        Als Standard für dieses Team
-                                                    </button>
-                                                @endif
-                                                <button
-                                                    type="button"
-                                                    wire:click="detachTeamFromPerspective({{ $pt['id'] }})"
-                                                    wire:confirm="Team-Zuordnung wirklich entfernen?"
-                                                    class="text-[var(--ui-muted)] hover:text-red-600 transition"
-                                                    title="Zuordnung entfernen">
-                                                    @svg('heroicon-o-x-mark', 'w-4 h-4')
-                                                </button>
-                                            </div>
-                                        @endforeach
-                                    </div>
-                                @endif
-
-                                @if(! empty($availableTeams))
-                                    <div class="mt-4 flex items-center gap-2" x-data="{ pickTeamId: '' }">
-                                        <select
-                                            x-model="pickTeamId"
-                                            class="flex-1 rounded-md border-gray-300 shadow-sm focus:border-[var(--ui-primary)] focus:ring focus:ring-[var(--ui-primary)]/30 text-sm">
-                                            <option value="">Team auswählen …</option>
-                                            @foreach($availableTeams as $t)
-                                                <option value="{{ $t['id'] }}">
-                                                    {{ $t['name'] }}{{ !empty($t['parent_name']) ? '   ·   ' . $t['parent_name'] : '   ·   (Root)' }}
-                                                </option>
-                                            @endforeach
-                                        </select>
-                                        <button
-                                            type="button"
-                                            x-bind:disabled="!pickTeamId"
-                                            @click="$wire.attachTeamToPerspective(parseInt(pickTeamId)); pickTeamId = ''"
-                                            class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm font-medium bg-[var(--ui-primary)] text-white hover:opacity-90 disabled:opacity-50 transition">
-                                            @svg('heroicon-o-plus', 'w-4 h-4')
-                                            Zuordnen
-                                        </button>
-                                    </div>
-                                @elseif(! empty($perspectiveTeams))
-                                    <p class="mt-3 text-xs text-[var(--ui-muted)]">Alle verfügbaren Teams sind bereits zugeordnet.</p>
-                                @endif
-                            </div>
-                        </div>
-                    </div>
-                    @endif
                 @endif
 
-                {{-- Tab: Berichte (Verbalization-Feeds) --}}
-                @if($activeTab === 'reports')
-                <div x-show="tab === 'reports'" x-cloak>
-                    {{-- Puls-Widget: live gerechneter Zustand ohne LLM-Prosa --}}
-                    @php $pulse = $this->entityPulseSnapshot; @endphp
-                    @if($pulse)
-                        @php
-                            $signalColor = match($pulse['signal']) {
-                                'red' => 'bg-red-500',
-                                'yellow' => 'bg-amber-400',
-                                default => 'bg-emerald-500',
-                            };
-                            $signalRing = match($pulse['signal']) {
-                                'red' => 'ring-red-100',
-                                'yellow' => 'ring-amber-100',
-                                default => 'ring-emerald-100',
-                            };
-                        @endphp
-                        <div class="mb-6 bg-white rounded-lg border border-[var(--ui-border)] overflow-hidden">
-                            <div class="px-5 py-4 border-b border-[var(--ui-border)] flex items-center justify-between gap-4">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-3 h-3 rounded-full ring-4 {{ $signalColor }} {{ $signalRing }}"></div>
-                                    <h3 class="text-base font-semibold text-[var(--ui-secondary)]">Puls</h3>
-                                    <span class="text-xs text-[var(--ui-muted)]">{{ $pulse['signal_reason'] }}</span>
-                                </div>
-                                <span class="text-[11px] text-[var(--ui-muted)] shrink-0">
-                                    berechnet {{ $pulse['computed_at'] }} · Fenster {{ $pulse['window_days'] }}d · {{ $pulse['total_facts'] }} Facts
-                                </span>
-                            </div>
-                            @if(! empty($pulse['derivations']))
-                                <div class="px-5 py-4 border-b border-[var(--ui-border)]">
-                                    <div class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mb-2">Aufmerksamkeit</div>
-                                    <ul class="space-y-1.5">
-                                        @foreach($pulse['derivations'] as $d)
-                                            <li class="text-sm text-[var(--ui-secondary)] flex items-start gap-2">
-                                                <span class="text-[var(--ui-muted)]">•</span>
-                                                <span>{{ $d['text'] }}</span>
-                                            </li>
-                                        @endforeach
-                                    </ul>
-                                </div>
-                            @endif
-                            @if(! empty($pulse['movements']))
-                                <div class="px-5 py-4 border-b border-[var(--ui-border)]">
-                                    <div class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mb-2">Bewegung (letzte {{ $pulse['window_days'] }}d)</div>
-                                    <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
-                                        @foreach($pulse['movements'] as $m)
-                                            <li class="text-sm text-[var(--ui-secondary)]">{{ $m['text'] }}</li>
-                                        @endforeach
-                                    </ul>
-                                </div>
-                            @endif
-                            @if(! empty($pulse['states']))
-                                <div class="px-5 py-4">
-                                    <div class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mb-2">Zustand</div>
-                                    <ul class="grid grid-cols-1 md:grid-cols-2 gap-x-6 gap-y-1.5">
-                                        @foreach($pulse['states'] as $s)
-                                            <li class="text-sm text-[var(--ui-secondary)]">{{ $s['text'] }}</li>
-                                        @endforeach
-                                    </ul>
-                                </div>
-                            @endif
-                        </div>
-                    @endif
-
-                    <div class="mb-4 flex items-center justify-between gap-4">
-                        <p class="text-xs text-[var(--ui-muted)] leading-relaxed">
-                            @if($includeDescendantsInReports)
-                                Zeigt Berichte fuer <span class="font-medium text-[var(--ui-secondary)]">{{ $entity->name }}</span> inklusive aller Sub-Ebenen (Descendants und deren verlinkte Objekte).
-                            @else
-                                Zeigt nur Berichte, die direkt an <span class="font-medium text-[var(--ui-secondary)]">{{ $entity->name }}</span> haengen.
-                            @endif
-                        </p>
-                        <button
-                            type="button"
-                            wire:click="toggleReportsScope"
-                            class="shrink-0 text-xs px-3 py-1.5 rounded-md border border-[var(--ui-border)] text-[var(--ui-secondary)] hover:bg-[var(--ui-surface-2)] transition-colors"
-                        >
-                            @if($includeDescendantsInReports)
-                                Nur direkter Knoten
-                            @else
-                                Inkl. Sub-Baum
-                            @endif
-                        </button>
-                    </div>
-                    @php $feeds = $this->verbalizationFeeds; @endphp
-                    @if(empty($feeds))
-                        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 text-center">
-                            <p class="text-sm text-[var(--ui-muted)]">Keine Berichte im gewaehlten Umfang.</p>
-                            <p class="text-xs text-[var(--ui-muted)] mt-2">Neue Feeds werden per MCP-Tool <code class="text-[11px] bg-[var(--ui-surface-2)] px-1 py-0.5 rounded">core.verbalization.feeds.POST</code> angelegt.</p>
-                        </div>
-                    @else
-                        <div class="space-y-4">
-                            @foreach($feeds as $feed)
-                                @php
-                                    $badgeOn = 'inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-[var(--ui-primary)]/10 text-[var(--ui-primary)] font-medium';
-                                    $badgeMuted = 'inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full bg-[var(--ui-surface-2)] text-[var(--ui-muted)]';
-                                    $badgeGhost = 'inline-flex items-center gap-1 text-[11px] px-2 py-0.5 rounded-full border border-dashed border-[var(--ui-border)] text-[var(--ui-muted)]/60';
-                                @endphp
-                                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-5">
-                                    <div class="flex items-start justify-between gap-4">
-                                        <div class="flex-1 min-w-0">
-                                            <div class="flex items-center gap-2 mb-1">
-                                                <h3 class="text-base font-semibold text-[var(--ui-secondary)] truncate">{{ $feed['title'] }}</h3>
-                                                @if(! $feed['is_active'])
-                                                    <span class="text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded bg-[var(--ui-surface-2)] text-[var(--ui-muted)]">inaktiv</span>
-                                                @endif
-                                            </div>
-                                            @if($feed['description'])
-                                                <p class="text-xs text-[var(--ui-muted)] mb-3 leading-relaxed">{{ $feed['description'] }}</p>
-                                            @endif
-                                        </div>
-                                        <a
-                                            href="{{ $feed['feed_url'] }}"
-                                            target="_blank"
-                                            rel="noopener"
-                                            class="shrink-0 text-xs text-[var(--ui-primary)] hover:underline flex items-center gap-1"
-                                            title="{{ $feed['feed_url'] }}"
-                                        >
-                                            @svg('heroicon-o-rss', 'w-3.5 h-3.5')
-                                            RSS
-                                        </a>
-                                    </div>
-
-                                    {{-- Bericht-Setup --}}
-                                    <div class="mt-3 flex flex-wrap items-center gap-1.5">
-                                        <span class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mr-1">Setup</span>
-                                        <span class="{{ $badgeOn }}">{{ $feed['subject_type'] }}</span>
-                                        <span class="{{ $badgeOn }}">{{ $feed['refresh_strategy'] }}</span>
-                                        <span class="{{ $feed['access'] === 'public' ? $badgeOn : $badgeMuted }}">Zugriff: {{ $feed['access'] }}</span>
-                                        <span class="{{ $badgeMuted }}">Verlauf: {{ $feed['item_strategy'] }} ({{ $feed['retention_items'] }})</span>
-                                        @if($feed['subject_selector_descend'] !== false && $feed['subject_selector_descend'] !== null)
-                                            <span class="{{ $badgeOn }}">Sub-Baum (Feed){{ $feed['subject_selector_descend'] === true ? '' : ' Tiefe ' . $feed['subject_selector_descend'] }}</span>
-                                        @else
-                                            <span class="{{ $badgeGhost }}">Sub-Baum (Feed)</span>
-                                        @endif
-                                    </div>
-
-                                    {{-- Recipe-Details pro subject_type --}}
-                                    @foreach($feed['recipe_details'] as $recipeKey => $rd)
-                                        <div class="mt-3 pl-2 border-l-2 border-[var(--ui-border)]">
-                                            <div class="flex flex-wrap items-center gap-1.5">
-                                                <span class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mr-1">Recipe</span>
-                                                <span class="{{ $badgeOn }} font-semibold">{{ $rd['key'] }}</span>
-                                                @if($rd['llm_model'])
-                                                    <span class="{{ $badgeMuted }}">{{ $rd['llm_provider'] }} / {{ $rd['llm_model'] }}</span>
-                                                @endif
-                                                @if(! empty($rd['style']['tone']))
-                                                    <span class="{{ $badgeMuted }}">Ton: {{ $rd['style']['tone'] }}</span>
-                                                @endif
-                                                @if(! empty($rd['style']['address']))
-                                                    <span class="{{ $badgeMuted }}">Anrede: {{ $rd['style']['address'] }}</span>
-                                                @endif
-                                                @if($rd['freshness_requirement'])
-                                                    <span class="{{ $badgeMuted }}">Frische: {{ $rd['freshness_requirement'] }}</span>
-                                                @endif
-                                            </div>
-
-                                            {{-- Nature-Filter --}}
-                                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                                                <span class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mr-1">Naturen</span>
-                                                @php
-                                                    $activeN = $rd['include_natures'];
-                                                    $isFilter = is_array($activeN) && count($activeN) > 0;
-                                                @endphp
-                                                @foreach(['state' => 'State', 'movement' => 'Movement', 'derivation' => 'Derivation'] as $n => $nLabel)
-                                                    @if(! $isFilter || in_array($n, $activeN))
-                                                        <span class="{{ $badgeOn }}">{{ $nLabel }}</span>
-                                                    @else
-                                                        <span class="{{ $badgeGhost }}">{{ $nLabel }}</span>
-                                                    @endif
+                {{-- ═══ Berichte ═══ --}}
+                @if ($activeTab === 'reports')
+                    <div class="space-y-5">
+                        @php $pulse = $this->entityPulseSnapshot; @endphp
+                        @if ($pulse)
+                            @php
+                                $pulseColor = match ($pulse['signal']) { 'red' => 'var(--nx-danger)', 'yellow' => 'var(--nx-warning)', default => 'var(--nx-success)' };
+                            @endphp
+                            <x-nx-panel flush title="Puls" :subtitle="$pulse['signal_reason']">
+                                <x-slot name="actions">
+                                    <span class="h-2.5 w-2.5 rounded-full" style="background: {{ $pulseColor }}"></span>
+                                </x-slot>
+                                @foreach (['derivations' => 'Aufmerksamkeit', 'movements' => 'Bewegung (' . $pulse['window_days'] . ' Tage)', 'states' => 'Zustand'] as $pKey => $pLabel)
+                                    @if (! empty($pulse[$pKey]))
+                                        <div class="border-b border-[color:var(--nx-line)] px-4 py-3">
+                                            <div class="mb-1.5 text-xs font-medium text-[color:var(--nx-faint)]">{{ $pLabel }}</div>
+                                            <ul class="m-0 grid list-none grid-cols-1 gap-x-6 gap-y-1 p-0 text-sm text-[color:var(--nx-text)] {{ $pKey === 'derivations' ? '' : 'md:grid-cols-2' }}">
+                                                @foreach ($pulse[$pKey] as $row)
+                                                    <li>{{ $row['text'] }}</li>
                                                 @endforeach
-                                                @if(! $isFilter)
-                                                    <span class="text-[10px] text-[var(--ui-muted)] italic">alle Naturen</span>
-                                                @endif
-                                            </div>
-
-                                            {{-- Rekursion Recipe-Ebene --}}
-                                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                                                <span class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mr-1">Rekursion</span>
-                                                @if($rd['descend'] !== false && $rd['descend'] !== null)
-                                                    <span class="{{ $badgeOn }}">Sub-Baum (Recipe){{ $rd['descend'] === true ? '' : ' Tiefe ' . $rd['descend'] }}</span>
-                                                @else
-                                                    <span class="{{ $badgeGhost }}">Sub-Baum (Recipe)</span>
-                                                @endif
-                                            </div>
-
-                                            {{-- Sources --}}
-                                            <div class="mt-2 flex flex-wrap items-center gap-1.5">
-                                                <span class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mr-1">Quellen</span>
-                                                @foreach($rd['source_flags'] as $sk => $sf)
-                                                    @if($sk === '__descend') @continue @endif
-                                                    <span class="{{ $sf['on'] ? $badgeOn : $badgeGhost }}" @if($sf['detail']) title="{{ $sf['detail'] }}" @endif>
-                                                        {{ $sf['label'] }}@if($sf['on'] && $sf['detail']) <span class="opacity-60">· {{ $sf['detail'] }}</span>@endif
-                                                    </span>
-                                                @endforeach
-                                            </div>
-                                        </div>
-                                    @endforeach
-
-                                    {{-- Kanäle --}}
-                                    <div class="mt-3 pl-2 border-l-2 border-[var(--ui-border)]">
-                                        <div class="flex flex-wrap items-center gap-1.5">
-                                            <span class="text-[10px] uppercase tracking-wide text-[var(--ui-muted)] mr-1">Kanäle</span>
-                                            @foreach($feed['available_channel_types'] as $ctype => $cmeta)
-                                                @php
-                                                    $activeChannel = collect($feed['channels'])->firstWhere('type', $ctype);
-                                                @endphp
-                                                @if($activeChannel && $activeChannel['is_active'])
-                                                    <span class="{{ $badgeOn }}" @if($activeChannel['summary']) title="{{ $activeChannel['summary'] }}" @endif>
-                                                        {{ $cmeta['label'] }}
-                                                        @if($activeChannel['summary'])
-                                                            <span class="opacity-70">· {{ $activeChannel['summary'] }}</span>
-                                                        @endif
-                                                    </span>
-                                                @elseif(! empty($cmeta['registered']))
-                                                    <span class="{{ $badgeGhost }}" title="Renderer registriert, kein Kanal konfiguriert">{{ $cmeta['label'] }}</span>
-                                                @else
-                                                    <span class="{{ $badgeGhost }}" title="Renderer noch nicht implementiert">{{ $cmeta['label'] }}</span>
-                                                @endif
-                                            @endforeach
-                                        </div>
-                                    </div>
-
-                                    {{-- Status --}}
-                                    <div class="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 text-xs text-[var(--ui-muted)]">
-                                        @if($feed['last_refreshed_at'])
-                                            <span><span class="font-medium text-[var(--ui-secondary)]">Zuletzt:</span> {{ $feed['last_refreshed_at'] }}</span>
-                                        @endif
-                                        <span><span class="font-medium text-[var(--ui-secondary)]">Outputs:</span> {{ $feed['outputs_count'] }}</span>
-                                    </div>
-
-                                    @if($feed['latest'])
-                                        <div class="mt-4 pt-4 border-t border-[var(--ui-border)]">
-                                            <div class="flex items-center justify-between mb-2">
-                                                <div class="text-xs text-[var(--ui-muted)]">
-                                                    <span class="font-medium text-[var(--ui-secondary)]">Letzter Bericht</span>
-                                                    &middot; {{ $feed['latest']['created_at'] }}
-                                                    @if($feed['latest']['model'])
-                                                        &middot; {{ $feed['latest']['model'] }}
-                                                    @endif
-                                                </div>
-                                            </div>
-                                            <p class="text-sm text-[var(--ui-secondary)] leading-relaxed">
-                                                {{ $feed['latest']['preview'] }}
-                                            </p>
-                                            <div class="mt-3 text-xs">
-                                                <a href="{{ $feed['feed_url'] }}" target="_blank" rel="noopener" class="text-[var(--ui-primary)] hover:underline">
-                                                    Vollstaendiger Feed und Historie im Reader &rarr;
-                                                </a>
-                                            </div>
-                                        </div>
-                                    @else
-                                        <div class="mt-4 pt-4 border-t border-[var(--ui-border)]">
-                                            <p class="text-xs text-[var(--ui-muted)]">Noch kein Bericht erzeugt.</p>
+                                            </ul>
                                         </div>
                                     @endif
+                                @endforeach
+                                <div class="px-4 py-2 text-[11px] text-[color:var(--nx-faint)]">berechnet {{ $pulse['computed_at'] }} · {{ $pulse['total_facts'] }} Fakten</div>
+                            </x-nx-panel>
+                        @endif
+
+                        @php $feeds = $this->verbalizationFeeds; @endphp
+                        <x-nx-panel flush title="Berichte" :subtitle="$includeDescendantsInReports ? 'für ' . $entity->name . ' und den ganzen Teilbaum' : 'nur direkt an ' . $entity->name">
+                            <x-slot name="actions">
+                                <x-nx-button size="sm" variant="ghost" wire:click="toggleReportsScope">{{ $includeDescendantsInReports ? 'Nur diese Einheit' : 'Mit Teilbaum' }}</x-nx-button>
+                            </x-slot>
+
+                            @forelse ($feeds as $feed)
+                                <div class="border-b border-[color:var(--nx-line)] px-4 py-3 last:border-0" x-data="{ setup: false }">
+                                    <div class="flex items-start gap-3">
+                                        <div class="min-w-0 flex-1">
+                                            <div class="flex flex-wrap items-center gap-2">
+                                                <span class="text-sm font-medium text-[color:var(--nx-text)]">{{ $feed['title'] }}</span>
+                                                @unless ($feed['is_active'])<x-nx-badge>inaktiv</x-nx-badge>@endunless
+                                                <span class="text-xs text-[color:var(--nx-faint)]">{{ $feed['outputs_count'] }} Ausgaben{{ $feed['last_refreshed_at'] ? ' · zuletzt ' . $feed['last_refreshed_at'] : '' }}</span>
+                                            </div>
+                                            @if ($feed['description'])
+                                                <p class="mb-0 mt-0.5 text-xs text-[color:var(--nx-muted)]">{{ $feed['description'] }}</p>
+                                            @endif
+                                        </div>
+                                        <div class="flex shrink-0 items-center gap-1">
+                                            <button type="button" x-on:click="setup = !setup" class="rounded-[6px] px-2 py-1 text-xs text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]" x-text="setup ? 'Konfiguration ausblenden' : 'Konfiguration'"></button>
+                                            <a href="{{ $feed['feed_url'] }}" target="_blank" rel="noopener noreferrer" title="{{ $feed['feed_url'] }}"
+                                               class="inline-flex items-center gap-1 rounded-[6px] px-2 py-1 text-xs text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)] hover:text-[color:var(--nx-text)]">
+                                                @svg('heroicon-o-rss', 'w-3.5 h-3.5') Feed
+                                            </a>
+                                        </div>
+                                    </div>
+
+                                    @if ($feed['latest'])
+                                        <div class="mt-2 rounded-[6px] bg-[color:var(--nx-bg)] px-3 py-2">
+                                            <div class="mb-1 text-[11px] text-[color:var(--nx-faint)]">Letzter Bericht · {{ $feed['latest']['created_at'] }}@if ($feed['latest']['model']) · {{ $feed['latest']['model'] }}@endif</div>
+                                            <p class="m-0 text-sm leading-relaxed text-[color:var(--nx-text)]">{{ $feed['latest']['preview'] }}</p>
+                                        </div>
+                                    @else
+                                        <p class="mb-0 mt-2 text-xs text-[color:var(--nx-faint)]">Noch kein Bericht erzeugt.</p>
+                                    @endif
+
+                                    {{-- Technische Einrichtung: für Betreuer, standardmäßig zu --}}
+                                    <div x-show="setup" x-cloak class="mt-3 space-y-2 border-l-2 border-[color:var(--nx-line)] pl-3 text-xs text-[color:var(--nx-muted)]">
+                                        <div class="flex flex-wrap gap-1.5">
+                                            <x-nx-badge>{{ $feed['subject_type'] }}</x-nx-badge>
+                                            <x-nx-badge>{{ $feed['refresh_strategy'] }}</x-nx-badge>
+                                            <x-nx-badge>Zugriff {{ $feed['access'] }}</x-nx-badge>
+                                            <x-nx-badge>Verlauf {{ $feed['item_strategy'] }} ({{ $feed['retention_items'] }})</x-nx-badge>
+                                            @if ($feed['subject_selector_descend'] !== false && $feed['subject_selector_descend'] !== null)
+                                                <x-nx-badge>Teilbaum{{ $feed['subject_selector_descend'] === true ? '' : ' Tiefe ' . $feed['subject_selector_descend'] }}</x-nx-badge>
+                                            @endif
+                                        </div>
+                                        @foreach ($feed['recipe_details'] as $rd)
+                                            @php
+                                                $activeN = $rd['include_natures'];
+                                                $isFilter = is_array($activeN) && count($activeN) > 0;
+                                                $natures = collect(['state' => 'State', 'movement' => 'Movement', 'derivation' => 'Derivation'])
+                                                    ->filter(fn ($l, $n) => ! $isFilter || in_array($n, $activeN))->implode(', ');
+                                                $sources = collect($rd['source_flags'])->except('__descend')->filter(fn ($sf) => $sf['on'])
+                                                    ->map(fn ($sf) => $sf['label'] . ($sf['detail'] ? ' (' . $sf['detail'] . ')' : ''))->implode(', ');
+                                            @endphp
+                                            <div>
+                                                <span class="font-medium text-[color:var(--nx-text)]">Recipe {{ $rd['key'] }}</span>
+                                                @if ($rd['llm_model']) · {{ $rd['llm_provider'] }}/{{ $rd['llm_model'] }}@endif
+                                                @if (! empty($rd['style']['tone'])) · Ton {{ $rd['style']['tone'] }}@endif
+                                                @if (! empty($rd['style']['address'])) · {{ $rd['style']['address'] }}@endif
+                                                @if ($rd['freshness_requirement']) · Frische {{ $rd['freshness_requirement'] }}@endif
+                                                <div>Naturen: {{ $natures }}@if ($rd['descend'] !== false && $rd['descend'] !== null) · Teilbaum{{ $rd['descend'] === true ? '' : ' Tiefe ' . $rd['descend'] }}@endif</div>
+                                                @if ($sources)<div>Quellen: {{ $sources }}</div>@endif
+                                            </div>
+                                        @endforeach
+                                        @php
+                                            $channels = collect($feed['available_channel_types'])->map(function ($cmeta, $ctype) use ($feed) {
+                                                $ch = collect($feed['channels'])->firstWhere('type', $ctype);
+                                                return ($ch && $ch['is_active']) ? $cmeta['label'] . ($ch['summary'] ? ' (' . $ch['summary'] . ')' : '') : null;
+                                            })->filter()->implode(', ');
+                                        @endphp
+                                        <div>Kanäle: {{ $channels ?: 'keine aktiv' }}</div>
+                                    </div>
                                 </div>
-                            @endforeach
-                        </div>
-                    @endif
-                </div>
+                            @empty
+                                <x-nx-empty icon="heroicon-o-document-text">Keine Berichte in diesem Umfang. Neue Feeds per <code class="text-xs">core.verbalization.feeds.POST</code>.</x-nx-empty>
+                            @endforelse
+                        </x-nx-panel>
+                    </div>
+                @endif
+
+                {{-- ═══ Aktivität ═══ --}}
+                @if ($activeTab === 'activity')
+                    <x-nx-panel flush title="Aktivität" subtitle="Änderungen, Zeitbuchungen und Notizen">
+                        <livewire:organization.activity-feed :entityId="$entity->id" :key="'activity-'.$entity->id" />
+                    </x-nx-panel>
+                @endif
+
+                {{-- ═══ Einstellungen: Stammdaten, Fremd-IDs, Modul-Zugang, Perspektive ═══ --}}
+                @if ($activeTab === 'data')
+                    <div class="space-y-5">
+                        <x-nx-panel title="Stammdaten">
+                            <div class="space-y-3">
+                                <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    <x-nx-input-text name="name" label="Name" wire:model.live="form.name" errorKey="form.name" required />
+                                    <x-nx-input-text name="code" label="Code" wire:model.live="form.code" errorKey="form.code" placeholder="optional" />
+                                </div>
+                                <x-nx-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" rows="3" />
+                                <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                                    <x-nx-input-select name="entity_type_id" label="Typ" :options="$this->entityTypes->flatten()" optionValue="id" optionLabel="name"
+                                        wire:model.live="form.entity_type_id" errorKey="form.entity_type_id" required />
+                                    <x-nx-input-select name="parent_entity_id" label="Übergeordnete Einheit" :options="$this->parentEntities" optionValue="id" optionLabel="name"
+                                        nullable nullLabel="Keine" wire:model.live="form.parent_entity_id" errorKey="form.parent_entity_id" />
+                                </div>
+                                <x-nx-input-select name="linked_user_id" label="Verknüpfter User" hint="nur für Personen und Agenten" :options="$this->teamUsers" optionValue="id" optionLabel="name"
+                                    nullable nullLabel="Keiner" wire:model.live="form.linked_user_id" errorKey="form.linked_user_id" />
+                                <x-nx-input-checkbox label="Aktiv" wire:model.live="form.is_active" />
+                            </div>
+                        </x-nx-panel>
+
+                        <x-nx-panel flush title="Fremd-IDs" subtitle="Kennungen dieser Einheit in anderen Systemen — die Kostenstelle ist das System „kostenstelle“">
+                            <x-slot name="actions">
+                                <x-nx-button size="sm" variant="ghost" wire:click="addIdentifier">
+                                    @svg('heroicon-o-plus', 'w-4 h-4')
+                                    <span>Hinzufügen</span>
+                                </x-nx-button>
+                            </x-slot>
+                            <datalist id="org-known-systems">
+                                @foreach (\Platform\Organization\Models\OrganizationEntityExternalId::KNOWN_SYSTEMS as $sysKey => $sysLabel)
+                                    <option value="{{ $sysKey }}">{{ $sysLabel }}</option>
+                                @endforeach
+                            </datalist>
+                            @if (empty($identifiers))
+                                <x-nx-empty icon="heroicon-o-identification">Noch keine Fremd-IDs.</x-nx-empty>
+                            @else
+                                <div class="space-y-2 p-4">
+                                    <div class="hidden gap-2 px-0.5 text-xs font-medium text-[color:var(--nx-faint)] md:grid md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_2rem]">
+                                        <span>System</span><span>Wert</span><span>Bezeichnung</span><span></span>
+                                    </div>
+                                    @foreach ($identifiers as $i => $identifier)
+                                        <div wire:key="identifier-{{ $i }}" class="grid grid-cols-1 items-start gap-2 md:grid-cols-[minmax(0,1fr)_minmax(0,1.2fr)_minmax(0,1fr)_2rem]">
+                                            <input type="text" list="org-known-systems" wire:model.live="identifiers.{{ $i }}.system" placeholder="z. B. kostenstelle" class="{{ $field }}" />
+                                            <input type="text" wire:model.live="identifiers.{{ $i }}.value" placeholder="z. B. KST-4200" class="{{ $field }}" />
+                                            <input type="text" wire:model.live="identifiers.{{ $i }}.label" placeholder="optional" class="{{ $field }}" />
+                                            <button type="button" wire:click="removeIdentifier({{ $i }})" title="Entfernen"
+                                                class="inline-flex h-8 w-8 items-center justify-center rounded-[6px] text-[color:var(--nx-faint)] hover:bg-[color:var(--nx-hover)] hover:text-[color:var(--nx-danger)]">
+                                                @svg('heroicon-o-trash', 'w-4 h-4')
+                                            </button>
+                                        </div>
+                                    @endforeach
+                                </div>
+                            @endif
+                        </x-nx-panel>
+
+                        @if ($this->hasLinkedUser)
+                            <x-nx-panel flush title="Modul-Zugang" subtitle="Welche Module diese Person nutzen kann. Lese- und Schreibrechte auf Inhalte regelt die Organisationsstruktur.">
+                                @unless ($this->canManageModuleAccess)
+                                    <div class="border-b border-[color:var(--nx-line)] px-4 py-2 text-xs text-[color:var(--nx-warning)]">Nur Team-Admins können das ändern.</div>
+                                @endunless
+                                @foreach ($this->moduleAccessRows as $mod)
+                                    <div wire:key="mod-access-{{ $mod['key'] }}" class="flex items-center justify-between gap-3 border-b border-[color:var(--nx-line)] px-4 py-2 last:border-0">
+                                        <div class="min-w-0 text-sm">
+                                            <span class="font-medium text-[color:var(--nx-text)]">{{ $mod['title'] }}</span>
+                                            <span class="ml-1 font-mono text-xs text-[color:var(--nx-faint)]">{{ $mod['key'] }}</span>
+                                        </div>
+                                        <button type="button" wire:click="toggleModule('{{ $mod['key'] }}')" @disabled(! $this->canManageModuleAccess)
+                                            title="{{ $mod['enabled'] ? 'Deaktivieren' : 'Aktivieren' }}"
+                                            class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition-colors disabled:opacity-40 {{ $mod['enabled'] ? 'bg-[color:var(--nx-accent)]' : 'bg-[color:var(--nx-line-strong)]' }}">
+                                            <span class="inline-block h-3.5 w-3.5 rounded-full bg-[color:var(--nx-surface)] transition-transform {{ $mod['enabled'] ? 'translate-x-[18px]' : 'translate-x-[3px]' }}"></span>
+                                        </button>
+                                    </div>
+                                @endforeach
+                            </x-nx-panel>
+                        @endif
+
+                        @if ($this->isCarrierEntity)
+                            @php
+                                $perspectiveTeams = $this->perspectiveTeamAssignments;
+                                $availableTeams = $this->perspectiveAvailableTeams;
+                            @endphp
+                            <x-nx-panel flush title="Perspektive für Plattform-Teams" :subtitle="'Mitglieder dieser Teams können ' . $entity->name . ' als VSM-Sicht nutzen. „Standard“ ist die Sicht für alle, die nie selbst eine gewählt haben — wichtig fürs Signal-Routing.'">
+                                @forelse ($perspectiveTeams as $pt)
+                                    <div class="flex items-center gap-3 border-b border-[color:var(--nx-line)] px-4 py-2">
+                                        <div class="min-w-0 flex-1">
+                                            <div class="truncate text-sm font-medium text-[color:var(--nx-text)]">{{ $pt['team_name'] }}</div>
+                                            @if (! empty($pt['parent_name']))<div class="truncate text-xs text-[color:var(--nx-faint)]">in {{ $pt['parent_name'] }}</div>@endif
+                                        </div>
+                                        @if ($pt['is_default'])
+                                            <x-nx-badge variant="success" dot>Standard</x-nx-badge>
+                                        @else
+                                            <button type="button" wire:click="markPerspectiveTeamDefault({{ $pt['id'] }})" class="text-xs text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] hover:underline">als Standard</button>
+                                        @endif
+                                        <button type="button" wire:click="detachTeamFromPerspective({{ $pt['id'] }})" wire:confirm="Team-Zuordnung wirklich entfernen?" title="Entfernen"
+                                            class="inline-flex h-7 w-7 items-center justify-center rounded-[6px] text-[color:var(--nx-faint)] hover:bg-[color:var(--nx-hover)] hover:text-[color:var(--nx-danger)]">
+                                            @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                        </button>
+                                    </div>
+                                @empty
+                                    <p class="m-0 border-b border-[color:var(--nx-line)] px-4 py-3 text-sm text-[color:var(--nx-faint)]">Noch keine Teams zugeordnet.</p>
+                                @endforelse
+                                @if (! empty($availableTeams))
+                                    <div class="flex items-center gap-2 px-4 py-3" x-data="{ pickTeamId: '' }">
+                                        <select x-model="pickTeamId" class="{{ $field }} flex-1">
+                                            <option value="">Team auswählen …</option>
+                                            @foreach ($availableTeams as $t)
+                                                <option value="{{ $t['id'] }}">{{ $t['name'] }}{{ ! empty($t['parent_name']) ? ' · ' . $t['parent_name'] : ' · (Root)' }}</option>
+                                            @endforeach
+                                        </select>
+                                        <x-nx-button size="sm" x-bind:disabled="!pickTeamId" x-on:click="$wire.attachTeamToPerspective(parseInt(pickTeamId)); pickTeamId = ''">Zuordnen</x-nx-button>
+                                    </div>
+                                @elseif (! empty($perspectiveTeams))
+                                    <p class="m-0 px-4 py-2 text-xs text-[color:var(--nx-faint)]">Alle verfügbaren Teams sind zugeordnet.</p>
+                                @endif
+                            </x-nx-panel>
+                        @endif
+                    </div>
                 @endif
             </div>
         </div>
-    <!-- Create Team Modal -->
-    <x-ui-modal
-        wire:model="showCreateTeamModal"
-        size="md"
-    >
-        <x-slot name="header">
-            Team aus Entität erstellen
-        </x-slot>
 
-        <div class="space-y-4">
+        {{-- Plattform-Team aus der Einheit erstellen --}}
+        <x-nx-modal wire:model="showCreateTeamModal" size="md">
+            <x-slot name="header">Plattform-Team erstellen</x-slot>
             <div class="space-y-4">
-                <x-ui-input-text
-                    name="team_name"
-                    label="Team-Name"
-                    wire:model.live="newTeam.name"
-                    required
-                    placeholder="Name des Teams"
-                />
-
-                <x-ui-input-select
-                    name="parent_team_id"
-                    label="Eltern-Team (optional)"
-                    :options="$this->availableTeams"
-                    optionValue="id"
-                    optionLabel="name"
-                    :nullable="true"
-                    nullLabel="Kein Eltern-Team"
-                    wire:model.live="newTeam.parent_team_id"
-                />
+                <x-nx-input-text name="team_name" label="Team-Name" wire:model.live="newTeam.name" errorKey="newTeam.name" required placeholder="Name des Teams" />
+                <x-nx-input-select name="parent_team_id" label="Eltern-Team" :options="$this->availableTeams" optionValue="id" optionLabel="name"
+                    nullable nullLabel="Keins" wire:model.live="newTeam.parent_team_id" />
             </div>
-        </div>
+            <x-slot name="footer">
+                <div class="flex justify-end gap-2">
+                    <x-nx-button variant="ghost" wire:click="closeCreateTeamModal">Abbrechen</x-nx-button>
+                    <x-nx-button variant="primary" wire:click="createTeam">Erstellen</x-nx-button>
+                </div>
+            </x-slot>
+        </x-nx-modal>
 
-        <x-slot name="footer">
-            <div class="d-flex justify-end gap-2">
-                <x-ui-button
-                    type="button"
-                    variant="secondary-outline"
-                    wire:click="closeCreateTeamModal"
-                >
-                    Abbrechen
-                </x-ui-button>
-                <x-ui-button type="button" variant="primary" wire:click="createTeam">
-                    @svg('heroicon-o-user-group', 'w-4 h-4 mr-2')
-                    Team erstellen
-                </x-ui-button>
-            </div>
-        </x-slot>
-    </x-ui-modal>
-
-    {{-- VSM-Assignment Modal --}}
-    @php
-        $sysCode = $vsmAssignmentForm['vsm_system'] ?? '';
-        $sysLabel = \Platform\Organization\Models\OrganizationEntityVsmAssignment::VSM_DEFINITIONS[$sysCode]['label'] ?? $sysCode;
-    @endphp
-    <x-ui-modal wire:model="vsmAssignmentModalShow" size="md">
-        <x-slot name="header">
-            Zuordnung für {{ $sysLabel }}
-        </x-slot>
-
-        <form wire:submit.prevent="addVsmAssignment" class="space-y-4">
-            <p class="text-xs text-[var(--ui-muted)]">
-                Aus Sicht <span class="font-medium text-[var(--ui-secondary)]">{{ $entity->name }}</span> — wer füllt {{ $sysLabel }} aus?
-            </p>
-
-            <x-ui-input-select
-                name="assigned_entity_id"
-                label="Actor-Entity"
-                :options="$this->vsmActorEntities"
-                optionValue="id"
-                optionLabel="name"
-                :nullable="true"
-                nullLabel="– Actor auswählen –"
-                wire:model.live="vsmAssignmentForm.assigned_entity_id"
-                required
-            />
-
-            <x-ui-input-text
-                name="scope"
-                label="Scope (optional)"
-                wire:model.live="vsmAssignmentForm.scope"
-                placeholder='z.B. "Cashflow", "Backend"'
-            />
-
-            <x-ui-input-textarea
-                name="notes"
-                label="Notiz (optional)"
-                wire:model.live="vsmAssignmentForm.notes"
-                placeholder="Warum diese Zuordnung?"
-                rows="3"
-            />
-        </form>
-
-        <x-slot name="footer">
-            <div class="d-flex justify-end gap-2">
-                <x-ui-button type="button" variant="secondary-outline" wire:click="closeVsmAssignmentModal">
-                    Abbrechen
-                </x-ui-button>
-                <x-ui-button type="button" variant="primary" wire:click="addVsmAssignment">
-                    @svg('heroicon-o-check', 'w-4 h-4 mr-2')
-                    Zuweisen
-                </x-ui-button>
-            </div>
-        </x-slot>
-    </x-ui-modal>
-
+        {{-- VSM-Zuordnung --}}
+        @php
+            $sysCode = $vsmAssignmentForm['vsm_system'] ?? '';
+            $sysLabel = \Platform\Organization\Models\OrganizationEntityVsmAssignment::VSM_DEFINITIONS[$sysCode]['label'] ?? $sysCode;
+        @endphp
+        <x-nx-modal wire:model="vsmAssignmentModalShow" size="md">
+            <x-slot name="header">{{ $sysLabel }} besetzen</x-slot>
+            <form wire:submit.prevent="addVsmAssignment" class="space-y-4">
+                <p class="m-0 text-xs text-[color:var(--nx-muted)]">Aus Sicht <span class="font-medium text-[color:var(--nx-text)]">{{ $entity->name }}</span> — wer füllt {{ $sysLabel }} aus?</p>
+                <x-nx-input-select name="assigned_entity_id" label="Actor" :options="$this->vsmActorEntities" optionValue="id" optionLabel="name"
+                    nullable nullLabel="– auswählen –" wire:model.live="vsmAssignmentForm.assigned_entity_id" errorKey="vsmAssignmentForm.assigned_entity_id" required />
+                <x-nx-input-text name="scope" label="Scope" wire:model.live="vsmAssignmentForm.scope" placeholder="optional, z. B. Cashflow, Backend" />
+                <x-nx-input-textarea name="notes" label="Notiz" wire:model.live="vsmAssignmentForm.notes" placeholder="optional — warum diese Zuordnung?" rows="3" />
+            </form>
+            <x-slot name="footer">
+                <div class="flex justify-end gap-2">
+                    <x-nx-button variant="ghost" wire:click="closeVsmAssignmentModal">Abbrechen</x-nx-button>
+                    <x-nx-button variant="primary" wire:click="addVsmAssignment">Zuweisen</x-nx-button>
+                </div>
+            </x-slot>
+        </x-nx-modal>
     </x-ui-page-container>
 
-    {{-- Alpine treeNode component for recursive tree rendering --}}
+        {{-- Alpine treeNode component for recursive tree rendering --}}
     @script
     <script>
         // Store linkConfig and linkIconSvgs globally for tree nodes
@@ -2531,9 +1529,9 @@
         });
         const escHtml = (s) => s ? String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;') : '';
 
-        const chevronSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[var(--ui-muted)]"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>`;
-        const spinnerSvg = `<svg class="w-4 h-4 animate-spin text-[var(--ui-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
-        const externalSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5 text-[var(--ui-muted)]"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>`;
+        const chevronSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[color:var(--nx-muted)]"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>`;
+        const spinnerSvg = `<svg class="w-4 h-4 animate-spin text-[color:var(--nx-muted)]" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>`;
+        const externalSvg = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-3.5 h-3.5 text-[color:var(--nx-muted)]"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 0 0 3 8.25v10.5A2.25 2.25 0 0 0 5.25 21h10.5A2.25 2.25 0 0 0 18 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25" /></svg>`;
 
         function formatTime(totalMin) {
             const h = Math.floor(totalMin / 60);
@@ -2588,19 +1586,19 @@
                         if (val > 0) parts.push(val + '%' + (rule.suffix ? ' ' + rule.suffix : ''));
                         break;
                     case 'boolean_done':
-                        if (val) parts.push('<span class="text-green-600">erledigt</span>');
+                        if (val) parts.push('<span class="text-[color:var(--nx-success)]">erledigt</span>');
                         break;
                     case 'boolean_active':
-                        if (val === false) parts.push('<span class="text-amber-600">inaktiv</span>');
+                        if (val === false) parts.push('<span class="text-[color:var(--nx-warning)]">inaktiv</span>');
                         break;
                     case 'boolean_published':
-                        if (val) parts.push('<span class="text-green-600">veröffentlicht</span>');
+                        if (val) parts.push('<span class="text-[color:var(--nx-success)]">veröffentlicht</span>');
                         break;
                     case 'boolean_pinned':
                         if (val) parts.push('angepinnt');
                         break;
                     case 'boolean_frog':
-                        if (val) parts.push('<span class="text-green-700">🐸</span>');
+                        if (val) parts.push('<span class="text-[color:var(--nx-success)]">🐸</span>');
                         break;
                     case 'badge':
                         if (val) parts.push(escHtml(String(val)));
@@ -2608,7 +1606,7 @@
                 }
             }
             if (parts.length === 0) return '';
-            return `<span class="inline-flex items-center gap-1.5 text-[10px] text-[var(--ui-muted)] flex-shrink-0">${parts.join(' · ')}</span>`;
+            return `<span class="inline-flex items-center gap-1.5 text-[10px] text-[color:var(--nx-muted)] flex-shrink-0">${parts.join(' · ')}</span>`;
         }
 
         // Shared render function for a node card (used at all Alpine levels)
@@ -2618,14 +1616,14 @@
             const billedMin = node.cascaded_time ? node.cascaded_time.billed_minutes : 0;
             const openMin = totalMin - billedMin;
 
-            let html = `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3 ${!node.is_active ? 'opacity-50' : ''}">`;
+            let html = `<div class="group rounded-[6px] transition-colors hover:bg-[color:var(--nx-hover)] py-2 px-3 ${!node.is_active ? 'opacity-50' : ''}">`;
             html += `<div class="flex items-center gap-2 ${isExpandable ? 'cursor-pointer' : ''}" @click="nodeToggle()">`;
 
             // Chevron/spinner
             html += `<div class="w-5 h-5 flex items-center justify-center flex-shrink-0">`;
             if (isExpandable) {
                 html += `<template x-if="nodeLoading">${spinnerSvg}</template>`;
-                html += `<template x-if="!nodeLoading"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200" :class="{ 'rotate-90': nodeExpanded }"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></template>`;
+                html += `<template x-if="!nodeLoading"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[color:var(--nx-muted)] transition-transform duration-200" :class="{ 'rotate-90': nodeExpanded }"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></template>`;
             }
             html += `</div>`;
 
@@ -2635,26 +1633,26 @@
             }
 
             // Name link
-            html += `<a href="/organization/entities/${node.id}" class="text-sm font-semibold text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate" @click.stop>${escHtml(node.name)}</a>`;
+            html += `<a href="/organization/entities/${node.id}" class="text-sm font-semibold text-[color:var(--nx-text)] hover:text-[color:var(--nx-text)] hover:underline truncate" @click.stop>${escHtml(node.name)}</a>`;
 
             // Code
             if (node.code) {
-                html += `<span class="text-xs text-[var(--ui-muted)] font-mono flex-shrink-0">${escHtml(node.code)}</span>`;
+                html += `<span class="text-xs text-[color:var(--nx-muted)] font-mono flex-shrink-0">${escHtml(node.code)}</span>`;
             }
 
             // Type badge
-            html += `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] flex-shrink-0">${escHtml(node.type_name)}</span>`;
+            html += `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[color:var(--nx-accent-soft)] text-[color:var(--nx-muted)] flex-shrink-0">${escHtml(node.type_name)}</span>`;
 
             // Time
             if (totalMin > 0) {
-                const dotClass = openMin > 0 ? 'bg-amber-400' : 'bg-green-500';
+                const dotClass = openMin > 0 ? 'bg-[color:var(--nx-warning)]' : 'bg-[color:var(--nx-success)]';
                 html += `<div class="flex items-center gap-2 ml-auto flex-shrink-0">`;
-                html += `<span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--ui-secondary)]">`;
+                html += `<span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[color:var(--nx-text)]">`;
                 html += `<span class="w-2 h-2 rounded-full flex-shrink-0 ${dotClass}"></span>`;
                 html += formatTime(totalMin);
                 html += `</span>`;
                 if (openMin > 0) {
-                    html += `<span class="text-[10px] text-amber-600 font-medium">${formatOpenTime(totalMin, billedMin)}</span>`;
+                    html += `<span class="text-[10px] text-[color:var(--nx-warning)] font-medium">${formatOpenTime(totalMin, billedMin)}</span>`;
                 }
                 html += `</div>`;
             }
@@ -2668,15 +1666,15 @@
                     for (const [type, count] of Object.entries(node.cascaded_link_counts)) {
                         if (count > 0 && linkConfig[type]) {
                             const iconSvg = linkIconSvgs[type] ? linkIconSvgs[type].replace('w-4 h-4', 'w-3 h-3') : '';
-                            html += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-[var(--ui-muted-5)] text-[var(--ui-muted)] border border-[var(--ui-border)]/20">`;
+                            html += `<span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] bg-[color:var(--nx-accent-soft)] text-[color:var(--nx-muted)] border border-[color:var(--nx-line)]">`;
                             html += iconSvg;
-                            html += `${escHtml(linkConfig[type].label)} <span class="font-semibold text-[var(--ui-secondary)]">${count}</span>`;
+                            html += `${escHtml(linkConfig[type].label)} <span class="font-semibold text-[color:var(--nx-text)]">${count}</span>`;
                             html += `</span>`;
                         }
                     }
                 }
                 if (node.descendant_count > 0) {
-                    html += `<span class="text-[10px] text-[var(--ui-muted)] ml-1">inkl. ${node.descendant_count} ${node.descendant_count === 1 ? 'Untereinheit' : 'Untereinheiten'}</span>`;
+                    html += `<span class="text-[10px] text-[color:var(--nx-muted)] ml-1">inkl. ${node.descendant_count} ${node.descendant_count === 1 ? 'Untereinheit' : 'Untereinheiten'}</span>`;
                 }
                 html += `</div>`;
             }
@@ -2700,16 +1698,16 @@
             for (const group of node.own_links_grouped) {
                 const iconSvg = linkIconSvgs[group.type] || '';
                 const expandRule = getExpandableRule(group.type);
-                html += `<div x-data="{ gOpen: $store.tree.allExpanded, init() { this.$watch('$store.tree.allExpanded', v => this.gOpen = v); } }" class="ml-6 border-l-2 border-[var(--ui-border)]/20">`;
+                html += `<div x-data="{ gOpen: $store.tree.allExpanded, init() { this.$watch('$store.tree.allExpanded', v => this.gOpen = v); } }" class="ml-6 border-l border-[color:var(--nx-line)]">`;
                 // Group header
-                html += `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3 cursor-pointer" @click.stop="gOpen = !gOpen">`;
+                html += `<div class="group rounded-[6px] transition-colors hover:bg-[color:var(--nx-hover)] py-2 px-3 cursor-pointer" @click.stop="gOpen = !gOpen">`;
                 html += `<div class="flex items-center gap-2">`;
-                html += `<div class="w-5 h-5 flex items-center justify-center flex-shrink-0"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200" :class="{ 'rotate-90': gOpen }"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></div>`;
+                html += `<div class="w-5 h-5 flex items-center justify-center flex-shrink-0"><svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[color:var(--nx-muted)] transition-transform duration-200" :class="{ 'rotate-90': gOpen }"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg></div>`;
                 html += iconSvg;
-                html += `<span class="text-sm font-medium text-[var(--ui-secondary)]">${escHtml(group.label)}</span>`;
-                html += `<span class="text-xs text-[var(--ui-muted)]">(${group.items.length})</span>`;
+                html += `<span class="text-sm font-medium text-[color:var(--nx-text)]">${escHtml(group.label)}</span>`;
+                html += `<span class="text-xs text-[color:var(--nx-muted)]">(${group.items.length})</span>`;
                 if (group.group_logged_minutes > 0) {
-                    html += `<span class="text-xs text-[var(--ui-muted)] ml-auto flex-shrink-0">${formatTime(group.group_logged_minutes)}</span>`;
+                    html += `<span class="text-xs text-[color:var(--nx-muted)] ml-auto flex-shrink-0">${formatTime(group.group_logged_minutes)}</span>`;
                 }
                 html += `</div></div>`;
 
@@ -2725,26 +1723,26 @@
                     const doneShowAttr = linkIsDone ? ' x-show="$store.tree.showDone" x-transition' : '';
                     const doneNameClass = linkIsDone ? ' line-through opacity-60' : '';
 
-                    html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20"${hasChildren ? ` x-data="{ ${linkId}: $store.tree.allExpanded, init() { this.$watch('$store.tree.allExpanded', v => this.${linkId} = v); } }"` : ''}${doneShowAttr}>`;
-                    html += `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">`;
+                    html += `<div class="ml-6 border-l border-[color:var(--nx-line)]"${hasChildren ? ` x-data="{ ${linkId}: $store.tree.allExpanded, init() { this.$watch('$store.tree.allExpanded', v => this.${linkId} = v); } }"` : ''}${doneShowAttr}>`;
+                    html += `<div class="group rounded-[6px] transition-colors hover:bg-[color:var(--nx-hover)] py-2 px-3">`;
                     html += `<div class="flex items-center gap-2${hasChildren ? ' cursor-pointer' : ''}"${hasChildren ? ` @click="${linkId} = !${linkId}"` : ''}>`;
 
                     // Chevron for expandable items
                     html += `<div class="w-5 h-5 flex items-center justify-center flex-shrink-0">`;
                     if (hasChildren) {
-                        html += `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200" :class="{ 'rotate-90': ${linkId} }"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>`;
+                        html += `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-4 h-4 text-[color:var(--nx-muted)] transition-transform duration-200" :class="{ 'rotate-90': ${linkId} }"><path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" /></svg>`;
                     }
                     html += `</div>`;
 
                     html += iconSvg;
                     if (link.url) {
-                        html += `<a href="${escHtml(link.url)}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate${doneNameClass}" @click.stop>${escHtml(link.name)}</a>`;
+                        html += `<a href="${escHtml(link.url)}" class="text-sm font-medium text-[color:var(--nx-text)] hover:text-[color:var(--nx-text)] hover:underline truncate${doneNameClass}" @click.stop>${escHtml(link.name)}</a>`;
                     } else {
-                        html += `<span class="text-sm font-medium text-[var(--ui-secondary)] truncate${doneNameClass}">${escHtml(link.name)}</span>`;
+                        html += `<span class="text-sm font-medium text-[color:var(--nx-text)] truncate${doneNameClass}">${escHtml(link.name)}</span>`;
                     }
                     html += renderLinkMeta(link, group.type);
                     if (link.status) {
-                        html += `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)] flex-shrink-0">${escHtml(link.status)}</span>`;
+                        html += `<span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[color:var(--nx-accent-soft)] text-[color:var(--nx-muted)] flex-shrink-0">${escHtml(link.status)}</span>`;
                     }
                     if (link.url) {
                         html += `<div class="ml-auto flex-shrink-0">${externalSvg}</div>`;
@@ -2763,12 +1761,12 @@
                             const childDoneClass = childIsDone ? 'line-through opacity-60' : '';
                             const childDoneShow = childIsDone ? ' x-show="$store.tree.showDone" x-transition' : '';
                             const childName = child[expandRule.name_field || 'name'] || '—';
-                            html += `<div class="ml-6 border-l-2 border-[var(--ui-border)]/20"${childDoneShow}>`;
-                            html += `<div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">`;
+                            html += `<div class="ml-6 border-l border-[color:var(--nx-line)]"${childDoneShow}>`;
+                            html += `<div class="group rounded-[6px] transition-colors hover:bg-[color:var(--nx-hover)] py-2 px-3">`;
                             html += `<div class="flex items-center gap-2">`;
                             html += `<div class="w-5 h-5 flex-shrink-0"></div>`;
                             html += childIconSvg;
-                            html += `<span class="text-sm font-medium text-[var(--ui-secondary)] truncate ${childDoneClass}">${escHtml(childName)}</span>`;
+                            html += `<span class="text-sm font-medium text-[color:var(--nx-text)] truncate ${childDoneClass}">${escHtml(childName)}</span>`;
                             // Render child metadata using its own display rules
                             html += renderLinkMeta(child, childType);
                             html += `</div></div></div>`;

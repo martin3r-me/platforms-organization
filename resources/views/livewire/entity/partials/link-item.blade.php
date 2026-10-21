@@ -22,11 +22,11 @@
     $doneField = $expandRule['done_field'] ?? 'is_done';
 @endphp
 
-<div class="ml-6 border-l-2 border-[var(--ui-border)]/20"
+<div class="ml-6 border-l border-[color:var(--nx-line)]"
     @if($hasChildren) x-data="{ childOpen: false, init() { this.$watch('$store.tree.allExpanded', v => this.childOpen = v); } }" @endif
     @if($isDone) x-show="$store.tree.showDone" x-transition @endif
 >
-    <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">
+    <div class="group rounded-[6px] transition-colors hover:bg-[color:var(--nx-hover)] py-1.5 px-2.5">
         <div class="flex items-center gap-2 {{ $hasChildren ? 'cursor-pointer' : '' }}"
             @if($hasChildren) @click="childOpen = !childOpen" @endif
         >
@@ -34,27 +34,27 @@
             <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
                 @if($hasChildren)
                     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
-                        class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200"
+                        class="w-4 h-4 text-[color:var(--nx-muted)] transition-transform duration-200"
                         :class="{ 'rotate-90': childOpen }">
                         <path stroke-linecap="round" stroke-linejoin="round" d="m8.25 4.5 7.5 7.5-7.5 7.5" />
                     </svg>
                 @endif
             </div>
-            @svg('heroicon-o-' . (app('safe-svg')->resolve($groupIcon ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
+            @svg('heroicon-o-' . (app('safe-svg')->resolve($groupIcon ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 text-[color:var(--nx-muted)] flex-shrink-0')
             @if($link['url'])
-                <a href="{{ $link['url'] }}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate {{ $isDone ? 'line-through opacity-60' : '' }}" @click.stop>
+                <a href="{{ $link['url'] }}" class="text-sm font-medium text-[color:var(--nx-text)] hover:underline truncate {{ $isDone ? 'line-through opacity-60' : '' }}" @click.stop>
                     {{ $link['name'] }}
                 </a>
             @else
-                <span class="text-sm font-medium text-[var(--ui-secondary)] truncate {{ $isDone ? 'line-through opacity-60' : '' }}">{{ $link['name'] }}</span>
+                <span class="text-sm font-medium text-[color:var(--nx-text)] truncate {{ $isDone ? 'line-through opacity-60' : '' }}">{{ $link['name'] }}</span>
             @endif
             @include('organization::livewire.entity.partials.link-meta', ['link' => $link, 'linkType' => $linkType])
             @if($link['status'])
-                <x-ui-badge variant="secondary" size="xs">{{ $link['status'] }}</x-ui-badge>
+                <x-nx-badge>{{ $link['status'] }}</x-nx-badge>
             @endif
             @if($link['url'])
                 <div class="ml-auto flex-shrink-0">
-                    @svg('heroicon-o-arrow-top-right-on-square', 'w-3.5 h-3.5 text-[var(--ui-muted)]')
+                    @svg('heroicon-o-arrow-top-right-on-square', 'w-3.5 h-3.5 text-[color:var(--nx-muted)]')
                 </div>
             @endif
         </div>
@@ -68,14 +68,14 @@
         <div x-show="childOpen" x-collapse x-cloak>
             @foreach($link[$childrenField] as $child)
                 @php $childIsDone = $child[$doneField] ?? false; @endphp
-                <div class="ml-6 border-l-2 border-[var(--ui-border)]/20"
+                <div class="ml-6 border-l border-[color:var(--nx-line)]"
                     @if($childIsDone) x-show="$store.tree.showDone" x-transition @endif
                 >
-                    <div class="group rounded-lg transition-colors hover:bg-[var(--ui-muted-5)] py-2 px-3">
+                    <div class="group rounded-[6px] transition-colors hover:bg-[color:var(--nx-hover)] py-1.5 px-2.5">
                         <div class="flex items-center gap-2">
                             <div class="w-5 h-5 flex-shrink-0"></div>
-                            @svg('heroicon-o-' . (app('safe-svg')->resolve($childIconName ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 text-[var(--ui-muted)] flex-shrink-0')
-                            <span class="text-sm font-medium text-[var(--ui-secondary)] truncate {{ $childIsDone ? 'line-through opacity-60' : '' }}">
+                            @svg('heroicon-o-' . (app('safe-svg')->resolve($childIconName ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 text-[color:var(--nx-muted)] flex-shrink-0')
+                            <span class="text-sm font-medium text-[color:var(--nx-text)] truncate {{ $childIsDone ? 'line-through opacity-60' : '' }}">
                                 {{ $child[$nameField] ?? '—' }}
                             </span>
                             @include('organization::livewire.entity.partials.link-meta', ['link' => $child, 'linkType' => $childType])

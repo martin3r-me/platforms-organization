@@ -40,14 +40,14 @@
         {{-- Grid circles --}}
         @foreach($gridLevels as $level)
             <circle cx="{{ $cx }}" cy="{{ $cy }}" r="{{ ($level / 100) * $maxR }}"
-                fill="none" stroke="var(--ui-border)" stroke-width="0.5" opacity="0.4" />
+                fill="none" stroke="var(--nx-line-strong)" stroke-width="0.5" opacity="0.4" />
         @endforeach
 
         {{-- Axis lines --}}
         @foreach($dimensions as $i => $dimKey)
             @php $ax = $axes[$dimKey]; $dim = $radar[$dimKey]; @endphp
             <line x1="{{ $cx }}" y1="{{ $cy }}" x2="{{ $ax['x'] }}" y2="{{ $ax['y'] }}"
-                stroke="var(--ui-border)"
+                stroke="var(--nx-line-strong)"
                 stroke-width="0.8"
                 @if(!$dim['has_data']) stroke-dasharray="4,3" opacity="0.5" @endif
             />
@@ -56,8 +56,8 @@
         {{-- Filled polygon --}}
         @if($hasAnyData)
             <polygon points="{{ $polygonStr }}"
-                fill="rgb(59, 130, 246)" fill-opacity="0.15"
-                stroke="rgb(59, 130, 246)" stroke-width="1.5" stroke-linejoin="round" />
+                fill="var(--nx-accent)" fill-opacity="0.12"
+                stroke="var(--nx-accent)" stroke-width="1.5" stroke-linejoin="round" />
 
             {{-- Score dots --}}
             @foreach($dimensions as $i => $dimKey)
@@ -72,7 +72,7 @@
                 @endphp
                 @if($dim['has_data'])
                     <circle cx="{{ $dotX }}" cy="{{ $dotY }}" r="3"
-                        fill="rgb(59, 130, 246)" stroke="white" stroke-width="1.5" />
+                        fill="var(--nx-accent)" stroke="var(--nx-surface)" stroke-width="1.5" />
                 @endif
             @endforeach
         @endif
@@ -89,7 +89,7 @@
             <text x="{{ $ax['lx'] }}" y="{{ $ax['ly'] }}"
                 text-anchor="{{ $anchor }}"
                 dominant-baseline="central"
-                class="fill-current {{ $dim['has_data'] ? 'text-[var(--ui-secondary)]' : 'text-[var(--ui-muted)]' }}"
+                class="fill-current {{ $dim['has_data'] ? 'text-[color:var(--nx-text)]' : 'text-[color:var(--nx-faint)]' }}"
                 style="font-size: 9px; font-weight: {{ $dim['has_data'] ? '600' : '400' }};"
             >{{ $dim['label'] }}</text>
         @endforeach
@@ -108,23 +108,23 @@
     @foreach($dimensions as $dimKey)
         @php $dim = $radar[$dimKey]; @endphp
         <div x-show="activeTooltip === '{{ $dimKey }}'" x-cloak x-transition.opacity
-            class="absolute z-20 px-3 py-2 rounded-lg bg-[var(--ui-secondary)] text-white text-[11px] shadow-lg pointer-events-none whitespace-nowrap"
+            class="absolute z-20 px-3 py-2 rounded-[6px] border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] text-[color:var(--nx-text)] text-[11px] shadow-sm pointer-events-none whitespace-nowrap"
             style="left: 50%; top: 50%; transform: translate(-50%, -50%);">
             <div class="font-semibold mb-1">{{ $dim['label'] }} &mdash; Score {{ round($dim['score']) }}</div>
             @if($dim['delta'] != 0)
-                <div class="text-[10px] {{ $dim['delta'] > 0 ? 'text-green-300' : 'text-red-300' }}">
+                <div class="text-[10px] {{ $dim['delta'] > 0 ? 'text-[color:var(--nx-success)]' : 'text-[color:var(--nx-danger)]' }}">
                     7d: {{ $dim['delta'] > 0 ? '+' : '' }}{{ round($dim['delta'], 1) }}
                 </div>
             @endif
             @if(!empty($dim['metrics']))
-                <div class="mt-1 border-t border-white/20 pt-1 space-y-0.5">
+                <div class="mt-1 border-t border-[color:var(--nx-line)] pt-1 space-y-0.5">
                     @foreach($dim['metrics'] as $m)
-                        <div class="text-[10px] text-gray-300">{{ $m['label'] }}: {{ $m['formatted'] }}</div>
+                        <div class="text-[10px] text-[color:var(--nx-muted)]">{{ $m['label'] }}: {{ $m['formatted'] }}</div>
                     @endforeach
                 </div>
             @endif
             @if(!$dim['has_data'])
-                <div class="text-[10px] text-gray-400 italic">Keine Daten</div>
+                <div class="text-[10px] text-[color:var(--nx-faint)] italic">Keine Daten</div>
             @endif
         </div>
     @endforeach

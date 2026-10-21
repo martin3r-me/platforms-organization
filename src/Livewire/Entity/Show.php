@@ -545,6 +545,18 @@ class Show extends Component
             'linkedUser',
         ]);
         $this->loadForm();
+
+        // Ohne Untereinheiten ist „Struktur" leer — dann direkt das Verknüpfte zeigen.
+        if ($this->entity->children->isEmpty()) {
+            $this->activeTab = 'links';
+        }
+    }
+
+    /** Offene Signale für den Tab-Zähler (läuft bei jedem Request, daher nur ein COUNT). */
+    #[Computed]
+    public function openSignalCount(): int
+    {
+        return OrganizationSignal::where('entity_id', $this->entity->id)->where('status', 'open')->count();
     }
 
     /** Fremd-ID-Editor: Zeilen [['system','value','label'], ...]. */

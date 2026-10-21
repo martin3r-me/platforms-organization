@@ -1,568 +1,325 @@
+@php
+    $insights = $this->insightStatements;
+    $summary = $this->teamSnapshotSummary;
+    $health = $this->entityHealthOverview;
+    $time = $this->teamTimeAnalytics;
+    $velocity = $this->completionVelocity;
+    $trend = $this->teamSnapshotTrend;
+    $linkDist = $this->linkTypeDistribution;
+    $topEntities = $this->topEntitiesByActivity;
+    $personOverview = $this->personOverview;
+    $signalOverview = $this->signalOverview;
+    $focusedSignals = $this->focusedSignals;
+    $teamMovement = $this->teamMovement;
+    $envRadar = $this->environmentRadar;
+
+    $hasSignals = ($signalOverview['total_open'] ?? 0) > 0;
+    $hasProblems = count($health['problems'] ?? []) > 0;
+    $hasPersonWarnings = count($personOverview['persons'] ?? []) > 0;
+    $hasTrend = ! empty($trend) && count($trend['snapshots'] ?? []) >= 1;
+    $hasMovement = ! empty($teamMovement['metrics']);
+
+    $signalCritical = $signalOverview['signals']->where('severity', 'critical')->count();
+    $signalAccent = $signalCritical > 0 ? 'var(--nx-danger)' : ($hasSignals ? 'var(--nx-warning)' : 'var(--nx-success)');
+    $signalHint = $signalCritical > 0
+        ? $signalCritical . ' kritisch'
+        : ($hasSignals ? $signalOverview['total_open'] . ' offen' : 'keine offenen');
+
+    $signed = fn ($v, $suffix) => ($v > 0 ? '+' : '') . $v . $suffix;
+
+    $sevVariant = fn ($s) => match ($s) {
+        'critical', 'algedonic' => 'danger',
+        'warning' => 'warning',
+        default => 'info',
+    };
+    $sevLabel = fn ($s) => match ($s) {
+        'critical' => 'Kritisch',
+        'algedonic' => 'Algedonisch',
+        'warning' => 'Warnung',
+        default => 'Info',
+    };
+    $statusBadge = fn ($s) => match ($s) {
+        'open' => ['warning', 'Offen'],
+        'acknowledged' => ['info', 'Bestätigt'],
+        'resolved' => ['success', 'Gelöst'],
+        'dismissed' => ['neutral', 'Verworfen'],
+        default => ['neutral', ucfirst((string) $s)],
+    };
+@endphp
+
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar title="Übersicht" icon="heroicon-o-building-office" />
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'icon' => 'building-office'],
-        ]" />
+            ['label' => 'Organisation', 'icon' => 'building-office'],
+        ]">
+            <x-nx-button size="sm" :href="route('organization.entities.index')" wire:navigate>
+                @svg('heroicon-o-rectangle-stack', 'w-4 h-4')
+                <span>Einheiten</span>
+            </x-nx-button>
+        </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Übersicht" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                @php $time = $this->teamTimeAnalytics; @endphp
-                @if($time['has_data'])
-                    <div>
-                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Zeiterfassung</h3>
-                        <div class="space-y-3">
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 flex items-center justify-between">
-                                <span class="text-xs text-[var(--ui-muted)]">Stunden (Monat)</span>
-                                <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ $time['hours_this_month'] }}</span>
-                            </div>
-                            @php $summary = $this->teamSnapshotSummary; @endphp
-                            @if($summary['has_data'])
-                                <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 flex items-center justify-between">
-                                    <span class="text-xs text-[var(--ui-muted)]">Items erledigt</span>
-                                    <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ $summary['items_done'] }}</span>
-                                </div>
-                                <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 flex items-center justify-between">
-                                    <span class="text-xs text-[var(--ui-muted)]">Abrechnungsquote</span>
-                                    <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ $time['billing_rate'] }}%</span>
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                @endif
+    <x-ui-page-container width="contained">
+        <div class="space-y-5">
+            <div class="flex flex-wrap items-baseline gap-2">
+                <h1 class="m-0 text-2xl font-semibold tracking-tight text-[color:var(--nx-text)]">Übersicht</h1>
+                <span class="text-sm text-[color:var(--nx-muted)]">{{ now()->locale('de')->isoFormat('dddd, D. MMMM') }}</span>
+            </div>
 
-                @php $linkDist = $this->linkTypeDistribution; @endphp
-                @if(count($linkDist) > 0)
-                    <div>
-                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Verknüpfungs-Typen</h3>
-                        <div class="space-y-2">
-                            @foreach($linkDist as $dist)
-                                <div class="flex items-center gap-3 py-2 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                    <div class="w-5 h-5 flex items-center justify-center flex-shrink-0">
-                                        @svg('heroicon-o-' . (app('safe-svg')->resolve($dist['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-3.5 h-3.5 text-[var(--ui-muted)]')
+            {{-- Kennzahlen --}}
+            <x-nx-stat-grid cols="4">
+                <x-nx-stat label="Aktive Einheiten" :value="$this->activeEntities" :hint="$this->totalEntities . ' gesamt'"
+                    icon="heroicon-o-building-office" :href="route('organization.entities.index')" wire:navigate />
+                <x-nx-stat label="Fortschritt" :value="$summary['has_data'] ? $summary['completion_rate'] . ' %' : '–'"
+                    :hint="$summary['has_data'] && $summary['trend_completion'] != 0 ? $signed($summary['trend_completion'], ' % ggü. 7 Tagen') : null"
+                    icon="heroicon-o-check-circle" />
+                <x-nx-stat label="Stunden (Monat)" :value="$time['has_data'] ? $time['hours_this_month'] : '–'"
+                    :hint="$time['has_data'] && $time['trend_hours'] != 0 ? $signed($time['trend_hours'], ' h ggü. Vormonat') : null"
+                    icon="heroicon-o-clock" :href="route('organization.time-entries.index')" wire:navigate />
+                <x-nx-stat label="Offene Signale" :value="$signalOverview['total_open']" :hint="$signalHint"
+                    icon="heroicon-o-bell-alert" :accent="$signalAccent" :href="route('organization.signals.index')" wire:navigate />
+            </x-nx-stat-grid>
+
+            @if (count($insights) > 0)
+                <x-nx-callout variant="neutral" icon="heroicon-o-light-bulb">
+                    <div class="flex flex-col gap-1">
+                        @foreach ($insights as $insight)
+                            <span @class([
+                                'text-[color:var(--nx-success)]' => $insight['type'] === 'success',
+                                'text-[color:var(--nx-warning)]' => $insight['type'] === 'warning',
+                                'text-[color:var(--nx-text)]' => ! in_array($insight['type'], ['success', 'warning']),
+                            ])>{{ $insight['text'] }}</span>
+                        @endforeach
+                    </div>
+                </x-nx-callout>
+            @endif
+
+            <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
+                {{-- Hauptspalte --}}
+                <div class="min-w-0 space-y-5 lg:col-span-2">
+                    @if ($focusedSignals->isNotEmpty())
+                        <x-nx-panel flush title="Fokus" :subtitle="$focusedSignals->count() . ' markierte Signale'">
+                            <x-slot name="actions">
+                                <a href="{{ route('organization.signals.index', ['focusOnly' => 1]) }}" wire:navigate class="text-xs font-medium text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">Alle</a>
+                            </x-slot>
+                            @foreach ($focusedSignals as $signal)
+                                @php
+                                    [$stV, $stL] = $statusBadge($signal->status);
+                                @endphp
+                                <div class="flex items-start gap-3 border-b border-[color:var(--nx-line)] px-4 py-2.5 last:border-0">
+                                    <button type="button" wire:click="unfocusSignal({{ $signal->id }})" title="Aus Fokus entfernen"
+                                        class="mt-0.5 shrink-0 text-[color:var(--nx-warning)] hover:opacity-70">
+                                        @svg('heroicon-s-star', 'w-4 h-4')
+                                    </button>
+                                    <div class="min-w-0 flex-1">
+                                        <a href="{{ route('organization.signals.show', $signal) }}" wire:navigate class="block text-sm text-[color:var(--nx-text)] hover:underline">
+                                            {{ \Illuminate\Support\Str::limit($signal->message, 140) }}
+                                        </a>
+                                        <div class="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-[color:var(--nx-faint)]">
+                                            <x-nx-badge :variant="$sevVariant($signal->severity)">{{ $sevLabel($signal->severity) }}</x-nx-badge>
+                                            <x-nx-badge :variant="$stV" dot>{{ $stL }}</x-nx-badge>
+                                            @if ($signal->entity)
+                                                <a href="{{ route('organization.entities.show', $signal->entity) }}" wire:navigate class="hover:underline">{{ $signal->entity->name }}</a> ·
+                                            @endif
+                                            <span>{{ $signal->created_at->diffForHumans() }}</span>
+                                        </div>
                                     </div>
-                                    <span class="text-xs text-[var(--ui-muted)] flex-1 truncate">{{ $dist['label'] }}</span>
-                                    <span class="text-sm font-bold text-[var(--ui-secondary)]">{{ $dist['count'] }}</span>
                                 </div>
                             @endforeach
-                        </div>
-                    </div>
-                @endif
-            </div>
-        </x-ui-page-sidebar>
-    </x-slot>
+                        </x-nx-panel>
+                    @endif
 
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="true" storeKey="activityOpen" side="right">
-            <livewire:organization.activity-feed />
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-ui-page-container>
-        @php
-            $insights = $this->insightStatements;
-            $summary = $this->teamSnapshotSummary;
-            $health = $this->entityHealthOverview;
-            $time = $this->teamTimeAnalytics;
-            $velocity = $this->completionVelocity;
-            $trend = $this->teamSnapshotTrend;
-            $linkDist = $this->linkTypeDistribution;
-            $topEntities = $this->topEntitiesByActivity;
-            $personOverview = $this->personOverview;
-            $signalOverview = $this->signalOverview;
-            $focusedSignals = $this->focusedSignals;
-
-            $hasSignals = ($signalOverview['total_open'] ?? 0) > 0;
-            $hasProblems = count($health['problems'] ?? []) > 0;
-            $hasPersonWarnings = count($personOverview['persons'] ?? []) > 0;
-            $hasHandlungsbedarf = $hasSignals || $hasProblems || $hasPersonWarnings;
-        @endphp
-
-        {{-- ============================================================ --}}
-        {{-- FOKUS-SIGNALE (persönlich, oberste Priorität)                --}}
-        {{-- ============================================================ --}}
-        @if($focusedSignals->isNotEmpty())
-            <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50/40 p-4">
-                <div class="flex items-center justify-between mb-3">
-                    <div class="flex items-center gap-2">
-                        @svg('heroicon-s-star', 'w-5 h-5 text-amber-500')
-                        <h2 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider">Fokus-Signale</h2>
-                        <span class="text-xs text-[var(--ui-muted)]">({{ $focusedSignals->count() }})</span>
-                    </div>
-                    <a href="{{ route('organization.signals.index', ['focusOnly' => 1]) }}" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-primary)] inline-flex items-center gap-1">
-                        Alle anzeigen
-                        @svg('heroicon-o-arrow-right', 'w-3 h-3')
-                    </a>
-                </div>
-                <div class="space-y-2">
-                    @foreach($focusedSignals as $signal)
-                        <div class="flex items-start gap-3 bg-white rounded-md border border-amber-200/60 p-3 hover:border-amber-400 transition">
-                            <button
-                                wire:click="unfocusSignal({{ $signal->id }})"
-                                type="button"
-                                class="flex-shrink-0 mt-0.5 text-amber-500 hover:text-amber-700 transition"
-                                title="Aus Fokus entfernen"
-                            >
-                                @svg('heroicon-s-star', 'w-4 h-4')
-                            </button>
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2 mb-1 flex-wrap">
-                                    @if($signal->entity)
-                                        <a href="{{ route('organization.entities.show', $signal->entity) }}" class="link text-sm font-medium">
-                                            {{ $signal->entity->name }}
-                                        </a>
-                                    @endif
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium
-                                        @if($signal->severity === 'critical' || $signal->severity === 'algedonic') bg-red-100 text-red-800
-                                        @elseif($signal->severity === 'warning') bg-amber-100 text-amber-800
-                                        @else bg-blue-100 text-blue-800
-                                        @endif
-                                    ">{{ ucfirst($signal->severity) }}</span>
-                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium
-                                        @if($signal->status === 'open') bg-yellow-100 text-yellow-800
-                                        @elseif($signal->status === 'acknowledged') bg-blue-100 text-blue-800
-                                        @elseif($signal->status === 'resolved') bg-green-100 text-green-800
-                                        @else bg-gray-100 text-gray-600
-                                        @endif
-                                    ">
-                                        @switch($signal->status)
-                                            @case('open') Offen @break
-                                            @case('acknowledged') Bestätigt @break
-                                            @case('resolved') Gelöst @break
-                                            @case('dismissed') Verworfen @break
-                                        @endswitch
-                                    </span>
+                    @if ($hasSignals || $hasProblems || $hasPersonWarnings)
+                        <x-nx-panel flush title="Handlungsbedarf">
+                            <x-slot name="actions">
+                                <div class="flex flex-wrap gap-1">
+                                    @if ($hasSignals)<x-nx-badge variant="warning">{{ $signalOverview['total_open'] }} Signale</x-nx-badge>@endif
+                                    @if ($hasProblems)<x-nx-badge variant="danger">{{ count($health['problems']) }} Einheiten</x-nx-badge>@endif
+                                    @if ($hasPersonWarnings)<x-nx-badge variant="warning">{{ count($personOverview['persons']) }} Personen</x-nx-badge>@endif
                                 </div>
-                                <a href="{{ route('organization.signals.show', $signal) }}" class="text-sm text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] block">
-                                    {{ \Illuminate\Support\Str::limit($signal->message, 140) }}
-                                </a>
-                                <p class="text-xs text-[var(--ui-muted)] mt-1">{{ $signal->created_at->diffForHumans() }}</p>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-        @endif
+                            </x-slot>
 
-        {{-- ============================================================ --}}
-        {{-- ALERT BAR: Handlungsbedarf (compact)                         --}}
-        {{-- ============================================================ --}}
-        @if($hasHandlungsbedarf)
-            <div class="mb-6 rounded-lg border border-amber-200 bg-gradient-to-r from-amber-50 to-orange-50 p-4" x-data="{ expanded: false }">
-                <div class="flex items-center justify-between cursor-pointer" @click="expanded = !expanded">
-                    <div class="flex items-center gap-3">
-                        @svg('heroicon-o-exclamation-triangle', 'w-5 h-5 text-amber-500 flex-shrink-0')
-                        <span class="text-sm font-semibold text-amber-800">Handlungsbedarf</span>
-                        <div class="flex items-center gap-2">
-                            @if($hasSignals)
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 border border-amber-200">
-                                    @svg('heroicon-o-bell-alert', 'w-3 h-3')
-                                    {{ $signalOverview['total_open'] }} Signale
-                                </span>
-                            @endif
-                            @if($hasProblems)
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 border border-red-200">
-                                    @svg('heroicon-o-exclamation-triangle', 'w-3 h-3')
-                                    {{ count($health['problems']) }} Einheiten
-                                </span>
-                            @endif
-                            @if($hasPersonWarnings)
-                                <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-orange-100 text-orange-800 border border-orange-200">
-                                    @svg('heroicon-o-users', 'w-3 h-3')
-                                    {{ count($personOverview['persons']) }} Personen
-                                </span>
-                            @endif
-                        </div>
-                    </div>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
-                        class="w-4 h-4 text-amber-500 transition-transform duration-200"
-                        :class="{ 'rotate-180': expanded }">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                    </svg>
-                </div>
-
-                {{-- Expanded Details --}}
-                <div x-show="expanded" x-collapse x-cloak class="mt-4 space-y-4">
-                    {{-- Offene Signale --}}
-                    @if($hasSignals)
-                        <div>
-                            <div class="text-xs font-medium text-amber-700 uppercase tracking-wider mb-2">Signale</div>
-                            <div class="space-y-1.5">
-                                @foreach($signalOverview['signals'] as $signal)
-                                    <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-white/60 border border-amber-100">
-                                        <div class="flex items-center gap-2 min-w-0">
-                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium flex-shrink-0
-                                                @if($signal->severity === 'critical') bg-red-100 text-red-800
-                                                @elseif($signal->severity === 'warning') bg-amber-100 text-amber-800
-                                                @else bg-blue-100 text-blue-800
-                                                @endif
-                                            ">{{ ucfirst($signal->severity) }}</span>
-                                            <a href="{{ route('organization.signals.show', $signal) }}"
-                                               class="text-sm text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate">
-                                                {{ $signal->definition?->name ?? 'Signal' }}
-                                            </a>
-                                            <span class="text-xs text-[var(--ui-muted)]">{{ $signal->entity?->name ?? '' }}</span>
-                                        </div>
-                                        <span class="text-xs text-[var(--ui-muted)] flex-shrink-0">{{ $signal->created_at->diffForHumans() }}</span>
+                            @if ($hasSignals)
+                                <div class="px-4 pb-1 pt-3 text-xs font-medium text-[color:var(--nx-faint)]">Signale</div>
+                                @foreach ($signalOverview['signals'] as $signal)
+                                    <div class="flex items-center gap-2 border-b border-[color:var(--nx-line)] px-4 py-2 text-sm">
+                                        <x-nx-badge :variant="$sevVariant($signal->severity)">{{ $sevLabel($signal->severity) }}</x-nx-badge>
+                                        <a href="{{ route('organization.signals.show', $signal) }}" wire:navigate class="truncate text-[color:var(--nx-text)] hover:underline">{{ $signal->definition?->name ?? 'Signal' }}</a>
+                                        <span class="truncate text-xs text-[color:var(--nx-faint)]">{{ $signal->entity?->name }}</span>
+                                        <span class="ml-auto shrink-0 text-xs text-[color:var(--nx-faint)]">{{ $signal->created_at->diffForHumans() }}</span>
                                     </div>
                                 @endforeach
-                            </div>
-                        </div>
-                    @endif
+                            @endif
 
-                    {{-- Gefährdete Einheiten --}}
-                    @if($hasProblems)
-                        <div>
-                            <div class="text-xs font-medium text-red-700 uppercase tracking-wider mb-2">Gefährdete Einheiten</div>
-                            <div class="space-y-1.5">
-                                @foreach($health['problems'] as $problem)
-                                    <div class="flex items-center gap-3 py-2 px-3 rounded-lg bg-white/60 border border-amber-100">
-                                        <a href="{{ route('organization.entities.show', $problem['id']) }}"
-                                           class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate">
-                                            {{ $problem['name'] }}
-                                        </a>
-                                        @if($problem['status'] === 'at_risk')
-                                            <x-ui-badge variant="danger" size="xs">gefährdet</x-ui-badge>
+                            @if ($hasProblems)
+                                <div class="px-4 pb-1 pt-3 text-xs font-medium text-[color:var(--nx-faint)]">Gefährdete Einheiten</div>
+                                @foreach ($health['problems'] as $problem)
+                                    <div class="flex items-center gap-3 border-b border-[color:var(--nx-line)] px-4 py-2 text-sm">
+                                        <a href="{{ route('organization.entities.show', $problem['id']) }}" wire:navigate class="truncate font-medium text-[color:var(--nx-text)] hover:underline">{{ $problem['name'] }}</a>
+                                        @if ($problem['status'] === 'at_risk')
+                                            <x-nx-badge variant="danger">gefährdet</x-nx-badge>
                                         @else
-                                            <x-ui-badge variant="warning" size="xs">stagnierend</x-ui-badge>
+                                            <x-nx-badge variant="warning">stagnierend</x-nx-badge>
                                         @endif
-                                        <div class="ml-auto flex items-center gap-2 flex-shrink-0">
-                                            <div class="w-16 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                                                <div class="h-full {{ $problem['completion_pct'] >= 50 ? 'bg-blue-500' : 'bg-amber-500' }} rounded-full" style="width: {{ min($problem['completion_pct'], 100) }}%"></div>
+                                        <div class="ml-auto flex shrink-0 items-center gap-2">
+                                            <div class="h-1.5 w-16 overflow-hidden rounded-full bg-[color:var(--nx-accent-soft)]">
+                                                <div class="h-full rounded-full bg-[color:var(--nx-accent)]" style="width: {{ min($problem['completion_pct'], 100) }}%"></div>
                                             </div>
-                                            <span class="text-xs text-[var(--ui-muted)]">{{ $problem['completion_pct'] }}%</span>
+                                            <span class="w-9 text-right text-xs tabular-nums text-[color:var(--nx-muted)]">{{ $problem['completion_pct'] }} %</span>
                                         </div>
                                     </div>
                                 @endforeach
-                            </div>
-                        </div>
-                    @endif
+                            @endif
 
-                    {{-- Personen-Warnungen --}}
-                    @if($hasPersonWarnings)
-                        <div>
-                            <div class="text-xs font-medium text-orange-700 uppercase tracking-wider mb-2">Personen</div>
-                            <div class="space-y-1.5">
-                                @foreach($personOverview['persons'] as $person)
-                                    <div class="flex items-center justify-between py-2 px-3 rounded-lg bg-white/60 border border-amber-100">
-                                        <a href="{{ route('organization.entities.show', $person['id']) }}"
-                                           class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate">
-                                            {{ $person['name'] }}
-                                        </a>
-                                        <div class="flex items-center gap-2 flex-shrink-0">
-                                            @foreach($personOverview['metric_configs'] as $snapshotKey => $mCfg)
-                                                @if(($person['metrics'][$snapshotKey] ?? 0) > 0 && in_array($mCfg['type'], ['warning', 'danger']))
-                                                    <span class="text-xs font-medium {{ $mCfg['type'] === 'danger' ? 'text-red-600' : 'text-amber-600' }}">
-                                                        {{ $person['metrics'][$snapshotKey] }} {{ $mCfg['label'] }}
-                                                    </span>
+                            @if ($hasPersonWarnings)
+                                <div class="px-4 pb-1 pt-3 text-xs font-medium text-[color:var(--nx-faint)]">Personen</div>
+                                @foreach ($personOverview['persons'] as $person)
+                                    <div class="flex items-center justify-between gap-3 border-b border-[color:var(--nx-line)] px-4 py-2 text-sm last:border-0">
+                                        <a href="{{ route('organization.entities.show', $person['id']) }}" wire:navigate class="truncate font-medium text-[color:var(--nx-text)] hover:underline">{{ $person['name'] }}</a>
+                                        <div class="flex shrink-0 flex-wrap justify-end gap-2 text-xs">
+                                            @foreach ($personOverview['metric_configs'] as $snapshotKey => $mCfg)
+                                                @if (($person['metrics'][$snapshotKey] ?? 0) > 0 && in_array($mCfg['type'], ['warning', 'danger']))
+                                                    <span class="{{ $mCfg['type'] === 'danger' ? 'text-[color:var(--nx-danger)]' : 'text-[color:var(--nx-warning)]' }}">{{ $person['metrics'][$snapshotKey] }} {{ $mCfg['label'] }}</span>
                                                 @endif
                                             @endforeach
                                         </div>
                                     </div>
                                 @endforeach
-                            </div>
-                        </div>
+                            @endif
+                        </x-nx-panel>
                     @endif
-                </div>
-            </div>
-        @endif
 
-        {{-- ============================================================ --}}
-        {{-- QUICK ACCESS: Top Einheiten + KPIs                           --}}
-        {{-- ============================================================ --}}
-
-        {{-- Top Einheiten (prominenter Quick-Access) --}}
-        @if(count($topEntities) > 0)
-            <div class="mb-6">
-                <div class="flex items-center gap-2 mb-3">
-                    @svg('heroicon-o-bolt', 'w-4 h-4 text-[var(--ui-primary)]')
-                    <h3 class="text-sm font-semibold text-[var(--ui-secondary)]">Aktive Einheiten</h3>
-                    <span class="text-xs text-[var(--ui-muted)]">(7 Tage)</span>
-                </div>
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
-                    @foreach($topEntities as $top)
-                        <a href="{{ route('organization.entities.show', $top['id']) }}"
-                           class="flex items-center gap-3 p-3 rounded-lg border border-[var(--ui-border)]/60 bg-white hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition-colors group">
-                            <div class="min-w-0 flex-1">
-                                <div class="text-sm font-medium text-[var(--ui-secondary)] group-hover:text-[var(--ui-primary)] truncate">{{ $top['name'] }}</div>
-                                <div class="text-xs text-[var(--ui-muted)]">{{ $top['type_name'] }}</div>
-                            </div>
-                            <div class="flex flex-col items-end flex-shrink-0">
-                                @if($top['items_completed_7d'] > 0)
-                                    <span class="text-xs text-green-600 font-medium">{{ $top['items_completed_7d'] }} Items</span>
-                                @endif
-                                @if($top['hours_7d'] > 0)
-                                    <span class="text-[10px] text-[var(--ui-muted)]">{{ $top['hours_7d'] }}h</span>
-                                @endif
-                            </div>
-                        </a>
-                    @endforeach
-                </div>
-            </div>
-        @endif
-
-        {{-- KPI Tiles --}}
-        @php
-            $signalCriticalCount = $signalOverview['signals']->where('severity', 'critical')->count();
-            $signalVariant = $signalCriticalCount > 0 ? 'danger' : ($signalOverview['total_open'] > 0 ? 'warning' : 'success');
-            $signalDescription = $signalCriticalCount > 0
-                ? $signalCriticalCount . ' kritisch'
-                : ($signalOverview['total_open'] === 0 ? 'Keine offenen Signale' : $signalOverview['total_open'] . ' offen');
-        @endphp
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-            <x-ui-dashboard-tile
-                title="Aktive Einheiten"
-                :count="$this->activeEntities"
-                :description="$this->totalEntities . ' gesamt'"
-                icon="building-office"
-                variant="primary"
-                :href="route('organization.entities.index')"
-            />
-
-            @if($summary['has_data'])
-                <x-ui-dashboard-tile
-                    title="Fortschritt"
-                    :count="$summary['completion_rate']"
-                    :description="$summary['completion_rate'] . '% abgeschlossen'"
-                    icon="check-circle"
-                    :variant="$summary['completion_rate'] >= 50 ? 'success' : 'warning'"
-                    :trend="$summary['trend_completion'] > 0 ? 'up' : ($summary['trend_completion'] < 0 ? 'down' : null)"
-                    :trendValue="$summary['trend_completion'] != 0 ? ($summary['trend_completion'] > 0 ? '+' : '') . $summary['trend_completion'] . '% vs. 7d' : null"
-                />
-            @else
-                <x-ui-dashboard-tile
-                    title="Fortschritt"
-                    :count="0"
-                    icon="check-circle"
-                    variant="secondary"
-                />
-            @endif
-
-            @if($time['has_data'])
-                <x-ui-dashboard-tile
-                    title="Stunden (Monat)"
-                    :count="$time['hours_this_month']"
-                    icon="clock"
-                    variant="secondary"
-                    :trend="$time['trend_hours'] > 0 ? 'up' : ($time['trend_hours'] < 0 ? 'down' : null)"
-                    :trendValue="$time['trend_hours'] != 0 ? ($time['trend_hours'] > 0 ? '+' : '') . $time['trend_hours'] . 'h vs. Vormonat' : null"
-                />
-            @else
-                <x-ui-dashboard-tile title="Stunden (Monat)" :count="0" icon="clock" variant="secondary" />
-            @endif
-
-            <x-ui-dashboard-tile
-                title="Offene Signale"
-                :count="$signalOverview['total_open']"
-                :description="$signalDescription"
-                icon="bell-alert"
-                :variant="$signalVariant"
-            />
-        </div>
-
-        {{-- Insight Banner (compact) --}}
-        @if(count($insights) > 0)
-            <div class="mb-6 p-4 rounded-lg bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
-                <div class="flex items-start gap-3">
-                    @svg('heroicon-o-light-bulb', 'w-4 h-4 text-amber-500 flex-shrink-0 mt-0.5')
-                    <div class="flex flex-wrap gap-x-4 gap-y-1">
-                        @foreach($insights as $insight)
-                            <span class="text-sm
-                                @if($insight['type'] === 'success') text-green-700
-                                @elseif($insight['type'] === 'warning') text-amber-700
-                                @else text-[var(--ui-secondary)]
-                                @endif
-                            ">
-                                @if($insight['type'] === 'success')
-                                    @svg('heroicon-o-arrow-trending-up', 'w-3.5 h-3.5 inline-block -mt-0.5 mr-0.5')
-                                @elseif($insight['type'] === 'warning')
-                                    @svg('heroicon-o-exclamation-triangle', 'w-3.5 h-3.5 inline-block -mt-0.5 mr-0.5')
-                                @else
-                                    @svg('heroicon-o-information-circle', 'w-3.5 h-3.5 inline-block -mt-0.5 mr-0.5')
-                                @endif
-                                {{ $insight['text'] }}
-                            </span>
-                        @endforeach
-                    </div>
-                </div>
-            </div>
-        @endif
-
-        {{-- ============================================================ --}}
-        {{-- ANALYSE: Trends + Bewegung + Umwelt (collapsible)            --}}
-        {{-- ============================================================ --}}
-        @php
-            $hasTrend = !empty($trend) && count($trend['snapshots'] ?? []) >= 1;
-            $teamMovement = $this->teamMovement;
-            $hasMovement = !empty($teamMovement['metrics']);
-            $envRadar = $this->environmentRadar;
-        @endphp
-
-        @if($hasTrend || $hasMovement || $envRadar['has_data'])
-            <div x-data="{ analyseOpen: false }">
-                <button @click="analyseOpen = !analyseOpen"
-                    class="w-full flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-white hover:bg-[var(--ui-muted-5)] transition-colors mb-4">
-                    <div class="flex items-center gap-2">
-                        @svg('heroicon-o-chart-bar-square', 'w-4 h-4 text-[var(--ui-primary)]')
-                        <span class="text-sm font-semibold text-[var(--ui-secondary)]">Analyse & Trends</span>
-                        <span class="text-xs text-[var(--ui-muted)]">
-                            @if($hasTrend) 14d-Trend @endif
-                            @if($hasMovement) &middot; Bewegung @endif
-                            @if($envRadar['has_data']) &middot; Umwelt @endif
-                        </span>
-                    </div>
-                    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
-                        class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200"
-                        :class="{ 'rotate-180': analyseOpen }">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                    </svg>
-                </button>
-
-                <div x-show="analyseOpen" x-collapse x-cloak class="space-y-6">
-                    {{-- Entwicklung (Trend + Bewegung) --}}
-                    @if($hasTrend || $hasMovement)
-                        <x-ui-panel title="Entwicklung" x-data="{ tab: '{{ $hasTrend ? 'trend' : 'movement' }}' }">
-                            <div class="flex items-center gap-2 mb-4">
-                                @if($hasTrend)
-                                    <button @click="tab = 'trend'"
-                                        :class="tab === 'trend' ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]'"
-                                        class="px-3 py-1.5 text-xs font-medium rounded transition-colors">
-                                        14-Tage Trend
-                                    </button>
-                                @endif
-                                @if($hasMovement)
-                                    <button @click="tab = 'movement'"
-                                        :class="tab === 'movement' ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]'"
-                                        class="px-3 py-1.5 text-xs font-medium rounded transition-colors">
-                                        Bewegung (7d)
-                                    </button>
-                                @endif
-                            </div>
-
-                            {{-- Tab: Trend --}}
-                            @if($hasTrend)
-                                <div x-show="tab === 'trend'" x-cloak>
-                                    <div class="flex items-center justify-end gap-3 mb-4">
-                                        <div class="flex items-center gap-1.5">
-                                            <span class="w-2 h-2 rounded-full bg-blue-500"></span>
-                                            <span class="text-[10px] text-[var(--ui-muted)]">Items erledigt</span>
-                                        </div>
-                                        <div class="flex items-center gap-1.5">
-                                            <span class="w-2 h-2 rounded-full bg-blue-200"></span>
-                                            <span class="text-[10px] text-[var(--ui-muted)]">Items gesamt</span>
-                                        </div>
-                                        <div class="flex items-center gap-1.5">
-                                            <span class="w-2 h-2 rounded-full bg-violet-400"></span>
-                                            <span class="text-[10px] text-[var(--ui-muted)]">Stunden</span>
-                                        </div>
+                    @if (count($topEntities) > 0)
+                        <x-nx-panel flush title="Aktive Einheiten" subtitle="letzte 7 Tage">
+                            @foreach ($topEntities as $top)
+                                <a href="{{ route('organization.entities.show', $top['id']) }}" wire:navigate
+                                   class="flex items-center gap-3 border-b border-[color:var(--nx-line)] px-4 py-2 text-sm transition-colors last:border-0 hover:bg-[color:var(--nx-hover)]">
+                                    <div class="min-w-0 flex-1">
+                                        <div class="truncate font-medium text-[color:var(--nx-text)]">{{ $top['name'] }}</div>
+                                        <div class="text-xs text-[color:var(--nx-faint)]">{{ $top['type_name'] }}</div>
                                     </div>
+                                    <div class="shrink-0 text-right text-xs tabular-nums">
+                                        @if ($top['items_completed_7d'] > 0)
+                                            <div class="text-[color:var(--nx-success)]">{{ $top['items_completed_7d'] }} erledigt</div>
+                                        @endif
+                                        @if ($top['hours_7d'] > 0)
+                                            <div class="text-[color:var(--nx-muted)]">{{ $top['hours_7d'] }} h</div>
+                                        @endif
+                                    </div>
+                                </a>
+                            @endforeach
+                        </x-nx-panel>
+                    @endif
 
-                                    <div class="flex items-end gap-1" style="height: 160px;" x-data="{ tooltip: null }">
-                                        @foreach($trend['snapshots'] as $idx => $snap)
+                    @if ($hasTrend || $hasMovement)
+                        <x-nx-panel title="Entwicklung" x-data="{ tab: '{{ $hasTrend ? 'trend' : 'movement' }}' }">
+                            <x-slot name="actions">
+                                <div class="flex gap-1">
+                                    @if ($hasTrend)
+                                        <button type="button" x-on:click="tab = 'trend'"
+                                            :class="tab === 'trend' ? 'bg-[color:var(--nx-active)] text-[color:var(--nx-text)]' : 'text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]'"
+                                            class="rounded-[6px] px-2.5 py-1 text-xs font-medium">14 Tage</button>
+                                    @endif
+                                    @if ($hasMovement)
+                                        <button type="button" x-on:click="tab = 'movement'"
+                                            :class="tab === 'movement' ? 'bg-[color:var(--nx-active)] text-[color:var(--nx-text)]' : 'text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]'"
+                                            class="rounded-[6px] px-2.5 py-1 text-xs font-medium">Bewegung</button>
+                                    @endif
+                                </div>
+                            </x-slot>
+
+                            @if ($hasTrend)
+                                <div x-show="tab === 'trend'" x-cloak>
+                                    <div class="mb-3 flex items-center justify-end gap-3 text-[11px] text-[color:var(--nx-muted)]">
+                                        <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-[color:var(--nx-accent)]"></span>erledigt</span>
+                                        <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-[color:var(--nx-accent-soft)]"></span>gesamt</span>
+                                        <span class="inline-flex items-center gap-1.5"><span class="h-2 w-2 rounded-full bg-[color:var(--nx-info)]"></span>Stunden</span>
+                                    </div>
+                                    <div class="flex items-end gap-1" style="height: 160px;" x-data="{ tip: null }">
+                                        @foreach ($trend['snapshots'] as $idx => $snap)
                                             @php
                                                 $maxItems = max($trend['max_items_total'], 1);
                                                 $maxMin = max($trend['max_minutes'], 1);
                                                 $totalH = round(($snap['items_total'] / $maxItems) * 130);
                                                 $doneH = $snap['items_total'] > 0 ? max(1, round(($snap['items_done'] / $maxItems) * 130)) : 0;
                                                 $timeH = $snap['time_total_minutes'] > 0 ? max(2, round(($snap['time_total_minutes'] / $maxMin) * 130)) : 0;
+                                                $lastIdx = count($trend['snapshots']) - 1;
                                             @endphp
-                                            <div class="flex-1 flex flex-col items-center h-full justify-end gap-px relative"
-                                                 @mouseenter="tooltip = {{ $idx }}"
-                                                 @mouseleave="tooltip = null">
-                                                <div x-show="tooltip === {{ $idx }}" x-cloak
-                                                     class="absolute bottom-full mb-2 px-2.5 py-1.5 rounded-lg bg-[var(--ui-secondary)] text-white text-[10px] whitespace-nowrap z-10 shadow-lg pointer-events-none"
-                                                     x-transition.opacity>
-                                                    {{ $snap['date'] }}: {{ $snap['items_done'] }}/{{ $snap['items_total'] }} Items,
-                                                    {{ intdiv($snap['time_total_minutes'], 60) }}:{{ str_pad($snap['time_total_minutes'] % 60, 2, '0', STR_PAD_LEFT) }}h
+                                            <div class="relative flex h-full flex-1 flex-col items-center justify-end gap-px"
+                                                 x-on:mouseenter="tip = {{ $idx }}" x-on:mouseleave="tip = null">
+                                                <div x-show="tip === {{ $idx }}" x-cloak
+                                                     class="pointer-events-none absolute bottom-full z-10 mb-2 whitespace-nowrap rounded-[6px] border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] px-2 py-1 text-[11px] text-[color:var(--nx-text)] shadow-sm">
+                                                    {{ $snap['date'] }}: {{ $snap['items_done'] }}/{{ $snap['items_total'] }} ·
+                                                    {{ intdiv($snap['time_total_minutes'], 60) }}:{{ str_pad($snap['time_total_minutes'] % 60, 2, '0', STR_PAD_LEFT) }} h
                                                 </div>
-
-                                                <div class="w-full flex gap-px justify-center flex-1 items-end">
-                                                    <div class="flex-1 flex flex-col justify-end">
-                                                        @if($snap['items_total'] > 0)
-                                                            <div class="w-full bg-blue-200 rounded-t" style="height: {{ $totalH }}px;">
-                                                                <div class="w-full bg-blue-500 rounded-t" style="height: {{ $doneH }}px;"></div>
+                                                <div class="flex w-full flex-1 items-end justify-center gap-px">
+                                                    <div class="flex flex-1 flex-col justify-end">
+                                                        @if ($snap['items_total'] > 0)
+                                                            <div class="flex w-full flex-col justify-end rounded-t-[3px] bg-[color:var(--nx-accent-soft)]" style="height: {{ $totalH }}px;">
+                                                                <div class="w-full rounded-t-[3px] bg-[color:var(--nx-accent)]" style="height: {{ $doneH }}px;"></div>
                                                             </div>
                                                         @else
-                                                            <div class="w-full bg-[var(--ui-border)]/20 rounded-t" style="height: 1px;"></div>
+                                                            <div class="h-px w-full bg-[color:var(--nx-line)]"></div>
                                                         @endif
                                                     </div>
-                                                    <div class="flex-1 flex flex-col justify-end">
-                                                        @if($snap['time_total_minutes'] > 0)
-                                                            <div class="w-full bg-violet-400 rounded-t" style="height: {{ $timeH }}px;"></div>
+                                                    <div class="flex flex-1 flex-col justify-end">
+                                                        @if ($snap['time_total_minutes'] > 0)
+                                                            <div class="w-full rounded-t-[3px] bg-[color:var(--nx-info)] opacity-70" style="height: {{ $timeH }}px;"></div>
                                                         @else
-                                                            <div class="w-full bg-[var(--ui-border)]/20 rounded-t" style="height: 1px;"></div>
+                                                            <div class="h-px w-full bg-[color:var(--nx-line)]"></div>
                                                         @endif
                                                     </div>
                                                 </div>
-                                                @if($idx === 0 || $idx === count($trend['snapshots']) - 1 || $idx % 3 === 0)
-                                                    <div class="text-[9px] text-[var(--ui-muted)] mt-0.5 leading-none">{{ $snap['date'] }}</div>
-                                                @else
-                                                    <div class="h-[11px]"></div>
-                                                @endif
+                                                <div class="mt-0.5 h-[11px] text-[9px] leading-none text-[color:var(--nx-faint)]">
+                                                    @if ($idx === 0 || $idx === $lastIdx || $idx % 3 === 0){{ $snap['date'] }}@endif
+                                                </div>
                                             </div>
                                         @endforeach
                                     </div>
-
-                                    @if($velocity['avg_per_week'] > 0)
-                                        <div class="mt-3 pt-3 border-t border-[var(--ui-border)]/40">
-                                            <p class="text-xs text-[var(--ui-muted)]">
-                                                @svg('heroicon-o-arrow-trending-up', 'w-3.5 h-3.5 inline-block -mt-0.5 mr-1')
-                                                Erledigungsrate: Ø {{ $velocity['avg_per_week'] }} Items/Woche
-                                                @if($velocity['trend'] === 'accelerating')
-                                                    <span class="text-green-600">(beschleunigend)</span>
-                                                @elseif($velocity['trend'] === 'decelerating')
-                                                    <span class="text-amber-600">(verlangsamend)</span>
-                                                @endif
-                                            </p>
-                                        </div>
+                                    @if ($velocity['avg_per_week'] > 0)
+                                        <p class="mb-0 mt-3 border-t border-[color:var(--nx-line)] pt-3 text-xs text-[color:var(--nx-muted)]">
+                                            Erledigungsrate Ø {{ $velocity['avg_per_week'] }} Items/Woche
+                                            @if ($velocity['trend'] === 'accelerating')
+                                                <span class="text-[color:var(--nx-success)]">· beschleunigt</span>
+                                            @elseif ($velocity['trend'] === 'decelerating')
+                                                <span class="text-[color:var(--nx-warning)]">· verlangsamt</span>
+                                            @endif
+                                        </p>
                                     @endif
                                 </div>
                             @endif
 
-                            {{-- Tab: Movement --}}
-                            @if($hasMovement)
+                            @if ($hasMovement)
                                 <div x-show="tab === 'movement'" x-cloak>
-                                    <div class="flex gap-1 mb-4">
-                                        <button wire:click="$set('dashboardStream', null)"
-                                            class="px-2 py-1 text-[10px] rounded transition-colors {{ !$dashboardStream ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]' }}">
-                                            Alle
-                                        </button>
-                                        @foreach($teamMovement['available_groups'] as $groupKey => $groupLabel)
-                                            <button wire:click="$set('dashboardStream', '{{ $groupKey }}')"
-                                                class="px-2 py-1 text-[10px] rounded transition-colors {{ $dashboardStream === $groupKey ? 'bg-[var(--ui-primary)] text-white' : 'text-[var(--ui-muted)] hover:text-[var(--ui-text)]' }}">
-                                                {{ $groupLabel }}
-                                            </button>
+                                    <div class="mb-3 flex flex-wrap gap-1">
+                                        <button type="button" wire:click="$set('dashboardStream', null)"
+                                            class="rounded-[6px] px-2 py-0.5 text-xs {{ ! $dashboardStream ? 'bg-[color:var(--nx-active)] font-medium text-[color:var(--nx-text)]' : 'text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]' }}">Alle</button>
+                                        @foreach ($teamMovement['available_groups'] as $groupKey => $groupLabel)
+                                            <button type="button" wire:click="$set('dashboardStream', '{{ $groupKey }}')"
+                                                class="rounded-[6px] px-2 py-0.5 text-xs {{ $dashboardStream === $groupKey ? 'bg-[color:var(--nx-active)] font-medium text-[color:var(--nx-text)]' : 'text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]' }}">{{ $groupLabel }}</button>
                                         @endforeach
                                     </div>
-
-                                    @foreach($teamMovement['metrics_by_group'] as $groupKey => $metrics)
+                                    @foreach ($teamMovement['metrics_by_group'] as $groupKey => $metrics)
                                         <div class="mb-3">
-                                            <div class="text-[10px] font-medium text-[var(--ui-muted)] uppercase mb-1.5">
-                                                {{ ucfirst($groupKey) }}
-                                            </div>
-                                            <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-2">
-                                                @foreach($metrics as $m)
-                                                    @if($m['current'] > 0 || $m['previous'] > 0)
-                                                        <div class="py-2 px-2.5 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/20">
-                                                            <div class="text-sm font-bold text-[var(--ui-text)]">
+                                            <div class="mb-1.5 text-xs font-medium text-[color:var(--nx-faint)]">{{ ucfirst($groupKey) }}</div>
+                                            <div class="grid grid-cols-2 gap-2 md:grid-cols-3">
+                                                @foreach ($metrics as $m)
+                                                    @if ($m['current'] > 0 || $m['previous'] > 0)
+                                                        <div class="rounded-[6px] border border-[color:var(--nx-line)] px-2.5 py-2">
+                                                            <div class="text-sm font-semibold tabular-nums text-[color:var(--nx-text)]">
                                                                 {{ $m['current'] }}
-                                                                @if($m['delta'] != 0)
-                                                                    <span class="text-[10px] ml-1
-                                                                        {{ $m['sentiment'] === 'positive' ? 'text-green-600' : '' }}
-                                                                        {{ $m['sentiment'] === 'negative' ? 'text-red-600' : '' }}
-                                                                        {{ $m['sentiment'] === 'neutral' ? 'text-[var(--ui-muted)]' : '' }}
-                                                                    ">{{ $m['delta_formatted'] }}</span>
+                                                                @if ($m['delta'] != 0)
+                                                                    <span class="ml-1 text-[11px] font-medium {{ $m['sentiment'] === 'positive' ? 'text-[color:var(--nx-success)]' : ($m['sentiment'] === 'negative' ? 'text-[color:var(--nx-danger)]' : 'text-[color:var(--nx-muted)]') }}">{{ $m['delta_formatted'] }}</span>
                                                                 @endif
                                                             </div>
-                                                            <div class="text-[10px] text-[var(--ui-muted)]">{{ $m['label'] }}</div>
-                                                            @if($m['ratio'])
-                                                                <div class="mt-1 h-1 bg-[var(--ui-border)]/30 rounded-full overflow-hidden">
-                                                                    <div class="h-full bg-blue-500 rounded-full" style="width: {{ min($m['ratio'], 100) }}%"></div>
+                                                            <div class="text-[11px] text-[color:var(--nx-muted)]">{{ $m['label'] }}</div>
+                                                            @if ($m['ratio'])
+                                                                <div class="mt-1 h-1 overflow-hidden rounded-full bg-[color:var(--nx-accent-soft)]">
+                                                                    <div class="h-full rounded-full bg-[color:var(--nx-accent)]" style="width: {{ min($m['ratio'], 100) }}%"></div>
                                                                 </div>
                                                             @endif
                                                         </div>
@@ -573,81 +330,95 @@
                                     @endforeach
                                 </div>
                             @endif
-                        </x-ui-panel>
+                        </x-nx-panel>
                     @endif
 
-                    {{-- Umwelt-Radar --}}
-                    @if($envRadar['has_data'])
-                        <x-ui-panel title="Umwelt-Radar" subtitle="Externe Signale">
-                            <div class="space-y-2">
-                                @foreach($envRadar['sources'] as $src)
-                                    <div class="p-3 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)]">
-                                        <div class="flex items-center gap-2 mb-1.5">
+                    @if ($envRadar['has_data'])
+                        <x-nx-panel flush title="Umwelt-Radar" subtitle="Externe Signale">
+                            <x-slot name="actions">
+                                <a href="{{ route('organization.environment-snapshots.index') }}" wire:navigate class="text-xs font-medium text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">Alle</a>
+                            </x-slot>
+                            @foreach ($envRadar['sources'] as $src)
+                                <div class="border-b border-[color:var(--nx-line)] px-4 py-3 last:border-0">
+                                    <div class="flex items-center gap-2">
+                                        <x-nx-badge>{{ ucfirst($src['category']) }}</x-nx-badge>
+                                        <span class="flex-1 truncate text-sm font-medium text-[color:var(--nx-text)]">{{ $src['name'] }}</span>
+                                        @if ($src['sentiment_score'] !== null)
                                             @php
-                                                $badgeColors = [
-                                                    'indigo' => 'bg-indigo-100 text-indigo-700',
-                                                    'cyan' => 'bg-cyan-100 text-cyan-700',
-                                                    'amber' => 'bg-amber-100 text-amber-700',
-                                                    'rose' => 'bg-rose-100 text-rose-700',
-                                                    'red' => 'bg-red-100 text-red-700',
-                                                    'sky' => 'bg-sky-100 text-sky-700',
-                                                    'orange' => 'bg-orange-100 text-orange-700',
-                                                    'gray' => 'bg-gray-100 text-gray-700',
-                                                ];
-                                                $bc = $badgeColors[$src['category_color']] ?? $badgeColors['gray'];
+                                                $sent = $src['sentiment_score'] >= 0.6 ? 'var(--nx-success)' : ($src['sentiment_score'] >= 0.3 ? 'var(--nx-warning)' : 'var(--nx-danger)');
                                             @endphp
-                                            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium {{ $bc }}">
-                                                {{ ucfirst($src['category']) }}
-                                            </span>
-                                            <span class="text-sm font-medium text-[var(--ui-secondary)] truncate flex-1">{{ $src['name'] }}</span>
-                                            @if($src['sentiment_score'] !== null)
-                                                @php
-                                                    $sentColor = $src['sentiment_score'] >= 0.6 ? 'bg-green-500' : ($src['sentiment_score'] >= 0.3 ? 'bg-yellow-500' : 'bg-red-500');
-                                                @endphp
-                                                <span class="w-2.5 h-2.5 rounded-full {{ $sentColor }} shrink-0" title="Sentiment: {{ round($src['sentiment_score'] * 100) }}%"></span>
-                                            @endif
-                                            @if($src['delta'] && $src['delta']['sentiment_change'] != 0)
-                                                @if($src['delta']['sentiment_change'] > 0)
-                                                    <span class="text-green-500 text-xs">&#9650;</span>
-                                                @else
-                                                    <span class="text-red-500 text-xs">&#9660;</span>
-                                                @endif
-                                            @endif
-                                        </div>
-
-                                        @if($src['relevance_score'] !== null)
-                                            <div class="flex items-center gap-2 mb-1.5">
-                                                <span class="text-[10px] text-[var(--ui-muted)] w-12 shrink-0">Relevanz</span>
-                                                <div class="flex-1 h-1 bg-[var(--ui-border)]/30 rounded-full overflow-hidden">
-                                                    <div class="h-full bg-blue-500 rounded-full" style="width: {{ min(round($src['relevance_score'] * 100), 100) }}%"></div>
-                                                </div>
-                                                <span class="text-[10px] text-[var(--ui-muted)] tabular-nums">{{ round($src['relevance_score'] * 100) }}%</span>
-                                            </div>
+                                            <span class="h-2 w-2 shrink-0 rounded-full" style="background: {{ $sent }}" title="Stimmung {{ round($src['sentiment_score'] * 100) }} %"></span>
                                         @endif
-
-                                        @if($src['summary'])
-                                            <p class="text-xs text-[var(--ui-muted)] line-clamp-2 mb-1.5">{{ $src['summary'] }}</p>
+                                        @if ($src['delta'] && $src['delta']['sentiment_change'] != 0)
+                                            <span class="text-xs {{ $src['delta']['sentiment_change'] > 0 ? 'text-[color:var(--nx-success)]' : 'text-[color:var(--nx-danger)]' }}">{!! $src['delta']['sentiment_change'] > 0 ? '&#9650;' : '&#9660;' !!}</span>
                                         @endif
-
-                                        <div class="flex items-center justify-between gap-2">
-                                            <div class="flex flex-wrap gap-1 min-w-0">
-                                                @foreach(array_slice($src['topics'] ?? [], 0, 4) as $topic)
-                                                    <span class="inline-flex items-center px-1.5 py-0.5 rounded bg-[var(--ui-muted-5)] text-[9px] text-[var(--ui-muted)] border border-[var(--ui-border)]/30">{{ $topic }}</span>
-                                                @endforeach
+                                    </div>
+                                    @if ($src['relevance_score'] !== null)
+                                        <div class="mt-1.5 flex items-center gap-2">
+                                            <span class="w-14 shrink-0 text-[11px] text-[color:var(--nx-faint)]">Relevanz</span>
+                                            <div class="h-1 flex-1 overflow-hidden rounded-full bg-[color:var(--nx-accent-soft)]">
+                                                <div class="h-full rounded-full bg-[color:var(--nx-accent)]" style="width: {{ min(round($src['relevance_score'] * 100), 100) }}%"></div>
                                             </div>
-                                            @if($src['last_pulled_at'])
-                                                <span class="text-[9px] text-[var(--ui-muted)] whitespace-nowrap shrink-0">{{ $src['last_pulled_at'] }}</span>
-                                            @endif
+                                            <span class="text-[11px] tabular-nums text-[color:var(--nx-muted)]">{{ round($src['relevance_score'] * 100) }} %</span>
                                         </div>
+                                    @endif
+                                    @if ($src['summary'])
+                                        <p class="mb-0 mt-1.5 line-clamp-2 text-xs text-[color:var(--nx-muted)]">{{ $src['summary'] }}</p>
+                                    @endif
+                                    <div class="mt-1.5 flex items-center justify-between gap-2">
+                                        <div class="flex min-w-0 flex-wrap gap-1">
+                                            @foreach (array_slice($src['topics'] ?? [], 0, 4) as $topic)
+                                                <span class="rounded-[4px] bg-[color:var(--nx-accent-soft)] px-1.5 py-0.5 text-[10px] text-[color:var(--nx-muted)]">{{ $topic }}</span>
+                                            @endforeach
+                                        </div>
+                                        @if ($src['last_pulled_at'])
+                                            <span class="shrink-0 whitespace-nowrap text-[10px] text-[color:var(--nx-faint)]">{{ $src['last_pulled_at'] }}</span>
+                                        @endif
+                                    </div>
+                                </div>
+                            @endforeach
+                        </x-nx-panel>
+                    @endif
+                </div>
+
+                {{-- Seitenspalte --}}
+                <div class="min-w-0 space-y-5">
+                    @if ($time['has_data'])
+                        <x-nx-panel flush title="Zeiterfassung">
+                            <div class="divide-y divide-[color:var(--nx-line)] text-sm">
+                                <div class="flex justify-between px-4 py-2"><span class="text-[color:var(--nx-muted)]">Stunden (Monat)</span><span class="font-medium tabular-nums">{{ $time['hours_this_month'] }}</span></div>
+                                @if ($summary['has_data'])
+                                    <div class="flex justify-between px-4 py-2"><span class="text-[color:var(--nx-muted)]">Items erledigt</span><span class="font-medium tabular-nums">{{ $summary['items_done'] }}</span></div>
+                                    <div class="flex justify-between px-4 py-2"><span class="text-[color:var(--nx-muted)]">Abrechnungsquote</span><span class="font-medium tabular-nums">{{ $time['billing_rate'] }} %</span></div>
+                                @endif
+                            </div>
+                        </x-nx-panel>
+                    @endif
+
+                    @if (count($linkDist) > 0)
+                        <x-nx-panel flush title="Verknüpfungen">
+                            <div class="divide-y divide-[color:var(--nx-line)] text-sm">
+                                @foreach ($linkDist as $dist)
+                                    <div class="flex items-center gap-2 px-4 py-2">
+                                        @svg('heroicon-o-' . (app('safe-svg')->resolve($dist['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 shrink-0 text-[color:var(--nx-faint)]')
+                                        <span class="flex-1 truncate text-[color:var(--nx-muted)]">{{ $dist['label'] }}</span>
+                                        <span class="font-medium tabular-nums">{{ $dist['count'] }}</span>
                                     </div>
                                 @endforeach
                             </div>
-                        </x-ui-panel>
+                        </x-nx-panel>
                     @endif
+
+                    <x-nx-panel flush title="Letzte Aktivität">
+                        <div class="max-h-[32rem] overflow-y-auto">
+                            <livewire:organization.activity-feed lazy />
+                        </div>
+                    </x-nx-panel>
                 </div>
             </div>
-        @endif
-        @if($profile)
+        </div>
+
+        @if ($profile)
             <script type="application/json" id="org-dashboard-timings">{!! json_encode($this->timings()) !!}</script>
         @endif
     </x-ui-page-container>

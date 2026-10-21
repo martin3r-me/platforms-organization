@@ -46,6 +46,8 @@ class ActivityFeed extends Component
                 $q->orWhere(function ($sq) use ($type, $ids) {
                     $sq->where('activityable_type', $type);
                     if ($ids !== null) {
+                        // Builder = Unterabfrage (Team-Einheiten, Team-Zeitbuchungen),
+                        // statt tausende IDs in die Query zu schreiben
                         $sq->whereIn('activityable_id', $ids);
                     }
                 });
@@ -88,12 +90,6 @@ class ActivityFeed extends Component
                 }
             }
 
-            // TimeEntries des Teams
-            $timeEntryIds = OrganizationTimeEntry::where('team_id', $teamId)->pluck('id')->toArray();
-            if (!empty($timeEntryIds)) {
-                $key = $this->getMorphKey(OrganizationTimeEntry::class);
-                $pairs[$key] = array_merge($pairs[$key] ?? [], $timeEntryIds);
-            }
         } else {
             // Dashboard: Team-weit
             $teamEntityIds = OrganizationEntity::where('team_id', $teamId)->pluck('id')->toArray();
@@ -110,12 +106,6 @@ class ActivityFeed extends Component
                 }
             }
 
-            // TimeEntries des Teams
-            $timeEntryIds = OrganizationTimeEntry::where('team_id', $teamId)->pluck('id')->toArray();
-            if (!empty($timeEntryIds)) {
-                $key = $this->getMorphKey(OrganizationTimeEntry::class);
-                $pairs[$key] = array_merge($pairs[$key] ?? [], $timeEntryIds);
-            }
         }
 
         // Cascade: Child-Models über Provider resolven (z.B. Project → Tasks)
@@ -130,6 +120,14 @@ class ActivityFeed extends Component
             if (is_array($ids)) {
                 $pairs[$type] = array_values(array_unique($ids));
             }
+        }
+
+        // Zeitbuchungen des Teams als Unterabfrage. Vorher: pluck aller IDs bei
+        // jedem Aufruf. Kein Provider-Cascade nötig (Zeitbuchungen haben keine Kinder).
+        // Bekannte Unschärfe wie vorher: auf Entity-Seiten alle Team-Buchungen.
+        $teKey = $this->getMorphKey(OrganizationTimeEntry::class);
+        if (! isset($pairs[$teKey])) {
+            $pairs[$teKey] = OrganizationTimeEntry::query()->select('id')->where('team_id', $teamId);
         }
 
         return $pairs;

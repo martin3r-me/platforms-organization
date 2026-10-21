@@ -87,11 +87,17 @@ class Index extends Component
     {
         $teamId = auth()->user()->currentTeam->id;
 
+        // Eine Abfrage statt vier; „aktiv" wie der active()-Scope des Models.
+        $active = OrganizationInterlink::where('team_id', $teamId)->active()->toBase()
+            ->selectRaw('COUNT(*) as active, SUM(CASE WHEN is_bidirectional = 1 THEN 1 ELSE 0 END) as bidirectional')
+            ->first();
+        $total = OrganizationInterlink::where('team_id', $teamId)->count();
+
         return [
-            'total' => OrganizationInterlink::where('team_id', $teamId)->count(),
-            'active' => OrganizationInterlink::where('team_id', $teamId)->active()->count(),
-            'inactive' => OrganizationInterlink::where('team_id', $teamId)->where('is_active', false)->count(),
-            'bidirectional' => OrganizationInterlink::where('team_id', $teamId)->active()->where('is_bidirectional', true)->count(),
+            'total' => $total,
+            'active' => (int) ($active->active ?? 0),
+            'inactive' => $total - (int) ($active->active ?? 0),
+            'bidirectional' => (int) ($active->bidirectional ?? 0),
         ];
     }
 

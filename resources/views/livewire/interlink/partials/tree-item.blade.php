@@ -1,40 +1,29 @@
-<div style="padding-left: {{ ($depth + 1) * 24 }}px;">
-    <div class="flex items-center gap-3 py-2 px-3 hover:bg-[var(--ui-muted-5)] rounded transition-colors group">
-        <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2">
-                @svg('heroicon-o-arrows-right-left', 'w-3.5 h-3.5 text-[var(--ui-muted)] flex-shrink-0')
-                <a href="{{ route('organization.interlinks.show', $item) }}" class="text-sm font-medium text-[var(--ui-primary)] hover:underline truncate" wire:navigate>
-                    {{ $item->name }}
-                </a>
-                @if($item->category)
-                    <x-ui-badge variant="secondary" size="sm">{{ $item->category->name }}</x-ui-badge>
-                @endif
-                @if($item->type)
-                    <x-ui-badge variant="secondary" size="sm">{{ $item->type->name }}</x-ui-badge>
-                @endif
-                @if($item->is_bidirectional)
-                    @svg('heroicon-o-arrows-right-left', 'w-3.5 h-3.5 text-[var(--ui-primary)] flex-shrink-0')
-                @endif
-                @if($item->is_active)
-                    <x-ui-badge variant="success" size="sm">Aktiv</x-ui-badge>
-                @else
-                    <x-ui-badge variant="danger" size="sm">Inaktiv</x-ui-badge>
-                @endif
-            </div>
-            @if($item->description)
-                <div class="text-xs text-[var(--ui-muted)] ml-5.5 truncate">{{ \Illuminate\Support\Str::limit($item->description, 80) }}</div>
+{{-- Ein Interlink im Baum. Erwartet: $item, $depth (Tiefe des Owner-Knotens). --}}
+<div wire:key="il-{{ $item->id }}" class="group flex items-center gap-2 py-1.5 pr-3 transition-colors hover:bg-[color:var(--nx-hover)]" style="padding-left: {{ 16 + ($depth + 1) * 20 }}px">
+    @svg('heroicon-o-arrows-right-left', 'w-3.5 h-3.5 shrink-0 text-[color:var(--nx-faint)]')
+    <div class="min-w-0 flex-1">
+        <div class="flex min-w-0 items-center gap-2">
+            <a href="{{ route('organization.interlinks.show', $item) }}" wire:navigate class="truncate text-sm font-medium text-[color:var(--nx-text)] hover:underline">{{ $item->name }}</a>
+            @if ($item->category)
+                <span class="shrink-0 text-xs text-[color:var(--nx-muted)]">{{ $item->category->name }}</span>
+            @endif
+            @if ($item->type)
+                <span class="shrink-0 text-xs text-[color:var(--nx-faint)]">· {{ $item->type->name }}</span>
+            @endif
+            @if ($item->is_bidirectional)
+                <span title="Bidirektional">@svg('heroicon-o-arrows-right-left', 'w-3.5 h-3.5 shrink-0 text-[color:var(--nx-accent)]')</span>
             @endif
         </div>
-
-        <div class="flex gap-1 flex-shrink-0 opacity-0 group-hover:opacity-100 transition-opacity">
-            <a href="{{ route('organization.interlinks.show', $item) }}">
-                <x-ui-button size="xs" variant="secondary-outline">
-                    @svg('heroicon-o-pencil-square', 'w-3.5 h-3.5')
-                </x-ui-button>
-            </a>
-            <x-ui-confirm-button size="xs" variant="danger-outline" wire:click="deleteInterlink({{ $item->id }})" confirm-text="Interlink wirklich löschen?">
-                @svg('heroicon-o-trash', 'w-3.5 h-3.5')
-            </x-ui-confirm-button>
-        </div>
+        @if ($item->description)
+            <div class="truncate text-xs text-[color:var(--nx-faint)]">{{ $item->description }}</div>
+        @endif
     </div>
+    @unless ($item->is_active)
+        <x-nx-badge dot>Inaktiv</x-nx-badge>
+    @endunless
+    <button type="button" wire:click="deleteInterlink({{ $item->id }})" wire:confirm="Interlink „{{ $item->name }}“ wirklich löschen?"
+        title="Löschen"
+        class="shrink-0 rounded-[6px] p-1 text-[color:var(--nx-faint)] opacity-0 transition hover:bg-[color:var(--nx-hover)] hover:text-[color:var(--nx-danger)] group-hover:opacity-100">
+        @svg('heroicon-o-trash', 'w-4 h-4')
+    </button>
 </div>

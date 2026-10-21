@@ -1,127 +1,97 @@
-<div>
-    @if(!$entity->linked_user_id)
-        <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-            <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
-                @svg('heroicon-o-user', 'w-8 h-8 text-[var(--ui-muted)]')
-            </div>
-            <p class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Kein User verknüpft</p>
-            <p class="text-xs text-[var(--ui-muted)]">Verknüpfe einen User im Tab "Daten", um Personen-Aktivitäten zu sehen.</p>
-        </div>
+{{-- Tab „Aktivität" einer Person (eingebettet in entity/show). --}}
+<div class="space-y-5">
+    @if (! $entity->linked_user_id)
+        <x-nx-card flush>
+            <x-nx-empty icon="heroicon-o-user">
+                Kein User verknüpft. Verknüpfe im Tab „Daten" einen User, um Aktivitäten zu sehen.
+            </x-nx-empty>
+        </x-nx-card>
     @else
         @php
             $linkedUser = $entity->linkedUser;
             $vitalSigns = $this->vitalSigns;
             $responsibilities = $this->responsibilities;
             $sectionConfigs = $this->sectionConfigs;
+            $icon = fn ($i) => 'heroicon-o-' . (app('safe-svg')->resolve($i ?? null, 'heroicon-o-') ?? 'cube');
+            $tone = fn ($v) => match ($v) {
+                'danger' => 'var(--nx-danger)',
+                'warning' => 'var(--nx-warning)',
+                'success' => 'var(--nx-success)',
+                default => 'var(--nx-text)',
+            };
         @endphp
 
-        {{-- User Info Header --}}
-        <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6 mb-6">
-            <div class="flex items-center gap-4">
-                <div class="w-12 h-12 rounded-full bg-[var(--ui-muted-5)] flex items-center justify-center border border-[var(--ui-border)]/40">
-                    @svg('heroicon-o-user', 'w-6 h-6 text-[var(--ui-muted)]')
-                </div>
-                <div>
-                    <h3 class="text-lg font-semibold text-[var(--ui-secondary)]">{{ $linkedUser->name ?? '—' }}</h3>
-                    @if($linkedUser?->email)
-                        <p class="text-sm text-[var(--ui-muted)]">{{ $linkedUser->email }}</p>
-                    @endif
-                </div>
+        <div class="flex items-center gap-3">
+            <x-nx-avatar :name="$linkedUser->name ?? '?'" :src="$linkedUser && $linkedUser->avatar ? $linkedUser->avatarUrl() : null" size="lg" />
+            <div class="min-w-0">
+                <div class="truncate text-base font-semibold text-[color:var(--nx-text)]">{{ $linkedUser->name ?? '–' }}</div>
+                @if ($linkedUser?->email)
+                    <div class="truncate text-sm text-[color:var(--nx-muted)]">{{ $linkedUser->email }}</div>
+                @endif
             </div>
         </div>
 
-        {{-- Vital Signs --}}
-        @if(!empty($vitalSigns))
-            @foreach($vitalSigns as $sectionKey => $signs)
-                @php $config = $sectionConfigs[$sectionKey] ?? ['label' => $sectionKey, 'icon' => 'chart-bar']; @endphp
-                <div class="mb-6">
-                    <div class="flex items-center gap-2 mb-3">
-                        @svg('heroicon-o-' . (app('safe-svg')->resolve($config['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 text-[var(--ui-muted)]')
-                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider">{{ $config['label'] }}</h3>
-                    </div>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
-                        @foreach($signs as $sign)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 text-center">
-                                <div class="text-2xl font-bold
-                                    @if($sign['variant'] === 'danger') text-red-600
-                                    @elseif($sign['variant'] === 'warning') text-amber-600
-                                    @elseif($sign['variant'] === 'success') text-green-600
-                                    @else text-[var(--ui-secondary)]
-                                    @endif
-                                ">{{ $sign['value'] }}</div>
-                                <div class="text-xs text-[var(--ui-muted)] mt-1">{{ $sign['label'] }}</div>
-                            </div>
-                        @endforeach
-                    </div>
+        @foreach ($vitalSigns as $sectionKey => $signs)
+            @php
+                $config = $sectionConfigs[$sectionKey] ?? ['label' => $sectionKey, 'icon' => 'chart-bar'];
+            @endphp
+            <section class="space-y-2">
+                <div class="flex items-center gap-2">
+                    @svg($icon($config['icon'] ?? null), 'w-4 h-4 text-[color:var(--nx-faint)]')
+                    <h3 class="m-0 text-sm font-semibold text-[color:var(--nx-text)]">{{ $config['label'] }}</h3>
                 </div>
-            @endforeach
-        @endif
-
-        {{-- Responsibilities --}}
-        @if(!empty($responsibilities))
-            @foreach($responsibilities as $sectionKey => $groups)
-                @php $config = $sectionConfigs[$sectionKey] ?? ['label' => $sectionKey, 'icon' => 'chart-bar']; @endphp
-                <div class="bg-white rounded-lg border border-[var(--ui-border)] mb-4">
-                    @foreach($groups as $group)
-                        <div x-data="{ open: true }">
-                            {{-- Group Header --}}
-                            <div class="flex items-center justify-between px-6 py-4 cursor-pointer hover:bg-[var(--ui-muted-5)] transition-colors"
-                                 :class="{ 'border-b border-[var(--ui-border)]/40': open }"
-                                 @click="open = !open">
-                                <div class="flex items-center gap-2">
-                                    @svg('heroicon-o-' . (app('safe-svg')->resolve($group['icon'] ?? null, 'heroicon-o-') ?? 'cube'), 'w-4 h-4 text-[var(--ui-muted)]')
-                                    <span class="text-sm font-semibold text-[var(--ui-secondary)]">{{ $group['label'] }}</span>
-                                    <span class="text-xs text-[var(--ui-muted)]">({{ $group['total_count'] }})</span>
-                                </div>
-                                <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"
-                                     class="w-4 h-4 text-[var(--ui-muted)] transition-transform duration-200"
-                                     :class="{ 'rotate-180': open }">
-                                    <path stroke-linecap="round" stroke-linejoin="round" d="m19.5 8.25-7.5 7.5-7.5-7.5" />
-                                </svg>
-                            </div>
-
-                            {{-- Group Items --}}
-                            <div x-show="open" x-collapse x-cloak>
-                                <div class="divide-y divide-[var(--ui-border)]/40">
-                                    @foreach($group['items'] as $item)
-                                        <div class="px-6 py-3 flex items-center justify-between hover:bg-[var(--ui-muted-5)] transition-colors">
-                                            <div class="flex items-center gap-2 min-w-0">
-                                                @if($item['url'])
-                                                    <a href="{{ $item['url'] }}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate">
-                                                        {{ $item['name'] }}
-                                                    </a>
-                                                @else
-                                                    <span class="text-sm font-medium text-[var(--ui-secondary)] truncate">{{ $item['name'] }}</span>
-                                                @endif
-                                            </div>
-                                            @if($item['meta'] ?? null)
-                                                <span class="text-xs text-[var(--ui-muted)] flex-shrink-0 ml-2">{{ $item['meta'] }}</span>
-                                            @endif
-                                        </div>
-                                    @endforeach
-                                    @if($group['total_count'] > count($group['items']))
-                                        <div class="px-6 py-3 text-center">
-                                            <span class="text-xs text-[var(--ui-muted)]">
-                                                +{{ $group['total_count'] - count($group['items']) }} weitere
-                                            </span>
-                                        </div>
-                                    @endif
-                                </div>
-                            </div>
+                <div class="grid grid-cols-2 gap-3 md:grid-cols-4">
+                    @foreach ($signs as $sign)
+                        <div class="rounded-[8px] border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] p-4">
+                            <div class="text-xs font-medium text-[color:var(--nx-muted)]">{{ $sign['label'] }}</div>
+                            <div class="mt-2 text-2xl font-semibold tabular-nums" style="color: {{ $tone($sign['variant'] ?? null) }}">{{ $sign['value'] }}</div>
                         </div>
                     @endforeach
                 </div>
-            @endforeach
-        @endif
+            </section>
+        @endforeach
 
-        @if(empty($vitalSigns) && empty($responsibilities))
-            <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
-                    @svg('heroicon-o-inbox', 'w-8 h-8 text-[var(--ui-muted)]')
-                </div>
-                <p class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Keine Aktivitäten</p>
-                <p class="text-xs text-[var(--ui-muted)]">Für diese Person wurden noch keine Aktivitäten erfasst.</p>
-            </div>
+        @foreach ($responsibilities as $sectionKey => $groups)
+            <x-nx-card flush>
+                @foreach ($groups as $group)
+                    <div x-data="{ open: true }" class="border-b border-[color:var(--nx-line)] last:border-0">
+                        <button type="button" x-on:click="open = !open"
+                            class="flex w-full items-center gap-2 px-4 py-3 text-left hover:bg-[color:var(--nx-hover)]">
+                            @svg($icon($group['icon'] ?? null), 'w-4 h-4 shrink-0 text-[color:var(--nx-faint)]')
+                            <span class="text-sm font-semibold text-[color:var(--nx-text)]">{{ $group['label'] }}</span>
+                            <span class="text-xs tabular-nums text-[color:var(--nx-faint)]">{{ $group['total_count'] }}</span>
+                            <svg class="ml-auto h-4 w-4 text-[color:var(--nx-muted)] transition-transform" :class="{ 'rotate-180': open }" viewBox="0 0 20 20" fill="none" aria-hidden="true">
+                                <path d="M6 8l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+                            </svg>
+                        </button>
+                        <div x-show="open" x-collapse x-cloak>
+                            @foreach ($group['items'] as $item)
+                                <div class="flex items-center justify-between gap-3 border-t border-[color:var(--nx-line)] px-4 py-2 hover:bg-[color:var(--nx-hover)]">
+                                    @if ($item['url'])
+                                        <a href="{{ $item['url'] }}" class="truncate text-sm text-[color:var(--nx-text)] hover:underline">{{ $item['name'] }}</a>
+                                    @else
+                                        <span class="truncate text-sm text-[color:var(--nx-text)]">{{ $item['name'] }}</span>
+                                    @endif
+                                    @if ($item['meta'] ?? null)
+                                        <span class="shrink-0 text-xs text-[color:var(--nx-muted)]">{{ $item['meta'] }}</span>
+                                    @endif
+                                </div>
+                            @endforeach
+                            @if ($group['total_count'] > count($group['items']))
+                                <div class="border-t border-[color:var(--nx-line)] px-4 py-2 text-xs text-[color:var(--nx-faint)]">
+                                    +{{ $group['total_count'] - count($group['items']) }} weitere
+                                </div>
+                            @endif
+                        </div>
+                    </div>
+                @endforeach
+            </x-nx-card>
+        @endforeach
+
+        @if (empty($vitalSigns) && empty($responsibilities))
+            <x-nx-card flush>
+                <x-nx-empty icon="heroicon-o-inbox">Für diese Person wurden noch keine Aktivitäten erfasst.</x-nx-empty>
+            </x-nx-card>
         @endif
     @endif
 </div>

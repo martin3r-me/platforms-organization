@@ -1,189 +1,114 @@
+@php
+    $tree = $this->itemTree;
+    $stats = $this->stats;
+@endphp
+
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar title="Interlinks" icon="heroicon-o-arrows-right-left" />
+    </x-slot>
+
+    <x-slot name="sidebar">
+        <x-ui-page-sidebar title="Filter" width="w-64" :defaultOpen="true" side="left">
+            <div class="flex flex-col gap-3 p-3">
+                <x-nx-input-select name="selectedCategoryId" label="Kategorie" size="sm" wire:model.live="selectedCategoryId"
+                    :options="$this->availableCategories" optionValue="id" optionLabel="name" nullable nullLabel="Alle" />
+                <x-nx-input-select name="selectedTypeId" label="Typ" size="sm" wire:model.live="selectedTypeId"
+                    :options="$this->availableTypes" optionValue="id" optionLabel="name" nullable nullLabel="Alle" />
+                <div class="border-t border-[color:var(--nx-line)] pt-3">
+                    <div class="flex flex-col gap-1 text-xs text-[color:var(--nx-muted)]">
+                        <div class="flex justify-between"><span>Gesamt</span><span class="tabular-nums text-[color:var(--nx-text)]">{{ $stats['total'] }}</span></div>
+                        <div class="flex justify-between"><span>Aktiv</span><span class="tabular-nums text-[color:var(--nx-text)]">{{ $stats['active'] }}</span></div>
+                        <div class="flex justify-between"><span>Inaktiv</span><span class="tabular-nums text-[color:var(--nx-text)]">{{ $stats['inactive'] }}</span></div>
+                        <div class="flex justify-between"><span>Bidirektional</span><span class="tabular-nums text-[color:var(--nx-text)]">{{ $stats['bidirectional'] }}</span></div>
+                    </div>
+                </div>
+            </div>
+        </x-ui-page-sidebar>
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
             ['label' => 'Interlinks'],
         ]">
-            <x-ui-button variant="primary" size="sm" wire:click="openCreateModal">
+            <x-slot name="left">
+                <div class="flex items-center gap-3">
+                    <div class="w-56">
+                        <x-nx-input-text name="search" size="sm" placeholder="Suchen…" wire:model.live.debounce.400ms="search" />
+                    </div>
+                    <x-nx-input-checkbox label="Inaktive" wire:model.live="showInactive" />
+                </div>
+            </x-slot>
+            <x-nx-button variant="primary" size="sm" wire:click="openCreateModal">
                 @svg('heroicon-o-plus', 'w-4 h-4')
                 <span>Neuer Interlink</span>
-            </x-ui-button>
+            </x-nx-button>
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Filter" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Suche</h3>
-                    <x-ui-input-text name="search" placeholder="Suche Interlinks..." class="w-full" size="sm" />
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>
-                    <div class="space-y-3">
-                        <x-ui-input-select name="selectedCategoryId" label="Kategorie" :options="$this->availableCategories" optionValue="id" optionLabel="name" :nullable="true" nullLabel="– Alle Kategorien –" size="sm" />
-                        <x-ui-input-select name="selectedTypeId" label="Typ" :options="$this->availableTypes" optionValue="id" optionLabel="name" :nullable="true" nullLabel="– Alle Typen –" size="sm" />
-                        <div class="flex items-center">
-                            <input type="checkbox" wire:model.live="showInactive" id="showInactive" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                            <label for="showInactive" class="ml-2 text-sm text-[var(--ui-secondary)]">Inaktive anzeigen</label>
-                        </div>
+    <x-ui-page-container width="contained">
+        <div class="space-y-4">
+            @if (session()->has('message'))
+                <x-nx-callout variant="success">{{ session('message') }}</x-nx-callout>
+            @endif
+            @if (session()->has('error'))
+                <x-nx-callout variant="danger">{{ session('error') }}</x-nx-callout>
+            @endif
+
+            <x-nx-card flush>
+                @if (count($tree) === 0)
+                    <x-nx-empty icon="heroicon-o-arrows-right-left">
+                        Keine Interlinks gefunden.
+                        <x-slot name="action">
+                            <x-nx-button size="sm" wire:click="openCreateModal">Interlink anlegen</x-nx-button>
+                        </x-slot>
+                    </x-nx-empty>
+                @else
+                    {{-- Baum: Owner-Einheit → Interlinks; schlichtes Markup, eine Zeile je Eintrag --}}
+                    <div class="py-1">
+                        @foreach ($tree as $node)
+                            @include('organization::livewire.interlink.partials.tree-node', ['node' => $node])
+                        @endforeach
                     </div>
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Statistiken</h3>
-                    <div class="space-y-3">
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 flex items-center justify-between">
-                            <span class="text-xs text-[var(--ui-muted)]">Gesamt</span>
-                            <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ $this->stats['total'] }}</span>
-                        </div>
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 flex items-center justify-between">
-                            <span class="text-xs text-[var(--ui-muted)]">Aktiv</span>
-                            <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ $this->stats['active'] }}</span>
-                        </div>
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 flex items-center justify-between">
-                            <span class="text-xs text-[var(--ui-muted)]">Inaktiv</span>
-                            <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ $this->stats['inactive'] }}</span>
-                        </div>
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40 flex items-center justify-between">
-                            <span class="text-xs text-[var(--ui-muted)]">Bidirektional</span>
-                            <span class="text-lg font-bold text-[var(--ui-secondary)]">{{ $this->stats['bidirectional'] }}</span>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <div class="p-6 text-sm text-[var(--ui-muted)]">Keine Aktivitäten verfügbar</div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-ui-page-container>
-        @if (session()->has('message'))
-            <div class="mb-4 p-4 bg-[var(--ui-success-10)] border border-[var(--ui-success)]/30 text-[var(--ui-success)] rounded-lg">
-                {{ session('message') }}
-            </div>
-        @endif
-
-        @if (session()->has('error'))
-            <div class="mb-4 p-4 bg-[var(--ui-danger-10)] border border-[var(--ui-danger)]/30 text-[var(--ui-danger)] rounded-lg">
-                {{ session('error') }}
-            </div>
-        @endif
-
-        @php $tree = $this->itemTree; @endphp
-
-        @if(count($tree) === 0 && $this->interlinks->isEmpty())
-            <div class="text-center text-[var(--ui-muted)] py-12">Keine Interlinks gefunden.</div>
-        @else
-            <div class="space-y-1">
-                @foreach($tree as $node)
-                    @include('organization::livewire.partials.entity-tree-node', ['node' => $node, 'itemPartial' => 'organization::livewire.interlink.partials.tree-item'])
-                @endforeach
-            </div>
-        @endif
+                @endif
+            </x-nx-card>
+        </div>
     </x-ui-page-container>
 
-    <!-- Create Interlink Modal -->
-    <x-ui-modal wire:model="modalShow" size="lg">
-        <x-slot name="header">
-            Neuen Interlink erstellen
-        </x-slot>
+    <x-nx-modal size="lg" wire:model="modalShow">
+        <x-slot name="header">Neuer Interlink</x-slot>
 
-        <div class="space-y-4">
-            <form wire:submit.prevent="createInterlink" class="space-y-4">
-                <x-ui-input-text
-                    name="name"
-                    label="Name"
-                    wire:model.live="newInterlink.name"
-                    required
-                    placeholder="Name des Interlinks"
-                />
+        <form wire:submit.prevent="createInterlink" class="space-y-4">
+            <x-nx-input-text name="name" label="Name" wire:model.live="newInterlink.name" errorKey="newInterlink.name" required placeholder="Name des Interlinks" />
+            <x-nx-input-textarea name="description" label="Beschreibung" wire:model.live="newInterlink.description" errorKey="newInterlink.description" rows="3" placeholder="Optional" />
 
-                <x-ui-input-textarea
-                    name="description"
-                    label="Beschreibung"
-                    wire:model.live="newInterlink.description"
-                    placeholder="Optionale Beschreibung"
-                    rows="3"
-                />
+            <div class="grid grid-cols-2 gap-3">
+                <x-nx-input-select name="category_id" label="Kategorie" wire:model.live="newInterlink.category_id" errorKey="newInterlink.category_id"
+                    :options="$this->availableCategories" optionValue="id" optionLabel="name" nullable nullLabel="Kategorie wählen" required />
+                <x-nx-input-select name="type_id" label="Typ" wire:model.live="newInterlink.type_id" errorKey="newInterlink.type_id"
+                    :options="$this->availableTypes" optionValue="id" optionLabel="name" nullable nullLabel="Typ wählen" required />
+            </div>
 
-                <div class="grid grid-cols-2 gap-4">
-                    <x-ui-input-select
-                        name="category_id"
-                        label="Kategorie"
-                        :options="$this->availableCategories"
-                        optionValue="id"
-                        optionLabel="name"
-                        :nullable="true"
-                        nullLabel="Kategorie auswählen"
-                        wire:model.live="newInterlink.category_id"
-                        required
-                    />
+            <x-nx-input-select name="owner_entity_id" label="Owner (Einheit)" wire:model.live="newInterlink.owner_entity_id" errorKey="newInterlink.owner_entity_id"
+                :options="$this->availableEntities" optionValue="id" optionLabel="name" nullable nullLabel="Kein Owner" />
 
-                    <x-ui-input-select
-                        name="type_id"
-                        label="Typ"
-                        :options="$this->availableTypes"
-                        optionValue="id"
-                        optionLabel="name"
-                        :nullable="true"
-                        nullLabel="Typ auswählen"
-                        wire:model.live="newInterlink.type_id"
-                        required
-                    />
-                </div>
+            <div class="grid grid-cols-2 gap-3">
+                <x-nx-input-date name="valid_from" label="Gültig von" hint="optional" wire:model.live="newInterlink.valid_from" errorKey="newInterlink.valid_from" />
+                <x-nx-input-date name="valid_to" label="Gültig bis" hint="optional" wire:model.live="newInterlink.valid_to" errorKey="newInterlink.valid_to" />
+            </div>
 
-                <div>
-                    <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">Owner (Entity)</label>
-                    <select wire:model.live="newInterlink.owner_entity_id" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">– Kein Owner –</option>
-                        @foreach($this->availableEntities as $entity)
-                            <option value="{{ $entity->id }}">{{ $entity->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">Gültig von (optional)</label>
-                        <x-ui-input-text name="valid_from" type="date" wire:model.live="newInterlink.valid_from" />
-                    </div>
-                    <div>
-                        <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">Gültig bis (optional)</label>
-                        <x-ui-input-text name="valid_to" type="date" wire:model.live="newInterlink.valid_to" />
-                    </div>
-                </div>
-
-                <div class="flex items-center gap-6">
-                    <div class="flex items-center">
-                        <input type="checkbox" wire:model.live="newInterlink.is_bidirectional" id="is_bidirectional" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                        <label for="is_bidirectional" class="ml-2 text-sm text-[var(--ui-secondary)]">Bidirektional</label>
-                    </div>
-                    <div class="flex items-center">
-                        <input type="checkbox" wire:model.live="newInterlink.is_active" id="is_active_new" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                        <label for="is_active_new" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
-                    </div>
-                </div>
-            </form>
-        </div>
+            <div class="flex flex-col items-start gap-2 border-t border-[color:var(--nx-line)] pt-3">
+                <x-nx-input-checkbox label="Bidirektional — gilt in beide Richtungen" wire:model.live="newInterlink.is_bidirectional" />
+                <x-nx-input-checkbox label="Aktiv" wire:model.live="newInterlink.is_active" />
+            </div>
+        </form>
 
         <x-slot name="footer">
-            <div class="d-flex justify-end gap-2">
-                <x-ui-button type="button" variant="secondary-outline" wire:click="closeCreateModal">
-                    Abbrechen
-                </x-ui-button>
-                <x-ui-button type="button" variant="primary" wire:click="createInterlink">
-                    @svg('heroicon-o-plus', 'w-4 h-4 mr-2')
-                    Erstellen
-                </x-ui-button>
+            <div class="flex justify-end gap-2">
+                <x-nx-button variant="ghost" wire:click="closeCreateModal">Abbrechen</x-nx-button>
+                <x-nx-button variant="primary" wire:click="createInterlink">Anlegen</x-nx-button>
             </div>
         </x-slot>
-    </x-ui-modal>
+    </x-nx-modal>
 </x-ui-page>

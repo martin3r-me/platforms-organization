@@ -1,148 +1,109 @@
+{{-- Eine Zeile der Einheiten-Liste, rekursiv für Kinder derselben Gruppe.
+     Erwartet: $entity, $depth, $childrenByParent, $entityMovements, $vsmSystemMap, $signalCounts.
+     Bewusst schlichtes Markup: die Liste hat schnell mehrere hundert Zeilen. --}}
 @php
     $children = $childrenByParent[$entity->id] ?? collect();
-    $hasChildren = $children->isNotEmpty();
-    $indent = $depth * 1.25;
+    $rawIcon = $entity->type->icon ? str_replace('heroicons.', '', $entity->type->icon) : null;
+    $iconName = $rawIcon ? (app('safe-svg')->resolve($rawIcon, 'heroicon-o-') ?? 'cube') : null;
+    $vc = $entity->type->vsm_class;
+    $relFrom = $entity->relations_from_count ?? 0;
+    $relTo = $entity->relations_to_count ?? 0;
+    $vsmValues = $vsmSystemMap[$entity->id] ?? [];
+    $sc = $signalCounts[$entity->id] ?? null;
+    $mv = $entityMovements[$entity->id] ?? null;
+
+    $signalDot = ! $sc ? null : (
+        (($sc['algedonic_count'] ?? 0) > 0 || ($sc['critical_count'] ?? 0) > 0) ? 'var(--nx-danger)'
+        : ((($sc['warning_count'] ?? 0) > 0) ? 'var(--nx-warning)' : 'var(--nx-info)')
+    );
+    $moveDot = ! ($mv && $mv['delta_count'] > 0) ? null : (
+        $mv['positive'] > $mv['negative'] ? 'var(--nx-success)'
+        : ($mv['negative'] > $mv['positive'] ? 'var(--nx-danger)' : 'var(--nx-warning)')
+    );
+    [$vcLetter, $vcClass, $vcTitle] = match ($vc) {
+        'carrier'  => ['C', 'bg-[rgba(47,158,68,.12)] text-[color:var(--nx-success)]', 'Carrier — kann eigene Perspektive sein'],
+        'actor'    => ['A', 'bg-[color:var(--nx-accent-soft)] text-[color:var(--nx-muted)]', 'Actor — füllt VSM-Funktion aus'],
+        'observed' => ['O', 'bg-[rgba(232,89,12,.12)] text-[color:var(--nx-warning)]', 'Observed — Umwelt, wird beobachtet'],
+        default    => [null, '', ''],
+    };
 @endphp
-<x-ui-table-row compact="true" class="{{ !$entity->is_active ? 'opacity-50' : '' }} {{ $depth === 0 ? '' : 'bg-[var(--ui-muted-5)]/20' }}">
-    {{-- Name (with indentation + expand indicator) --}}
-    <x-ui-table-cell compact="true">
-        <div class="flex items-center" style="padding-left: {{ $indent }}rem;">
-            {{-- Tree line indicator --}}
-            @if($depth > 0)
-                <span class="w-4 h-px bg-[var(--ui-border)]/40 mr-1 flex-shrink-0"></span>
+<tr wire:key="ent-{{ $entity->id }}" class="border-b border-[color:var(--nx-line)] hover:bg-[color:var(--nx-hover)] {{ $entity->is_active ? '' : 'opacity-50' }}">
+    <td class="px-4 py-1.5">
+        <div class="flex min-w-0 items-center gap-2" style="padding-left: {{ $depth * 1.25 }}rem">
+            @if ($depth > 0)
+                <span class="h-px w-3 shrink-0 bg-[color:var(--nx-line-strong)]"></span>
             @endif
-
-            {{-- Type Icon --}}
-            @if($entity->type->icon)
-                @php
-                    $iconName = str_replace('heroicons.', '', $entity->type->icon);
-                    $iconName = app('safe-svg')->resolve($iconName, 'heroicon-o-') ?? 'cube';
-                @endphp
-                @svg('heroicon-o-' . $iconName, 'w-4 h-4 text-[var(--ui-muted)] mr-2 flex-shrink-0')
+            @if ($iconName)
+                @svg('heroicon-o-' . $iconName, 'w-4 h-4 shrink-0 text-[color:var(--nx-faint)]')
             @endif
-
-            <div class="min-w-0">
-                <div class="flex items-center gap-2">
-                    <a href="{{ route('organization.entities.show', $entity) }}" class="text-sm font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline truncate">{{ $entity->name }}</a>
-                    @if($hasChildren)
-                        <span class="inline-flex items-center justify-center min-w-[1.1rem] h-4 px-1 text-[10px] font-bold text-[var(--ui-muted)] bg-[var(--ui-muted-5)] rounded-full flex-shrink-0">{{ $children->count() }}</span>
-                    @endif
-                </div>
-                @if($entity->code)
-                    <div class="text-[10px] text-[var(--ui-muted)] font-mono mt-0.5">{{ $entity->code }}</div>
-                @endif
-            </div>
-        </div>
-    </x-ui-table-cell>
-
-    {{-- Typ --}}
-    <x-ui-table-cell compact="true">
-        <div class="flex items-center gap-1">
-            <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $entity->type->name }}</span>
-            @php $vc = $entity->type->vsm_class; @endphp
-            @if($vc === 'carrier')
-                <span class="inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 ring-1 ring-inset ring-emerald-600/20" title="Carrier — kann eigene Perspektive sein">C</span>
-            @elseif($vc === 'actor')
-                <span class="inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold bg-slate-100 text-slate-600 ring-1 ring-inset ring-slate-600/15" title="Actor — füllt VSM-Funktion aus">A</span>
-            @elseif($vc === 'observed')
-                <span class="inline-flex items-center justify-center w-4 h-4 rounded text-[10px] font-bold bg-amber-50 text-amber-700 ring-1 ring-inset ring-amber-600/20" title="Observed — Umwelt, wird beobachtet">O</span>
+            <a href="{{ route('organization.entities.show', $entity) }}" wire:navigate class="truncate font-medium text-[color:var(--nx-text)] hover:underline">{{ $entity->name }}</a>
+            @if ($children->isNotEmpty())
+                <span class="shrink-0 text-xs tabular-nums text-[color:var(--nx-faint)]">{{ $children->count() }}</span>
+            @endif
+            @if ($entity->code)
+                <span class="shrink-0 font-mono text-xs text-[color:var(--nx-faint)]">{{ $entity->code }}</span>
+            @endif
+            @if (! $entity->is_active)
+                <span class="shrink-0 text-xs text-[color:var(--nx-faint)]">inaktiv</span>
             @endif
         </div>
-    </x-ui-table-cell>
-
-    {{-- Relationen --}}
-    <x-ui-table-cell compact="true">
-        @php
-            $relationsFromCount = $entity->relations_from_count ?? $entity->relationsFrom->count();
-            $relationsToCount = $entity->relations_to_count ?? $entity->relationsTo->count();
-            $totalRelations = $relationsFromCount + $relationsToCount;
-        @endphp
-        @if($totalRelations > 0)
-            <div class="flex items-center gap-1">
-                @if($relationsToCount > 0)
-                    <span class="text-[10px] text-[var(--ui-muted)]">← {{ $relationsToCount }}</span>
-                @endif
-                @if($relationsFromCount > 0)
-                    <span class="text-[10px] text-[var(--ui-muted)]">→ {{ $relationsFromCount }}</span>
-                @endif
-            </div>
+    </td>
+    <td class="whitespace-nowrap px-3 py-1.5">
+        <div class="flex items-center gap-1.5">
+            <span class="text-[color:var(--nx-muted)]">{{ $entity->type->name }}</span>
+            @if ($vcLetter)
+                <span class="inline-flex h-4 w-4 items-center justify-center rounded-[4px] text-[10px] font-semibold {{ $vcClass }}" title="{{ $vcTitle }}">{{ $vcLetter }}</span>
+            @endif
+        </div>
+    </td>
+    <td class="whitespace-nowrap px-3 py-1.5 text-xs tabular-nums text-[color:var(--nx-muted)]">
+        @if ($relFrom + $relTo > 0)
+            @if ($relTo > 0)<span title="eingehend">← {{ $relTo }}</span>@endif
+            @if ($relFrom > 0)<span class="ml-1" title="ausgehend">→ {{ $relFrom }}</span>@endif
         @else
-            <span class="text-xs text-[var(--ui-muted)]">&ndash;</span>
+            <span class="text-[color:var(--nx-faint)]">–</span>
         @endif
-    </x-ui-table-cell>
-
-    {{-- VSM --}}
-    <x-ui-table-cell compact="true">
-        @php $vsmValues = $vsmSystemMap[$entity->id] ?? []; @endphp
-        @if(count($vsmValues) > 0)
+    </td>
+    <td class="px-3 py-1.5">
+        @if (count($vsmValues) > 0)
             <div class="flex flex-wrap gap-1">
-                @foreach($vsmValues as $val)
-                    <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-medium bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/10" title="{{ $val['name'] }}">{{ $val['code'] }}</span>
+                @foreach ($vsmValues as $val)
+                    <span class="rounded-[4px] bg-[rgba(25,113,194,.12)] px-1.5 py-0.5 text-[10px] font-medium text-[color:var(--nx-info)]" title="{{ $val['name'] }}">{{ $val['code'] }}</span>
                 @endforeach
             </div>
         @else
-            <span class="text-xs text-[var(--ui-muted)]">&ndash;</span>
+            <span class="text-[color:var(--nx-faint)]">–</span>
         @endif
-    </x-ui-table-cell>
-
-    {{-- Status --}}
-    <x-ui-table-cell compact="true">
-        @if($entity->is_active)
-            <span class="w-2 h-2 rounded-full bg-green-500 inline-block" title="Aktiv"></span>
-        @else
-            <span class="w-2 h-2 rounded-full bg-gray-300 inline-block" title="Inaktiv"></span>
-        @endif
-    </x-ui-table-cell>
-
-    {{-- Signale --}}
-    <x-ui-table-cell compact="true">
-        @php $sc = $signalCounts[$entity->id] ?? null; @endphp
-        @if($sc)
-            <a href="{{ route('organization.entities.show', $entity) }}?tab=signals" class="flex items-center gap-1">
-                @if(($sc['algedonic_count'] ?? 0) > 0 || ($sc['critical_count'] ?? 0) > 0)
-                    <span class="w-2 h-2 rounded-full bg-red-500 flex-shrink-0"></span>
-                @elseif(($sc['warning_count'] ?? 0) > 0)
-                    <span class="w-2 h-2 rounded-full bg-amber-400 flex-shrink-0"></span>
-                @else
-                    <span class="w-2 h-2 rounded-full bg-blue-400 flex-shrink-0"></span>
-                @endif
-                <span class="text-[10px] text-[var(--ui-muted)]">{{ $sc['total'] }}</span>
+    </td>
+    <td class="whitespace-nowrap px-3 py-1.5">
+        @if ($sc)
+            <a href="{{ route('organization.entities.show', $entity) }}?tab=signals" wire:navigate class="inline-flex items-center gap-1.5 text-xs tabular-nums text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">
+                <span class="h-2 w-2 shrink-0 rounded-full" style="background: {{ $signalDot }}"></span>
+                {{ $sc['total'] }}
             </a>
         @else
-            <span class="text-xs text-[var(--ui-muted)]">&ndash;</span>
+            <span class="text-[color:var(--nx-faint)]">–</span>
         @endif
-    </x-ui-table-cell>
-
-    {{-- Bewegung --}}
-    <x-ui-table-cell compact="true">
-        @php $mv = ($entityMovements[$entity->id] ?? null); @endphp
-        @if($mv && $mv['delta_count'] > 0)
+    </td>
+    <td class="px-4 py-1.5">
+        @if ($moveDot)
             <div class="flex items-center gap-1.5">
-                <span class="w-2 h-2 rounded-full flex-shrink-0
-                    {{ $mv['positive'] > $mv['negative'] ? 'bg-green-500' : '' }}
-                    {{ $mv['negative'] > $mv['positive'] ? 'bg-red-500' : '' }}
-                    {{ $mv['positive'] === $mv['negative'] && $mv['delta_count'] > 0 ? 'bg-amber-400' : '' }}
-                "></span>
-                <span class="text-[10px] text-[var(--ui-muted)] truncate max-w-[80px]" title="{{ $mv['top_delta'] }}">
-                    {{ $mv['top_delta'] }}
-                </span>
+                <span class="h-2 w-2 shrink-0 rounded-full" style="background: {{ $moveDot }}"></span>
+                <span class="max-w-[8rem] truncate text-xs text-[color:var(--nx-muted)]" title="{{ $mv['top_delta'] }}">{{ $mv['top_delta'] }}</span>
             </div>
         @else
-            <span class="w-2 h-2 rounded-full bg-gray-200 inline-block" title="Keine Bewegung"></span>
+            <span class="text-[color:var(--nx-faint)]">–</span>
         @endif
-    </x-ui-table-cell>
-</x-ui-table-row>
+    </td>
+</tr>
 
-{{-- Recursively render children --}}
-@if($hasChildren)
-    @foreach($children as $childEntity)
-        @include('organization::livewire.entity.partials.tree-table-row', [
-            'entity' => $childEntity,
-            'depth' => $depth + 1,
-            'childrenByParent' => $childrenByParent,
-            'entityMovements' => $entityMovements,
-            'vsmSystemMap' => $vsmSystemMap,
-            'signalCounts' => $signalCounts,
-        ])
-    @endforeach
-@endif
+@foreach ($children as $childEntity)
+    @include('organization::livewire.entity.partials.tree-table-row', [
+        'entity' => $childEntity,
+        'depth' => $depth + 1,
+        'childrenByParent' => $childrenByParent,
+        'entityMovements' => $entityMovements,
+        'vsmSystemMap' => $vsmSystemMap,
+        'signalCounts' => $signalCounts,
+    ])
+@endforeach

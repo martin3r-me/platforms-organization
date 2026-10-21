@@ -1,153 +1,124 @@
+@php
+    use Platform\Organization\Models\OrganizationRole;
+
+    $tree = $this->itemTree;
+    $statusOptions = [
+        ['value' => 'active', 'label' => 'Aktiv'],
+        ['value' => 'archived', 'label' => 'Archiviert'],
+    ];
+    $vsmOptions = collect(OrganizationRole::VSM_LABELS)->map(fn ($l, $c) => ['value' => $c, 'label' => $l])->values()->all();
+    $stageOptions = collect(OrganizationRole::STAGES)->map(fn ($s) => ['value' => $s, 'label' => $s])->values()->all();
+    $ownerOptions = $this->availableEntities->map(fn ($e) => ['value' => $e->id, 'label' => $e->name])->values()->all();
+@endphp
+
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar title="Rollen" icon="heroicon-o-identification" />
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
             ['label' => 'Rollen'],
         ]">
-            <x-ui-button variant="primary" size="sm" wire:click="create">
+            <x-slot name="left">
+                <div class="flex items-center gap-3">
+                    <div class="w-56">
+                        <x-nx-input-text name="search" size="sm" placeholder="Name, Slug, Beschreibung…" wire:model.live.debounce.400ms="search" />
+                    </div>
+                    <div class="w-36">
+                        <x-nx-input-select name="statusFilter" size="sm" wire:model.live="statusFilter"
+                            :options="$statusOptions" nullable nullLabel="Alle" />
+                    </div>
+                </div>
+            </x-slot>
+            <x-nx-button variant="primary" size="sm" wire:click="create">
                 @svg('heroicon-o-plus', 'w-4 h-4')
                 <span>Neue Rolle</span>
-            </x-ui-button>
+            </x-nx-button>
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Filter" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Suche</h3>
-                    <x-ui-input-text name="search" wire:model.live="search" placeholder="Name, Slug, Beschreibung..." class="w-full" size="sm" />
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Status</h3>
-                    <select wire:model.live="statusFilter" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="active">Aktiv</option>
-                        <option value="archived">Archiviert</option>
-                        <option value="">Alle</option>
-                    </select>
-                </div>
+    <x-ui-page-container width="contained">
+        <div class="space-y-5">
+            <div class="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+                <h1 class="m-0 text-2xl font-semibold tracking-tight text-[color:var(--nx-text)]">Rollen</h1>
+                <span class="text-sm text-[color:var(--nx-muted)]">nach Owner-Einheit</span>
             </div>
-        </x-ui-page-sidebar>
-    </x-slot>
 
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <div class="p-6 text-sm text-[var(--ui-muted)]">Keine Aktivitäten verfügbar</div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-ui-page-container>
-        @php $tree = $this->itemTree; @endphp
-
-        @if(count($tree) === 0 && $this->roles->isEmpty())
-            <div class="text-center text-[var(--ui-muted)] py-12">Keine Rollen gefunden.</div>
-        @else
-            <div class="space-y-1">
-                @foreach($tree as $node)
-                    @include('organization::livewire.partials.entity-tree-node', ['node' => $node, 'itemPartial' => 'organization::livewire.role.partials.tree-item'])
-                @endforeach
-            </div>
-        @endif
+            <x-nx-card flush>
+                @if (count($tree) === 0 && $this->roles->isEmpty())
+                    <x-nx-empty icon="heroicon-o-identification">
+                        Keine Rollen gefunden.
+                        <x-slot name="action">
+                            <x-nx-button size="sm" wire:click="create">Rolle anlegen</x-nx-button>
+                        </x-slot>
+                    </x-nx-empty>
+                @else
+                    <div class="[&>*:last-child]:border-b-0">
+                        @foreach ($tree as $node)
+                            @include('organization::livewire.role.partials.owner-node', ['node' => $node])
+                        @endforeach
+                    </div>
+                @endif
+            </x-nx-card>
+        </div>
     </x-ui-page-container>
 
-    <!-- Create/Edit Modal -->
-    <x-ui-modal wire:model="modalShow" size="lg">
-        <x-slot name="header">
-            {{ $editingId ? 'Rolle bearbeiten' : 'Neue Rolle erstellen' }}
-        </x-slot>
+    <x-nx-modal size="md" wire:model="modalShow">
+        <x-slot name="header">{{ $editingId ? 'Rolle bearbeiten' : 'Neue Rolle' }}</x-slot>
 
         <form wire:submit.prevent="store" class="space-y-4">
-            <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required placeholder="z.B. Projektleiter" />
+            <div class="grid grid-cols-2 gap-3">
+                <x-nx-input-text name="name" label="Name" wire:model.live="form.name" errorKey="form.name" required placeholder="z. B. Projektleitung" />
+                <x-nx-input-text name="slug" label="Slug" wire:model.live="form.slug" errorKey="form.slug" placeholder="wird automatisch erzeugt" />
+            </div>
+            <x-nx-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" rows="3" placeholder="Optional" />
 
-            <x-ui-input-text name="slug" label="Slug (optional, wird automatisch erzeugt)" wire:model.live="form.slug" placeholder="project-lead" />
+            <x-nx-input-select name="vsm_system" label="VSM-Funktion" hint="z. B. GF → S3, Inhaber → S5" wire:model.live="form.vsm_system" errorKey="form.vsm_system"
+                :options="$vsmOptions" nullable nullLabel="Keine VSM-Bedeutung" />
 
-            <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" rows="3" />
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-2">
-                    VSM-Funktion
-                    <span class="ml-1 text-xs font-normal text-gray-500">— wenn diese Rolle einer Beer'schen System-Funktion entspricht (z.B. GF → S3, Inhaber → S5)</span>
-                </label>
-                <select wire:model.live="form.vsm_system" class="w-full rounded-md border-gray-300 shadow-sm">
-                    <option value="">– keine VSM-Bedeutung –</option>
-                    @foreach(\Platform\Organization\Models\OrganizationRole::VSM_LABELS as $code => $label)
-                        <option value="{{ $code }}">{{ $label }}</option>
-                    @endforeach
-                </select>
+            <div class="grid grid-cols-2 gap-3">
+                <x-nx-input-select name="owner_entity_id" label="Owner" wire:model.live="form.owner_entity_id" errorKey="form.owner_entity_id"
+                    :options="$ownerOptions" nullable nullLabel="Kein Owner" />
+                <x-nx-input-select name="status" label="Status" wire:model.live="form.status" errorKey="form.status"
+                    :options="$statusOptions" required />
             </div>
 
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">
-                        Stufe
-                        <span class="ml-1 text-xs font-normal text-gray-500">— Dev-Loop-Konfiguration einer Agent-Rolle (optional)</span>
-                    </label>
-                    <select wire:model.live="form.stage" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">– keine –</option>
-                        @foreach(\Platform\Organization\Models\OrganizationRole::STAGES as $s)
-                            <option value="{{ $s }}">{{ $s }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
+            <x-nx-input-select name="stage" label="Stufe" hint="Dev-Loop einer Agent-Rolle, optional" wire:model.live="form.stage" errorKey="form.stage"
+                :options="$stageOptions" nullable nullLabel="Keine" />
 
-            <div class="grid grid-cols-2 gap-4">
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                    <select wire:model.live="form.status" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="active">Aktiv</option>
-                        <option value="archived">Archiviert</option>
-                    </select>
-                </div>
-                <div>
-                    <label class="block text-sm font-medium text-gray-700 mb-2">Owner (Entity)</label>
-                    <select wire:model.live="form.owner_entity_id" class="w-full rounded-md border-gray-300 shadow-sm">
-                        <option value="">– Kein Owner –</option>
-                        @foreach($this->availableEntities as $entity)
-                            <option value="{{ $entity->id }}">{{ $entity->name }}</option>
-                        @endforeach
-                    </select>
-                </div>
-            </div>
-
-            <div>
-                <label class="block text-sm font-medium text-gray-700 mb-1">
-                    Berechtigungen (Autorisierung)
-                </label>
-                <p class="text-xs text-gray-500 mb-2">
-                    Wird diese Rolle einer Person an einer Kontext-Entity zugewiesen, erhält sie die gewählte Content-Capability auf diese Entity und ihren Teilbaum. Ohne Auswahl verleiht die Rolle keinen Zugriff. Höchste Stufe gewinnt (manage&nbsp;&gt;&nbsp;write&nbsp;&gt;&nbsp;read).
+            <div class="space-y-2 border-t border-[color:var(--nx-line)] pt-3">
+                <div class="text-xs font-medium text-[color:var(--nx-text)]">Berechtigungen</div>
+                <p class="m-0 text-xs text-[color:var(--nx-muted)]">
+                    Wird die Rolle einer Person an einer Kontext-Einheit zugewiesen, erhält sie diese Stufe auf die Einheit und ihren Teilbaum.
+                    Ohne Auswahl entsteht kein Zugriff; die höchste Stufe gewinnt.
                 </p>
-                <div class="space-y-2">
-                    <label class="flex items-center text-sm text-gray-700">
-                        <input type="checkbox" wire:model.live="form.capabilities" value="read" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                        <span class="ml-2">Lesen <code class="text-xs">read</code> — Objekte im Teilbaum sehen</span>
+                <div class="flex flex-col items-start gap-2">
+                    <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-[color:var(--nx-text)]">
+                        <input type="checkbox" value="read" wire:model.live="form.capabilities" class="h-4 w-4 rounded-[4px] accent-[var(--nx-accent)]" />
+                        <span>Lesen <span class="text-xs text-[color:var(--nx-muted)]">— Objekte im Teilbaum sehen</span></span>
                     </label>
-                    <label class="flex items-center text-sm text-gray-700">
-                        <input type="checkbox" wire:model.live="form.capabilities" value="write" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                        <span class="ml-2">Bearbeiten <code class="text-xs">write</code> — sehen und ändern</span>
+                    <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-[color:var(--nx-text)]">
+                        <input type="checkbox" value="write" wire:model.live="form.capabilities" class="h-4 w-4 rounded-[4px] accent-[var(--nx-accent)]" />
+                        <span>Bearbeiten <span class="text-xs text-[color:var(--nx-muted)]">— sehen und ändern</span></span>
                     </label>
-                    <label class="flex items-center text-sm text-gray-700">
-                        <input type="checkbox" wire:model.live="form.capabilities" value="manage" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                        <span class="ml-2">Verwalten <code class="text-xs">manage</code> — voller Zugriff inkl. Verwalten/Löschen</span>
+                    <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-[color:var(--nx-text)]">
+                        <input type="checkbox" value="manage" wire:model.live="form.capabilities" class="h-4 w-4 rounded-[4px] accent-[var(--nx-accent)]" />
+                        <span>Verwalten <span class="text-xs text-[color:var(--nx-muted)]">— voller Zugriff inkl. Löschen</span></span>
                     </label>
                 </div>
+                @error('form.capabilities.*')
+                    <p class="m-0 text-xs text-[color:var(--nx-danger)]">{{ $message }}</p>
+                @enderror
             </div>
         </form>
 
         <x-slot name="footer">
-            <div class="d-flex justify-end gap-2">
-                <x-ui-button type="button" variant="secondary-outline" wire:click="$set('modalShow', false)">
-                    Abbrechen
-                </x-ui-button>
-                <x-ui-button type="button" variant="primary" wire:click="store">
-                    @svg('heroicon-o-check', 'w-4 h-4 mr-2')
-                    {{ $editingId ? 'Speichern' : 'Erstellen' }}
-                </x-ui-button>
+            <div class="flex justify-end gap-2">
+                <x-nx-button variant="ghost" wire:click="$set('modalShow', false)">Abbrechen</x-nx-button>
+                <x-nx-button variant="primary" wire:click="store">{{ $editingId ? 'Speichern' : 'Anlegen' }}</x-nx-button>
             </div>
         </x-slot>
-    </x-ui-modal>
+    </x-nx-modal>
 </x-ui-page>

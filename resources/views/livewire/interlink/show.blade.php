@@ -1,212 +1,166 @@
+@php
+    $links = $this->linkedRelationships;
+@endphp
+
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar :title="$interlink->name" icon="heroicon-o-arrows-right-left" />
+    </x-slot>
+
+    <x-slot name="sidebar">
+        <x-ui-page-sidebar title="Interlink" width="w-64" :defaultOpen="true" side="left">
+            <div class="flex flex-col gap-0.5 p-2">
+                <x-nx-property-row icon="heroicon-o-signal" label="Status">
+                    <x-nx-badge :variant="$interlink->is_active ? 'success' : 'neutral'" dot>{{ $interlink->is_active ? 'Aktiv' : 'Inaktiv' }}</x-nx-badge>
+                </x-nx-property-row>
+                <x-nx-property-row icon="heroicon-o-arrows-right-left" label="Richtung">
+                    {{ $interlink->is_bidirectional ? 'Bidirektional' : 'Einseitig' }}
+                </x-nx-property-row>
+                <x-nx-property-row icon="heroicon-o-tag" label="Kategorie">
+                    {{ $interlink->category?->name ?? '–' }}
+                </x-nx-property-row>
+                <x-nx-property-row icon="heroicon-o-squares-2x2" label="Typ">
+                    {{ $interlink->type?->name ?? '–' }}
+                </x-nx-property-row>
+                <x-nx-property-row icon="heroicon-o-calendar" label="Gültig">
+                    @if ($interlink->valid_from || $interlink->valid_to)
+                        {{ $interlink->valid_from?->format('d.m.Y') ?? '–' }} → {{ $interlink->valid_to?->format('d.m.Y') ?? '–' }}
+                    @else
+                        <span class="text-[color:var(--nx-faint)]">unbegrenzt</span>
+                    @endif
+                </x-nx-property-row>
+                <x-nx-property-row icon="heroicon-o-link" label="Beziehungen">
+                    {{ $links->count() }}
+                </x-nx-property-row>
+                <x-nx-property-row icon="heroicon-o-clock" label="Erstellt">
+                    {{ $interlink->created_at->format('d.m.Y H:i') }}
+                </x-nx-property-row>
+            </div>
+        </x-ui-page-sidebar>
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
             ['label' => 'Interlinks', 'href' => route('organization.interlinks.index')],
             ['label' => $interlink->name],
         ]">
-            @if($this->isDirty)
-                <x-ui-button variant="secondary-ghost" size="sm" wire:click="loadForm">
-                    @svg('heroicon-o-x-mark', 'w-4 h-4')
-                    <span>Abbrechen</span>
-                </x-ui-button>
-                <x-ui-button variant="primary" size="sm" wire:click="save">
-                    @svg('heroicon-o-check', 'w-4 h-4')
-                    <span>Speichern</span>
-                </x-ui-button>
-            @endif
-            <x-ui-confirm-button
-                variant="danger-outline"
-                size="sm"
-                wire:click="delete"
-                confirm-text="Interlink wirklich löschen?"
-            >
-                @svg('heroicon-o-trash', 'w-4 h-4')
-            </x-ui-confirm-button>
+            <div class="flex items-center gap-2">
+                @if ($this->isDirty)
+                    <x-nx-button variant="primary" size="sm" wire:click="save">
+                        @svg('heroicon-o-check', 'w-4 h-4')
+                        <span>Speichern</span>
+                    </x-nx-button>
+                @endif
+                <x-nx-dropdown>
+                    @if ($this->isDirty)
+                        <x-nx-dropdown-item wire:click="loadForm">
+                            @svg('heroicon-o-arrow-uturn-left', 'w-4 h-4')
+                            Änderungen verwerfen
+                        </x-nx-dropdown-item>
+                        <x-nx-dropdown-divider />
+                    @endif
+                    <x-nx-dropdown-item variant="danger" wire:click="delete" wire:confirm="Interlink „{{ $interlink->name }}“ wirklich löschen?">
+                        @svg('heroicon-o-trash', 'w-4 h-4')
+                        Löschen
+                    </x-nx-dropdown-item>
+                </x-nx-dropdown>
+            </div>
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Informationen" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Status</h3>
-                    <div class="space-y-2">
-                        @if($interlink->is_active)
-                            <x-ui-badge variant="success" size="sm">Aktiv</x-ui-badge>
-                        @else
-                            <x-ui-badge variant="danger" size="sm">Inaktiv</x-ui-badge>
-                        @endif
-                        @if($interlink->is_bidirectional)
-                            <x-ui-badge variant="info" size="sm">Bidirektional</x-ui-badge>
-                        @endif
-                    </div>
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Details</h3>
-                    <div class="space-y-3">
-                        @if($interlink->category)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Kategorie</span>
-                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $interlink->category->name }}</div>
-                            </div>
-                        @endif
-                        @if($interlink->type)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Typ</span>
-                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $interlink->type->name }}</div>
-                            </div>
-                        @endif
-                        @if($interlink->valid_from || $interlink->valid_to)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Gültigkeit</span>
-                                <div class="text-sm font-medium text-[var(--ui-secondary)]">
-                                    {{ $interlink->valid_from?->format('d.m.Y') ?? '–' }}
-                                    →
-                                    {{ $interlink->valid_to?->format('d.m.Y') ?? '–' }}
-                                </div>
-                            </div>
-                        @endif
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <span class="text-xs text-[var(--ui-muted)]">Verknüpfte Relationships</span>
-                            <div class="text-lg font-bold text-[var(--ui-secondary)]">{{ $this->linkedRelationships->count() }}</div>
-                        </div>
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <span class="text-xs text-[var(--ui-muted)]">Erstellt</span>
-                            <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $interlink->created_at->format('d.m.Y H:i') }}</div>
-                        </div>
-                    </div>
-                </div>
+    <x-ui-page-container width="contained">
+        <div class="space-y-5">
+            <div class="flex flex-wrap items-center gap-2">
+                <h1 class="m-0 text-2xl font-semibold tracking-tight text-[color:var(--nx-text)]">{{ $interlink->name }}</h1>
+                <x-nx-badge :variant="$interlink->is_active ? 'success' : 'neutral'" dot>{{ $interlink->is_active ? 'Aktiv' : 'Inaktiv' }}</x-nx-badge>
             </div>
-        </x-ui-page-sidebar>
-    </x-slot>
 
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <div class="p-6 text-sm text-[var(--ui-muted)]">Keine Aktivitäten verfügbar</div>
-        </x-ui-page-sidebar>
-    </x-slot>
+            <x-nx-tabs class="!mb-0">
+                <x-nx-tab :active="$activeTab === 'details'" wire:click="$set('activeTab', 'details')">Details</x-nx-tab>
+                <x-nx-tab :active="$activeTab === 'relationships'" wire:click="$set('activeTab', 'relationships')">
+                    Beziehungen <span class="ml-1 text-xs tabular-nums text-[color:var(--nx-faint)]">{{ $links->count() }}</span>
+                </x-nx-tab>
+            </x-nx-tabs>
 
-    <x-ui-page-container>
-        <!-- Tabs -->
-        <div class="flex items-center gap-1 mb-6 border-b border-[var(--ui-border)]/60">
-            <button
-                wire:click="$set('activeTab', 'details')"
-                class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors {{ $activeTab === 'details' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}"
-            >
-                Details
-            </button>
-            <button
-                wire:click="$set('activeTab', 'relationships')"
-                class="px-4 py-2.5 text-sm font-medium border-b-2 transition-colors {{ $activeTab === 'relationships' ? 'border-[var(--ui-primary)] text-[var(--ui-primary)]' : 'border-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' }}"
-            >
-                Verknüpfte Relationships
-                <span class="ml-1 px-1.5 py-0.5 text-xs rounded-full bg-[var(--ui-muted-5)] text-[var(--ui-muted)]">{{ $this->linkedRelationships->count() }}</span>
-            </button>
-        </div>
-
-        @if($activeTab === 'details')
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Grunddaten</h2>
-                <div class="space-y-4">
-                    <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required />
-                    <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" />
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <x-ui-input-select
-                            name="category_id"
-                            label="Kategorie"
-                            :options="$this->availableCategories"
-                            optionValue="id"
-                            optionLabel="name"
-                            :nullable="true"
-                            nullLabel="Kategorie auswählen"
-                            wire:model.live="form.category_id"
-                            required
-                        />
-
-                        <x-ui-input-select
-                            name="type_id"
-                            label="Typ"
-                            :options="$this->availableTypes"
-                            optionValue="id"
-                            optionLabel="name"
-                            :nullable="true"
-                            nullLabel="Typ auswählen"
-                            wire:model.live="form.type_id"
-                            required
-                        />
-                    </div>
-
-                    <div class="grid grid-cols-2 gap-4">
-                        <div>
-                            <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">Gültig von (optional)</label>
-                            <x-ui-input-text name="valid_from" type="date" wire:model.live="form.valid_from" />
+            @if ($activeTab === 'details')
+                <x-nx-panel title="Grunddaten">
+                    <div class="space-y-3 p-4">
+                        <x-nx-input-text name="name" label="Name" wire:model.live="form.name" errorKey="form.name" required />
+                        <x-nx-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" errorKey="form.description" rows="3" />
+                        <div class="grid grid-cols-2 gap-3">
+                            <x-nx-input-select name="category_id" label="Kategorie" wire:model.live="form.category_id" errorKey="form.category_id"
+                                :options="$this->availableCategories" optionValue="id" optionLabel="name" nullable nullLabel="Kategorie wählen" required />
+                            <x-nx-input-select name="type_id" label="Typ" wire:model.live="form.type_id" errorKey="form.type_id"
+                                :options="$this->availableTypes" optionValue="id" optionLabel="name" nullable nullLabel="Typ wählen" required />
                         </div>
-                        <div>
-                            <label class="block text-sm font-semibold text-[var(--ui-secondary)] mb-2">Gültig bis (optional)</label>
-                            <x-ui-input-text name="valid_to" type="date" wire:model.live="form.valid_to" />
+                        <div class="grid grid-cols-2 gap-3">
+                            <x-nx-input-date name="valid_from" label="Gültig von" hint="optional" wire:model.live="form.valid_from" errorKey="form.valid_from" />
+                            <x-nx-input-date name="valid_to" label="Gültig bis" hint="optional" wire:model.live="form.valid_to" errorKey="form.valid_to" />
                         </div>
                     </div>
+                </x-nx-panel>
 
-                    <div class="flex items-center gap-6">
-                        <div class="flex items-center">
-                            <input type="checkbox" wire:model.live="form.is_bidirectional" id="is_bidirectional" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                            <label for="is_bidirectional" class="ml-2 text-sm text-[var(--ui-secondary)]">Bidirektional</label>
-                        </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" wire:model.live="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                            <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
+                <x-nx-panel title="Eigenschaften">
+                    <div class="flex flex-col items-start gap-2.5 p-4">
+                        <x-nx-input-checkbox wire:model.live="form.is_bidirectional">
+                            <span>Bidirektional <span class="text-xs text-[color:var(--nx-muted)]">— gilt in beide Richtungen</span></span>
+                        </x-nx-input-checkbox>
+                        <div class="w-full border-t border-[color:var(--nx-line)] pt-2.5">
+                            <x-nx-input-checkbox label="Aktiv" wire:model.live="form.is_active" />
                         </div>
                     </div>
-                </div>
-            </div>
-        @endif
+                </x-nx-panel>
+            @endif
 
-        @if($activeTab === 'relationships')
-            <div class="space-y-3">
-                @forelse($this->linkedRelationships as $pivot)
-                    @php $rel = $pivot->entityRelationship; @endphp
-                    @if($rel)
-                        <div class="flex items-center justify-between p-4 rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-surface)]">
-                            <div class="flex-1">
-                                <div class="flex items-center gap-3">
-                                    <div class="flex-shrink-0">
-                                        <div class="w-10 h-10 rounded-lg bg-[var(--ui-primary-5)] flex items-center justify-center">
-                                            @svg('heroicon-o-link', 'w-5 h-5 text-[var(--ui-primary)]')
-                                        </div>
-                                    </div>
-                                    <div class="flex-1 min-w-0">
-                                        <div class="font-semibold text-[var(--ui-secondary)]">
-                                            {{ $rel->fromEntity?->name ?? 'Unbekannt' }}
-                                            <span class="text-[var(--ui-muted)] font-normal">{{ $rel->relationType?->name ?? '–' }}</span>
-                                            {{ $rel->toEntity?->name ?? 'Unbekannt' }}
-                                        </div>
-                                        <div class="text-xs text-[var(--ui-muted)] mt-0.5">
-                                            {{ $rel->fromEntity?->type?->name ?? '' }} → {{ $rel->toEntity?->type?->name ?? '' }}
-                                            @if($pivot->note)
-                                                &middot; {{ $pivot->note }}
+            @if ($activeTab === 'relationships')
+                <x-nx-card flush>
+                    @if ($links->isEmpty())
+                        <x-nx-empty icon="heroicon-o-link">
+                            Dieser Interlink wird noch in keiner Beziehung verwendet.
+                        </x-nx-empty>
+                    @else
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-xs text-[color:var(--nx-muted)]">
+                                    <th class="border-b border-[color:var(--nx-line)] px-4 py-2.5 text-left font-medium">Von</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-left font-medium">Beziehung</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-left font-medium">Nach</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-4 py-2.5 text-left font-medium">Notiz</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($links as $pivot)
+                                    @continue(! $pivot->entityRelationship)
+                                    @php
+                                        $rel = $pivot->entityRelationship;
+                                    @endphp
+                                    <tr wire:key="rel-{{ $pivot->id }}" class="border-b border-[color:var(--nx-line)] last:border-0 hover:bg-[color:var(--nx-hover)]">
+                                        <td class="px-4 py-2">
+                                            @if ($rel->fromEntity)
+                                                <a href="{{ route('organization.entities.show', $rel->fromEntity) }}" wire:navigate class="font-medium text-[color:var(--nx-text)] hover:underline">{{ $rel->fromEntity->name }}</a>
+                                                <div class="text-xs text-[color:var(--nx-faint)]">{{ $rel->fromEntity->type?->name }}</div>
+                                            @else
+                                                <span class="text-[color:var(--nx-faint)]">Unbekannt</span>
                                             @endif
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
+                                        </td>
+                                        <td class="px-3 py-2 text-[color:var(--nx-muted)]">{{ $rel->relationType?->name ?? '–' }}</td>
+                                        <td class="px-3 py-2">
+                                            @if ($rel->toEntity)
+                                                <a href="{{ route('organization.entities.show', $rel->toEntity) }}" wire:navigate class="font-medium text-[color:var(--nx-text)] hover:underline">{{ $rel->toEntity->name }}</a>
+                                                <div class="text-xs text-[color:var(--nx-faint)]">{{ $rel->toEntity->type?->name }}</div>
+                                            @else
+                                                <span class="text-[color:var(--nx-faint)]">Unbekannt</span>
+                                            @endif
+                                        </td>
+                                        <td class="px-4 py-2 text-[color:var(--nx-muted)]">{{ $pivot->note ?: '–' }}</td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     @endif
-                @empty
-                    <div class="p-8 text-center rounded-lg border border-[var(--ui-border)]/60 bg-[var(--ui-muted-5)]">
-                        <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-[var(--ui-surface)] flex items-center justify-center">
-                            @svg('heroicon-o-link', 'w-8 h-8 text-[var(--ui-muted)]')
-                        </div>
-                        <p class="text-sm font-medium text-[var(--ui-secondary)] mb-1">Keine verknüpften Relationships</p>
-                        <p class="text-xs text-[var(--ui-muted)]">Dieser Interlink wird noch in keiner Entity-Relationship verwendet.</p>
-                    </div>
-                @endforelse
-            </div>
-        @endif
+                </x-nx-card>
+            @endif
+        </div>
     </x-ui-page-container>
 </x-ui-page>

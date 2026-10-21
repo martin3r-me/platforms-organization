@@ -84,7 +84,7 @@ class Fleet extends Component
         }
         $cands = [];
         try {
-            if (Schema::hasTable('dev_issues')) {
+            if ($this->hasTable('dev_issues')) {
                 $r = DB::table('dev_issues')
                     ->leftJoin('dev_boards', 'dev_issues.dev_board_id', '=', 'dev_boards.id')
                     ->whereNull('dev_issues.deleted_at')
@@ -100,7 +100,7 @@ class Fleet extends Component
         } catch (\Throwable $e) {
         }
         try {
-            if (Schema::hasTable('planner_tasks')) {
+            if ($this->hasTable('planner_tasks')) {
                 $r = DB::table('planner_tasks')
                     ->leftJoin('planner_projects', 'planner_tasks.project_id', '=', 'planner_projects.id')
                     ->whereNull('planner_tasks.deleted_at')
@@ -136,7 +136,7 @@ class Fleet extends Component
             return 0;
         }
         try {
-            if (Schema::hasTable('organization_time_entries')) {
+            if ($this->hasTable('organization_time_entries')) {
                 return (int) DB::table('organization_time_entries')
                     ->where('user_id', $userId)
                     ->whereDate('work_date', today())
@@ -157,7 +157,7 @@ class Fleet extends Component
             'review' => 'in Prüfung', 'learn' => 'lernt', 'idle' => 'im Leerlauf',
         ];
         try {
-            if (Schema::hasTable('organization_agent_run_events')) {
+            if ($this->hasTable('organization_agent_run_events')) {
                 $r = DB::table('organization_agent_run_events')
                     ->where('organization_entity_id', $entityId)
                     ->orderByDesc('id')
@@ -174,6 +174,14 @@ class Fleet extends Component
         }
 
         return null;
+    }
+
+    /** Schema-Guard je Tabelle einmal pro Request — sonst 4 Metadaten-Abfragen je Agent und Poll. */
+    private array $tableMemo = [];
+
+    private function hasTable(string $table): bool
+    {
+        return $this->tableMemo[$table] ??= Schema::hasTable($table);
     }
 
     public function render()

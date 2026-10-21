@@ -2,6 +2,7 @@
 
 namespace Platform\Organization\Livewire\Agent;
 
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
@@ -30,6 +31,8 @@ class ProfilePanel extends Component
 
     /** Frisch geminteter Token — NUR einmal sichtbar (danach nur der Hash in der DB). */
     public ?string $mintedToken = null;
+
+    private const LOG_TAIL = 200;
 
     public function mount(OrganizationEntity $entity): void
     {
@@ -111,11 +114,15 @@ class ProfilePanel extends Component
             return [];
         }
 
+        // Nur das Ende des Laufs: das Panel pollt alle 4 s, ein langer Lauf hat tausende Events.
         return OrganizationAgentRunEvent::query()
             ->where('organization_entity_id', $this->entity->id)
             ->where('run_id', $latestRun)
-            ->orderBy('id')
+            ->orderByDesc('id')
+            ->limit(self::LOG_TAIL)
             ->get(['kind', 'text', 'created_at'])
+            ->reverse()
+            ->values()
             ->all();
     }
 
@@ -132,6 +139,13 @@ class ProfilePanel extends Component
             return [];
         }
 
+        // Kurz gecacht: der Live-Log-Poll (4 s) rendert das ganze Panel neu, die Queue ändert sich selten.
+        return Cache::remember('organization:agent-next-tasks:' . $this->entity->id, 30, fn () => $this->loadNextTasks($user->id));
+    }
+
+    private function loadNextTasks(int $userId): array
+    {
+
         $tasks = [];
 
         try {
@@ -139,7 +153,7 @@ class ProfilePanel extends Component
                 $tasks = array_merge($tasks, DB::table('dev_issues')
                     ->leftJoin('dev_boards', 'dev_issues.dev_board_id', '=', 'dev_boards.id')
                     ->whereNull('dev_issues.deleted_at')
-                    ->where('dev_issues.user_in_charge_id', $user->id)
+                    ->where('dev_issues.user_in_charge_id', $userId)
                     ->where('dev_issues.status', 'open')
                     ->where('dev_issues.is_done', false)
                     ->orderBy('dev_boards.order')
@@ -159,7 +173,7 @@ class ProfilePanel extends Component
                 $tasks = array_merge($tasks, DB::table('planner_tasks')
                     ->leftJoin('planner_projects', 'planner_tasks.project_id', '=', 'planner_projects.id')
                     ->whereNull('planner_tasks.deleted_at')
-                    ->where('planner_tasks.user_in_charge_id', $user->id)
+                    ->where('planner_tasks.user_in_charge_id', $userId)
                     ->where('planner_tasks.is_done', false)
                     ->orderBy('planner_tasks.project_slot_order')
                     ->orderBy('planner_tasks.created_at')

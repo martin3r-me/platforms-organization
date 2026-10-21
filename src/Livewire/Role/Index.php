@@ -65,8 +65,9 @@ class Index extends Component
     public function roles()
     {
         $q = OrganizationRole::query()
+            // Zuweisungen samt Personen nur für die aufgeklappte Rolle (expandedAssignments).
             ->withCount('assignments')
-            ->with('ownerEntity', 'assignments.person', 'assignments.context')
+            ->with('ownerEntity')
             ->where('team_id', Auth::user()->currentTeam->id);
 
         if ($this->search !== '') {
@@ -158,6 +159,18 @@ class Index extends Component
         }
 
         return $nodes;
+    }
+
+    #[Computed]
+    public function expandedAssignments()
+    {
+        if (! $this->expandedRoleId) {
+            return collect();
+        }
+
+        $role = OrganizationRole::where('team_id', Auth::user()->currentTeam->id)->find($this->expandedRoleId);
+
+        return $role ? $role->assignments()->with('person', 'context')->get() : collect();
     }
 
     #[Computed]
@@ -384,7 +397,7 @@ class Index extends Component
         ]);
 
         $this->reset('roleAssignForm');
-        unset($this->roles);
+        unset($this->roles, $this->expandedAssignments);
         $this->dispatch('toast', message: 'Rollenzuweisung erstellt');
     }
 
@@ -395,7 +408,7 @@ class Index extends Component
         $assignment = OrganizationRoleAssignment::where('team_id', $teamId)->find($id);
         if ($assignment) {
             $assignment->delete();
-            unset($this->roles);
+            unset($this->roles, $this->expandedAssignments);
             $this->dispatch('toast', message: 'Rollenzuweisung entfernt');
         }
     }

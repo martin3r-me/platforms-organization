@@ -64,7 +64,7 @@
             </x-nx-panel>
 
             <x-nx-panel title="Eigenschaften">
-                <div class="space-y-2.5 p-4">
+                <div class="flex flex-col items-start gap-2.5 p-4">
                     <x-nx-input-checkbox wire:model.live="form.is_directional">
                         <span>Gerichtet <span class="text-xs text-[color:var(--nx-muted)]">— die Beziehung hat eine Richtung (von → nach)</span></span>
                     </x-nx-input-checkbox>
@@ -74,7 +74,7 @@
                     <x-nx-input-checkbox wire:model.live="form.is_reciprocal">
                         <span>Wechselseitig <span class="text-xs text-[color:var(--nx-muted)]">— gilt in beide Richtungen gleichermaßen</span></span>
                     </x-nx-input-checkbox>
-                    <div class="border-t border-[color:var(--nx-line)] pt-2.5">
+                    <div class="w-full border-t border-[color:var(--nx-line)] pt-2.5">
                         <x-nx-input-checkbox label="Aktiv" wire:model.live="form.is_active" />
                     </div>
                 </div>
@@ -86,7 +86,7 @@
                         Wirkt nur bei <strong>Person → Einheit</strong>. Rein strukturelle Beziehungen zwischen Einheiten verleihen nichts.
                         Ohne Auswahl entsteht kein Zugriff; die höchste Stufe gewinnt (Verwalten &gt; Bearbeiten &gt; Lesen).
                     </x-nx-callout>
-                    <div class="space-y-2.5">
+                    <div class="flex flex-col items-start gap-2.5">
                         <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-[color:var(--nx-text)]">
                             <input type="checkbox" value="read" wire:model.live="form.capabilities" class="h-4 w-4 rounded-[4px] accent-[var(--nx-accent)]" />
                             <span>Lesen <code class="text-xs text-[color:var(--nx-faint)]">read</code> <span class="text-xs text-[color:var(--nx-muted)]">— Objekte im Teilbaum sehen</span></span>

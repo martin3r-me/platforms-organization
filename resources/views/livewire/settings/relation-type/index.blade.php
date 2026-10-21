@@ -12,7 +12,6 @@
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
             ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Einstellungen'],
             ['label' => 'Beziehungstypen'],
         ]">
             <x-slot name="left">
@@ -99,7 +98,7 @@
                 <x-nx-input-text name="icon" label="Icon" wire:model.live="form.icon" placeholder="heroicon-o-arrow-right" />
                 <x-nx-input-number name="sort_order" label="Sortierung" wire:model.live="form.sort_order" min="0" />
             </div>
-            <div class="space-y-2 border-t border-[color:var(--nx-line)] pt-3">
+            <div class="flex flex-col items-start gap-2 border-t border-[color:var(--nx-line)] pt-3">
                 <x-nx-input-checkbox label="Gerichtet — hat eine Richtung (von → nach)" wire:model.live="form.is_directional" />
                 <x-nx-input-checkbox label="Hierarchisch — bildet Über-/Unterordnung" wire:model.live="form.is_hierarchical" />
                 <x-nx-input-checkbox label="Wechselseitig — gilt in beide Richtungen" wire:model.live="form.is_reciprocal" />

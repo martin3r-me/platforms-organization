@@ -12,6 +12,11 @@ class Index extends Component
 {
     public $sourceFilter = '';
 
+    /** Sichtbare Zeilen; "Weitere laden" erhöht um PAGE. */
+    public int $limit = self::PAGE;
+
+    private const PAGE = 100;
+
     protected $queryString = [
         'sourceFilter' => ['except' => ''],
     ];
@@ -31,7 +36,20 @@ class Index extends Component
             $query->where('source_id', $this->sourceFilter);
         }
 
-        return $query->orderByDesc('snapshot_date')->limit(100)->get();
+        // Ein Datensatz mehr als sichtbar: verrät, ob es weitere gibt.
+        return $query->orderByDesc('snapshot_date')->limit($this->limit + 1)->get();
+    }
+
+    public function loadMore(): void
+    {
+        $this->limit += self::PAGE;
+    }
+
+    public function updated($property): void
+    {
+        if ($property !== 'limit') {
+            $this->limit = self::PAGE;
+        }
     }
 
     #[Computed]

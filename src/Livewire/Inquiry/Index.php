@@ -11,6 +11,11 @@ class Index extends Component
     public $search = '';
     public $statusFilter = '';
 
+    /** Sichtbare Zeilen; Treffer zählen alle. */
+    public int $limit = self::PAGE;
+
+    private const PAGE = 100;
+
     protected $queryString = [
         'search' => ['except' => ''],
         'statusFilter' => ['except' => ''],
@@ -25,7 +30,8 @@ class Index extends Component
         }
 
         $query = OrganizationInquiry::forTeam($teamId)
-            ->with(['entity', 'inferencePrompt', 'recipients']);
+            ->with(['entity', 'inferencePrompt'])
+            ->withCount('recipients');
 
         if ($this->search) {
             $query->where(function ($q) {
@@ -40,6 +46,18 @@ class Index extends Component
         }
 
         return $query->orderByDesc('created_at')->get();
+    }
+
+    public function loadMore(): void
+    {
+        $this->limit += self::PAGE;
+    }
+
+    public function updated($property): void
+    {
+        if ($property !== 'limit') {
+            $this->limit = self::PAGE;
+        }
     }
 
     public function render()

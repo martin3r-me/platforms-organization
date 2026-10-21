@@ -52,7 +52,7 @@ class Index extends Component
             return;
         }
 
-        $visibleIds = $this->signals->pluck('id')->all();
+        $visibleIds = $this->signals->take($this->limit)->pluck('id')->all();
 
         // If all visible are already selected, clear; otherwise select all visible
         if (! empty($visibleIds) && count(array_intersect($visibleIds, $this->selectedIds)) === count($visibleIds)) {

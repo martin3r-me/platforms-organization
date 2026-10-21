@@ -11,6 +11,11 @@ class RunIndex extends Component
     public $search = '';
     public $statusFilter = '';
 
+    /** Sichtbare Zeilen; "Weitere laden" erhöht um PAGE. */
+    public int $limit = self::PAGE;
+
+    private const PAGE = 100;
+
     protected $queryString = [
         'search' => ['except' => ''],
         'statusFilter' => ['except' => ''],
@@ -38,7 +43,20 @@ class RunIndex extends Component
             $query->where('status', $this->statusFilter);
         }
 
-        return $query->orderByDesc('created_at')->get();
+        // Ein Datensatz mehr als sichtbar: verrät, ob es weitere gibt.
+        return $query->orderByDesc('created_at')->limit($this->limit + 1)->get();
+    }
+
+    public function loadMore(): void
+    {
+        $this->limit += self::PAGE;
+    }
+
+    public function updated($property): void
+    {
+        if ($property !== 'limit') {
+            $this->limit = self::PAGE;
+        }
     }
 
     public function render()

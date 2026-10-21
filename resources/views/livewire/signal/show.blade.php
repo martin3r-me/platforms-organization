@@ -1,721 +1,422 @@
+@php
+    $hasActions = $signal->actions->isNotEmpty();
+    $offen = in_array($signal->status, ['open', 'acknowledged'], true);
+
+    $sevVariant = fn ($s) => match ($s) { 'critical', 'algedonic' => 'danger', 'warning' => 'warning', default => 'info' };
+    $sevLabel = fn ($s) => match ($s) { 'critical' => 'Kritisch', 'algedonic' => 'Algedonisch', 'warning' => 'Warnung', 'info' => 'Info', default => ucfirst((string) $s) };
+    $statusVariant = fn ($s) => match ($s) { 'open' => 'warning', 'acknowledged' => 'info', 'resolved' => 'success', default => 'neutral' };
+    $statusLabel = fn ($s) => match ($s) { 'open' => 'Offen', 'acknowledged' => 'Bestätigt', 'resolved' => 'Gelöst', 'dismissed' => 'Verworfen', default => ucfirst((string) $s) };
+    $patternLabel = fn ($p) => match ($p) { 'threshold' => 'Schwellenwert', 'trend' => 'Trend', 'cross_dimension' => 'Kreuz-Dimension', 'ratio' => 'Verhältnis', default => $p };
+
+    // Ein sichtbarer Button rechts: der nächste Schritt im Status, sofern keine Handlungsoptionen entscheiden.
+    $primaer = match (true) {
+        $hasActions => null,
+        $signal->status === 'open' => ['acknowledge', 'Bestätigen', 'heroicon-o-check'],
+        $signal->status === 'acknowledged' => ['resolve', 'Lösen', 'heroicon-o-check-circle'],
+        default => null,
+    };
+
+    $autor = fn ($c) => match ($c->author_context) { 'system' => 'System', 'inference' => 'Inference', default => $c->user?->name ?? 'Unbekannt' };
+    $autorIcon = fn ($c) => match ($c->author_context) { 'system' => 'heroicon-s-cog-6-tooth', 'inference' => 'heroicon-s-cpu-chip', default => null };
+    $textarea = 'block w-full resize-none rounded-[6px] border border-[color:var(--nx-line-strong)] bg-[color:var(--nx-surface)] px-3 py-2 text-sm text-[color:var(--nx-text)] placeholder:text-[color:var(--nx-faint)] focus:border-[color:var(--nx-accent)] focus:outline-none focus:ring-1 focus:ring-[color:var(--nx-accent)]';
+@endphp
+
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar :title="$signal->definition?->name ?? 'Signal'" icon="heroicon-o-bell-alert" />
+    </x-slot>
+
+    <x-slot name="sidebar">
+        <x-ui-page-sidebar title="Signal" width="w-64" :defaultOpen="true" side="left">
+            <div class="flex flex-col gap-0.5 p-2">
+                <x-nx-property-row icon="heroicon-o-signal" label="Status">
+                    <x-nx-badge :variant="$statusVariant($signal->status)" dot>{{ $statusLabel($signal->status) }}</x-nx-badge>
+                </x-nx-property-row>
+                @if ($signal->snooze_until && $signal->snooze_until->isFuture())
+                    <x-nx-property-row icon="heroicon-o-clock" label="Snooze">
+                        <span class="inline-flex items-center gap-1">
+                            bis {{ $signal->snooze_until->format('d.m.Y') }}
+                            @if ($offen)
+                                <button wire:click="cancelSnoozeActive" title="Snooze aufheben" class="text-[color:var(--nx-faint)] hover:text-[color:var(--nx-danger)]">
+                                    @svg('heroicon-o-x-mark', 'w-3.5 h-3.5')
+                                </button>
+                            @endif
+                        </span>
+                    </x-nx-property-row>
+                @endif
+                <x-nx-property-row icon="heroicon-o-exclamation-triangle" label="Schweregrad">
+                    <x-nx-badge :variant="$sevVariant($signal->severity)">{{ $sevLabel($signal->severity) }}</x-nx-badge>
+                </x-nx-property-row>
+                @if ($signal->definition?->pattern_type)
+                    <x-nx-property-row icon="heroicon-o-chart-bar" label="Muster">{{ $patternLabel($signal->definition->pattern_type) }}</x-nx-property-row>
+                @endif
+                @if ($signal->entity)
+                    <x-nx-property-row icon="heroicon-o-cube" label="Einheit">
+                        <a href="{{ route('organization.entities.show', $signal->entity) }}" wire:navigate class="hover:underline">{{ $signal->entity->name }}</a>
+                        @if ($signal->entity->type)
+                            <div class="text-xs text-[color:var(--nx-faint)]">{{ $signal->entity->type->name }}</div>
+                        @endif
+                    </x-nx-property-row>
+                @endif
+                @if ($signal->assignee)
+                    <x-nx-property-row icon="heroicon-o-user" label="Zugewiesen">
+                        <a href="{{ route('organization.entities.show', $signal->assignee) }}" wire:navigate class="hover:underline">{{ $signal->assignee->name }}</a>
+                    </x-nx-property-row>
+                @endif
+                @if ($signal->definition)
+                    <x-nx-property-row icon="heroicon-o-adjustments-horizontal" label="Definition">
+                        <a href="{{ route('organization.settings.signal-definitions.show', $signal->definition) }}" wire:navigate class="hover:underline">{{ $signal->definition->name }}</a>
+                    </x-nx-property-row>
+                @endif
+                <x-nx-property-row icon="heroicon-o-calendar" label="Erstellt">{{ $signal->created_at->format('d.m.Y H:i') }}</x-nx-property-row>
+                @if ($signal->resolved_at)
+                    <x-nx-property-row icon="heroicon-o-check-circle" label="Gelöst">{{ $signal->resolved_at->format('d.m.Y H:i') }}</x-nx-property-row>
+                @endif
+                @if ($signal->resolvedByUser)
+                    <x-nx-property-row icon="heroicon-o-user-circle" label="Gelöst von">{{ $signal->resolvedByUser->name }}</x-nx-property-row>
+                @endif
+            </div>
+        </x-ui-page-sidebar>
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => $signal->entity?->name ?? 'Entity', 'href' => $signal->entity ? route('organization.entities.show', $signal->entity) : '#'],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
             ['label' => 'Signale', 'href' => route('organization.signals.index')],
             ['label' => $signal->definition?->name ?? 'Signal'],
         ]">
-            <button
-                wire:click="toggleFocus"
-                type="button"
-                @class([
-                    'inline-flex items-center gap-1 px-2.5 py-1.5 rounded-md text-sm font-medium transition',
-                    'bg-amber-100 text-amber-800 hover:bg-amber-200' => $this->isFocused,
-                    'bg-transparent text-[var(--ui-muted)] hover:text-[var(--ui-secondary)] hover:bg-gray-100' => ! $this->isFocused,
-                ])
-                title="{{ $this->isFocused ? 'Aus Fokus entfernen' : 'In Fokus aufnehmen' }}"
-            >
-                @if($this->isFocused)
-                    @svg('heroicon-s-star', 'w-4 h-4')
-                    <span>Fokus</span>
-                @else
-                    @svg('heroicon-o-star', 'w-4 h-4')
-                    <span>Fokus</span>
+            <div class="flex items-center gap-2">
+                @if ($primaer)
+                    <x-nx-button variant="primary" size="sm" wire:click="startAction('{{ $primaer[0] }}')">
+                        @svg($primaer[2], 'w-4 h-4')
+                        <span>{{ $primaer[1] }}</span>
+                    </x-nx-button>
                 @endif
-            </button>
-            @php($hasActions = $signal->actions->isNotEmpty())
-            @if($signal->status === 'open')
-                @unless($hasActions)
-                    <x-ui-button variant="primary" size="sm" wire:click="startAction('acknowledge')">
-                        @svg('heroicon-o-check', 'w-4 h-4')
-                        <span>Bestätigen</span>
-                    </x-ui-button>
-                @endunless
-                <x-ui-button variant="ghost" size="sm" wire:click="openSnooze">
-                    @svg('heroicon-o-clock', 'w-4 h-4')
-                    <span>Snooze</span>
-                </x-ui-button>
-                @unless($hasActions)
-                    <x-ui-button variant="ghost" size="sm" wire:click="startAction('dismiss')">
-                        @svg('heroicon-o-x-mark', 'w-4 h-4')
-                        <span>Verwerfen</span>
-                    </x-ui-button>
-                @endunless
-            @elseif($signal->status === 'acknowledged')
-                @unless($hasActions)
-                    <x-ui-button variant="primary" size="sm" wire:click="startAction('resolve')">
-                        @svg('heroicon-o-check-circle', 'w-4 h-4')
-                        <span>Lösen</span>
-                    </x-ui-button>
-                @endunless
-                <x-ui-button variant="ghost" size="sm" wire:click="openSnooze">
-                    @svg('heroicon-o-clock', 'w-4 h-4')
-                    <span>Snooze</span>
-                </x-ui-button>
-                @unless($hasActions)
-                    <x-ui-button variant="ghost" size="sm" wire:click="startAction('dismiss')">
-                        @svg('heroicon-o-x-mark', 'w-4 h-4')
-                        <span>Verwerfen</span>
-                    </x-ui-button>
-                @endunless
-            @endif
+                <x-nx-dropdown>
+                    <x-nx-dropdown-item wire:click="toggleFocus">
+                        @svg($this->isFocused ? 'heroicon-s-star' : 'heroicon-o-star', 'w-4 h-4')
+                        {{ $this->isFocused ? 'Aus Fokus entfernen' : 'In Fokus aufnehmen' }}
+                    </x-nx-dropdown-item>
+                    @if ($offen)
+                        <x-nx-dropdown-item wire:click="openSnooze">
+                            @svg('heroicon-o-clock', 'w-4 h-4')
+                            Snoozen…
+                        </x-nx-dropdown-item>
+                        @unless ($hasActions)
+                            <x-nx-dropdown-divider />
+                            <x-nx-dropdown-item variant="danger" wire:click="startAction('dismiss')">
+                                @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                Verwerfen…
+                            </x-nx-dropdown-item>
+                        @endunless
+                    @endif
+                </x-nx-dropdown>
+            </div>
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Informationen" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Status</h3>
-                    <div class="space-y-3">
-                        <span class="inline-flex items-center px-2.5 py-1 rounded text-xs font-medium
-                            @if($signal->status === 'open') bg-yellow-100 text-yellow-800
-                            @elseif($signal->status === 'acknowledged') bg-blue-100 text-blue-800
-                            @elseif($signal->status === 'resolved') bg-green-100 text-green-800
-                            @else bg-gray-100 text-gray-600
-                            @endif
-                        ">
-                            @switch($signal->status)
-                                @case('open') Offen @break
-                                @case('acknowledged') Bestätigt @break
-                                @case('resolved') Gelöst @break
-                                @case('dismissed') Verworfen @break
-                            @endswitch
-                        </span>
-
-                        {{-- Snooze Badge --}}
-                        @if($signal->snooze_until && $signal->snooze_until->isFuture())
-                            <div class="flex items-center gap-2">
-                                <span class="inline-flex items-center gap-1 px-2.5 py-1 rounded text-xs font-medium bg-amber-100 text-amber-800">
-                                    @svg('heroicon-o-clock', 'w-3.5 h-3.5')
-                                    Snoozed bis {{ $signal->snooze_until->format('d.m.Y') }}
-                                </span>
-                                @if(in_array($signal->status, ['open', 'acknowledged']))
-                                    <button wire:click="cancelSnoozeActive" class="text-xs text-[var(--ui-muted)] hover:text-red-600 transition-colors" title="Snooze aufheben">
-                                        @svg('heroicon-o-x-mark', 'w-3.5 h-3.5')
-                                    </button>
-                                @endif
-                            </div>
-                        @endif
-                    </div>
+    <x-ui-page-container width="contained">
+        <div class="space-y-5">
+            {{-- Kopf --}}
+            <div class="space-y-2">
+                <div class="flex flex-wrap items-center gap-2">
+                    <button wire:click="toggleFocus" type="button" title="{{ $this->isFocused ? 'Aus Fokus entfernen' : 'In Fokus aufnehmen' }}"
+                        class="transition-colors {{ $this->isFocused ? 'text-[color:var(--nx-warning)]' : 'text-[color:var(--nx-faint)] hover:text-[color:var(--nx-warning)]' }}">
+                        @svg($this->isFocused ? 'heroicon-s-star' : 'heroicon-o-star', 'w-5 h-5')
+                    </button>
+                    <h1 class="m-0 text-2xl font-semibold tracking-tight text-[color:var(--nx-text)]">{{ $signal->definition?->name ?? 'Signal' }}</h1>
+                    <x-nx-badge :variant="$sevVariant($signal->severity)">{{ $sevLabel($signal->severity) }}</x-nx-badge>
+                    <x-nx-badge :variant="$statusVariant($signal->status)" dot>{{ $statusLabel($signal->status) }}</x-nx-badge>
+                    <span class="ml-auto text-xs text-[color:var(--nx-faint)]" title="{{ $signal->created_at->format('d.m.Y H:i') }}">{{ $signal->created_at->diffForHumans() }}</span>
                 </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Details</h3>
-                    <div class="space-y-3">
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <span class="text-xs text-[var(--ui-muted)]">Schweregrad</span>
-                            <div class="mt-1">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-                                    @if($signal->severity === 'critical') bg-red-100 text-red-800
-                                    @elseif($signal->severity === 'warning') bg-amber-100 text-amber-800
-                                    @else bg-blue-100 text-blue-800
-                                    @endif
-                                ">
-                                    {{ ucfirst($signal->severity) }}
-                                </span>
-                            </div>
-                        </div>
-                        @if($signal->definition?->pattern_type)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Pattern</span>
-                                <div class="text-sm font-medium text-[var(--ui-secondary)]">
-                                    @switch($signal->definition->pattern_type)
-                                        @case('threshold') Schwellenwert @break
-                                        @case('trend') Trend @break
-                                        @case('cross_dimension') Kreuz-Dimension @break
-                                        @case('ratio') Verhältnis @break
-                                        @default {{ $signal->definition->pattern_type }}
-                                    @endswitch
-                                </div>
-                            </div>
-                        @endif
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <span class="text-xs text-[var(--ui-muted)]">Erstellt</span>
-                            <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $signal->created_at->format('d.m.Y H:i') }}</div>
-                        </div>
-                        @if($signal->resolved_at)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Gelöst</span>
-                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $signal->resolved_at->format('d.m.Y H:i') }}</div>
-                            </div>
-                        @endif
-                        @if($signal->resolvedByUser)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Gelöst von</span>
-                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $signal->resolvedByUser->name }}</div>
-                            </div>
-                        @endif
-                        @if($signal->assignee)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Zugewiesen an</span>
-                                <div class="text-sm font-medium">
-                                    <a href="{{ route('organization.entities.show', $signal->assignee) }}" class="text-[var(--ui-primary)] hover:underline">
-                                        {{ $signal->assignee->name }}
-                                    </a>
-                                </div>
-                            </div>
-                        @endif
-                        @if($signal->definition)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Definition</span>
-                                <div class="text-sm font-medium">
-                                    <a href="{{ route('organization.settings.signal-definitions.show', $signal->definition) }}" class="text-[var(--ui-primary)] hover:underline">
-                                        {{ $signal->definition->name }}
-                                    </a>
-                                </div>
-                            </div>
-                        @endif
-                        @if($signal->entity)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Entity</span>
-                                <div class="text-sm font-medium">
-                                    <a href="{{ route('organization.entities.show', $signal->entity) }}" class="text-[var(--ui-primary)] hover:underline">
-                                        {{ $signal->entity->name }}
-                                    </a>
-                                    @if($signal->entity->type)
-                                        <div class="text-xs text-[var(--ui-muted)]">{{ $signal->entity->type->name }}</div>
-                                    @endif
-                                </div>
-                            </div>
-                        @endif
-                    </div>
-                </div>
+                <p class="m-0 text-[15px] leading-relaxed text-[color:var(--nx-text)]">{{ $signal->message }}</p>
             </div>
-        </x-ui-page-sidebar>
-    </x-slot>
 
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <div class="h-full flex flex-col">
-                {{-- Timeline --}}
-                <div class="flex-1 overflow-y-auto p-4 space-y-3">
-                    @forelse($this->signalActivities as $activity)
-                        <div class="flex gap-3 group">
-                            <div class="flex-shrink-0 mt-0.5">
-                                @if($activity->activity_type === 'manual')
-                                    <div class="w-6 h-6 rounded-full bg-[var(--ui-primary-10)] flex items-center justify-center">
-                                        @svg('heroicon-s-pencil', 'w-3 h-3 text-[var(--ui-primary)]')
+            @if ($signal->status === 'resolved' && $signal->resolution_summary)
+                <x-nx-callout variant="success" title="Was wurde getan">
+                    <span class="whitespace-pre-line">{{ $signal->resolution_summary }}</span>
+                    @if ($signal->resolvedByUser || $signal->resolved_at)
+                        <div class="mt-1 text-xs text-[color:var(--nx-faint)]">
+                            {{ $signal->resolvedByUser?->name }}@if ($signal->resolvedByUser && $signal->resolved_at) · @endif{{ $signal->resolved_at?->diffForHumans() }}
+                        </div>
+                    @endif
+                </x-nx-callout>
+            @endif
+
+            @if ($signal->status === 'dismissed' && $signal->dismissed_reason)
+                <x-nx-callout variant="neutral" icon="heroicon-o-x-circle" title="Verworfen — Begründung">
+                    <span class="whitespace-pre-line">{{ $signal->dismissed_reason }}</span>
+                </x-nx-callout>
+            @endif
+
+            @if ($hasActions)
+                <x-nx-panel flush title="Handlungsoptionen" subtitle="Jede Option einzeln umsetzen oder verwerfen">
+                    <div>
+                        @foreach ($signal->actions as $action)
+                            @php
+                                $isActive = $activeActionId === $action->id;
+                                $isPending = $action->status === 'pending';
+                            @endphp
+                            <div wire:key="a-{{ $action->id }}"
+                                class="border-b border-[color:var(--nx-line)] px-4 py-3 last:border-0 {{ $isActive ? 'bg-[color:var(--nx-hover)]' : '' }} {{ $action->status === 'dismissed' ? 'opacity-70' : '' }}">
+                                <div class="flex items-start gap-2.5">
+                                    @if ($action->status === 'applied')
+                                        @svg('heroicon-o-check-circle', 'mt-0.5 w-4 h-4 shrink-0 text-[color:var(--nx-success)]')
+                                    @elseif ($action->status === 'dismissed')
+                                        @svg('heroicon-o-x-circle', 'mt-0.5 w-4 h-4 shrink-0 text-[color:var(--nx-faint)]')
+                                    @else
+                                        @svg('heroicon-o-light-bulb', 'mt-0.5 w-4 h-4 shrink-0 text-[color:var(--nx-info)]')
+                                    @endif
+                                    <div class="min-w-0 flex-1">
+                                        <div class="flex items-start justify-between gap-3">
+                                            <div class="text-sm font-medium text-[color:var(--nx-text)]">{{ $action->title }}</div>
+                                            @if ($action->status === 'applied')
+                                                <x-nx-badge variant="success">Umgesetzt</x-nx-badge>
+                                            @elseif ($action->status === 'dismissed')
+                                                <x-nx-badge>Verworfen</x-nx-badge>
+                                            @endif
+                                        </div>
+                                        @if (! empty($action->description))
+                                            <p class="mt-0.5 text-xs text-[color:var(--nx-muted)]">{{ $action->description }}</p>
+                                        @endif
+                                        @if (! $isPending && $action->decision_reason)
+                                            <p class="mt-2 text-xs italic text-[color:var(--nx-text)]">„{{ $action->decision_reason }}"</p>
+                                        @endif
+                                        @if (! $isPending)
+                                            <p class="mt-1 text-[11px] text-[color:var(--nx-faint)]">
+                                                {{ $action->decidedByUser?->name ?? 'System' }}@if ($action->decided_at) · {{ $action->decided_at->diffForHumans() }}@endif
+                                            </p>
+                                        @endif
+
+                                        @if ($isPending && ! $isActive)
+                                            <div class="mt-3 flex items-center gap-2">
+                                                <x-nx-button variant="primary" size="sm" wire:click="startActionDecision({{ $action->id }}, 'applied')">
+                                                    @svg('heroicon-o-check', 'w-4 h-4')
+                                                    <span>Umsetzen</span>
+                                                </x-nx-button>
+                                                <x-nx-button size="sm" wire:click="startActionDecision({{ $action->id }}, 'dismissed')">
+                                                    @svg('heroicon-o-x-mark', 'w-4 h-4')
+                                                    <span>Verwerfen</span>
+                                                </x-nx-button>
+                                            </div>
+                                        @elseif ($isPending && $isActive)
+                                            <div class="mt-3 space-y-2">
+                                                <label class="block text-xs font-medium text-[color:var(--nx-muted)]">
+                                                    {{ $activeActionDecision === 'applied' ? 'Notiz zur Umsetzung (optional)' : 'Begründung für das Verwerfen' }}
+                                                </label>
+                                                <textarea wire:model="activeActionReason" rows="2" autofocus class="{{ $textarea }}"
+                                                    placeholder="{{ $activeActionDecision === 'applied' ? 'z. B. Weekly mit Team X ist eingerichtet …' : 'z. B. Empfehlung zielt am Kontext vorbei, weil …' }}"></textarea>
+                                                @error('activeActionReason')
+                                                    <p class="text-xs text-[color:var(--nx-danger)]">{{ $message }}</p>
+                                                @enderror
+                                                <div class="flex items-center justify-end gap-2">
+                                                    <x-nx-button variant="ghost" size="sm" wire:click="cancelActionDecision">Abbrechen</x-nx-button>
+                                                    <x-nx-button :variant="$activeActionDecision === 'applied' ? 'primary' : 'secondary'" size="sm" wire:click="confirmActionDecision">
+                                                        {{ $activeActionDecision === 'applied' ? 'Umsetzen bestätigen' : 'Verwerfen bestätigen' }}
+                                                    </x-nx-button>
+                                                </div>
+                                            </div>
+                                        @endif
                                     </div>
-                                @elseif($activity->name === 'created')
-                                    <div class="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center">
-                                        @svg('heroicon-s-plus', 'w-3 h-3 text-green-600')
-                                    </div>
-                                @elseif($activity->name === 'updated')
-                                    <div class="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
-                                        @svg('heroicon-s-pencil-square', 'w-3 h-3 text-blue-600')
-                                    </div>
-                                @elseif($activity->name === 'deleted')
-                                    <div class="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
-                                        @svg('heroicon-s-trash', 'w-3 h-3 text-red-600')
-                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </x-nx-panel>
+            @endif
+
+            @if ($signal->trigger_metrics && count($signal->trigger_metrics) > 0)
+                <x-nx-panel title="Auslösende Werte">
+                    <div class="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3">
+                        @foreach ($signal->trigger_metrics as $key => $value)
+                            <div class="min-w-0">
+                                <div class="truncate text-xs text-[color:var(--nx-muted)]">{{ ucfirst(str_replace('_', ' ', $key)) }}</div>
+                                <div class="mt-0.5 break-words text-sm font-medium tabular-nums text-[color:var(--nx-text)]">{{ is_array($value) ? json_encode($value) : $value }}</div>
+                            </div>
+                        @endforeach
+                    </div>
+                </x-nx-panel>
+            @endif
+
+            {{-- Kommentare --}}
+            <x-nx-panel title="Kommentare" :subtitle="$this->signalComments->isNotEmpty() ? $this->signalComments->count() . ' Beiträge' : null">
+                <div class="space-y-4">
+                    @foreach ($this->signalComments as $comment)
+                        <div wire:key="c-{{ $comment->id }}" class="flex gap-3">
+                            <span class="flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] bg-[color:var(--nx-accent-soft)] text-[10px] font-medium text-[color:var(--nx-muted)]">
+                                @if ($autorIcon($comment))
+                                    @svg($autorIcon($comment), 'w-3 h-3')
                                 @else
-                                    <div class="w-6 h-6 rounded-full bg-[var(--ui-muted-10)] flex items-center justify-center">
-                                        @svg('heroicon-s-cog-6-tooth', 'w-3 h-3 text-[var(--ui-muted)]')
+                                    {{ mb_strtoupper(mb_substr($comment->user?->name ?? '?', 0, 1)) }}
+                                @endif
+                            </span>
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-center gap-1.5 text-xs">
+                                    <span class="font-semibold text-[color:var(--nx-text)]">{{ $autor($comment) }}</span>
+                                    <span class="text-[color:var(--nx-faint)]">· {{ $comment->created_at->diffForHumans() }}</span>
+                                </div>
+                                <div class="mt-0.5 text-sm leading-relaxed text-[color:var(--nx-text)]">{!! nl2br(e($comment->content)) !!}</div>
+
+                                @if ($comment->replies->isNotEmpty())
+                                    <div class="mt-2 space-y-2 border-l-2 border-[color:var(--nx-line)] pl-3">
+                                        @foreach ($comment->replies as $reply)
+                                            <div>
+                                                <div class="flex items-center gap-1.5 text-xs">
+                                                    @if ($autorIcon($reply))
+                                                        @svg($autorIcon($reply), 'w-3 h-3 text-[color:var(--nx-faint)]')
+                                                    @endif
+                                                    <span class="font-medium text-[color:var(--nx-text)]">{{ $autor($reply) }}</span>
+                                                    <span class="text-[color:var(--nx-faint)]">· {{ $reply->created_at->diffForHumans() }}</span>
+                                                </div>
+                                                <div class="mt-0.5 text-sm text-[color:var(--nx-text)]">{!! nl2br(e($reply->content)) !!}</div>
+                                            </div>
+                                        @endforeach
                                     </div>
+                                @endif
+
+                                @if ($comment->author_context !== 'system')
+                                    @if ($replyingTo === $comment->id)
+                                        <div class="mt-2 space-y-2">
+                                            <textarea wire:model="replyBody" wire:keydown.ctrl.enter="submitReply" rows="2" autofocus class="{{ $textarea }}" placeholder="Antwort schreiben…"></textarea>
+                                            <div class="flex items-center justify-between">
+                                                <span class="text-[10px] text-[color:var(--nx-faint)]">Strg+Enter</span>
+                                                <div class="flex items-center gap-2">
+                                                    <x-nx-button variant="ghost" size="sm" wire:click="cancelReply">Abbrechen</x-nx-button>
+                                                    <x-nx-button variant="primary" size="sm" wire:click="submitReply">Antworten</x-nx-button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    @else
+                                        <button wire:click="startReply({{ $comment->id }})" class="mt-1 inline-flex items-center gap-1 text-xs text-[color:var(--nx-faint)] hover:text-[color:var(--nx-text)]">
+                                            @svg('heroicon-o-chat-bubble-left', 'w-3 h-3')
+                                            Antworten
+                                        </button>
+                                    @endif
                                 @endif
                             </div>
-                            <div class="flex-grow min-w-0">
-                                @if($activity->activity_type === 'manual')
-                                    <p class="text-sm text-[var(--ui-secondary)]">{{ $activity->message }}</p>
-                                @elseif($activity->name === 'created')
-                                    <p class="text-sm text-[var(--ui-muted)]">Signal erstellt</p>
-                                @elseif($activity->name === 'updated' && is_array($activity->properties))
-                                    <p class="text-sm text-[var(--ui-muted)]">
-                                        {{ collect($activity->properties)->keys()->map(fn($k) => ucfirst(str_replace('_', ' ', $k)))->implode(', ') }} geändert
-                                    </p>
-                                @elseif($activity->name === 'deleted')
-                                    <p class="text-sm text-[var(--ui-muted)]">Signal gelöscht</p>
-                                @endif
+                        </div>
+                    @endforeach
 
-                                <div class="flex items-center gap-2 mt-0.5">
-                                    <span class="text-[10px] text-[var(--ui-muted)]">
-                                        {{ $activity->user?->name ?? 'System' }} &middot; {{ $activity->created_at->diffForHumans() }}
-                                    </span>
-                                </div>
+                    <div @class(['space-y-2', 'border-t border-[color:var(--nx-line)] pt-4' => $this->signalComments->isNotEmpty()])>
+                        <textarea wire:model="newComment" wire:keydown.ctrl.enter="addComment" rows="2" class="{{ $textarea }}" placeholder="Kommentar schreiben…"></textarea>
+                        <div class="flex items-center justify-between">
+                            <span class="text-[10px] text-[color:var(--nx-faint)]">Strg+Enter</span>
+                            <x-nx-button size="sm" wire:click="addComment">Kommentieren</x-nx-button>
+                        </div>
+                    </div>
+                </div>
+            </x-nx-panel>
+
+            {{-- Verlauf: vorher rechte Aktivitäten-Sidebar --}}
+            <x-nx-panel title="Verlauf" subtitle="Änderungen und Notizen">
+                <div class="space-y-3">
+                    <form wire:submit="addNote" class="flex items-end gap-2">
+                        <textarea wire:model="newNote" rows="1" class="{{ $textarea }}" placeholder="Notiz hinzufügen…"></textarea>
+                        <x-nx-button type="submit" size="sm">Notiz</x-nx-button>
+                    </form>
+                    @forelse ($this->signalActivities as $activity)
+                        @php
+                            $actIcon = match (true) {
+                                $activity->activity_type === 'manual' => 'heroicon-o-pencil',
+                                $activity->name === 'created' => 'heroicon-o-plus',
+                                $activity->name === 'deleted' => 'heroicon-o-trash',
+                                default => 'heroicon-o-pencil-square',
+                            };
+                        @endphp
+                        <div class="flex gap-2.5 text-sm">
+                            @svg($actIcon, 'mt-0.5 w-4 h-4 shrink-0 text-[color:var(--nx-faint)]')
+                            <div class="min-w-0 flex-1">
+                                @if ($activity->activity_type === 'manual')
+                                    <p class="m-0 text-[color:var(--nx-text)]">{{ $activity->message }}</p>
+                                @elseif ($activity->name === 'created')
+                                    <p class="m-0 text-[color:var(--nx-muted)]">Signal erstellt</p>
+                                @elseif ($activity->name === 'updated' && is_array($activity->properties))
+                                    <p class="m-0 text-[color:var(--nx-muted)]">{{ collect($activity->properties)->keys()->map(fn ($k) => ucfirst(str_replace('_', ' ', $k)))->implode(', ') }} geändert</p>
+                                @elseif ($activity->name === 'deleted')
+                                    <p class="m-0 text-[color:var(--nx-muted)]">Signal gelöscht</p>
+                                @endif
+                                <div class="text-[11px] text-[color:var(--nx-faint)]">{{ $activity->user?->name ?? 'System' }} · {{ $activity->created_at->diffForHumans() }}</div>
                             </div>
                         </div>
                     @empty
-                        <p class="text-sm text-[var(--ui-muted)] text-center py-4">Keine Aktivitäten vorhanden.</p>
+                        <p class="m-0 text-sm text-[color:var(--nx-faint)]">Noch keine Einträge.</p>
                     @endforelse
                 </div>
+            </x-nx-panel>
 
-                {{-- Notiz-Eingabe --}}
-                <div class="flex-shrink-0 border-t border-[var(--ui-border)] p-3">
-                    <form wire:submit="addNote" class="flex items-end gap-2">
-                        <textarea
-                            wire:model="newNote"
-                            rows="2"
-                            class="flex-1 text-sm rounded-lg border border-[var(--ui-border)] bg-[var(--ui-surface)] px-3 py-2 text-[var(--ui-secondary)] placeholder:text-[var(--ui-muted)] focus:border-[var(--ui-primary)] focus:ring-1 focus:ring-[var(--ui-primary)] resize-none"
-                            placeholder="Notiz hinzufügen..."
-                        ></textarea>
-                        <button
-                            type="submit"
-                            class="flex-shrink-0 w-8 h-8 rounded-lg bg-[var(--ui-primary)] text-white flex items-center justify-center hover:opacity-90 transition-opacity disabled:opacity-50"
-                            @if(!$newNote) disabled @endif
-                        >
-                            @svg('heroicon-s-arrow-up', 'w-4 h-4')
-                        </button>
-                    </form>
-                </div>
-            </div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-ui-page-container>
-        <div class="space-y-6">
-            {{-- Signal-Details --}}
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Signal-Details</h2>
-
-                <div class="space-y-4">
-                    <div>
-                        <h3 class="text-sm font-medium text-[var(--ui-muted)] mb-1">Nachricht</h3>
-                        <p class="text-sm text-[var(--ui-secondary)]">{{ $signal->message }}</p>
-                    </div>
-
-                    @if($signal->status === 'resolved' && $signal->resolution_summary)
-                        <div class="rounded-lg border border-green-200 bg-green-50/50 p-4">
-                            <div class="flex items-center gap-2 mb-2">
-                                @svg('heroicon-o-check-circle', 'w-4 h-4 text-green-700')
-                                <h3 class="text-sm font-medium text-green-900">Was wurde getan</h3>
-                                @if($signal->resolvedByUser)
-                                    <span class="text-xs text-green-700">· {{ $signal->resolvedByUser->name }}</span>
-                                @endif
-                                @if($signal->resolved_at)
-                                    <span class="text-xs text-green-700" title="{{ $signal->resolved_at->format('d.m.Y H:i') }}">· {{ $signal->resolved_at->diffForHumans() }}</span>
-                                @endif
-                            </div>
-                            <p class="text-sm text-[var(--ui-secondary)] whitespace-pre-line">{{ $signal->resolution_summary }}</p>
-                        </div>
-                    @endif
-
-                    @if($signal->status === 'dismissed' && $signal->dismissed_reason)
-                        <div class="rounded-lg border border-gray-200 bg-gray-50/50 p-4">
-                            <div class="flex items-center gap-2 mb-2">
-                                @svg('heroicon-o-x-circle', 'w-4 h-4 text-gray-600')
-                                <h3 class="text-sm font-medium text-gray-700">Verworfen — Begründung</h3>
-                            </div>
-                            <p class="text-sm text-[var(--ui-secondary)] whitespace-pre-line">{{ $signal->dismissed_reason }}</p>
-                        </div>
-                    @endif
-
-                    @if($signal->actions->isNotEmpty())
-                        <div>
-                            <h3 class="text-sm font-medium text-[var(--ui-muted)] mb-2">Handlungsoptionen</h3>
-                            <div class="space-y-2">
-                                @foreach($signal->actions as $action)
-                                    @php($isActive = $activeActionId === $action->id)
-                                    @php($isPending = $action->status === 'pending')
-                                    <div @class([
-                                        'rounded-lg border transition',
-                                        'bg-blue-50 border-blue-200' => $isPending && ! $isActive,
-                                        'bg-white border-[var(--ui-primary)] ring-2 ring-[var(--ui-primary)]/30 shadow-sm' => $isActive,
-                                        'bg-green-50 border-green-200' => $action->status === 'applied',
-                                        'bg-gray-50 border-gray-200 opacity-80' => $action->status === 'dismissed',
-                                    ])>
-                                        <div class="py-3 px-4">
-                                            <div class="flex items-start gap-2">
-                                                @if($action->status === 'applied')
-                                                    @svg('heroicon-o-check-circle', 'w-4 h-4 text-green-600 mt-0.5 flex-shrink-0')
-                                                @elseif($action->status === 'dismissed')
-                                                    @svg('heroicon-o-x-circle', 'w-4 h-4 text-gray-500 mt-0.5 flex-shrink-0')
-                                                @else
-                                                    @svg('heroicon-o-light-bulb', 'w-4 h-4 text-blue-600 mt-0.5 flex-shrink-0')
-                                                @endif
-                                                <div class="flex-1 min-w-0">
-                                                    <div class="flex items-start justify-between gap-3">
-                                                        <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $action->title }}</div>
-                                                        @if($action->status === 'applied')
-                                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-green-100 text-green-800 whitespace-nowrap">Umgesetzt</span>
-                                                        @elseif($action->status === 'dismissed')
-                                                            <span class="inline-flex items-center px-2 py-0.5 rounded text-[10px] font-medium bg-gray-200 text-gray-700 whitespace-nowrap">Verworfen</span>
-                                                        @endif
-                                                    </div>
-                                                    @if(!empty($action->description))
-                                                        <p class="text-xs text-[var(--ui-muted)] mt-0.5">{{ $action->description }}</p>
-                                                    @endif
-
-                                                    @if(! $isPending && $action->decision_reason)
-                                                        <p class="text-xs text-[var(--ui-secondary)] mt-2 italic">„{{ $action->decision_reason }}"</p>
-                                                    @endif
-                                                    @if(! $isPending)
-                                                        <p class="text-[10px] text-[var(--ui-muted)] mt-1">
-                                                            {{ $action->decidedByUser?->name ?? 'System' }}
-                                                            @if($action->decided_at) · {{ $action->decided_at->diffForHumans() }} @endif
-                                                        </p>
-                                                    @endif
-                                                </div>
-                                            </div>
-
-                                            @if($isPending)
-                                                @if(! $isActive)
-                                                    <div class="flex items-center gap-2 mt-3 pl-6">
-                                                        <button
-                                                            wire:click="startActionDecision({{ $action->id }}, 'applied')"
-                                                            class="px-3 py-1.5 rounded-md text-xs font-medium bg-[var(--ui-primary)] text-[var(--ui-on-primary)] hover:opacity-90 transition inline-flex items-center gap-1"
-                                                        >
-                                                            @svg('heroicon-o-check', 'w-3.5 h-3.5')
-                                                            Umsetzen
-                                                        </button>
-                                                        <button
-                                                            wire:click="startActionDecision({{ $action->id }}, 'dismissed')"
-                                                            class="px-3 py-1.5 rounded-md text-xs font-medium bg-white border border-[var(--ui-border)] text-[var(--ui-secondary)] hover:bg-gray-50 transition inline-flex items-center gap-1"
-                                                        >
-                                                            @svg('heroicon-o-x-mark', 'w-3.5 h-3.5')
-                                                            Verwerfen
-                                                        </button>
-                                                    </div>
-                                                @else
-                                                    <div class="mt-3 pl-6 space-y-2">
-                                                        <label class="block text-xs font-medium text-[var(--ui-muted)]">
-                                                            @if($activeActionDecision === 'applied')
-                                                                Notiz zur Umsetzung (optional)
-                                                            @else
-                                                                Begründung für das Verwerfen
-                                                            @endif
-                                                        </label>
-                                                        <textarea
-                                                            wire:model="activeActionReason"
-                                                            rows="2"
-                                                            class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm"
-                                                            placeholder="{{ $activeActionDecision === 'applied' ? 'z.B. Weekly mit Team X ist eingerichtet ...' : 'z.B. Empfehlung zielt am Kontext vorbei, weil ...' }}"
-                                                            autofocus
-                                                        ></textarea>
-                                                        @error('activeActionReason')
-                                                            <p class="text-xs text-red-600">{{ $message }}</p>
-                                                        @enderror
-                                                        <div class="flex items-center justify-end gap-2">
-                                                            <button wire:click="cancelActionDecision" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]">
-                                                                Abbrechen
-                                                            </button>
-                                                            <button
-                                                                wire:click="confirmActionDecision"
-                                                                @class([
-                                                                    'px-3 py-1.5 rounded-md text-xs font-medium transition',
-                                                                    'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] hover:opacity-90' => $activeActionDecision === 'applied',
-                                                                    'bg-gray-600 text-white hover:bg-gray-700' => $activeActionDecision === 'dismissed',
-                                                                ])
-                                                            >
-                                                                @if($activeActionDecision === 'applied') Umsetzen bestätigen @else Verwerfen bestätigen @endif
-                                                            </button>
-                                                        </div>
-                                                    </div>
-                                                @endif
-                                            @endif
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-
-                    @if($signal->trigger_metrics && count($signal->trigger_metrics) > 0)
-                        <div>
-                            <h3 class="text-sm font-medium text-[var(--ui-muted)] mb-2">Trigger-Metriken</h3>
-                            <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                                @foreach($signal->trigger_metrics as $key => $value)
-                                    <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                        <span class="text-xs text-[var(--ui-muted)]">{{ ucfirst(str_replace('_', ' ', $key)) }}</span>
-                                        <div class="text-sm font-medium text-[var(--ui-secondary)] mt-0.5">
-                                            {{ is_array($value) ? json_encode($value) : $value }}
-                                        </div>
-                                    </div>
-                                @endforeach
-                            </div>
-                        </div>
-                    @endif
-                </div>
-            </div>
-
-            {{-- Kommentare --}}
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">
-                    Kommentare
-                    @if($this->signalComments->isNotEmpty())
-                        <span class="ml-1.5 px-1.5 py-0.5 text-[10px] font-medium rounded-full bg-neutral-200/80 text-gray-600 tabular-nums">{{ $this->signalComments->count() }}</span>
-                    @endif
-                </h2>
-
-                @if($this->signalComments->isNotEmpty())
-                    <div class="relative mb-6">
-                        {{-- Vertical connection line --}}
-                        <div class="absolute left-[11px] top-0 bottom-0 w-px bg-gray-200"></div>
-
-                        <div class="space-y-4 relative">
-                            @foreach($this->signalComments as $comment)
-                                <div class="flex gap-3">
-                                    <div class="flex-shrink-0 relative z-10">
-                                        @if($comment->author_context === 'system')
-                                            <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-amber-100 border border-amber-200">
-                                                @svg('heroicon-s-cog-6-tooth', 'w-3 h-3 text-amber-600')
-                                            </span>
-                                        @elseif($comment->author_context === 'inference')
-                                            <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-purple-100 border border-purple-200">
-                                                @svg('heroicon-s-cpu-chip', 'w-3 h-3 text-purple-600')
-                                            </span>
-                                        @else
-                                            <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-gray-100 border border-gray-200 text-[9px] font-medium text-gray-600">
-                                                {{ mb_strtoupper(mb_substr($comment->user?->name ?? 'U', 0, 1)) }}
-                                            </span>
-                                        @endif
-                                    </div>
-                                    <div class="flex-grow min-w-0 rounded-md border border-gray-200 overflow-hidden">
-                                        <div class="px-4 py-2 bg-gray-50 border-b border-gray-200 flex items-center gap-2 text-[11px] text-gray-500">
-                                            <span class="font-semibold text-gray-900">
-                                                @if($comment->author_context === 'system')
-                                                    System
-                                                @elseif($comment->author_context === 'inference')
-                                                    Inference
-                                                @else
-                                                    {{ $comment->user?->name ?? 'Unbekannt' }}
-                                                @endif
-                                            </span>
-                                            <span class="text-gray-300">&middot;</span>
-                                            <span>{{ $comment->created_at->diffForHumans() }}</span>
-                                        </div>
-                                        <div class="px-4 py-3 text-xs text-gray-700 leading-relaxed">
-                                            {!! nl2br(e($comment->content)) !!}
-                                        </div>
-
-                                        {{-- Nested replies --}}
-                                        @if($comment->replies->isNotEmpty())
-                                            <div class="border-t border-gray-100">
-                                                @foreach($comment->replies as $reply)
-                                                    <div class="px-4 py-3 {{ !$loop->last ? 'border-b border-gray-100' : '' }}">
-                                                        <div class="text-[11px] text-gray-500 mb-1 flex items-center gap-1.5">
-                                                            @if($reply->author_context === 'system')
-                                                                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-amber-100">
-                                                                    @svg('heroicon-s-cog-6-tooth', 'w-2.5 h-2.5 text-amber-600')
-                                                                </span>
-                                                                <span class="font-medium text-gray-700">System</span>
-                                                            @elseif($reply->author_context === 'inference')
-                                                                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-purple-100">
-                                                                    @svg('heroicon-s-cpu-chip', 'w-2.5 h-2.5 text-purple-600')
-                                                                </span>
-                                                                <span class="font-medium text-gray-700">Inference</span>
-                                                            @else
-                                                                <span class="inline-flex items-center justify-center w-4 h-4 rounded-full bg-gray-100 text-[8px] font-medium text-gray-500">
-                                                                    {{ mb_strtoupper(mb_substr($reply->user?->name ?? 'U', 0, 1)) }}
-                                                                </span>
-                                                                <span class="font-medium text-gray-700">{{ $reply->user?->name ?? 'Unbekannt' }}</span>
-                                                            @endif
-                                                            <span class="text-gray-300">&middot;</span>
-                                                            <span>{{ $reply->created_at->diffForHumans() }}</span>
-                                                        </div>
-                                                        <div class="text-xs text-gray-700 pl-5">
-                                                            {!! nl2br(e($reply->content)) !!}
-                                                        </div>
-                                                    </div>
-                                                @endforeach
-                                            </div>
-                                        @endif
-
-                                        {{-- Reply button --}}
-                                        @if($comment->author_context !== 'system')
-                                            <div class="px-4 py-2 border-t border-gray-100 bg-gray-50/50">
-                                                @if($replyingTo === $comment->id)
-                                                    <div class="space-y-2">
-                                                        <textarea
-                                                            wire:model="replyBody"
-                                                            wire:keydown.ctrl.enter="submitReply"
-                                                            rows="2"
-                                                            class="w-full text-xs rounded-md border border-gray-200 bg-white px-3 py-2 text-gray-900 placeholder-gray-400 focus:outline-none focus:border-blue-300 focus:ring-1 focus:ring-blue-100 resize-none"
-                                                            placeholder="Antwort schreiben..."
-                                                            autofocus
-                                                        ></textarea>
-                                                        <div class="flex items-center justify-between">
-                                                            <span class="text-[10px] text-gray-400">Ctrl+Enter</span>
-                                                            <div class="flex items-center gap-2">
-                                                                <button wire:click="cancelReply" class="text-[11px] text-gray-500 hover:text-gray-700">Abbrechen</button>
-                                                                <button wire:click="submitReply" class="inline-flex items-center gap-1 px-2.5 py-1 text-[11px] font-medium text-white bg-[var(--ui-primary)] hover:opacity-90 rounded-md transition-opacity">
-                                                                    Antworten
-                                                                </button>
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                @else
-                                                    <button wire:click="startReply({{ $comment->id }})" class="text-[11px] text-gray-500 hover:text-[var(--ui-primary)] transition-colors">
-                                                        @svg('heroicon-o-chat-bubble-left', 'w-3 h-3 inline-block mr-0.5')
-                                                        Antworten
-                                                    </button>
-                                                @endif
-                                            </div>
-                                        @endif
-                                    </div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                @endif
-
-                {{-- New Comment Form --}}
-                <div class="flex gap-3">
-                    <div class="flex-shrink-0">
-                        <span class="inline-flex items-center justify-center w-[22px] h-[22px] rounded-full bg-green-100 border border-green-200 text-[9px] font-medium text-green-700">+</span>
-                    </div>
-                    <div class="flex-grow rounded-md border border-gray-200 overflow-hidden focus-within:border-blue-300 focus-within:ring-1 focus-within:ring-blue-100 transition-all">
-                        <textarea
-                            wire:model="newComment"
-                            wire:keydown.ctrl.enter="addComment"
-                            rows="2"
-                            placeholder="Kommentar schreiben..."
-                            class="w-full px-4 py-3 text-xs bg-white text-gray-900 placeholder-gray-400 focus:outline-none resize-none border-none"
-                        ></textarea>
-                        <div class="px-4 py-2 bg-gray-50 border-t border-gray-100 flex justify-between items-center">
-                            <span class="text-[10px] text-gray-400">Ctrl+Enter</span>
-                            <button wire:click="addComment"
-                                    class="inline-flex items-center gap-1.5 px-3 py-[4px] text-[11px] font-medium text-white bg-[var(--ui-primary)] hover:opacity-90 rounded-md transition-opacity">
-                                Kommentieren
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-
-            {{-- Signalverlauf --}}
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Signalverlauf (gleiche Definition)</h2>
-
-                @if($this->historicalSignals->isEmpty())
-                    <div class="text-center py-6">
-                        @svg('heroicon-o-bell-slash', 'w-6 h-6 text-[var(--ui-muted)] mx-auto mb-2')
-                        <p class="text-sm text-[var(--ui-muted)]">Erstes Signal dieser Art.</p>
-                    </div>
+            {{-- Gleiche Definition, gleiche Einheit --}}
+            <x-nx-panel flush title="Frühere Signale dieser Art">
+                @if ($this->historicalSignals->isEmpty())
+                    <x-nx-empty icon="heroicon-o-bell-slash">Erstes Signal dieser Art.</x-nx-empty>
                 @else
-                    <div class="space-y-2">
-                        @foreach($this->historicalSignals as $histSignal)
-                            <a href="{{ route('organization.signals.show', $histSignal) }}" class="flex items-center gap-3 py-2.5 px-4 rounded-lg hover:bg-[var(--ui-muted-5)] transition-colors group">
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium flex-shrink-0
-                                    @if($histSignal->severity === 'critical') bg-red-100 text-red-800
-                                    @elseif($histSignal->severity === 'warning') bg-amber-100 text-amber-800
-                                    @else bg-blue-100 text-blue-800
-                                    @endif
-                                ">
-                                    {{ ucfirst($histSignal->severity) }}
-                                </span>
-                                <span class="text-sm text-[var(--ui-muted)]">{{ $histSignal->created_at->format('d.m.Y') }}</span>
-                                <span class="text-sm text-[var(--ui-secondary)]">&ndash;</span>
-                                <span class="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium
-                                    @if($histSignal->status === 'open') bg-yellow-100 text-yellow-800
-                                    @elseif($histSignal->status === 'acknowledged') bg-blue-100 text-blue-800
-                                    @elseif($histSignal->status === 'resolved') bg-green-100 text-green-800
-                                    @else bg-gray-100 text-gray-600
-                                    @endif
-                                ">
-                                    @switch($histSignal->status)
-                                        @case('open') Offen @break
-                                        @case('acknowledged') Bestätigt @break
-                                        @case('resolved') Gelöst @break
-                                        @case('dismissed') Verworfen @break
-                                    @endswitch
-                                </span>
+                    <div>
+                        @foreach ($this->historicalSignals as $hist)
+                            <a href="{{ route('organization.signals.show', $hist) }}" wire:navigate
+                                class="flex items-center gap-3 border-b border-[color:var(--nx-line)] px-4 py-2 text-sm last:border-0 hover:bg-[color:var(--nx-hover)]">
+                                <span class="w-24 shrink-0 tabular-nums text-[color:var(--nx-muted)]">{{ $hist->created_at->format('d.m.Y') }}</span>
+                                <x-nx-badge :variant="$sevVariant($hist->severity)">{{ $sevLabel($hist->severity) }}</x-nx-badge>
+                                <x-nx-badge :variant="$statusVariant($hist->status)" dot>{{ $statusLabel($hist->status) }}</x-nx-badge>
+                                <span class="min-w-0 flex-1 truncate text-[color:var(--nx-muted)]">{{ $hist->message }}</span>
                             </a>
                         @endforeach
                     </div>
                 @endif
-            </div>
+            </x-nx-panel>
         </div>
     </x-ui-page-container>
 
-    {{-- Action Reason Modal --}}
-    @if($pendingAction)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" wire:click.self="cancelAction">
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-md mx-4 p-6">
-                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-1">
-                    @switch($pendingAction)
-                        @case('acknowledge') Signal bestätigen @break
-                        @case('resolve') Signal lösen @break
-                        @case('dismiss') Signal verwerfen @break
-                    @endswitch
+    {{-- Begründung für Bestätigen / Lösen / Verwerfen --}}
+    @if ($pendingAction)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" wire:click.self="cancelAction">
+            <div class="w-full max-w-md rounded-[10px] border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] p-5 shadow-xl">
+                <h3 class="m-0 text-base font-semibold text-[color:var(--nx-text)]">
+                    {{ match ($pendingAction) { 'acknowledge' => 'Signal bestätigen', 'resolve' => 'Signal lösen', 'dismiss' => 'Signal verwerfen', default => 'Signal' } }}
                 </h3>
-                <p class="text-sm text-[var(--ui-muted)] mb-4">
-                    @switch($pendingAction)
-                        @case('acknowledge') Was macht dieses Signal relevant? @break
-                        @case('resolve') Was wurde unternommen? Bleibt am Signal sichtbar — bullet-list ist OK. @break
-                        @case('dismiss') Warum ist dieses Signal nicht relevant? @break
-                    @endswitch
+                <p class="mb-3 mt-1 text-sm text-[color:var(--nx-muted)]">
+                    {{ match ($pendingAction) {
+                        'acknowledge' => 'Was macht dieses Signal relevant?',
+                        'resolve' => 'Was wurde unternommen? Bleibt am Signal sichtbar — Stichpunkte sind ok.',
+                        'dismiss' => 'Warum ist dieses Signal nicht relevant?',
+                        default => '',
+                    } }}
                 </p>
-
-                <textarea
-                    wire:model="actionReason"
-                    rows="{{ $pendingAction === 'resolve' ? 5 : 3 }}"
-                    class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm mb-4"
-                    placeholder="{{ match($pendingAction) { 'acknowledge' => 'z.B. Bestätigt, prüfen wir im nächsten Weekly...', 'resolve' => "z.B.\n• Interlink zu Team B angelegt\n• Zuständigkeit mit C besprochen\n• Snapshot-Frequenz erhöht", 'dismiss' => 'z.B. Entity bewusst inaktiv, kein Handlungsbedarf...' } }}"
-                    autofocus
-                ></textarea>
-
-                <div class="flex items-center justify-end gap-3">
-                    <button wire:click="cancelAction" class="text-sm text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]">
-                        Abbrechen
-                    </button>
-                    <button
-                        wire:click="confirmAction"
-                        class="px-4 py-2 rounded-md text-sm font-medium transition
-                            {{ $pendingAction === 'dismiss'
-                                ? 'bg-gray-600 text-white hover:bg-gray-700'
-                                : 'bg-[var(--ui-primary)] text-[var(--ui-on-primary)] hover:opacity-90' }}"
-                    >
-                        @switch($pendingAction)
-                            @case('acknowledge') Bestätigen @break
-                            @case('resolve') Lösen @break
-                            @case('dismiss') Verwerfen @break
-                        @endswitch
-                    </button>
+                <textarea wire:model="actionReason" rows="{{ $pendingAction === 'resolve' ? 5 : 3 }}" autofocus class="{{ $textarea }}"
+                    placeholder="{{ match ($pendingAction) { 'acknowledge' => 'z. B. Bestätigt, prüfen wir im nächsten Weekly …', 'resolve' => "z. B.\n• Interlink zu Team B angelegt\n• Zuständigkeit mit C besprochen\n• Snapshot-Frequenz erhöht", 'dismiss' => 'z. B. Einheit bewusst inaktiv, kein Handlungsbedarf …', default => '' } }}"></textarea>
+                <div class="mt-4 flex items-center justify-end gap-2">
+                    <x-nx-button variant="ghost" wire:click="cancelAction">Abbrechen</x-nx-button>
+                    <x-nx-button :variant="$pendingAction === 'dismiss' ? 'danger' : 'primary'" wire:click="confirmAction">
+                        {{ match ($pendingAction) { 'acknowledge' => 'Bestätigen', 'resolve' => 'Lösen', 'dismiss' => 'Verwerfen', default => 'OK' } }}
+                    </x-nx-button>
                 </div>
             </div>
         </div>
     @endif
 
-    {{-- Snooze Modal --}}
-    @if($showSnoozeModal)
-        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" wire:click.self="cancelSnooze">
-            <div class="bg-white rounded-lg shadow-xl w-full max-w-sm mx-4 p-6">
-                <h3 class="text-lg font-semibold text-[var(--ui-secondary)] mb-1">Signal snoozen</h3>
-                <p class="text-sm text-[var(--ui-muted)] mb-4">Signal wird bis zum gewählten Zeitpunkt aus der Übersicht ausgeblendet.</p>
-
-                <div class="space-y-2 mb-4">
-                    @foreach([
-                        '1d' => '1 Tag',
-                        '3d' => '3 Tage',
-                        '1w' => '1 Woche',
-                        '2w' => '2 Wochen',
-                        '1m' => '1 Monat',
-                        'custom' => 'Benutzerdefiniert',
-                    ] as $value => $label)
-                        <label class="flex items-center gap-3 px-3 py-2.5 rounded-md border cursor-pointer transition-colors
-                            {{ $snoozeDuration === $value ? 'border-[var(--ui-primary)] bg-[var(--ui-primary)]/5' : 'border-gray-200 hover:border-gray-300' }}">
-                            <input type="radio" wire:model.live="snoozeDuration" value="{{ $value }}"
-                                   class="text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]">
-                            <span class="text-sm text-[var(--ui-secondary)]">{{ $label }}</span>
+    {{-- Snooze --}}
+    @if ($showSnoozeModal)
+        <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4" wire:click.self="cancelSnooze">
+            <div class="w-full max-w-sm rounded-[10px] border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] p-5 shadow-xl">
+                <h3 class="m-0 text-base font-semibold text-[color:var(--nx-text)]">Signal snoozen</h3>
+                <p class="mb-3 mt-1 text-sm text-[color:var(--nx-muted)]">Bis zum gewählten Zeitpunkt aus der Übersicht ausgeblendet.</p>
+                <div class="flex flex-col gap-1">
+                    @foreach (['1d' => '1 Tag', '3d' => '3 Tage', '1w' => '1 Woche', '2w' => '2 Wochen', '1m' => '1 Monat', 'custom' => 'Benutzerdefiniert'] as $value => $label)
+                        <label class="flex cursor-pointer items-center gap-3 rounded-[6px] border px-3 py-2 text-sm text-[color:var(--nx-text)] transition-colors {{ $snoozeDuration === $value ? 'border-[color:var(--nx-accent)] bg-[color:var(--nx-hover)]' : 'border-[color:var(--nx-line)] hover:bg-[color:var(--nx-hover)]' }}">
+                            <input type="radio" wire:model.live="snoozeDuration" value="{{ $value }}" class="accent-[var(--nx-accent)]">
+                            {{ $label }}
                         </label>
                     @endforeach
                 </div>
-
-                @if($snoozeDuration === 'custom')
-                    <div class="mb-4">
-                        <input type="date" wire:model="snoozeCustomDate"
-                               min="{{ now()->addDay()->format('Y-m-d') }}"
-                               class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm">
+                @if ($snoozeDuration === 'custom')
+                    <div class="mt-3">
+                        <x-nx-input-date name="snoozeCustomDate" size="sm" wire:model="snoozeCustomDate" :min="now()->addDay()->format('Y-m-d')" />
                     </div>
                 @endif
-
-                <div class="flex items-center justify-end gap-3">
-                    <button wire:click="cancelSnooze" class="text-sm text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]">
-                        Abbrechen
-                    </button>
-                    <button
-                        wire:click="confirmSnooze"
-                        class="px-4 py-2 rounded-md text-sm font-medium bg-[var(--ui-primary)] text-[var(--ui-on-primary)] hover:opacity-90 transition"
-                        @if($snoozeDuration === 'custom' && !$snoozeCustomDate) disabled @endif
-                    >
-                        @svg('heroicon-o-clock', 'w-4 h-4 inline-block mr-1')
-                        Snoozen
-                    </button>
+                <div class="mt-4 flex items-center justify-end gap-2">
+                    <x-nx-button variant="ghost" wire:click="cancelSnooze">Abbrechen</x-nx-button>
+                    <x-nx-button variant="primary" wire:click="confirmSnooze" :disabled="$snoozeDuration === 'custom' && ! $snoozeCustomDate">
+                        @svg('heroicon-o-clock', 'w-4 h-4')
+                        <span>Snoozen</span>
+                    </x-nx-button>
                 </div>
             </div>
         </div>

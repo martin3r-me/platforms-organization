@@ -1,119 +1,97 @@
+@php
+    $alle = $this->recipients;
+    $zeilen = $alle->take($limit);
+    $statusLabel = ['pending' => 'Offen', 'answered' => 'Beantwortet', 'timeout' => 'Abgelaufen'];
+    $statusVariant = ['pending' => 'warning', 'answered' => 'success', 'timeout' => 'danger'];
+@endphp
+
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar title="Meine Rückfragen" icon="heroicon-o-inbox" />
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Meine Inquiries'],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Meine Rückfragen'],
         ]">
+            <x-slot name="left">
+                <div class="w-44">
+                    <x-nx-input-select name="statusFilter" size="sm" wire:model.live="statusFilter" nullable nullLabel="Alle Status"
+                        :options="collect($statusLabel)->map(fn ($l, $v) => ['value' => $v, 'label' => $l])->values()->all()" />
+                </div>
+            </x-slot>
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Filter" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>
-                    <div class="space-y-3">
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Status</label>
-                            <select wire:model.live="statusFilter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm">
-                                <option value="">Alle Status</option>
-                                <option value="pending">Offen</option>
-                                <option value="answered">Beantwortet</option>
-                                <option value="timeout">Timeout</option>
-                            </select>
-                        </div>
+    <x-ui-page-container width="contained">
+        <div class="space-y-4">
+            @if (session('success'))
+                <x-nx-callout variant="success">{{ session('success') }}</x-nx-callout>
+            @endif
+
+            <x-nx-card flush>
+                @if ($alle->isEmpty())
+                    <x-nx-empty icon="heroicon-o-inbox">Keine Rückfragen an dich.</x-nx-empty>
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-xs text-[color:var(--nx-muted)]">
+                                    <th class="border-b border-[color:var(--nx-line)] px-4 py-2.5 text-left font-medium">Einheit · Kontext</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-left font-medium">Typ</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-right font-medium">Runde</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-right font-medium">Fällig</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-right font-medium">Status</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-4 py-2.5"></th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($zeilen as $recipient)
+                                    @php
+                                        $inquiry = $recipient->inquiry;
+                                        $offen = $recipient->status === 'pending';
+                                        $ueberfaellig = $inquiry?->due_date && $inquiry->due_date->isPast() && $offen;
+                                        $erinnert = $recipient->reminded_at && in_array($recipient->status, ['pending', 'sent']);
+                                    @endphp
+                                    <tr wire:key="rcp-{{ $recipient->id }}" class="border-b border-[color:var(--nx-line)] last:border-0 hover:bg-[color:var(--nx-hover)]">
+                                        <td class="max-w-md px-4 py-2">
+                                            <div class="font-medium text-[color:var(--nx-text)]">{{ $inquiry?->entity?->name ?? '–' }}</div>
+                                            @if ($inquiry?->context_summary)
+                                                <div class="truncate text-xs text-[color:var(--nx-muted)]" title="{{ $inquiry->context_summary }}">{{ $inquiry->context_summary }}</div>
+                                            @endif
+                                        </td>
+                                        <td class="px-3 py-2 text-[color:var(--nx-muted)]">{{ $inquiry?->inquiry_type ?? '–' }}</td>
+                                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[color:var(--nx-muted)]">{{ ($inquiry?->depth ?? 0) + 1 }}</td>
+                                        <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums {{ $ueberfaellig ? 'font-medium text-[color:var(--nx-danger)]' : 'text-[color:var(--nx-muted)]' }}">
+                                            {{ $inquiry?->due_date?->format('d.m.Y') ?? '–' }}
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-2 text-right">
+                                            <div class="inline-flex items-center gap-1">
+                                                <x-nx-badge :variant="$statusVariant[$recipient->status] ?? 'neutral'" dot>{{ $statusLabel[$recipient->status] ?? ucfirst($recipient->status) }}</x-nx-badge>
+                                                @if ($erinnert)
+                                                    <x-nx-badge variant="danger" title="Erinnert am {{ $recipient->reminded_at->format('d.m.Y H:i') }}">Erinnert</x-nx-badge>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td class="whitespace-nowrap px-4 py-2 text-right">
+                                            @if ($offen)
+                                                <x-nx-button size="sm" variant="primary" :href="route('organization.my-inquiries.respond', $recipient)" wire:navigate>Beantworten</x-nx-button>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
                     </div>
-                </div>
-            </div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <div class="p-6 text-sm text-[var(--ui-muted)]">Keine Aktivitäten verfügbar</div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-ui-page-container>
-        @if(session('success'))
-            <div class="mb-4 p-4 bg-green-50 border border-green-200 rounded-md text-green-800 text-sm">
-                {{ session('success') }}
-            </div>
-        @endif
-
-        <x-ui-table compact="true">
-            <x-ui-table-header>
-                <x-ui-table-header-cell compact="true">Entity</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Kontext</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Fällig am</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Runde</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Aktion</x-ui-table-header-cell>
-            </x-ui-table-header>
-
-            <x-ui-table-body>
-                @forelse($this->recipients as $recipient)
-                    @php $inquiry = $recipient->inquiry; @endphp
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true">
-                            @if($inquiry?->entity)
-                                <span class="font-medium">{{ $inquiry->entity->name }}</span>
-                            @else
-                                <span class="text-[var(--ui-muted)]">–</span>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="info">{{ $inquiry?->inquiry_type ?? '–' }}</x-ui-badge>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <span class="text-sm text-[var(--ui-secondary)]">{{ \Illuminate\Support\Str::limit($inquiry?->context_summary ?? '–', 60) }}</span>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($inquiry?->due_date)
-                                <span class="text-sm {{ $inquiry->due_date->isPast() && $recipient->status === 'pending' ? 'text-red-600 font-bold' : 'text-[var(--ui-muted)]' }}">
-                                    {{ $inquiry->due_date->format('d.m.Y') }}
-                                </span>
-                            @else
-                                <span class="text-sm text-[var(--ui-muted)]">–</span>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="{{ match($recipient->status) { 'pending' => 'warning', 'answered' => 'success', 'timeout' => 'danger', default => 'secondary' } }}">
-                                {{ match($recipient->status) { 'pending' => 'Offen', 'answered' => 'Beantwortet', 'timeout' => 'Timeout', default => ucfirst($recipient->status) } }}
-                            </x-ui-badge>
-                            @if($recipient->reminded_at && in_array($recipient->status, ['pending', 'sent']))
-                                <x-ui-badge variant="danger" size="xs" class="ml-1" title="Erinnert am {{ $recipient->reminded_at->format('d.m.Y H:i') }}">Erinnert</x-ui-badge>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <span class="text-sm text-[var(--ui-muted)]">{{ ($inquiry?->depth ?? 0) + 1 }}</span>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($recipient->status === 'pending')
-                                <a href="{{ route('organization.my-inquiries.respond', $recipient) }}" class="link text-sm font-medium" wire:navigate>
-                                    Beantworten
-                                </a>
-                            @else
-                                <span class="text-sm text-[var(--ui-muted)]">–</span>
-                            @endif
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @empty
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="7">
-                            <div class="text-center py-8">
-                                @svg('heroicon-o-inbox', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
-                                <p class="text-sm text-[var(--ui-muted)]">Keine Inquiries gefunden.</p>
-                            </div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @endforelse
-            </x-ui-table-body>
-        </x-ui-table>
+                    @if ($alle->count() > $zeilen->count())
+                        <div class="flex items-center justify-between border-t border-[color:var(--nx-line)] px-4 py-2.5">
+                            <span class="text-xs text-[color:var(--nx-faint)]">{{ $zeilen->count() }} von {{ $alle->count() }}</span>
+                            <x-nx-button size="sm" wire:click="loadMore">Weitere laden</x-nx-button>
+                        </div>
+                    @endif
+                @endif
+            </x-nx-card>
+        </div>
     </x-ui-page-container>
 </x-ui-page>

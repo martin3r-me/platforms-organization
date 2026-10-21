@@ -10,6 +10,11 @@ class MyInquiries extends Component
 {
     public $statusFilter = '';
 
+    /** Sichtbare Zeilen; Treffer zählen alle. */
+    public int $limit = self::PAGE;
+
+    private const PAGE = 100;
+
     protected $queryString = [
         'statusFilter' => ['except' => ''],
     ];
@@ -34,6 +39,18 @@ class MyInquiries extends Component
             ->orderByRaw("CASE WHEN reminded_at IS NOT NULL AND status IN ('pending', 'sent') THEN 0 ELSE 1 END")
             ->orderByDesc('created_at')
             ->get();
+    }
+
+    public function loadMore(): void
+    {
+        $this->limit += self::PAGE;
+    }
+
+    public function updated($property): void
+    {
+        if ($property !== 'limit') {
+            $this->limit = self::PAGE;
+        }
     }
 
     public function render()

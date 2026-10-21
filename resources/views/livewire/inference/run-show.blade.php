@@ -1,324 +1,238 @@
+@php
+    $statusVariant = match ($run->status) { 'completed' => 'success', 'failed' => 'danger', 'running' => 'warning', default => 'neutral' };
+    $statusLabel = match ($run->status) { 'running' => 'Läuft', 'completed' => 'Fertig', 'failed' => 'Fehler', default => ucfirst((string) $run->status) };
+
+    $dauer = '–';
+    if ($run->duration_ms > 0) {
+        $dauer = match (true) {
+            $run->duration_ms < 1000 => $run->duration_ms . ' ms',
+            $run->duration_ms < 60000 => number_format($run->duration_ms / 1000, 1, ',', '') . ' s',
+            default => intdiv($run->duration_ms, 60000) . 'm ' . intdiv($run->duration_ms % 60000, 1000) . 's',
+        };
+    }
+
+    $json = fn ($v) => json_encode($v, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+    $hatLlm = $run->llm_model || $run->token_usage;
+    $cost = $hatLlm ? $run->costBreakdown() : null;
+    $cacheRead = (int) ($run->token_usage['cache_read_input_tokens'] ?? 0);
+    $cacheWrite = (int) ($run->token_usage['cache_creation_input_tokens'] ?? 0);
+    $stepsByPrompt = $run->steps->groupBy('inference_prompt_id');
+    $pre = 'overflow-x-auto whitespace-pre-wrap break-words rounded-[6px] bg-[color:var(--nx-bg)] p-2 font-mono text-xs text-[color:var(--nx-text)]';
+@endphp
+
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar :title="'Lauf #' . $run->id" icon="heroicon-o-cpu-chip" />
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Inference Runs', 'href' => route('organization.inference-runs.index')],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Inference-Läufe', 'href' => route('organization.inference-runs.index')],
             ['label' => '#' . $run->id],
         ]" />
     </x-slot>
 
-    <x-ui-page-container>
-        <div class="max-w-5xl mx-auto space-y-6">
-
-            {{-- Status + Header --}}
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <div class="flex items-start justify-between gap-4 mb-4">
-                    <div class="min-w-0 flex-1">
-                        <h1 class="text-xl font-semibold text-[var(--ui-secondary)]">
-                            Inference Run #{{ $run->id }}
-                        </h1>
-                        <p class="text-xs text-[var(--ui-muted)] mt-1 font-mono break-all">{{ $run->uuid }}</p>
-                    </div>
-                    <div class="flex items-center gap-2 flex-shrink-0">
-                        @php($variant = match($run->status) { 'completed' => 'success', 'failed' => 'danger', 'running' => 'warning', default => 'secondary' })
-                        <x-ui-badge :variant="$variant">{{ ucfirst($run->status) }}</x-ui-badge>
-                    </div>
+    <x-ui-page-container width="contained">
+        <div class="space-y-5">
+            {{-- Kopf: Identität + Zustand --}}
+            <div>
+                <div class="flex flex-wrap items-center gap-2">
+                    <h1 class="m-0 text-2xl font-semibold tracking-tight text-[color:var(--nx-text)]">Inference-Lauf #{{ $run->id }}</h1>
+                    <x-nx-badge :variant="$statusVariant" dot>{{ $statusLabel }}</x-nx-badge>
+                    <span class="ml-auto text-xs text-[color:var(--nx-faint)]" title="{{ $run->created_at->format('d.m.Y H:i:s') }}">gestartet {{ $run->created_at->diffForHumans() }}</span>
                 </div>
+                <div class="mt-1 break-all font-mono text-xs text-[color:var(--nx-faint)]">{{ $run->uuid }}</div>
+            </div>
 
-                <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                    <div>
-                        <div class="text-xs text-[var(--ui-muted)]">Trigger-Typ</div>
-                        <div class="font-medium text-[var(--ui-secondary)]">{{ $run->trigger_type ?: '–' }}</div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-[var(--ui-muted)]">Dauer</div>
-                        <div class="font-medium text-[var(--ui-secondary)] tabular-nums">
-                            @if($run->duration_ms > 0)
-                                @if($run->duration_ms < 1000)
-                                    {{ $run->duration_ms }} ms
-                                @elseif($run->duration_ms < 60000)
-                                    {{ number_format($run->duration_ms / 1000, 1, ',', '') }} s
-                                @else
-                                    {{ intdiv($run->duration_ms, 60000) }}m {{ intdiv($run->duration_ms % 60000, 1000) }}s
+            @if ($run->isFailed() && $run->error_message)
+                <x-nx-callout variant="danger" title="Fehler">
+                    <pre class="mt-1 whitespace-pre-wrap break-words font-mono text-xs">{{ $run->error_message }}</pre>
+                </x-nx-callout>
+            @endif
+
+            @if ($run->isRunning())
+                <x-nx-callout variant="warning" icon="heroicon-o-arrow-path">
+                    Lauf läuft noch — letztes Lebenszeichen {{ $run->updated_at->diffForHumans() }}.
+                </x-nx-callout>
+            @endif
+
+            <x-nx-panel title="Eckdaten">
+                <div class="grid grid-cols-1 gap-x-6 md:grid-cols-2">
+                    <x-nx-property-row icon="heroicon-o-bolt" label="Trigger-Typ">{{ $run->trigger_type ?: '–' }}</x-nx-property-row>
+                    <x-nx-property-row icon="heroicon-o-clock" label="Dauer"><span class="tabular-nums">{{ $dauer }}</span></x-nx-property-row>
+                    <x-nx-property-row icon="heroicon-o-play" label="Gestartet">{{ $run->created_at->format('d.m.Y H:i:s') }}</x-nx-property-row>
+                    <x-nx-property-row icon="heroicon-o-arrow-path" label="Aktualisiert">
+                        <span title="{{ $run->updated_at->format('d.m.Y H:i:s') }}">{{ $run->updated_at->diffForHumans() }}</span>
+                    </x-nx-property-row>
+                </div>
+            </x-nx-panel>
+
+            <x-nx-stat-grid cols="3">
+                <x-nx-stat label="Prompts" :value="$run->prompts_evaluated ?? 0" icon="heroicon-o-cpu-chip" />
+                <x-nx-stat label="Einheiten" :value="$run->entities_analyzed ?? 0" icon="heroicon-o-building-office" />
+                <x-nx-stat label="Signale" :value="$run->signals_created ?? 0" icon="heroicon-o-bell-alert" />
+                <x-nx-stat label="Rückfragen" :value="$run->inquiries_created ?? 0" icon="heroicon-o-question-mark-circle" />
+                <x-nx-stat label="Memory" :value="$run->memory_updates ?? 0" icon="heroicon-o-circle-stack" />
+                <x-nx-stat label="Nichts tun" :value="$run->do_nothing_count ?? 0" icon="heroicon-o-hand-raised" />
+            </x-nx-stat-grid>
+
+            @if ($run->summary)
+                <x-nx-panel title="Zusammenfassung">
+                    <p class="m-0 text-sm text-[color:var(--nx-text)]">{{ $run->summary }}</p>
+                </x-nx-panel>
+            @endif
+
+            @if ($hatLlm)
+                <x-nx-panel title="LLM & Kosten">
+                    <div class="space-y-4">
+                        <div class="grid grid-cols-1 gap-x-6 md:grid-cols-2">
+                            @if ($run->llm_model)
+                                <x-nx-property-row icon="heroicon-o-sparkles" label="Modell"><span class="font-mono">{{ $run->llm_model }}</span></x-nx-property-row>
+                            @endif
+                            @if ($run->token_usage)
+                                <x-nx-property-row icon="heroicon-o-arrow-down-tray" label="Input-Tokens"><span class="tabular-nums">{{ number_format($run->token_usage['input_tokens'] ?? 0, 0, ',', '.') }}</span></x-nx-property-row>
+                                <x-nx-property-row icon="heroicon-o-arrow-up-tray" label="Output-Tokens"><span class="tabular-nums">{{ number_format($run->token_usage['output_tokens'] ?? 0, 0, ',', '.') }}</span></x-nx-property-row>
+                                @if ($cacheRead > 0 || $cacheWrite > 0)
+                                    <x-nx-property-row icon="heroicon-o-circle-stack" label="Cache (lesen / schreiben)">
+                                        <span class="tabular-nums">{{ number_format($cacheRead, 0, ',', '.') }} / {{ number_format($cacheWrite, 0, ',', '.') }}</span>
+                                    </x-nx-property-row>
                                 @endif
-                            @else
-                                –
                             @endif
                         </div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-[var(--ui-muted)]">Gestartet</div>
-                        <div class="font-medium text-[var(--ui-secondary)]" title="{{ $run->created_at->format('d.m.Y H:i:s') }}">
-                            {{ $run->created_at->diffForHumans() }}
-                        </div>
-                    </div>
-                    <div>
-                        <div class="text-xs text-[var(--ui-muted)]">Aktualisiert</div>
-                        <div class="font-medium text-[var(--ui-secondary)]" title="{{ $run->updated_at->format('d.m.Y H:i:s') }}">
-                            {{ $run->updated_at->diffForHumans() }}
-                        </div>
-                    </div>
-                </div>
-            </div>
 
-            {{-- Error (only if failed) --}}
-            @if($run->isFailed() && $run->error_message)
-                <div class="bg-red-50 rounded-lg border border-red-200 p-6">
-                    <div class="flex items-center gap-2 mb-3">
-                        @svg('heroicon-o-exclamation-triangle', 'w-5 h-5 text-red-600')
-                        <h2 class="text-lg font-semibold text-red-900">Fehler</h2>
-                    </div>
-                    <pre class="text-xs text-red-900 bg-white border border-red-200 rounded p-3 overflow-x-auto whitespace-pre-wrap font-mono">{{ $run->error_message }}</pre>
-                </div>
-            @endif
-
-            {{-- Running indicator --}}
-            @if($run->isRunning())
-                <div class="bg-yellow-50 rounded-lg border border-yellow-200 p-4 flex items-center gap-3">
-                    <div class="w-2 h-2 rounded-full bg-yellow-500 animate-pulse"></div>
-                    <span class="text-sm text-yellow-900">Run läuft noch — heartbeat: {{ $run->updated_at->diffForHumans() }}</span>
-                </div>
-            @endif
-
-            {{-- Stats --}}
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Ergebnisse</h2>
-                <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3">
-                    @foreach([
-                        ['Prompts', $run->prompts_evaluated, 'cpu-chip'],
-                        ['Entities', $run->entities_analyzed, 'building-office'],
-                        ['Signale', $run->signals_created, 'bell-alert'],
-                        ['Inquiries', $run->inquiries_created, 'question-mark-circle'],
-                        ['Memory', $run->memory_updates, 'circle-stack'],
-                        ['Do-Nothing', $run->do_nothing_count, 'hand-raised'],
-                    ] as [$label, $value, $icon])
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <div class="flex items-center gap-2 text-xs text-[var(--ui-muted)] mb-1">
-                                @svg('heroicon-o-' . (app('safe-svg')->resolve($icon ?? null, 'heroicon-o-') ?? 'cube'), 'w-3.5 h-3.5')
-                                <span>{{ $label }}</span>
-                            </div>
-                            <div class="text-2xl font-bold text-[var(--ui-secondary)] tabular-nums">{{ $value }}</div>
-                        </div>
-                    @endforeach
-                </div>
-
-                @if($run->summary)
-                    <div class="mt-4 pt-4 border-t border-[var(--ui-border)]/40">
-                        <div class="text-xs text-[var(--ui-muted)] mb-1">Zusammenfassung</div>
-                        <p class="text-sm text-[var(--ui-secondary)]">{{ $run->summary }}</p>
-                    </div>
-                @endif
-            </div>
-
-            {{-- LLM & Kosten --}}
-            @if($run->llm_model || $run->token_usage)
-                @php($cost = $run->costBreakdown())
-                @php($cacheRead = (int) ($run->token_usage['cache_read_input_tokens'] ?? 0))
-                @php($cacheWrite = (int) ($run->token_usage['cache_creation_input_tokens'] ?? 0))
-                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">LLM &amp; Kosten</h2>
-                    <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-sm">
-                        @if($run->llm_model)
-                            <div>
-                                <div class="text-xs text-[var(--ui-muted)]">Model</div>
-                                <div class="font-mono text-[var(--ui-secondary)]">{{ $run->llm_model }}</div>
-                            </div>
-                        @endif
-                        @if($run->token_usage)
-                            <div>
-                                <div class="text-xs text-[var(--ui-muted)]">Input Tokens</div>
-                                <div class="font-medium tabular-nums text-[var(--ui-secondary)]">{{ number_format($run->token_usage['input_tokens'] ?? 0, 0, ',', '.') }}</div>
-                            </div>
-                            <div>
-                                <div class="text-xs text-[var(--ui-muted)]">Output Tokens</div>
-                                <div class="font-medium tabular-nums text-[var(--ui-secondary)]">{{ number_format($run->token_usage['output_tokens'] ?? 0, 0, ',', '.') }}</div>
-                            </div>
-                            @if($cacheRead > 0 || $cacheWrite > 0)
-                                <div>
-                                    <div class="text-xs text-[var(--ui-muted)]">Cache (read / write)</div>
-                                    <div class="font-medium tabular-nums text-[var(--ui-secondary)]">{{ number_format($cacheRead, 0, ',', '.') }} / {{ number_format($cacheWrite, 0, ',', '.') }}</div>
-                                </div>
+                        <x-nx-stat-grid cols="4">
+                            <x-nx-stat label="Kosten (USD)" :value="'$' . number_format($cost['usd'], 4)" />
+                            @if ($cost['eur'] !== null)
+                                <x-nx-stat label="Kosten (EUR)" :value="number_format($cost['eur'], 4, ',', '.') . ' €'" />
                             @endif
+                            @if ($run->cost_per_signal_usd !== null)
+                                <x-nx-stat label="Kosten je Signal" :value="'$' . number_format($run->cost_per_signal_usd, 4)" />
+                            @endif
+                            <x-nx-stat label="Tokens gesamt" :value="number_format($cost['tokens'], 0, ',', '.')" />
+                        </x-nx-stat-grid>
+
+                        @if ($run->token_usage && $cacheRead === 0 && $cacheWrite === 0)
+                            <p class="m-0 text-xs text-[color:var(--nx-faint)]">Hinweis: kein Prompt-Caching aktiv — der Input-Kontext wird pro Loop-Iteration voll berechnet (Kostenhebel „B“).</p>
                         @endif
                     </div>
-
-                    {{-- Kosten-Highlight --}}
-                    <div class="mt-4 pt-4 border-t border-[var(--ui-border)]/40 grid grid-cols-2 md:grid-cols-4 gap-4">
-                        <div>
-                            <div class="text-xs text-[var(--ui-muted)]">Kosten (USD)</div>
-                            <div class="text-2xl font-bold text-[var(--ui-secondary)] tabular-nums">${{ number_format($cost['usd'], 4) }}</div>
-                        </div>
-                        @if($cost['eur'] !== null)
-                            <div>
-                                <div class="text-xs text-[var(--ui-muted)]">Kosten (EUR)</div>
-                                <div class="text-2xl font-bold text-[var(--ui-secondary)] tabular-nums">{{ number_format($cost['eur'], 4) }}€</div>
-                            </div>
-                        @endif
-                        @if($run->cost_per_signal_usd !== null)
-                            <div>
-                                <div class="text-xs text-[var(--ui-muted)]">Kosten / Signal</div>
-                                <div class="text-2xl font-bold text-[var(--ui-secondary)] tabular-nums">${{ number_format($run->cost_per_signal_usd, 4) }}</div>
-                            </div>
-                        @endif
-                        <div>
-                            <div class="text-xs text-[var(--ui-muted)]">Total Tokens</div>
-                            <div class="text-2xl font-bold text-[var(--ui-secondary)] tabular-nums">{{ number_format($cost['tokens'], 0, ',', '.') }}</div>
-                        </div>
-                    </div>
-
-                    @if($run->token_usage && $cacheRead === 0 && $cacheWrite === 0)
-                        <p class="text-[11px] text-[var(--ui-muted)] mt-3">Hinweis: kein Prompt-Caching aktiv — der Input-Kontext wird pro Loop-Iteration voll berechnet (Kostenhebel „B").</p>
-                    @endif
-                </div>
+                </x-nx-panel>
             @endif
 
-            {{-- Trigger Info --}}
-            @if($run->trigger)
-                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Trigger</h2>
-                    <div class="space-y-3 text-sm">
-                        <div class="grid grid-cols-1 md:grid-cols-3 gap-3">
-                            <div>
-                                <div class="text-xs text-[var(--ui-muted)]">Trigger-Typ</div>
-                                <div class="font-medium text-[var(--ui-secondary)]">{{ $run->trigger->trigger_type }}</div>
-                            </div>
-                            <div>
-                                <div class="text-xs text-[var(--ui-muted)]">Priorität</div>
-                                <div class="font-medium tabular-nums text-[var(--ui-secondary)]">{{ $run->trigger->priority ?? '–' }}</div>
-                            </div>
-                            <div>
-                                <div class="text-xs text-[var(--ui-muted)]">Trigger-Status</div>
-                                <div class="font-medium text-[var(--ui-secondary)]">{{ $run->trigger->status ?? '–' }}</div>
-                            </div>
-                        </div>
-                        @if(! empty($run->trigger->prompt_filter))
-                            <div>
-                                <div class="text-xs text-[var(--ui-muted)] mb-1">Prompt-Filter</div>
-                                <pre class="text-xs bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40 rounded p-3 overflow-x-auto font-mono">{{ json_encode($run->trigger->prompt_filter, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
-                            </div>
-                        @endif
-                    </div>
-                </div>
-            @endif
-
-            {{-- Linked Outputs --}}
-            @if($run->synthesisReports->isNotEmpty() || $run->inquiries->isNotEmpty())
-                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Erzeugte Outputs</h2>
+            @if ($run->trigger)
+                <x-nx-panel title="Trigger">
                     <div class="space-y-3">
-                        @foreach($run->synthesisReports as $report)
-                            <a href="{{ route('organization.synthesis-reports.show', $report) }}" class="flex items-center gap-3 py-2 px-3 rounded-md border border-[var(--ui-border)]/40 hover:border-[var(--ui-primary)]/60 hover:bg-[var(--ui-primary-5)] transition">
-                                @svg('heroicon-o-document-text', 'w-4 h-4 text-[var(--ui-muted)]')
-                                <span class="text-sm font-medium text-[var(--ui-secondary)] flex-1">{{ $report->title }}</span>
-                                <x-ui-badge variant="info">{{ ucfirst($report->report_type) }}</x-ui-badge>
-                                <x-ui-badge :variant="$report->status === 'published' ? 'success' : 'muted'">{{ ucfirst($report->status) }}</x-ui-badge>
+                        <div class="grid grid-cols-1 gap-x-6 md:grid-cols-2">
+                            <x-nx-property-row icon="heroicon-o-bolt" label="Typ">{{ $run->trigger->trigger_type }}</x-nx-property-row>
+                            <x-nx-property-row icon="heroicon-o-flag" label="Priorität"><span class="tabular-nums">{{ $run->trigger->priority ?? '–' }}</span></x-nx-property-row>
+                            <x-nx-property-row icon="heroicon-o-signal" label="Status">{{ $run->trigger->status ?? '–' }}</x-nx-property-row>
+                        </div>
+                        @if (! empty($run->trigger->prompt_filter))
+                            <div>
+                                <div class="mb-1 text-xs font-medium text-[color:var(--nx-muted)]">Prompt-Filter</div>
+                                <pre class="{{ $pre }}">{{ $json($run->trigger->prompt_filter) }}</pre>
+                            </div>
+                        @endif
+                    </div>
+                </x-nx-panel>
+            @endif
+
+            @if ($run->synthesisReports->isNotEmpty() || $run->inquiries->isNotEmpty())
+                <x-nx-panel flush title="Erzeugte Ergebnisse">
+                    <div class="divide-y divide-[color:var(--nx-line)]">
+                        @foreach ($run->synthesisReports as $report)
+                            <a href="{{ route('organization.synthesis-reports.show', $report) }}" wire:navigate class="flex items-center gap-3 px-4 py-2.5 transition-colors hover:bg-[color:var(--nx-hover)]">
+                                @svg('heroicon-o-document-text', 'w-4 h-4 shrink-0 text-[color:var(--nx-faint)]')
+                                <span class="flex-1 truncate text-sm font-medium text-[color:var(--nx-text)]">{{ $report->title }}</span>
+                                <x-nx-badge variant="info">{{ ucfirst($report->report_type) }}</x-nx-badge>
+                                <x-nx-badge :variant="$report->status === 'published' ? 'success' : 'neutral'" dot>{{ ucfirst($report->status) }}</x-nx-badge>
                             </a>
                         @endforeach
-                        @foreach($run->inquiries as $inquiry)
-                            <div class="flex items-center gap-3 py-2 px-3 rounded-md border border-[var(--ui-border)]/40">
-                                @svg('heroicon-o-question-mark-circle', 'w-4 h-4 text-[var(--ui-muted)]')
-                                <span class="text-sm text-[var(--ui-secondary)] flex-1">
-                                    {{ $inquiry->inquiry_type ?? 'Inquiry' }}
-                                    @if($inquiry->context_summary)
-                                        <span class="text-[var(--ui-muted)]">— {{ \Illuminate\Support\Str::limit($inquiry->context_summary, 80) }}</span>
+                        @foreach ($run->inquiries as $inquiry)
+                            <div class="flex items-center gap-3 px-4 py-2.5">
+                                @svg('heroicon-o-question-mark-circle', 'w-4 h-4 shrink-0 text-[color:var(--nx-faint)]')
+                                <span class="flex-1 truncate text-sm text-[color:var(--nx-text)]">
+                                    {{ $inquiry->inquiry_type ?? 'Rückfrage' }}
+                                    @if ($inquiry->context_summary)
+                                        <span class="text-[color:var(--nx-muted)]">— {{ \Illuminate\Support\Str::limit($inquiry->context_summary, 80) }}</span>
                                     @endif
                                 </span>
-                                <x-ui-badge :variant="match($inquiry->status) { 'completed' => 'success', 'pending' => 'warning', default => 'muted' }">{{ ucfirst($inquiry->status) }}</x-ui-badge>
+                                <x-nx-badge :variant="match ($inquiry->status) { 'completed' => 'success', 'pending' => 'warning', default => 'neutral' }" dot>{{ ucfirst($inquiry->status) }}</x-nx-badge>
                             </div>
                         @endforeach
                     </div>
-                </div>
+                </x-nx-panel>
             @endif
 
             {{-- Step-Drilldown: jeder Tool-Call mit Argumenten und Ergebnis --}}
-            @if($run->steps->isNotEmpty())
-                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                    <div class="flex items-center justify-between mb-4">
-                        <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">Steps</h2>
-                        <span class="text-xs text-[var(--ui-muted)]">{{ $run->steps->count() }} Tool-Calls</span>
-                    </div>
-
-                    @php($stepsByPrompt = $run->steps->groupBy('inference_prompt_id'))
-
-                    <div class="space-y-6">
-                        @foreach($stepsByPrompt as $promptId => $promptSteps)
-                            @php($firstStep = $promptSteps->first())
-                            <div>
-                                @if($firstStep->prompt)
-                                    <div class="flex items-center gap-2 mb-2 pb-2 border-b border-[var(--ui-border)]/40">
-                                        <span class="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 ring-1 ring-inset ring-indigo-600/10">{{ strtoupper(str_replace('_star', '*', $firstStep->prompt->vsm_system)) }}</span>
-                                        <span class="text-sm font-medium text-[var(--ui-secondary)]">{{ $firstStep->prompt->name }}</span>
-                                        <span class="text-xs text-[var(--ui-muted)]">· {{ $promptSteps->count() }} Steps</span>
+            @if ($run->steps->isNotEmpty())
+                <x-nx-panel flush title="Schritte" :subtitle="$run->steps->count() . ' Tool-Calls'">
+                    <div class="divide-y divide-[color:var(--nx-line)]">
+                        @foreach ($stepsByPrompt as $promptId => $promptSteps)
+                            @php
+                                $firstStep = $promptSteps->first();
+                            @endphp
+                            <div class="px-4 py-3">
+                                @if ($firstStep->prompt)
+                                    <div class="mb-2 flex items-center gap-2">
+                                        <x-nx-badge variant="info">{{ strtoupper(str_replace('_star', '*', $firstStep->prompt->vsm_system)) }}</x-nx-badge>
+                                        <span class="text-sm font-medium text-[color:var(--nx-text)]">{{ $firstStep->prompt->name }}</span>
+                                        <span class="text-xs text-[color:var(--nx-faint)]">· {{ $promptSteps->count() }} Schritte</span>
                                     </div>
                                 @endif
 
-                                <div class="space-y-1.5" x-data="{ open: {} }">
-                                    @foreach($promptSteps as $step)
-                                        @php($isAssistant = $step->step_type === 'assistant_message')
-                                        @php($assistantText = $isAssistant ? ($step->result['text'] ?? '') : null)
-                                        <div class="border {{ $isAssistant ? 'border-indigo-200 bg-indigo-50/30' : 'border-[var(--ui-border)]/40' }} rounded-md overflow-hidden">
-                                            <button
-                                                type="button"
-                                                @click="open[{{ $step->id }}] = !open[{{ $step->id }}]"
-                                                class="w-full flex items-start gap-2.5 px-3 py-2 hover:bg-[var(--ui-muted-5)]/40 transition-colors text-left"
-                                            >
-                                                <span class="text-[10px] font-mono text-[var(--ui-muted)] w-6 tabular-nums flex-shrink-0 mt-0.5">#{{ $step->step_index }}</span>
-                                                @if($isAssistant)
-                                                    @svg('heroicon-o-chat-bubble-left', 'w-3.5 h-3.5 text-indigo-700 flex-shrink-0 mt-0.5')
-                                                @elseif($step->result_ok)
-                                                    <span class="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0 mt-1.5" title="OK"></span>
+                                <div class="space-y-1" x-data="{ open: {} }">
+                                    @foreach ($promptSteps as $step)
+                                        @php
+                                            $isAssistant = $step->step_type === 'assistant_message';
+                                            $assistantText = $isAssistant ? ($step->result['text'] ?? '') : null;
+                                        @endphp
+                                        <div class="overflow-hidden rounded-[6px] border border-[color:var(--nx-line)] {{ $isAssistant ? 'bg-[color:var(--nx-bg)]' : '' }}">
+                                            <button type="button" @click="open[{{ $step->id }}] = !open[{{ $step->id }}]"
+                                                class="flex w-full items-start gap-2.5 px-3 py-2 text-left transition-colors hover:bg-[color:var(--nx-hover)]">
+                                                <span class="mt-0.5 w-6 shrink-0 font-mono text-[10px] tabular-nums text-[color:var(--nx-faint)]">#{{ $step->step_index }}</span>
+                                                @if ($isAssistant)
+                                                    @svg('heroicon-o-chat-bubble-left', 'mt-0.5 w-3.5 h-3.5 shrink-0 text-[color:var(--nx-info)]')
+                                                    <span class="line-clamp-2 flex-1 text-xs italic text-[color:var(--nx-text)]">{{ \Illuminate\Support\Str::limit($assistantText, 240) }}</span>
                                                 @else
-                                                    <span class="w-2 h-2 rounded-full bg-red-500 flex-shrink-0 mt-1.5" title="Fehler"></span>
+                                                    <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full {{ $step->result_ok ? 'bg-[color:var(--nx-success)]' : 'bg-[color:var(--nx-danger)]' }}" title="{{ $step->result_ok ? 'OK' : 'Fehler' }}"></span>
+                                                    <span class="mt-0.5 flex-1 truncate font-mono text-xs text-[color:var(--nx-text)]" title="{{ $step->tool_name }}">{{ $step->tool_name }}</span>
                                                 @endif
-
-                                                @if($isAssistant)
-                                                    <span class="text-xs text-[var(--ui-secondary)] flex-1 line-clamp-2 italic">{{ \Illuminate\Support\Str::limit($assistantText, 240) }}</span>
-                                                @else
-                                                    <span class="text-xs font-mono text-[var(--ui-secondary)] truncate flex-1 mt-0.5" title="{{ $step->tool_name }}">{{ $step->tool_name }}</span>
+                                                @if ($step->occurred_at)
+                                                    <span class="mt-0.5 shrink-0 text-[10px] tabular-nums text-[color:var(--nx-faint)]">{{ $step->occurred_at->format('H:i:s') }}</span>
                                                 @endif
-
-                                                @if($step->occurred_at)
-                                                    <span class="text-[10px] text-[var(--ui-muted)] flex-shrink-0 mt-0.5">{{ $step->occurred_at->format('H:i:s') }}</span>
-                                                @endif
-                                                <span class="inline-block transition-transform mt-0.5" :class="open[{{ $step->id }}] ? 'rotate-180' : ''">
-                                                    @svg('heroicon-o-chevron-down', 'w-3.5 h-3.5 text-[var(--ui-muted)] flex-shrink-0')
+                                                <span class="mt-0.5 inline-block transition-transform" :class="open[{{ $step->id }}] ? 'rotate-180' : ''">
+                                                    @svg('heroicon-o-chevron-down', 'w-3.5 h-3.5 shrink-0 text-[color:var(--nx-faint)]')
                                                 </span>
                                             </button>
 
-                                            <div x-show="open[{{ $step->id }}]" x-cloak class="border-t {{ $isAssistant ? 'border-indigo-200' : 'border-[var(--ui-border)]/40' }}">
-                                                @if($isAssistant)
-                                                    <div class="p-3">
-                                                        <div class="text-[10px] font-bold text-indigo-900 uppercase tracking-wider mb-1">LLM-Reasoning</div>
-                                                        <div class="text-sm text-[var(--ui-secondary)] whitespace-pre-wrap leading-relaxed">{{ $assistantText }}</div>
+                                            <div x-show="open[{{ $step->id }}]" x-cloak class="space-y-3 border-t border-[color:var(--nx-line)] p-3">
+                                                @if ($isAssistant)
+                                                    <div>
+                                                        <div class="mb-1 text-xs font-medium text-[color:var(--nx-muted)]">LLM-Begründung</div>
+                                                        <div class="whitespace-pre-wrap text-sm leading-relaxed text-[color:var(--nx-text)]">{{ $assistantText }}</div>
                                                     </div>
                                                 @else
-                                                    @if($step->error_message)
-                                                        <div class="p-3 bg-red-50 border-b border-red-200">
-                                                            <div class="text-[10px] font-bold text-red-900 uppercase tracking-wider mb-1">Fehler</div>
-                                                            <pre class="text-xs text-red-900 font-mono whitespace-pre-wrap break-words">{{ $step->error_message }}</pre>
+                                                    @if ($step->error_message)
+                                                        <x-nx-callout variant="danger" title="Fehler">
+                                                            <pre class="mt-1 whitespace-pre-wrap break-words font-mono text-xs">{{ $step->error_message }}</pre>
+                                                        </x-nx-callout>
+                                                    @endif
+                                                    @if (! empty($step->arguments))
+                                                        <div>
+                                                            <div class="mb-1 text-xs font-medium text-[color:var(--nx-muted)]">Argumente</div>
+                                                            <pre class="{{ $pre }}">{{ $json($step->arguments) }}</pre>
                                                         </div>
                                                     @endif
-
-                                                    @if(!empty($step->arguments))
-                                                        <div class="p-3 border-b border-[var(--ui-border)]/30">
-                                                            <div class="text-[10px] font-bold text-[var(--ui-muted)] uppercase tracking-wider mb-1">Arguments</div>
-                                                            <pre class="text-xs text-[var(--ui-secondary)] bg-[var(--ui-muted-5)]/40 rounded p-2 overflow-x-auto font-mono whitespace-pre-wrap break-words">{{ json_encode($step->arguments, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
-                                                        </div>
-                                                    @endif
-
-                                                    @if(!empty($step->result))
-                                                        <div class="p-3">
-                                                            <div class="text-[10px] font-bold text-[var(--ui-muted)] uppercase tracking-wider mb-1">
-                                                                Result
-                                                                @if(($step->result['_truncated'] ?? false))
-                                                                    <span class="text-amber-700 ml-1">(gekuerzt — original {{ number_format($step->result['_original_bytes'] ?? 0, 0, ',', '.') }} Bytes)</span>
+                                                    @if (! empty($step->result))
+                                                        <div>
+                                                            <div class="mb-1 text-xs font-medium text-[color:var(--nx-muted)]">
+                                                                Ergebnis
+                                                                @if ($step->result['_truncated'] ?? false)
+                                                                    <span class="ml-1 text-[color:var(--nx-warning)]">(gekürzt — Original {{ number_format($step->result['_original_bytes'] ?? 0, 0, ',', '.') }} Bytes)</span>
                                                                 @endif
                                                             </div>
-                                                            <pre class="text-xs text-[var(--ui-secondary)] bg-[var(--ui-muted-5)]/40 rounded p-2 overflow-x-auto font-mono whitespace-pre-wrap break-words">{{ json_encode($step->result, JSON_PRETTY_PRINT | JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES) }}</pre>
+                                                            <pre class="{{ $pre }}">{{ $json($step->result) }}</pre>
                                                         </div>
                                                     @endif
                                                 @endif
@@ -329,7 +243,7 @@
                             </div>
                         @endforeach
                     </div>
-                </div>
+                </x-nx-panel>
             @endif
         </div>
     </x-ui-page-container>

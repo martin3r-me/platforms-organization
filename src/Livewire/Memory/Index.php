@@ -12,6 +12,11 @@ class Index extends Component
     public $typeFilter = '';
     public $showInactive = false;
 
+    /** Sichtbare Zeilen; Treffer zählen alle. */
+    public int $limit = self::PAGE;
+
+    private const PAGE = 100;
+
     protected $queryString = [
         'search' => ['except' => ''],
         'typeFilter' => ['except' => ''],
@@ -62,6 +67,18 @@ class Index extends Component
             ->filter()
             ->sort()
             ->values();
+    }
+
+    public function loadMore(): void
+    {
+        $this->limit += self::PAGE;
+    }
+
+    public function updated($property): void
+    {
+        if ($property !== 'limit') {
+            $this->limit = self::PAGE;
+        }
     }
 
     public function render()

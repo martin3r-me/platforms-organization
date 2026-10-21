@@ -1,132 +1,93 @@
+@php
+    $statusLabel = ['draft' => 'Entwurf', 'published' => 'Veröffentlicht', 'archived' => 'Archiviert'];
+    $statusVariant = ['draft' => 'warning', 'published' => 'success', 'archived' => 'neutral'];
+    $typLabel = ['weekly' => 'Wöchentlich', 'monthly' => 'Monatlich'];
+    $summary = $report->structured_summary ?? [];
+    $algedonisch = $report->algedonic_signals ?? [];
+@endphp
+
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar :title="$report->title" icon="heroicon-o-document-text" />
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Synthesis Reports', 'href' => route('organization.synthesis-reports.index')],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Synthese-Berichte', 'href' => route('organization.synthesis-reports.index')],
             ['label' => $report->title],
         ]">
-            @if($report->status === 'draft')
-                <x-ui-button variant="primary" size="sm" wire:click="publish">
+            @if ($report->status === 'draft')
+                <x-nx-button variant="primary" size="sm" wire:click="publish">
                     @svg('heroicon-o-paper-airplane', 'w-4 h-4')
                     <span>Veröffentlichen</span>
-                </x-ui-button>
-            @elseif($report->status === 'published')
-                <x-ui-button variant="ghost" size="sm" wire:click="archive">
+                </x-nx-button>
+            @elseif ($report->status === 'published')
+                <x-nx-button size="sm" wire:click="archive">
                     @svg('heroicon-o-archive-box', 'w-4 h-4')
                     <span>Archivieren</span>
-                </x-ui-button>
+                </x-nx-button>
             @endif
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Informationen" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Status</h3>
-                    <x-ui-badge variant="{{ match($report->status) { 'draft' => 'warning', 'published' => 'success', 'archived' => 'muted', default => 'secondary' } }}">
-                        {{ ucfirst($report->status) }}
-                    </x-ui-badge>
+    <x-ui-page-container width="contained">
+        <div class="space-y-5">
+            <div class="space-y-3">
+                <div class="flex flex-wrap items-center gap-2">
+                    <h1 class="m-0 text-2xl font-semibold tracking-tight text-[color:var(--nx-text)]">{{ $report->title }}</h1>
+                    <x-nx-badge :variant="$statusVariant[$report->status] ?? 'neutral'" dot>{{ $statusLabel[$report->status] ?? ucfirst($report->status) }}</x-nx-badge>
                 </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Details</h3>
-                    <div class="space-y-3">
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <span class="text-xs text-[var(--ui-muted)]">Typ</span>
-                            <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ ucfirst($report->report_type ?? '–') }}</div>
-                        </div>
-                        @if($report->period_start && $report->period_end)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Zeitraum</span>
-                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $report->period_start->format('d.m.Y') }} – {{ $report->period_end->format('d.m.Y') }}</div>
-                            </div>
-                        @endif
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <span class="text-xs text-[var(--ui-muted)]">Signals</span>
-                            <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ is_array($report->signals_included) ? count($report->signals_included) : 0 }}</div>
-                        </div>
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <span class="text-xs text-[var(--ui-muted)]">Erstellt</span>
-                            <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $report->created_at->format('d.m.Y H:i') }}</div>
-                        </div>
-                        @if($report->published_at)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Veröffentlicht</span>
-                                <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $report->published_at->format('d.m.Y H:i') }}</div>
-                            </div>
-                        @endif
-                    </div>
+                <div class="flex flex-wrap gap-x-5 gap-y-1 text-xs text-[color:var(--nx-muted)]">
+                    <span>{{ $typLabel[$report->report_type] ?? ucfirst($report->report_type ?? '–') }}</span>
+                    @if ($report->period_start && $report->period_end)
+                        <span>{{ $report->period_start->format('d.m.Y') }} – {{ $report->period_end->format('d.m.Y') }}</span>
+                    @endif
+                    <span>{{ is_array($report->signals_included) ? count($report->signals_included) : 0 }} Signale</span>
+                    <span>erstellt {{ $report->created_at->format('d.m.Y H:i') }}</span>
+                    @if ($report->published_at)
+                        <span>veröffentlicht {{ $report->published_at->format('d.m.Y H:i') }}</span>
+                    @endif
                 </div>
             </div>
-        </x-ui-page-sidebar>
-    </x-slot>
 
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <div class="p-6 text-sm text-[var(--ui-muted)]">Keine Aktivitäten verfügbar</div>
-        </x-ui-page-sidebar>
-    </x-slot>
+            @if (count($algedonisch) > 0)
+                <x-nx-panel flush title="Algedonische Signale" subtitle="Was sofort Aufmerksamkeit braucht">
+                    <table class="w-full text-sm">
+                        <tbody>
+                            @foreach ($algedonisch as $a)
+                                @php
+                                    $sev = $a['severity'] ?? '';
+                                    $sevVariant = in_array($sev, ['critical', 'algedonic']) ? 'danger' : ($sev === 'warning' ? 'warning' : 'info');
+                                @endphp
+                                <tr class="border-b border-[color:var(--nx-line)] align-top last:border-0">
+                                    <td class="whitespace-nowrap px-4 py-2 font-medium text-[color:var(--nx-text)]">{{ $a['entity'] ?? '–' }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2"><x-nx-badge :variant="$sevVariant" dot>{{ ucfirst($sev ?: '–') }}</x-nx-badge></td>
+                                    <td class="px-4 py-2 text-[color:var(--nx-muted)]">{{ $a['message'] ?? '–' }}</td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
+                </x-nx-panel>
+            @endif
 
-    <x-ui-page-container>
-        <div class="space-y-6">
-            {{-- Report Content --}}
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Report</h2>
-                <div class="prose prose-sm max-w-none text-[var(--ui-secondary)]">
+            <x-nx-panel title="Bericht">
+                <x-nx-prose class="text-sm">
                     {!! \Illuminate\Support\Str::markdown($report->content ?? '') !!}
-                </div>
-            </div>
+                </x-nx-prose>
+            </x-nx-panel>
 
-            {{-- Structured Summary --}}
-            @if($report->structured_summary && count($report->structured_summary) > 0)
-                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Structured Summary</h2>
-                    <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                        @foreach($report->structured_summary as $key => $value)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">{{ ucfirst(str_replace('_', ' ', $key)) }}</span>
-                                <div class="text-sm font-medium text-[var(--ui-secondary)] mt-0.5">
-                                    {{ is_array($value) ? json_encode($value) : $value }}
-                                </div>
+            @if (count($summary) > 0)
+                <x-nx-panel flush title="Kennzahlen">
+                    <div class="grid grid-cols-2 gap-px bg-[color:var(--nx-line)] sm:grid-cols-3">
+                        @foreach ($summary as $key => $value)
+                            <div class="bg-[color:var(--nx-surface)] px-4 py-3">
+                                <div class="text-xs text-[color:var(--nx-muted)]">{{ ucfirst(str_replace('_', ' ', $key)) }}</div>
+                                <div class="mt-0.5 break-words text-sm font-medium text-[color:var(--nx-text)]">{{ is_array($value) ? json_encode($value, JSON_UNESCAPED_UNICODE) : $value }}</div>
                             </div>
                         @endforeach
                     </div>
-                </div>
-            @endif
-
-            {{-- Algedonic Signals --}}
-            @if($report->algedonic_signals && count($report->algedonic_signals) > 0)
-                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Algedonic Signals</h2>
-                    <x-ui-table compact="true">
-                        <x-ui-table-header>
-                            <x-ui-table-header-cell compact="true">Entity</x-ui-table-header-cell>
-                            <x-ui-table-header-cell compact="true">Severity</x-ui-table-header-cell>
-                            <x-ui-table-header-cell compact="true">Message</x-ui-table-header-cell>
-                        </x-ui-table-header>
-                        <x-ui-table-body>
-                            @foreach($report->algedonic_signals as $algedonic)
-                                <x-ui-table-row compact="true">
-                                    <x-ui-table-cell compact="true">
-                                        <span class="text-sm text-[var(--ui-secondary)]">{{ $algedonic['entity'] ?? '–' }}</span>
-                                    </x-ui-table-cell>
-                                    <x-ui-table-cell compact="true">
-                                        <x-ui-badge variant="{{ match($algedonic['severity'] ?? '') { 'critical' => 'danger', 'algedonic' => 'danger', 'warning' => 'warning', default => 'info' } }}">
-                                            {{ ucfirst($algedonic['severity'] ?? '–') }}
-                                        </x-ui-badge>
-                                    </x-ui-table-cell>
-                                    <x-ui-table-cell compact="true">
-                                        <span class="text-sm text-[var(--ui-secondary)]">{{ $algedonic['message'] ?? '–' }}</span>
-                                    </x-ui-table-cell>
-                                </x-ui-table-row>
-                            @endforeach
-                        </x-ui-table-body>
-                    </x-ui-table>
-                </div>
+                </x-nx-panel>
             @endif
         </div>
     </x-ui-page-container>

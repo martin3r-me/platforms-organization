@@ -1,111 +1,83 @@
+@php
+    $alle = $this->reports;
+    $zeilen = $alle->take($limit);
+    $statusLabel = ['draft' => 'Entwurf', 'published' => 'Veröffentlicht', 'archived' => 'Archiviert'];
+    $statusVariant = ['draft' => 'warning', 'published' => 'success', 'archived' => 'neutral'];
+    $typLabel = ['weekly' => 'Wöchentlich', 'monthly' => 'Monatlich'];
+    $opts = fn (array $m) => collect($m)->map(fn ($l, $v) => ['value' => $v, 'label' => $l])->values()->all();
+@endphp
+
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar title="Synthese-Berichte" icon="heroicon-o-document-text" />
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Synthesis Reports'],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Synthese-Berichte'],
         ]">
+            <x-slot name="left">
+                <div class="flex items-center gap-3">
+                    <div class="w-44">
+                        <x-nx-input-select name="statusFilter" size="sm" wire:model.live="statusFilter" nullable nullLabel="Alle Status" :options="$opts($statusLabel)" />
+                    </div>
+                    <div class="w-44">
+                        <x-nx-input-select name="typeFilter" size="sm" wire:model.live="typeFilter" nullable nullLabel="Alle Typen" :options="$opts($typLabel)" />
+                    </div>
+                </div>
+            </x-slot>
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Filter" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>
-                    <div class="space-y-3">
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Status</label>
-                            <select wire:model.live="statusFilter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm">
-                                <option value="">Alle Status</option>
-                                <option value="draft">Draft</option>
-                                <option value="published">Published</option>
-                                <option value="archived">Archived</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Typ</label>
-                            <select wire:model.live="typeFilter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm">
-                                <option value="">Alle Typen</option>
-                                <option value="weekly">Wöchentlich</option>
-                                <option value="monthly">Monatlich</option>
-                            </select>
-                        </div>
-                    </div>
+    <x-ui-page-container width="contained">
+        <x-nx-card flush>
+            @if ($alle->isEmpty())
+                <x-nx-empty icon="heroicon-o-document-text">Keine Synthese-Berichte gefunden.</x-nx-empty>
+            @else
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-xs text-[color:var(--nx-muted)]">
+                                <th class="border-b border-[color:var(--nx-line)] px-4 py-2.5 text-left font-medium">Titel</th>
+                                <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-left font-medium">Zeitraum</th>
+                                <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-right font-medium">Signale</th>
+                                <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-right font-medium">Erstellt</th>
+                                <th class="border-b border-[color:var(--nx-line)] px-4 py-2.5 text-right font-medium">Status</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($zeilen as $report)
+                                <tr wire:key="syn-{{ $report->id }}" class="cursor-pointer border-b border-[color:var(--nx-line)] last:border-0 hover:bg-[color:var(--nx-hover)]"
+                                    onclick="window.location.href='{{ route('organization.synthesis-reports.show', $report) }}'">
+                                    <td class="px-4 py-2">
+                                        <a href="{{ route('organization.synthesis-reports.show', $report) }}" wire:navigate class="font-medium text-[color:var(--nx-text)] hover:underline">{{ $report->title }}</a>
+                                        <div class="text-xs text-[color:var(--nx-faint)]">{{ $typLabel[$report->report_type] ?? ucfirst($report->report_type ?? '–') }}</div>
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-2 tabular-nums text-[color:var(--nx-muted)]">
+                                        @if ($report->period_start && $report->period_end)
+                                            {{ $report->period_start->format('d.m.Y') }} – {{ $report->period_end->format('d.m.Y') }}
+                                        @else
+                                            –
+                                        @endif
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[color:var(--nx-muted)]">{{ is_array($report->signals_included) ? count($report->signals_included) : 0 }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[color:var(--nx-muted)]">{{ $report->created_at->format('d.m.Y') }}</td>
+                                    <td class="whitespace-nowrap px-4 py-2 text-right">
+                                        <x-nx-badge :variant="$statusVariant[$report->status] ?? 'neutral'" dot>{{ $statusLabel[$report->status] ?? ucfirst($report->status) }}</x-nx-badge>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
-            </div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <div class="p-6 text-sm text-[var(--ui-muted)]">Keine Aktivitäten verfügbar</div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-ui-page-container>
-        <x-ui-table compact="true">
-            <x-ui-table-header>
-                <x-ui-table-header-cell compact="true">Titel</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Typ</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Zeitraum</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Signals</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Veröffentlicht</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Erstellt</x-ui-table-header-cell>
-            </x-ui-table-header>
-
-            <x-ui-table-body>
-                @forelse($this->reports as $report)
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true">
-                            <a href="{{ route('organization.synthesis-reports.show', $report) }}" class="link font-medium">
-                                {{ $report->title }}
-                            </a>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="info">{{ ucfirst($report->report_type ?? '–') }}</x-ui-badge>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <span class="text-sm text-[var(--ui-secondary)]">
-                                @if($report->period_start && $report->period_end)
-                                    {{ $report->period_start->format('d.m.Y') }} – {{ $report->period_end->format('d.m.Y') }}
-                                @else
-                                    –
-                                @endif
-                            </span>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="{{ match($report->status) { 'draft' => 'warning', 'published' => 'success', 'archived' => 'muted', default => 'secondary' } }}">
-                                {{ ucfirst($report->status) }}
-                            </x-ui-badge>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <span class="text-sm text-[var(--ui-secondary)]">{{ is_array($report->signals_included) ? count($report->signals_included) : 0 }}</span>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <span class="text-sm text-[var(--ui-muted)]">
-                                {{ $report->published_at ? $report->published_at->format('d.m.Y H:i') : '–' }}
-                            </span>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <span class="text-sm text-[var(--ui-muted)]">{{ $report->created_at->format('d.m.Y H:i') }}</span>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @empty
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="7">
-                            <div class="text-center py-8">
-                                @svg('heroicon-o-document-text', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
-                                <p class="text-sm text-[var(--ui-muted)]">Keine Synthesis Reports gefunden.</p>
-                            </div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @endforelse
-            </x-ui-table-body>
-        </x-ui-table>
+                @if ($alle->count() > $zeilen->count())
+                    <div class="flex items-center justify-between border-t border-[color:var(--nx-line)] px-4 py-2.5">
+                        <span class="text-xs text-[color:var(--nx-faint)]">{{ $zeilen->count() }} von {{ $alle->count() }}</span>
+                        <x-nx-button size="sm" wire:click="loadMore">Weitere laden</x-nx-button>
+                    </div>
+                @endif
+            @endif
+        </x-nx-card>
     </x-ui-page-container>
 </x-ui-page>

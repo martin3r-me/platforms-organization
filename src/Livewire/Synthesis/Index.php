@@ -11,6 +11,11 @@ class Index extends Component
     public $statusFilter = '';
     public $typeFilter = '';
 
+    /** Sichtbare Zeilen; Treffer zählen alle. */
+    public int $limit = self::PAGE;
+
+    private const PAGE = 100;
+
     protected $queryString = [
         'statusFilter' => ['except' => ''],
         'typeFilter' => ['except' => ''],
@@ -24,7 +29,11 @@ class Index extends Component
             return collect();
         }
 
-        $query = OrganizationSynthesisReport::forTeam($teamId);
+        // Ohne content/structured_summary: der Langtext wird erst auf der Detailseite gebraucht.
+        $query = OrganizationSynthesisReport::forTeam($teamId)->select([
+            'id', 'uuid', 'team_id', 'report_type', 'period_start', 'period_end', 'title',
+            'signals_included', 'status', 'published_at', 'created_at', 'updated_at',
+        ]);
 
         if ($this->statusFilter) {
             $query->where('status', $this->statusFilter);
@@ -35,6 +44,18 @@ class Index extends Component
         }
 
         return $query->orderByDesc('created_at')->get();
+    }
+
+    public function loadMore(): void
+    {
+        $this->limit += self::PAGE;
+    }
+
+    public function updated($property): void
+    {
+        if ($property !== 'limit') {
+            $this->limit = self::PAGE;
+        }
     }
 
     public function render()

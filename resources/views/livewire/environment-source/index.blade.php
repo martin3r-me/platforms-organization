@@ -1,219 +1,155 @@
+@php
+    $clusterOptions = collect($this->clusters)->map(fn ($l, $k) => ['value' => $k, 'label' => $l])->values()->all();
+    $categoryOptions = collect($this->categories)->map(fn ($c) => ['value' => $c, 'label' => ucfirst($c)])->values()->all();
+    $intervall = fn ($h) => $h <= 24 ? "{$h} h" : ($h <= 168 ? round($h / 24) . ' T' : round($h / 168) . ' W');
+    $sources = $this->sources;
+@endphp
+
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar title="Umwelt-Quellen" icon="heroicon-o-globe-alt" />
+    </x-slot>
+
+    <x-slot name="sidebar">
+        <x-ui-page-sidebar title="Filter" width="w-64" :defaultOpen="true" side="left">
+            <div class="flex flex-col gap-3 p-3">
+                <x-nx-input-select name="clusterFilter" label="Cluster" size="sm" wire:model.live="clusterFilter"
+                    :options="$clusterOptions" nullable nullLabel="Alle Cluster" />
+                <x-nx-input-select name="categoryFilter" label="Kategorie" size="sm" wire:model.live="categoryFilter"
+                    :options="$categoryOptions" nullable nullLabel="Alle Kategorien" />
+            </div>
+        </x-ui-page-sidebar>
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Umwelt'],
-            ['label' => 'Quellen'],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Umwelt-Quellen'],
         ]">
-            <x-ui-button variant="primary" size="sm" wire:click="create">
+            <x-slot name="left">
+                <div class="flex items-center gap-3">
+                    <div class="w-56">
+                        <x-nx-input-text name="search" size="sm" placeholder="Name oder URL…" wire:model.live.debounce.400ms="search" />
+                    </div>
+                    <x-nx-input-checkbox label="Inaktive" wire:model.live="showInactive" />
+                </div>
+            </x-slot>
+            <x-nx-button variant="primary" size="sm" wire:click="create">
                 @svg('heroicon-o-plus', 'w-4 h-4')
                 <span>Neue Quelle</span>
-            </x-ui-button>
+            </x-nx-button>
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Filter" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Suche</h3>
-                    <x-ui-input-text name="search" wire:model.live="search" placeholder="Suche Quellen..." class="w-full" size="sm" />
+    <x-ui-page-container width="contained">
+        <x-nx-card flush>
+            @if ($sources->isEmpty())
+                <x-nx-empty icon="heroicon-o-globe-alt">
+                    Keine Quellen vorhanden. Lege eine Quelle an, um Umwelt-Daten zu erfassen.
+                    <x-slot name="action">
+                        <x-nx-button size="sm" wire:click="create">Quelle anlegen</x-nx-button>
+                    </x-slot>
+                </x-nx-empty>
+            @else
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-xs text-[color:var(--nx-muted)]">
+                                <th class="border-b border-[color:var(--nx-line)] px-4 py-2.5 text-left font-medium">Quelle</th>
+                                <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-left font-medium">Einordnung</th>
+                                <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-right font-medium">Intervall</th>
+                                <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-right font-medium">Letzter Abruf</th>
+                                <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-right font-medium">Snapshots</th>
+                                <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-right font-medium">Status</th>
+                                <th class="w-10 border-b border-[color:var(--nx-line)] px-2 py-2.5"></th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @foreach ($sources as $source)
+                                @php
+                                    $learned = ($this->sourceRelevanceMemories[$source->id] ?? null)?->structured_data ?? [];
+                                    $url = $source->config['url'] ?? null;
+                                @endphp
+                                <tr wire:key="src-{{ $source->id }}" class="cursor-pointer border-b border-[color:var(--nx-line)] last:border-0 hover:bg-[color:var(--nx-hover)]"
+                                    wire:click="edit({{ $source->id }})">
+                                    <td class="max-w-sm px-4 py-2">
+                                        <div class="font-medium text-[color:var(--nx-text)]">{{ $source->name }}</div>
+                                        @if ($url)
+                                            <div class="truncate text-xs text-[color:var(--nx-faint)]" title="{{ $url }}">{{ $url }}</div>
+                                        @endif
+                                        @if (! empty($learned['topics_useful']) || ! empty($learned['topics_noise']))
+                                            <div class="mt-1 flex flex-wrap gap-1">
+                                                @foreach (array_slice($learned['topics_useful'] ?? [], 0, 3) as $t)
+                                                    <x-nx-badge variant="success">{{ $t }}</x-nx-badge>
+                                                @endforeach
+                                                @foreach (array_slice($learned['topics_noise'] ?? [], 0, 3) as $t)
+                                                    <x-nx-badge variant="danger">{{ $t }}</x-nx-badge>
+                                                @endforeach
+                                            </div>
+                                        @endif
+                                    </td>
+                                    <td class="px-3 py-2">
+                                        <div class="text-[color:var(--nx-text)]">{{ $this->clusters[$source->cluster] ?? $source->cluster ?? '–' }}</div>
+                                        <div class="text-xs text-[color:var(--nx-faint)]">{{ ucfirst($source->category) }}</div>
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[color:var(--nx-muted)]">{{ $intervall($source->pull_interval_hours) }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2 text-right text-[color:var(--nx-muted)]">
+                                        @if ($source->last_pulled_at)
+                                            <span title="{{ $source->last_pulled_at->format('d.m.Y H:i') }}">{{ $source->last_pulled_at->diffForHumans() }}</span>
+                                        @else
+                                            <span class="text-[color:var(--nx-faint)]">–</span>
+                                        @endif
+                                    </td>
+                                    <td class="whitespace-nowrap px-3 py-2 text-right tabular-nums text-[color:var(--nx-text)]">{{ $source->snapshots_count }}</td>
+                                    <td class="whitespace-nowrap px-3 py-2 text-right">
+                                        <x-nx-badge :variant="$source->is_active ? 'success' : 'neutral'" dot>{{ $source->is_active ? 'Aktiv' : 'Inaktiv' }}</x-nx-badge>
+                                    </td>
+                                    <td class="px-2 py-2 text-right" x-on:click.stop>
+                                        <x-nx-dropdown>
+                                            <x-nx-dropdown-item wire:click="edit({{ $source->id }})">
+                                                @svg('heroicon-o-pencil-square', 'w-4 h-4') Bearbeiten
+                                            </x-nx-dropdown-item>
+                                            <x-nx-dropdown-item wire:click="pullNow({{ $source->id }})" wire:confirm="Quelle „{{ $source->name }}“ jetzt abrufen?">
+                                                @svg('heroicon-o-arrow-down-tray', 'w-4 h-4') Jetzt abrufen
+                                            </x-nx-dropdown-item>
+                                            <x-nx-dropdown-divider />
+                                            <x-nx-dropdown-item wire:click="toggleActive({{ $source->id }})">
+                                                @svg($source->is_active ? 'heroicon-o-pause' : 'heroicon-o-play', 'w-4 h-4')
+                                                {{ $source->is_active ? 'Deaktivieren' : 'Aktivieren' }}
+                                            </x-nx-dropdown-item>
+                                        </x-nx-dropdown>
+                                    </td>
+                                </tr>
+                            @endforeach
+                        </tbody>
+                    </table>
                 </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>
-                    <div class="space-y-3">
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Cluster</label>
-                            <select
-                                name="clusterFilter"
-                                wire:model.live="clusterFilter"
-                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm"
-                            >
-                                <option value="">Alle Cluster</option>
-                                @foreach($this->clusters as $key => $label)
-                                    <option value="{{ $key }}">{{ $label }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Kategorie</label>
-                            <select
-                                name="categoryFilter"
-                                wire:model.live="categoryFilter"
-                                class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm"
-                            >
-                                <option value="">Alle Kategorien</option>
-                                @foreach($this->categories as $cat)
-                                    <option value="{{ $cat }}">{{ ucfirst($cat) }}</option>
-                                @endforeach
-                            </select>
-                        </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" wire:model.live="showInactive" id="showInactive" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                            <label for="showInactive" class="ml-2 text-sm text-[var(--ui-secondary)]">Inaktive anzeigen</label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitaeten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <div class="p-6 text-sm text-[var(--ui-muted)]">Keine Aktivitaeten verfuegbar</div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-ui-page-container>
-        <x-ui-table compact="true">
-            <x-ui-table-header>
-                <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Cluster</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Kategorie</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">URL</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Intervall</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Letzter Pull</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Snapshots</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Aktionen</x-ui-table-header-cell>
-            </x-ui-table-header>
-
-            <x-ui-table-body>
-                @forelse($this->sources as $source)
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true">
-                            <span class="font-medium">{{ $source->name }}</span>
-                            @php
-                                $relevanceMemory = $this->sourceRelevanceMemories[$source->id] ?? null;
-                                $learnedData = $relevanceMemory?->structured_data ?? [];
-                            @endphp
-                            @if(!empty($learnedData['topics_useful']) || !empty($learnedData['topics_noise']))
-                                <div class="flex flex-wrap gap-1 mt-1">
-                                    @foreach(array_slice($learnedData['topics_useful'] ?? [], 0, 3) as $t)
-                                        <x-ui-badge variant="success" size="xs">{{ $t }}</x-ui-badge>
-                                    @endforeach
-                                    @foreach(array_slice($learnedData['topics_noise'] ?? [], 0, 3) as $t)
-                                        <x-ui-badge variant="danger" size="xs">{{ $t }}</x-ui-badge>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="muted">{{ $this->clusters[$source->cluster] ?? $source->cluster ?? '-' }}</x-ui-badge>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="info">{{ ucfirst($source->category) }}</x-ui-badge>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <span class="text-xs text-[var(--ui-muted)] truncate max-w-[200px] inline-block" title="{{ $source->config['url'] ?? '' }}">
-                                {{ $source->config['url'] ?? '-' }}
-                            </span>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @php
-                                $h = $source->pull_interval_hours;
-                                $label = $h <= 24 ? "{$h}h" : ($h <= 168 ? round($h/24) . 'd' : round($h/168) . 'w');
-                            @endphp
-                            {{ $label }}
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($source->last_pulled_at)
-                                <span class="text-xs" title="{{ $source->last_pulled_at->format('d.m.Y H:i') }}">
-                                    {{ $source->last_pulled_at->diffForHumans() }}
-                                </span>
-                            @else
-                                <span class="text-[var(--ui-muted)]">-</span>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            {{ $source->snapshots_count }}
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="{{ $source->is_active ? 'success' : 'muted' }}">
-                                {{ $source->is_active ? 'Aktiv' : 'Inaktiv' }}
-                            </x-ui-badge>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <div class="flex items-center gap-2">
-                                <button wire:click="edit({{ $source->id }})" class="text-[var(--ui-primary)] hover:underline text-sm">
-                                    Bearbeiten
-                                </button>
-                                <button wire:click="toggleActive({{ $source->id }})" class="text-[var(--ui-muted)] hover:underline text-sm">
-                                    {{ $source->is_active ? 'Deaktivieren' : 'Aktivieren' }}
-                                </button>
-                                <button wire:click="pullNow({{ $source->id }})" wire:confirm="Jetzt manuell pullen?" class="text-[var(--ui-primary)] hover:underline text-sm">
-                                    Pull
-                                </button>
-                            </div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @empty
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="9">
-                            <div class="text-center text-[var(--ui-muted)] py-8">
-                                Keine Quellen vorhanden. Erstelle eine neue Quelle um Umwelt-Daten zu erfassen.
-                            </div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @endforelse
-            </x-ui-table-body>
-        </x-ui-table>
+            @endif
+        </x-nx-card>
     </x-ui-page-container>
 
-    <!-- Create/Edit Source Modal -->
-    <x-ui-modal wire:model="modalShow" size="lg">
-        <x-slot name="header">
-            {{ $editingId ? 'Quelle bearbeiten' : 'Neue Quelle erstellen' }}
-        </x-slot>
+    <x-nx-modal size="md" wire:model="modalShow">
+        <x-slot name="header">{{ $editingId ? 'Quelle bearbeiten' : 'Neue Quelle' }}</x-slot>
 
-        <div class="space-y-4">
-            <form wire:submit.prevent="store" class="space-y-4">
-                <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required placeholder="z.B. t3n Digital" />
-
-                <div class="grid grid-cols-2 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Cluster</label>
-                        <select name="cluster" wire:model.live="form.cluster" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50">
-                            @foreach($this->clusters as $key => $label)
-                                <option value="{{ $key }}">{{ $label }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-2">Kategorie</label>
-                        <select name="category" wire:model.live="form.category" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50">
-                            @foreach($this->categories as $cat)
-                                <option value="{{ $cat }}">{{ ucfirst($cat) }}</option>
-                            @endforeach
-                        </select>
-                    </div>
-                </div>
-
-                <x-ui-input-text name="url" label="Feed-URL" wire:model.live="form.url" required placeholder="https://example.com/feed.xml" />
-
-                <x-ui-input-number name="pull_interval_hours" label="Pull-Intervall (Stunden)" wire:model.live="form.pull_interval_hours" min="1" max="720" />
-
-                <x-ui-input-textarea name="extraction_prompt" label="Extraktions-Prompt (optional)" wire:model.live="form.extraction_prompt" placeholder="Zusaetzlicher Kontext fuer die LLM-Extraktion..." rows="3" />
-
-                <div class="flex items-center">
-                    <input type="checkbox" wire:model.live="form.is_active" id="form_is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                    <label for="form_is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
-                </div>
-            </form>
-        </div>
+        <form wire:submit.prevent="store" class="space-y-4">
+            <x-nx-input-text name="name" label="Name" wire:model.live="form.name" errorKey="form.name" required placeholder="z. B. t3n Digital" />
+            <div class="grid grid-cols-2 gap-3">
+                <x-nx-input-select name="cluster" label="Cluster" wire:model.live="form.cluster" errorKey="form.cluster" :options="$clusterOptions" />
+                <x-nx-input-select name="category" label="Kategorie" wire:model.live="form.category" errorKey="form.category" :options="$categoryOptions" />
+            </div>
+            <x-nx-input-text name="url" label="Feed-URL" wire:model.live="form.url" errorKey="form.url" required placeholder="https://example.com/feed.xml" />
+            <x-nx-input-number name="pull_interval_hours" label="Abruf-Intervall (Stunden)" wire:model.live="form.pull_interval_hours" errorKey="form.pull_interval_hours" min="1" max="720" />
+            <x-nx-input-textarea name="extraction_prompt" label="Extraktions-Prompt" hint="optional" wire:model.live="form.extraction_prompt" errorKey="form.extraction_prompt" rows="3" placeholder="Zusätzlicher Kontext für die LLM-Extraktion…" />
+            <div class="border-t border-[color:var(--nx-line)] pt-3">
+                <x-nx-input-checkbox label="Aktiv" wire:model.live="form.is_active" />
+            </div>
+        </form>
 
         <x-slot name="footer">
-            <div class="d-flex justify-end gap-2">
-                <x-ui-button type="button" variant="secondary-outline" wire:click="$set('modalShow', false)">Abbrechen</x-ui-button>
-                <x-ui-button type="button" variant="primary" wire:click="store">
-                    @svg('heroicon-o-check', 'w-4 h-4 mr-2')
-                    {{ $editingId ? 'Speichern' : 'Erstellen' }}
-                </x-ui-button>
+            <div class="flex justify-end gap-2">
+                <x-nx-button variant="ghost" wire:click="$set('modalShow', false)">Abbrechen</x-nx-button>
+                <x-nx-button variant="primary" wire:click="store">{{ $editingId ? 'Speichern' : 'Anlegen' }}</x-nx-button>
             </div>
         </x-slot>
-    </x-ui-modal>
+    </x-nx-modal>
 </x-ui-page>

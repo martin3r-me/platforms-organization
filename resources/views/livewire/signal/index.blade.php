@@ -1,378 +1,257 @@
+@php
+    $focusedIds = $this->focusedIds;
+    $viewCounts = $this->viewCounts;
+    $zeilen = $this->signals->take($limit);
+    $archiv = $view === 'archive';
+
+    $sevVariant = fn ($s) => match ($s) { 'critical', 'algedonic' => 'danger', 'warning' => 'warning', default => 'info' };
+    $sevLabel = fn ($s) => match ($s) { 'critical' => 'Kritisch', 'algedonic' => 'Algedonisch', 'warning' => 'Warnung', 'info' => 'Info', default => ucfirst((string) $s) };
+    $statusVariant = fn ($s) => match ($s) { 'open' => 'warning', 'acknowledged' => 'info', 'resolved' => 'success', default => 'neutral' };
+    $statusLabel = fn ($s) => match ($s) { 'open' => 'Offen', 'acknowledged' => 'Bestätigt', 'resolved' => 'Gelöst', 'dismissed' => 'Verworfen', default => ucfirst((string) $s) };
+
+    // Badge-Klassen als Strings: in der Tabelle keine Komponente pro Zelle.
+    $pill = fn ($v) => 'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs font-medium ' . match ($v) {
+        'success' => 'text-[color:var(--nx-success)] bg-[rgba(47,158,68,.12)]',
+        'danger'  => 'text-[color:var(--nx-danger)] bg-[rgba(224,49,49,.12)]',
+        'warning' => 'text-[color:var(--nx-warning)] bg-[rgba(232,89,12,.12)]',
+        'info'    => 'text-[color:var(--nx-info)] bg-[rgba(25,113,194,.12)]',
+        default   => 'text-[color:var(--nx-muted)] bg-[color:var(--nx-accent-soft)]',
+    };
+    $chip = 'inline-flex items-center gap-0.5 rounded px-1 text-[10px] font-medium';
+
+    $visibleIds = $zeilen->pluck('id')->all();
+    $allSelected = ! empty($visibleIds) && count(array_intersect($visibleIds, $selectedIds)) === count($visibleIds);
+
+    $statusOptions = $archiv
+        ? [['value' => 'resolved', 'label' => 'Nur gelöst'], ['value' => 'dismissed', 'label' => 'Nur verworfen']]
+        : [['value' => 'open', 'label' => 'Nur offen'], ['value' => 'acknowledged', 'label' => 'Nur bestätigt']];
+@endphp
+
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar title="Signale" icon="heroicon-o-bell-alert" />
+    </x-slot>
+
+    <x-slot name="sidebar">
+        <x-ui-page-sidebar title="Filter" width="w-64" :defaultOpen="true" side="left">
+            <div class="flex flex-col gap-3 p-3">
+                <x-nx-input-select name="statusFilter" label="Status" size="sm" wire:model.live="statusFilter"
+                    :options="$statusOptions" nullable :nullLabel="$archiv ? 'Gelöst + verworfen' : 'Offen + bestätigt'" />
+                <x-nx-input-select name="severityFilter" label="Schweregrad" size="sm" wire:model.live="severityFilter"
+                    :options="[
+                        ['value' => 'info', 'label' => 'Info'],
+                        ['value' => 'warning', 'label' => 'Warnung'],
+                        ['value' => 'critical', 'label' => 'Kritisch'],
+                        ['value' => 'algedonic', 'label' => 'Algedonisch'],
+                    ]" nullable nullLabel="Alle" />
+                <x-nx-input-select name="sourceFilter" label="Quelle" size="sm" wire:model.live="sourceFilter"
+                    :options="[['value' => 'rule', 'label' => 'Regel'], ['value' => 'inference', 'label' => 'Inference']]" nullable nullLabel="Alle" />
+                <div class="border-t border-[color:var(--nx-line)] pt-3">
+                    <x-nx-input-checkbox label="Nur Fokus-Signale" wire:model.live="focusOnly" />
+                </div>
+            </div>
+        </x-ui-page-sidebar>
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
             ['label' => 'Signale'],
         ]">
+            <x-slot name="left">
+                <div class="flex items-center gap-3">
+                    <div class="inline-flex items-center gap-0.5 rounded-[6px] border border-[color:var(--nx-line)] bg-[color:var(--nx-bg)] p-0.5">
+                        @foreach (['active' => ['Aktiv', 'heroicon-o-bolt'], 'archive' => ['Archiv', 'heroicon-o-archive-box']] as $key => [$label, $ico])
+                            <button type="button" wire:click="switchView('{{ $key }}')"
+                                class="inline-flex items-center gap-1.5 rounded-[5px] px-2.5 py-1 text-sm font-medium transition-colors {{ $view === $key ? 'bg-[color:var(--nx-surface)] text-[color:var(--nx-text)] shadow-sm' : 'text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]' }}">
+                                @svg($ico, 'w-4 h-4')
+                                {{ $label }}
+                                <span class="text-xs tabular-nums text-[color:var(--nx-faint)]">{{ $viewCounts[$key] }}</span>
+                            </button>
+                        @endforeach
+                    </div>
+                    <div class="w-56">
+                        <x-nx-input-text name="search" size="sm" placeholder="Signale suchen…" wire:model.live.debounce.400ms="search" />
+                    </div>
+                </div>
+            </x-slot>
+            @if ($archiv && count($selectedIds) > 0)
+                <x-nx-button variant="danger" size="sm" wire:click="bulkDelete"
+                    wire:confirm="{{ count($selectedIds) }} archivierte Signale dauerhaft löschen? Diese Aktion kann nicht rückgängig gemacht werden.">
+                    @svg('heroicon-o-trash', 'w-4 h-4')
+                    <span>{{ count($selectedIds) }} dauerhaft löschen</span>
+                </x-nx-button>
+            @endif
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Filter" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Suche</h3>
-                    <x-ui-input-text name="search" wire:model.live.debounce.400ms="search" placeholder="Suche Signale..." class="w-full" size="sm" />
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>
-                    <div class="space-y-3">
-                        <label class="flex items-center gap-2 text-sm text-[var(--ui-secondary)] cursor-pointer select-none">
-                            <input type="checkbox" wire:model.live="focusOnly" class="rounded border-gray-300 text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]">
-                            <span class="inline-flex items-center gap-1">
-                                @svg('heroicon-s-star', 'w-4 h-4 text-amber-500')
-                                Nur Fokus-Signale
-                            </span>
-                        </label>
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Status</label>
-                            <select wire:model.live="statusFilter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm">
-                                @if($view === 'archive')
-                                    <option value="">Alle (gelöst + verworfen)</option>
-                                    <option value="resolved">Nur gelöst</option>
-                                    <option value="dismissed">Nur verworfen</option>
-                                @else
-                                    <option value="">Alle aktiven (offen + bestätigt)</option>
-                                    <option value="open">Nur offen</option>
-                                    <option value="acknowledged">Nur bestätigt</option>
-                                @endif
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Schweregrad</label>
-                            <select wire:model.live="severityFilter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm">
-                                <option value="">Alle Schweregrade</option>
-                                <option value="info">Info</option>
-                                <option value="warning">Warning</option>
-                                <option value="critical">Critical</option>
-                                <option value="algedonic">Algedonic</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Quelle</label>
-                            <select wire:model.live="sourceFilter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm">
-                                <option value="">Alle Quellen</option>
-                                <option value="rule">Regel</option>
-                                <option value="inference">Inference</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </x-ui-page-sidebar>
-    </x-slot>
+    <x-ui-page-container width="contained">
+        <div class="space-y-5">
+            <h1 class="m-0 text-2xl font-semibold tracking-tight text-[color:var(--nx-text)]">{{ $archiv ? 'Signal-Archiv' : 'Signale' }}</h1>
 
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <div class="p-6 text-sm text-[var(--ui-muted)]">Keine Aktivitäten verfügbar</div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-ui-page-container>
-        @php
-            $focusedIds = $this->focusedIds;
-            $viewCounts = $this->viewCounts;
-        @endphp
-
-        {{-- View toggle: Active / Archive --}}
-        <div class="mb-4 inline-flex items-center gap-1 p-1 rounded-lg bg-[var(--ui-muted-5)] border border-[var(--ui-border)]/40">
-            <button
-                type="button"
-                wire:click="switchView('active')"
-                @class([
-                    'px-3 py-1.5 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5',
-                    'bg-white text-[var(--ui-secondary)] shadow-sm' => $view === 'active',
-                    'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' => $view !== 'active',
-                ])
-            >
-                @svg('heroicon-o-bolt', 'w-4 h-4')
-                Aktiv
-                <span class="text-xs text-[var(--ui-muted)] tabular-nums">{{ $viewCounts['active'] }}</span>
-            </button>
-            <button
-                type="button"
-                wire:click="switchView('archive')"
-                @class([
-                    'px-3 py-1.5 text-sm font-medium rounded-md transition inline-flex items-center gap-1.5',
-                    'bg-white text-[var(--ui-secondary)] shadow-sm' => $view === 'archive',
-                    'text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]' => $view !== 'archive',
-                ])
-            >
-                @svg('heroicon-o-archive-box', 'w-4 h-4')
-                Archiv
-                <span class="text-xs text-[var(--ui-muted)] tabular-nums">{{ $viewCounts['archive'] }}</span>
-            </button>
-        </div>
-
-        @if($view !== 'archive' && ! $focusOnly && $this->focusedSignals->isNotEmpty())
-            <div class="mb-6 rounded-lg border border-amber-200 bg-amber-50/40 p-4">
-                <div class="flex items-center gap-2 mb-3">
-                    @svg('heroicon-s-star', 'w-5 h-5 text-amber-500')
-                    <h2 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider">Fokus-Signale</h2>
-                    <span class="text-xs text-[var(--ui-muted)]">({{ $this->focusedSignals->count() }})</span>
-                </div>
-                <div class="space-y-2">
-                    @foreach($this->focusedSignals as $signal)
-                        <div class="flex items-start gap-3 bg-white rounded-md border border-amber-200/60 p-3 hover:border-amber-400 transition">
-                            <button
-                                wire:click="toggleFocus({{ $signal->id }})"
-                                type="button"
-                                class="flex-shrink-0 mt-0.5 text-amber-500 hover:text-amber-700 transition"
-                                title="Aus Fokus entfernen"
-                            >
-                                @svg('heroicon-s-star', 'w-4 h-4')
-                            </button>
-                            <div class="flex-1 min-w-0">
-                                <div class="flex items-center gap-2 mb-1 flex-wrap">
-                                    @if($signal->entity)
-                                        <a href="{{ route('organization.entities.show', $signal->entity) }}" class="link text-sm font-medium">
-                                            {{ $signal->entity->name }}
-                                        </a>
-                                    @endif
-                                    <x-ui-badge variant="{{ match($signal->severity) { 'critical' => 'danger', 'algedonic' => 'danger', 'warning' => 'warning', default => 'info' } }}">
-                                        {{ ucfirst($signal->severity) }}
-                                    </x-ui-badge>
-                                    <x-ui-badge variant="{{ match($signal->status) { 'open' => 'warning', 'acknowledged' => 'info', 'resolved' => 'success', 'dismissed' => 'muted', default => 'secondary' } }}">
-                                        @switch($signal->status)
-                                            @case('open') Offen @break
-                                            @case('acknowledged') Bestätigt @break
-                                            @case('resolved') Gelöst @break
-                                            @case('dismissed') Verworfen @break
-                                        @endswitch
-                                    </x-ui-badge>
-                                </div>
-                                <a href="{{ route('organization.signals.show', $signal) }}" class="text-sm text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] block">
-                                    {{ \Illuminate\Support\Str::limit($signal->message, 140) }}
-                                </a>
-                                <p class="text-xs text-[var(--ui-muted)] mt-1">{{ $signal->created_at->diffForHumans() }}</p>
-                            </div>
-                        </div>
-                    @endforeach
-                </div>
-            </div>
-        @endif
-
-        @if($view === 'archive' && count($selectedIds) > 0)
-            <div class="mb-3 flex items-center justify-between gap-3 p-3 rounded-lg bg-red-50 border border-red-200">
-                <div class="flex items-center gap-2 text-sm text-red-900">
-                    @svg('heroicon-o-check-circle', 'w-4 h-4')
-                    <span class="font-medium">{{ count($selectedIds) }} {{ count($selectedIds) === 1 ? 'Signal' : 'Signale' }} ausgewählt</span>
-                </div>
-                <div class="flex items-center gap-2">
-                    <button
-                        type="button"
-                        wire:click="$set('selectedIds', [])"
-                        class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-secondary)]"
-                    >
-                        Auswahl aufheben
-                    </button>
-                    <button
-                        type="button"
-                        wire:click="bulkDelete"
-                        wire:confirm="{{ count($selectedIds) }} archivierte Signale dauerhaft löschen? Diese Aktion kann nicht rückgängig gemacht werden."
-                        class="px-3 py-1.5 rounded-md text-xs font-medium bg-red-600 text-white hover:bg-red-700 transition inline-flex items-center gap-1.5"
-                    >
-                        @svg('heroicon-o-trash', 'w-3.5 h-3.5')
-                        Dauerhaft löschen
-                    </button>
-                </div>
-            </div>
-        @endif
-
-        <x-ui-table compact="true">
-            <x-ui-table-header>
-                @if($view === 'archive')
-                    <x-ui-table-header-cell compact="true" class="w-8">
-                        @php
-                            $visibleIds = $this->signals->take($limit)->pluck('id')->all();
-                            $allSelected = ! empty($visibleIds) && count(array_intersect($visibleIds, $selectedIds)) === count($visibleIds);
-                        @endphp
-                        <input
-                            type="checkbox"
-                            wire:click="toggleSelectAll"
-                            @checked($allSelected)
-                            class="rounded border-gray-300 text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]"
-                            title="Alle sichtbaren auswählen"
-                        >
-                    </x-ui-table-header-cell>
-                @endif
-                <x-ui-table-header-cell compact="true" class="w-8"></x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Entity</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Schweregrad</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Quelle</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Nachricht</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true" class="text-center">@svg('heroicon-o-chat-bubble-left', 'w-4 h-4 inline-block')</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">{{ $view === 'archive' ? 'Abgeschlossen' : 'Erstellt' }}</x-ui-table-header-cell>
-            </x-ui-table-header>
-
-            <x-ui-table-body>
-                @forelse($this->signals->take($limit) as $signal)
-                    @php
-                        $isFocused = in_array($signal->id, $focusedIds, true);
-                    @endphp
-                    <x-ui-table-row compact="true">
-                        @if($view === 'archive')
-                            <x-ui-table-cell compact="true">
-                                <input
-                                    type="checkbox"
-                                    wire:model.live="selectedIds"
-                                    value="{{ $signal->id }}"
-                                    class="rounded border-gray-300 text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]"
-                                >
-                            </x-ui-table-cell>
-                        @endif
-                        <x-ui-table-cell compact="true">
-                            <button
-                                wire:click="toggleFocus({{ $signal->id }})"
-                                type="button"
-                                @class([
-                                    'transition',
-                                    'text-amber-500 hover:text-amber-700' => $isFocused,
-                                    'text-gray-300 hover:text-amber-500' => ! $isFocused,
-                                ])
-                                title="{{ $isFocused ? 'Aus Fokus entfernen' : 'In Fokus aufnehmen' }}"
-                            >
-                                @if($isFocused)
+            @if (! $archiv && ! $focusOnly && $this->focusedSignals->isNotEmpty())
+                <x-nx-panel flush title="Fokus" :subtitle="$this->focusedSignals->count() . ' markiert'">
+                    <div>
+                        @foreach ($this->focusedSignals as $signal)
+                            <div wire:key="fs-{{ $signal->id }}" class="flex items-start gap-3 border-b border-[color:var(--nx-line)] px-4 py-2.5 last:border-0 hover:bg-[color:var(--nx-hover)]">
+                                <button wire:click="toggleFocus({{ $signal->id }})" type="button" title="Aus Fokus entfernen"
+                                    class="mt-0.5 shrink-0 text-[color:var(--nx-warning)] hover:opacity-70">
                                     @svg('heroicon-s-star', 'w-4 h-4')
-                                @else
-                                    @svg('heroicon-o-star', 'w-4 h-4')
-                                @endif
-                            </button>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @if($signal->entity)
-                                <a href="{{ route('organization.entities.show', $signal->entity) }}" class="link font-medium">
-                                    {{ $signal->entity->name }}
-                                </a>
-                            @else
-                                <span class="text-[var(--ui-muted)]">–</span>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="{{ match($signal->severity) { 'critical' => 'danger', 'algedonic' => 'danger', 'warning' => 'warning', default => 'info' } }}">
-                                {{ ucfirst($signal->severity) }}
-                            </x-ui-badge>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="{{ $signal->source === 'inference' ? 'primary' : 'secondary' }}">
-                                {{ $signal->source === 'inference' ? 'Inference' : 'Regel' }}
-                            </x-ui-badge>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <a href="{{ route('organization.signals.show', $signal) }}" class="link text-sm">
-                                {{ \Illuminate\Support\Str::limit($signal->message, 80) }}
-                            </a>
-                            @if($view === 'archive' && $signal->status === 'dismissed' && $signal->dismissed_reason)
-                                <p class="text-xs text-[var(--ui-muted)] italic mt-0.5" title="{{ $signal->dismissed_reason }}">
-                                    „{{ \Illuminate\Support\Str::limit($signal->dismissed_reason, 90) }}"
-                                </p>
-                            @elseif($view === 'archive' && $signal->status === 'resolved' && $signal->resolution_summary)
-                                <p class="text-xs text-green-700 mt-0.5" title="{{ $signal->resolution_summary }}">
-                                    @svg('heroicon-o-check', 'w-3 h-3 inline-block -mt-0.5')
-                                    {{ \Illuminate\Support\Str::limit(str_replace(["\n", '•'], [' · ', ''], $signal->resolution_summary), 100) }}
-                                </p>
-                            @endif
+                                </button>
+                                <div class="min-w-0 flex-1">
+                                    <a href="{{ route('organization.signals.show', $signal) }}" wire:navigate class="block text-sm text-[color:var(--nx-text)] hover:underline">
+                                        {{ \Illuminate\Support\Str::limit($signal->message, 140) }}
+                                    </a>
+                                    <div class="mt-1 flex flex-wrap items-center gap-2 text-xs text-[color:var(--nx-faint)]">
+                                        @if ($signal->entity)
+                                            <a href="{{ route('organization.entities.show', $signal->entity) }}" wire:navigate class="font-medium text-[color:var(--nx-muted)] hover:underline">{{ $signal->entity->name }}</a>
+                                        @endif
+                                        <span class="{{ $pill($sevVariant($signal->severity)) }}">{{ $sevLabel($signal->severity) }}</span>
+                                        <span class="{{ $pill($statusVariant($signal->status)) }}">{{ $statusLabel($signal->status) }}</span>
+                                        <span>{{ $signal->created_at->diffForHumans() }}</span>
+                                    </div>
+                                </div>
+                            </div>
+                        @endforeach
+                    </div>
+                </x-nx-panel>
+            @endif
 
-                            {{-- Routing-Mikrozeile: VSM, Owner, Deadline, Eskalation --}}
-                            @php
-                                $isOverdue = $signal->deadline_at && $signal->status === 'open' && $signal->deadline_at->isPast();
-                            @endphp
-                            @if($signal->vsm_level || $signal->current_owner_entity_id || $signal->deadline_at || $signal->escalated_at)
-                                <div class="mt-1 flex flex-wrap items-center gap-1 text-[10px]">
-                                    @if($signal->vsm_level)
-                                        <span class="inline-flex items-center px-1 py-0 rounded font-medium bg-indigo-100 text-indigo-700">
-                                            {{ strtoupper(str_replace('_', '', $signal->vsm_level)) }}
-                                        </span>
+            <x-nx-card flush>
+                @if ($zeilen->isEmpty())
+                    <x-nx-empty icon="heroicon-o-bell-slash">
+                        {{ $archiv ? 'Noch keine archivierten Signale.' : 'Keine aktiven Signale.' }}
+                    </x-nx-empty>
+                @else
+                    <div class="overflow-x-auto">
+                        <table class="w-full text-sm">
+                            <thead>
+                                <tr class="text-xs text-[color:var(--nx-muted)]">
+                                    @if ($archiv)
+                                        <th class="w-8 border-b border-[color:var(--nx-line)] py-2.5 pl-4 text-left">
+                                            <input type="checkbox" wire:click="toggleSelectAll" @checked($allSelected) title="Alle sichtbaren auswählen"
+                                                class="h-4 w-4 rounded-[4px] accent-[var(--nx-accent)]">
+                                        </th>
                                     @endif
-                                    @if($signal->current_owner_entity_id)
-                                        <span class="inline-flex items-center gap-0.5 px-1 py-0 rounded bg-gray-100 text-gray-700" title="Owner">
-                                            @svg('heroicon-o-user-circle', 'w-2.5 h-2.5')
-                                            {{ $signal->currentOwner?->name ?? '#'.$signal->current_owner_entity_id }}
-                                        </span>
-                                    @elseif($signal->status === 'open')
-                                        <span class="inline-flex items-center gap-0.5 px-1 py-0 rounded bg-amber-50 text-amber-700" title="Kein Owner">
-                                            @svg('heroicon-o-user-circle', 'w-2.5 h-2.5')
-                                            vakant
-                                        </span>
-                                    @endif
-                                    @if($signal->deadline_at && $signal->status === 'open')
-                                        <span class="inline-flex items-center gap-0.5 px-1 py-0 rounded {{ $isOverdue ? 'bg-red-100 text-red-800' : 'bg-gray-100 text-gray-700' }}" title="Deadline {{ $signal->deadline_at->format('d.m.Y H:i') }}">
-                                            @svg('heroicon-o-clock', 'w-2.5 h-2.5')
-                                            {{ $isOverdue ? 'überfällig' : '' }} {{ $signal->deadline_at->diffForHumans() }}
-                                        </span>
-                                    @endif
-                                    @if($signal->escalated_at && $signal->status === 'open')
-                                        <span class="inline-flex items-center gap-0.5 px-1 py-0 rounded bg-orange-100 text-orange-800" title="Eskaliert {{ $signal->escalated_at->format('d.m.Y H:i') }}">
-                                            @svg('heroicon-o-arrow-trending-up', 'w-2.5 h-2.5')
-                                            eskaliert
-                                        </span>
-                                    @endif
-                                </div>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <div class="flex items-center gap-1.5">
-                                <x-ui-badge variant="{{ match($signal->status) { 'open' => 'warning', 'acknowledged' => 'info', 'resolved' => 'success', 'dismissed' => 'muted', default => 'secondary' } }}">
-                                    @switch($signal->status)
-                                        @case('open') Offen @break
-                                        @case('acknowledged') Bestätigt @break
-                                        @case('resolved') Gelöst @break
-                                        @case('dismissed') Verworfen @break
-                                    @endswitch
-                                </x-ui-badge>
-                                @if($signal->snooze_until && $signal->snooze_until->isFuture())
-                                    <span class="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-medium bg-amber-100 text-amber-700" title="Snoozed bis {{ $signal->snooze_until->format('d.m.Y') }}">
-                                        @svg('heroicon-o-clock', 'w-3 h-3')
-                                    </span>
-                                @endif
-                            </div>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true" class="text-center">
-                            @if($signal->comments_count > 0)
-                                <span class="text-xs text-[var(--ui-muted)] tabular-nums">{{ $signal->comments_count }}</span>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            @php
-                                $dateColumn = $view === 'archive' ? ($signal->resolved_at ?? $signal->created_at) : $signal->created_at;
-                            @endphp
-                            <div class="text-sm text-[var(--ui-muted)]" title="{{ $dateColumn->format('d.m.Y H:i') }}">
-                                {{ $dateColumn->diffForHumans() }}
-                            </div>
-                            @if($view === 'archive' && $signal->resolvedByUser)
-                                <div class="text-[10px] text-[var(--ui-muted)] mt-0.5">
-                                    von {{ $signal->resolvedByUser->name }}
-                                </div>
-                            @endif
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @empty
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="{{ $view === 'archive' ? 9 : 8 }}">
-                            <div class="text-center py-8">
-                                @svg('heroicon-o-bell-slash', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
-                                <p class="text-sm text-[var(--ui-muted)]">
-                                    @if($view === 'archive')
-                                        Noch keine archivierten Signale.
-                                    @else
-                                        Keine aktiven Signale.
-                                    @endif
-                                </p>
-                            </div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @endforelse
-            </x-ui-table-body>
-        </x-ui-table>
-        @if($this->signals->count() > $limit)
-            <div class="mt-3 text-center">
-                <x-ui-button variant="secondary-ghost" size="sm" wire:click="loadMore">Weitere laden</x-ui-button>
-            </div>
-        @endif
+                                    <th class="w-8 border-b border-[color:var(--nx-line)] py-2.5 pl-4"></th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-left font-medium">Signal</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-left font-medium">Einheit</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-left font-medium">Schweregrad</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-left font-medium">Status</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-3 py-2.5 text-center font-medium">@svg('heroicon-o-chat-bubble-left', 'w-4 h-4 inline-block')</th>
+                                    <th class="border-b border-[color:var(--nx-line)] px-4 py-2.5 text-right font-medium">{{ $archiv ? 'Abgeschlossen' : 'Erstellt' }}</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                @foreach ($zeilen as $signal)
+                                    @php
+                                        $isFocused = in_array($signal->id, $focusedIds, true);
+                                        $isOverdue = $signal->deadline_at && $signal->status === 'open' && $signal->deadline_at->isPast();
+                                        $dateColumn = $archiv ? ($signal->resolved_at ?? $signal->created_at) : $signal->created_at;
+                                    @endphp
+                                    <tr wire:key="s-{{ $signal->id }}" class="border-b border-[color:var(--nx-line)] align-top last:border-0 hover:bg-[color:var(--nx-hover)]">
+                                        @if ($archiv)
+                                            <td class="py-2 pl-4">
+                                                <input type="checkbox" wire:model.live="selectedIds" value="{{ $signal->id }}" class="h-4 w-4 rounded-[4px] accent-[var(--nx-accent)]">
+                                            </td>
+                                        @endif
+                                        <td class="py-2 pl-4">
+                                            <button wire:click="toggleFocus({{ $signal->id }})" type="button"
+                                                title="{{ $isFocused ? 'Aus Fokus entfernen' : 'In Fokus aufnehmen' }}"
+                                                class="transition-colors {{ $isFocused ? 'text-[color:var(--nx-warning)]' : 'text-[color:var(--nx-faint)] hover:text-[color:var(--nx-warning)]' }}">
+                                                @svg($isFocused ? 'heroicon-s-star' : 'heroicon-o-star', 'w-4 h-4')
+                                            </button>
+                                        </td>
+                                        <td class="max-w-md px-3 py-2">
+                                            <a href="{{ route('organization.signals.show', $signal) }}" wire:navigate class="text-[color:var(--nx-text)] hover:underline">
+                                                {{ \Illuminate\Support\Str::limit($signal->message, 100) }}
+                                            </a>
+                                            @if ($archiv && $signal->status === 'dismissed' && $signal->dismissed_reason)
+                                                <p class="mt-0.5 text-xs italic text-[color:var(--nx-muted)]" title="{{ $signal->dismissed_reason }}">„{{ \Illuminate\Support\Str::limit($signal->dismissed_reason, 90) }}"</p>
+                                            @elseif ($archiv && $signal->status === 'resolved' && $signal->resolution_summary)
+                                                <p class="mt-0.5 text-xs text-[color:var(--nx-success)]" title="{{ $signal->resolution_summary }}">
+                                                    {{ \Illuminate\Support\Str::limit(str_replace(["\n", '•'], [' · ', ''], $signal->resolution_summary), 100) }}
+                                                </p>
+                                            @endif
+                                            {{-- Routing-Mikrozeile: Quelle, VSM, Owner, Deadline, Eskalation --}}
+                                            <div class="mt-1 flex flex-wrap items-center gap-1">
+                                                <span class="{{ $chip }} {{ $signal->source === 'inference' ? 'bg-[color:var(--nx-accent-soft)] text-[color:var(--nx-text)]' : 'text-[color:var(--nx-faint)]' }}">
+                                                    {{ $signal->source === 'inference' ? 'Inference' : 'Regel' }}
+                                                </span>
+                                                @if ($signal->vsm_level)
+                                                    <span class="{{ $chip }} bg-[rgba(25,113,194,.12)] text-[color:var(--nx-info)]">{{ strtoupper(str_replace('_', '', $signal->vsm_level)) }}</span>
+                                                @endif
+                                                @if ($signal->current_owner_entity_id)
+                                                    <span class="{{ $chip }} bg-[color:var(--nx-accent-soft)] text-[color:var(--nx-muted)]" title="Owner">
+                                                        @svg('heroicon-o-user-circle', 'w-2.5 h-2.5')
+                                                        {{ $signal->currentOwner?->name ?? '#' . $signal->current_owner_entity_id }}
+                                                    </span>
+                                                @elseif ($signal->status === 'open')
+                                                    <span class="{{ $chip }} bg-[rgba(232,89,12,.12)] text-[color:var(--nx-warning)]" title="Kein Owner">
+                                                        @svg('heroicon-o-user-circle', 'w-2.5 h-2.5')
+                                                        vakant
+                                                    </span>
+                                                @endif
+                                                @if ($signal->deadline_at && $signal->status === 'open')
+                                                    <span class="{{ $chip }} {{ $isOverdue ? 'bg-[rgba(224,49,49,.12)] text-[color:var(--nx-danger)]' : 'bg-[color:var(--nx-accent-soft)] text-[color:var(--nx-muted)]' }}" title="Deadline {{ $signal->deadline_at->format('d.m.Y H:i') }}">
+                                                        @svg('heroicon-o-clock', 'w-2.5 h-2.5')
+                                                        {{ $isOverdue ? 'überfällig' : '' }} {{ $signal->deadline_at->diffForHumans() }}
+                                                    </span>
+                                                @endif
+                                                @if ($signal->escalated_at && $signal->status === 'open')
+                                                    <span class="{{ $chip }} bg-[rgba(232,89,12,.12)] text-[color:var(--nx-warning)]" title="Eskaliert {{ $signal->escalated_at->format('d.m.Y H:i') }}">
+                                                        @svg('heroicon-o-arrow-trending-up', 'w-2.5 h-2.5')
+                                                        eskaliert
+                                                    </span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-2">
+                                            @if ($signal->entity)
+                                                <a href="{{ route('organization.entities.show', $signal->entity) }}" wire:navigate class="font-medium text-[color:var(--nx-text)] hover:underline">{{ $signal->entity->name }}</a>
+                                            @else
+                                                <span class="text-[color:var(--nx-faint)]">–</span>
+                                            @endif
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-2">
+                                            <span class="{{ $pill($sevVariant($signal->severity)) }}">{{ $sevLabel($signal->severity) }}</span>
+                                        </td>
+                                        <td class="whitespace-nowrap px-3 py-2">
+                                            <div class="flex items-center gap-1.5">
+                                                <span class="{{ $pill($statusVariant($signal->status)) }}">
+                                                    <span class="h-1.5 w-1.5 rounded-full" style="background:currentColor"></span>
+                                                    {{ $statusLabel($signal->status) }}
+                                                </span>
+                                                @if ($signal->snooze_until && $signal->snooze_until->isFuture())
+                                                    <span class="text-[color:var(--nx-warning)]" title="Snoozed bis {{ $signal->snooze_until->format('d.m.Y') }}">@svg('heroicon-o-clock', 'w-3.5 h-3.5')</span>
+                                                @endif
+                                            </div>
+                                        </td>
+                                        <td class="px-3 py-2 text-center text-xs tabular-nums text-[color:var(--nx-muted)]">
+                                            {{ $signal->comments_count > 0 ? $signal->comments_count : '' }}
+                                        </td>
+                                        <td class="whitespace-nowrap px-4 py-2 text-right text-[color:var(--nx-muted)]">
+                                            <span title="{{ $dateColumn->format('d.m.Y H:i') }}">{{ $dateColumn->diffForHumans() }}</span>
+                                            @if ($archiv && $signal->resolvedByUser)
+                                                <div class="text-[10px] text-[color:var(--nx-faint)]">von {{ $signal->resolvedByUser->name }}</div>
+                                            @endif
+                                        </td>
+                                    </tr>
+                                @endforeach
+                            </tbody>
+                        </table>
+                    </div>
+                    @if ($this->signals->count() > $limit)
+                        <div class="flex items-center justify-between border-t border-[color:var(--nx-line)] px-4 py-2.5">
+                            <span class="text-xs text-[color:var(--nx-faint)]">{{ $zeilen->count() }} angezeigt</span>
+                            <x-nx-button size="sm" wire:click="loadMore">
+                                <span wire:loading.remove wire:target="loadMore">Weitere laden</span>
+                                <span wire:loading wire:target="loadMore">Lädt…</span>
+                            </x-nx-button>
+                        </div>
+                    @endif
+                @endif
+            </x-nx-card>
+        </div>
     </x-ui-page-container>
 </x-ui-page>

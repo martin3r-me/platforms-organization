@@ -8,181 +8,144 @@
     $sourceMemory = $this->sourceRelevanceMemories[$snapshot->source_id] ?? null;
     $memoryData = $sourceMemory?->structured_data ?? [];
     $memoryRating = $memoryData['relevance_rating'] ?? null;
-    $memoryConfidence = $sourceMemory?->confidence;
+
+    $titel = ($snapshot->source?->name ?? 'Snapshot') . ' · ' . $snapshot->snapshot_date->format('d.m.Y');
+    $ampel = fn ($v) => $v >= 0.7 ? 'var(--nx-success)' : ($v >= 0.4 ? 'var(--nx-warning)' : 'var(--nx-danger)');
 @endphp
 
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar :title="$titel" icon="heroicon-o-camera" />
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Umwelt'],
-            ['label' => 'Snapshots', 'href' => route('organization.environment-snapshots.index')],
-            ['label' => ($snapshot->source?->name ?? 'Snapshot') . ' ' . $snapshot->snapshot_date->format('d.m.Y')],
-        ]">
-        </x-ui-page-actionbar>
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Umwelt-Snapshots', 'href' => route('organization.environment-snapshots.index')],
+            ['label' => $titel],
+        ]" />
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Details" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                {{-- Metadaten --}}
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Metadaten</h3>
-                    <dl class="space-y-2 text-sm">
-                        <div class="flex justify-between">
-                            <dt class="text-[var(--ui-muted)]">Quelle</dt>
-                            <dd class="font-medium">{{ $snapshot->source?->name ?? '-' }}</dd>
-                        </div>
-                        <div class="flex justify-between">
-                            <dt class="text-[var(--ui-muted)]">Datum</dt>
-                            <dd class="font-medium">{{ $snapshot->snapshot_date->format('d.m.Y') }}</dd>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <dt class="text-[var(--ui-muted)]">Sentiment</dt>
-                            <dd>
-                                @if($sentiment !== null)
-                                    <span class="inline-flex items-center gap-1.5">
-                                        <span class="inline-block w-3 h-3 rounded-full {{ $sentiment > 0.3 ? 'bg-green-500' : ($sentiment < -0.3 ? 'bg-red-500' : 'bg-yellow-500') }}"></span>
-                                        <span class="font-medium">{{ number_format($sentiment, 2) }}</span>
-                                    </span>
-                                @else
-                                    <span class="text-[var(--ui-muted)]">-</span>
-                                @endif
-                            </dd>
-                        </div>
-                        <div class="flex justify-between items-center">
-                            <dt class="text-[var(--ui-muted)]">Relevanz</dt>
-                            <dd>
-                                @if($relevance !== null)
-                                    <span class="inline-flex items-center gap-1.5">
-                                        <div class="w-16 bg-gray-200 rounded-full h-2">
-                                            <div class="h-2 rounded-full {{ $relevance >= 0.7 ? 'bg-green-500' : ($relevance >= 0.4 ? 'bg-yellow-500' : 'bg-gray-400') }}" style="width: {{ $relevance * 100 }}%"></div>
-                                        </div>
-                                        <span class="font-medium">{{ number_format($relevance, 2) }}</span>
-                                    </span>
-                                @else
-                                    <span class="text-[var(--ui-muted)]">-</span>
-                                @endif
-                            </dd>
-                        </div>
-                        <div class="flex justify-between">
-                            <dt class="text-[var(--ui-muted)]">Items</dt>
-                            <dd class="font-medium">{{ $itemCount }}</dd>
-                        </div>
-                    </dl>
-                </div>
-
-                {{-- Gelernte Relevanz fuer diese Source --}}
-                @if($sourceMemory)
-                    <div>
-                        <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Gelernte Relevanz</h3>
-                        <div class="text-xs">
-                            <div class="flex justify-between mb-1">
-                                <span class="font-medium">{{ $memoryData['source_name'] ?? '?' }}</span>
-                                <span class="text-[var(--ui-muted)]">{{ number_format($memoryConfidence, 2) }}</span>
-                            </div>
-                            @if($memoryRating !== null)
-                                <div class="w-full bg-gray-200 rounded-full h-1.5">
-                                    <div class="h-1.5 rounded-full {{ $memoryRating >= 0.7 ? 'bg-green-500' : ($memoryRating >= 0.4 ? 'bg-yellow-500' : 'bg-red-400') }}" style="width: {{ $memoryRating * 100 }}%"></div>
-                                </div>
-                            @endif
-                            @if(!empty($memoryData['topics_useful']))
-                                <div class="flex flex-wrap gap-1 mt-2">
-                                    @foreach(array_slice($memoryData['topics_useful'], 0, 8) as $t)
-                                        <x-ui-badge variant="success" size="xs">{{ $t }}</x-ui-badge>
-                                    @endforeach
-                                </div>
-                            @endif
-                            @if(!empty($memoryData['topics_noise']))
-                                <div class="flex flex-wrap gap-1 mt-1">
-                                    @foreach(array_slice($memoryData['topics_noise'], 0, 8) as $t)
-                                        <x-ui-badge variant="danger" size="xs">{{ $t }}</x-ui-badge>
-                                    @endforeach
-                                </div>
-                            @endif
-                        </div>
-                    </div>
-                @endif
-            </div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitaeten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <div class="p-6 text-sm text-[var(--ui-muted)]">Keine Aktivitaeten verfuegbar</div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-ui-page-container>
-        <div class="space-y-6">
-            {{-- Zusammenfassung --}}
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Zusammenfassung</h3>
-                <p class="text-sm text-[var(--ui-secondary)] whitespace-pre-line">{{ $snapshot->summary }}</p>
+    <x-ui-page-container width="contained">
+        <div class="space-y-5">
+            {{-- Kopf: Identität + Kennwerte --}}
+            <div class="flex flex-wrap items-center gap-2">
+                <h1 class="m-0 text-2xl font-semibold tracking-tight text-[color:var(--nx-text)]">{{ $snapshot->source?->name ?? 'Snapshot' }}</h1>
+                <span class="text-sm text-[color:var(--nx-muted)]">{{ $snapshot->snapshot_date->format('d.m.Y') }}</span>
             </div>
 
-            {{-- Org-Relevanz-Reasoning --}}
-            @if(!empty($metrics['org_relevance_reasoning']))
-                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Org-Relevanz</h3>
-                    <p class="text-sm text-[var(--ui-muted)]">{{ $metrics['org_relevance_reasoning'] }}</p>
+            <x-nx-panel title="Eckdaten">
+                <div class="grid grid-cols-1 gap-x-6 md:grid-cols-2">
+                    <x-nx-property-row icon="heroicon-o-globe-alt" label="Quelle">{{ $snapshot->source?->name ?? '–' }}</x-nx-property-row>
+                    <x-nx-property-row icon="heroicon-o-calendar" label="Datum">{{ $snapshot->snapshot_date->format('d.m.Y') }}</x-nx-property-row>
+                    <x-nx-property-row icon="heroicon-o-face-smile" label="Stimmung">
+                        @if ($sentiment !== null)
+                            <span class="inline-flex items-center gap-1.5">
+                                <span class="inline-block h-2.5 w-2.5 rounded-full" style="background: {{ $sentiment > 0.3 ? 'var(--nx-success)' : ($sentiment < -0.3 ? 'var(--nx-danger)' : 'var(--nx-warning)') }}"></span>
+                                <span class="tabular-nums">{{ number_format($sentiment, 2) }}</span>
+                            </span>
+                        @else
+                            <span class="text-[color:var(--nx-faint)]">–</span>
+                        @endif
+                    </x-nx-property-row>
+                    <x-nx-property-row icon="heroicon-o-adjustments-horizontal" label="Relevanz">
+                        @if ($relevance !== null)
+                            <span class="inline-flex items-center gap-2">
+                                <span class="block h-1.5 w-16 rounded-full bg-[color:var(--nx-accent-soft)]">
+                                    <span class="block h-1.5 rounded-full" style="width: {{ $relevance * 100 }}%; background: {{ $ampel($relevance) }}"></span>
+                                </span>
+                                <span class="tabular-nums">{{ number_format($relevance, 2) }}</span>
+                            </span>
+                        @else
+                            <span class="text-[color:var(--nx-faint)]">–</span>
+                        @endif
+                    </x-nx-property-row>
+                    <x-nx-property-row icon="heroicon-o-queue-list" label="Neue Einträge"><span class="tabular-nums">{{ $itemCount }}</span></x-nx-property-row>
                 </div>
+            </x-nx-panel>
+
+            <x-nx-panel title="Zusammenfassung">
+                <p class="m-0 whitespace-pre-line text-sm text-[color:var(--nx-text)]">{{ $snapshot->summary ?: '–' }}</p>
+            </x-nx-panel>
+
+            @if (! empty($metrics['org_relevance_reasoning']))
+                <x-nx-panel title="Relevanz für die Organisation">
+                    <p class="m-0 text-sm text-[color:var(--nx-muted)]">{{ $metrics['org_relevance_reasoning'] }}</p>
+                </x-nx-panel>
             @endif
 
-            {{-- Topics mit Feedback --}}
-            @if(!empty($topics))
-                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Topics</h3>
-                    <div class="flex flex-wrap gap-3">
-                        @foreach($topics as $topic)
+            {{-- Themen mit Feedback: ✓ relevant / ✗ Rauschen → lernt die Quellen-Relevanz --}}
+            @if (! empty($topics))
+                <x-nx-panel title="Themen" subtitle="Markieren, was relevant ist und was Rauschen — das fließt in die gelernte Relevanz der Quelle.">
+                    <div class="flex flex-wrap gap-2">
+                        @foreach ($topics as $topic)
                             @php
                                 $topicStatus = $this->getTopicStatus($snapshot->source_id, $topic);
-                                $badgeVariant = match($topicStatus) {
-                                    'useful' => 'success',
-                                    'noise' => 'danger',
-                                    default => 'info',
-                                };
                             @endphp
-                            <span class="inline-flex items-center gap-1">
-                                <x-ui-badge variant="{{ $badgeVariant }}">{{ $topic }}</x-ui-badge>
-                                <button
+                            <span wire:key="topic-{{ md5($topic) }}" class="inline-flex items-center gap-0.5 rounded-full border border-[color:var(--nx-line)] py-0.5 pl-2.5 pr-1 text-xs
+                                {{ $topicStatus === 'useful' ? 'bg-[rgba(47,158,68,.12)] text-[color:var(--nx-success)]' : ($topicStatus === 'noise' ? 'bg-[rgba(224,49,49,.12)] text-[color:var(--nx-danger)]' : 'text-[color:var(--nx-text)]') }}">
+                                <span class="mr-1">{{ $topic }}</span>
+                                <button type="button" title="Relevant"
                                     wire:click="rateTopic({{ $snapshot->source_id }}, '{{ addslashes($topic) }}', 'useful')"
-                                    class="text-green-600 hover:text-green-800 text-sm p-0.5 {{ $topicStatus === 'useful' ? 'font-bold' : 'opacity-50 hover:opacity-100' }}"
-                                    title="Relevant"
-                                >&#10003;</button>
-                                <button
+                                    class="rounded-full p-0.5 transition-colors hover:bg-[color:var(--nx-hover)] {{ $topicStatus === 'useful' ? 'text-[color:var(--nx-success)]' : 'text-[color:var(--nx-faint)] hover:text-[color:var(--nx-success)]' }}">
+                                    @svg('heroicon-o-check', 'w-3.5 h-3.5')
+                                </button>
+                                <button type="button" title="Rauschen"
                                     wire:click="rateTopic({{ $snapshot->source_id }}, '{{ addslashes($topic) }}', 'noise')"
-                                    class="text-red-600 hover:text-red-800 text-sm p-0.5 {{ $topicStatus === 'noise' ? 'font-bold' : 'opacity-50 hover:opacity-100' }}"
-                                    title="Rauschen"
-                                >&#10007;</button>
+                                    class="rounded-full p-0.5 transition-colors hover:bg-[color:var(--nx-hover)] {{ $topicStatus === 'noise' ? 'text-[color:var(--nx-danger)]' : 'text-[color:var(--nx-faint)] hover:text-[color:var(--nx-danger)]' }}">
+                                    @svg('heroicon-o-x-mark', 'w-3.5 h-3.5')
+                                </button>
                             </span>
                         @endforeach
                     </div>
-                </div>
+                </x-nx-panel>
             @endif
 
-            {{-- Raw Items --}}
-            @if(!empty($snapshot->raw_items))
-                <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Raw Items ({{ count($snapshot->raw_items) }})</h3>
+            @if ($sourceMemory)
+                <x-nx-panel title="Gelernte Relevanz der Quelle" :subtitle="'Konfidenz ' . number_format($sourceMemory->confidence, 2)">
                     <div class="space-y-2">
-                        @foreach($snapshot->raw_items as $item)
-                            <div class="text-sm border-l-2 border-gray-300 pl-3 py-1">
-                                <strong>{{ $item['title'] ?? '' }}</strong>
-                                @if(!empty($item['link']))
-                                    <a href="{{ $item['link'] }}" target="_blank" class="text-[var(--ui-primary)] ml-1">Link</a>
-                                @endif
-                                @if(!empty($item['description']))
-                                    <p class="text-[var(--ui-muted)] mt-0.5">{{ $item['description'] }}</p>
+                        @if ($memoryRating !== null)
+                            <div class="flex items-center gap-2">
+                                <div class="h-1.5 flex-1 rounded-full bg-[color:var(--nx-accent-soft)]">
+                                    <div class="h-1.5 rounded-full" style="width: {{ $memoryRating * 100 }}%; background: {{ $ampel($memoryRating) }}"></div>
+                                </div>
+                                <span class="text-xs tabular-nums text-[color:var(--nx-muted)]">{{ number_format($memoryRating, 2) }}</span>
+                            </div>
+                        @endif
+                        @if (! empty($memoryData['topics_useful']) || ! empty($memoryData['topics_noise']))
+                            <div class="flex flex-wrap gap-1">
+                                @foreach (array_slice($memoryData['topics_useful'] ?? [], 0, 8) as $t)
+                                    <x-nx-badge variant="success">{{ $t }}</x-nx-badge>
+                                @endforeach
+                                @foreach (array_slice($memoryData['topics_noise'] ?? [], 0, 8) as $t)
+                                    <x-nx-badge variant="danger">{{ $t }}</x-nx-badge>
+                                @endforeach
+                            </div>
+                        @endif
+                    </div>
+                </x-nx-panel>
+            @endif
+
+            @if (! empty($snapshot->raw_items))
+                <x-nx-panel flush title="Rohdaten" :subtitle="count($snapshot->raw_items) . ' Einträge'">
+                    <div class="divide-y divide-[color:var(--nx-line)]">
+                        @foreach ($snapshot->raw_items as $item)
+                            <div class="px-4 py-2.5 text-sm">
+                                <div class="flex items-start gap-2">
+                                    <span class="flex-1 font-medium text-[color:var(--nx-text)]">{{ $item['title'] ?? '' }}</span>
+                                    @if (! empty($item['link']))
+                                        <a href="{{ $item['link'] }}" target="_blank" rel="noopener noreferrer" class="shrink-0 text-[color:var(--nx-faint)] hover:text-[color:var(--nx-text)]" title="Öffnen">
+                                            @svg('heroicon-o-arrow-top-right-on-square', 'w-4 h-4')
+                                        </a>
+                                    @endif
+                                </div>
+                                @if (! empty($item['description']))
+                                    <p class="m-0 mt-0.5 text-[color:var(--nx-muted)]">{{ $item['description'] }}</p>
                                 @endif
                             </div>
                         @endforeach
                     </div>
-                </div>
+                </x-nx-panel>
             @endif
         </div>
     </x-ui-page-container>

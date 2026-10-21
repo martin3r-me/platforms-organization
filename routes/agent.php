@@ -9,6 +9,7 @@ use Platform\Organization\Http\Controllers\Api\AgentOkrController;
 use Platform\Organization\Http\Controllers\Api\AgentPortfolioController;
 use Platform\Organization\Http\Controllers\Api\AgentPulseController;
 use Platform\Organization\Http\Controllers\Api\AgentProfileController;
+use Platform\Organization\Http\Controllers\Api\AgentStrategyController;
 use Platform\Organization\Http\Controllers\Api\AgentTimeController;
 
 /**
@@ -45,6 +46,11 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::get('/messages', [AgentMessagingController::class, 'inbox'])->name('organization.api.agent.messages');
     // ROSTER: die Kollegen-Agenten (Adresse + Rolle) für gezielte laterale 1:1-DMs.
     Route::get('/roster', [AgentMessagingController::class, 'roster'])->name('organization.api.agent.roster');
+    // AUSRICHTUNG: Meilensteine in Sichtweite, eigene Objekte auf Meilensteine einzahlen lassen,
+    // eigene Objekte (z. B. das persönliche OKR) an der eigenen Entity verorten.
+    Route::get('/milestones', [AgentStrategyController::class, 'milestones'])->name('organization.api.agent.milestones');
+    Route::post('/contributions', [AgentStrategyController::class, 'contribute'])->name('organization.api.agent.contributions');
+    Route::post('/self-link', [AgentStrategyController::class, 'selfLink'])->name('organization.api.agent.self-link');
 });
 
 // COMMS-SINK: Parlan pusht Koordinations-Kennzahlen pro Handle in die Org (eigener Service-Token).

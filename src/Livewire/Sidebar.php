@@ -16,7 +16,7 @@ class Sidebar extends Component
     /**
      * Navigation der Organisation. Gruppen: Übersicht · Organisation · Zeit ·
      * Maschinenraum (org-intern) · Reporting (wandert ins reporting-Modul) ·
-     * Einstellungen. Abgesetzte Gruppen sind 'muted' und tragen eine 'note'.
+     * Einstellungen (ein Eintrag, Kategorien in der Einstellungs-Sidebar). Abgesetzte Gruppen sind 'muted' und tragen eine 'note'.
      *
      * Item: route, label, icon, match (Regex auf den Pfad fürs Aktiv-Highlight),
      * optional migrates (Ziel-Modul, als leiser Hinweis).
@@ -69,16 +69,13 @@ class Sidebar extends Component
                 'items' => [
                     ['route' => 'core.verbalization.factory', 'label' => 'Baukasten', 'icon' => 'wrench-screwdriver', 'match' => '/verbalization/factory'],
                     ['route' => 'organization.synthesis-reports.index', 'label' => 'Synthese-Berichte', 'icon' => 'document-text', 'match' => '^/organization/synthesis-reports'],
-                    ['route' => 'organization.settings.synthesis-prompts.index', 'label' => 'Synthese-Prompts', 'icon' => 'chat-bubble-left-right', 'match' => '^/organization/settings/synthesis-prompts'],
                 ],
             ],
             [
                 'label' => 'Einstellungen',
+                // Ein Eintrag — die Kategorien stehen in der zweiten Sidebar der Einstellungsseiten.
                 'items' => [
-                    ['route' => 'organization.settings.entity-types.index', 'label' => 'Einheitstypen', 'icon' => 'cube', 'match' => '^/organization/settings/entity-type'],
-                    ['route' => 'organization.settings.relation-types.index', 'label' => 'Beziehungstypen', 'icon' => 'link', 'match' => '^/organization/settings/relation-types'],
-                    ['route' => 'organization.settings.signal-definitions.index', 'label' => 'Signal-Definitionen', 'icon' => 'adjustments-horizontal', 'match' => '^/organization/settings/signal-definitions'],
-                    ['route' => 'organization.settings.inference-prompts.index', 'label' => 'Inference-Prompts', 'icon' => 'sparkles', 'match' => '^/organization/settings/inference-prompts'],
+                    ['route' => 'organization.settings.entity-types.index', 'label' => 'Einstellungen', 'icon' => 'cog-6-tooth', 'match' => '^/organization/settings'],
                 ],
             ],
         ];

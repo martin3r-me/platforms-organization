@@ -1,179 +1,107 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar :title="$relationType->name" icon="heroicon-o-link" />
+    </x-slot>
+
+    <x-slot name="sidebar">
+        <x-ui-page-sidebar title="Einstellungen" width="w-64" :defaultOpen="true" side="left">
+            @include('organization::livewire.settings.partials.nav', ['aktiv' => 'relation-types'])
+        </x-ui-page-sidebar>
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Settings'],
-            ['label' => 'Relation Types', 'href' => route('organization.settings.relation-types.index')],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Beziehungstypen', 'href' => route('organization.settings.relation-types.index')],
             ['label' => $relationType->name],
         ]">
-            @if($this->isDirty)
-                <x-ui-button variant="secondary-ghost" size="sm" wire:click="loadForm">
-                    @svg('heroicon-o-x-mark', 'w-4 h-4')
-                    <span>Abbrechen</span>
-                </x-ui-button>
-                <x-ui-button variant="primary" size="sm" wire:click="save">
-                    @svg('heroicon-o-check', 'w-4 h-4')
-                    <span>Speichern</span>
-                </x-ui-button>
-            @endif
-            <x-ui-confirm-button
-                variant="danger-outline"
-                size="sm"
-                wire:click="delete"
-                confirm-text="Relation Type wirklich löschen?"
-            >
-                @svg('heroicon-o-trash', 'w-4 h-4')
-            </x-ui-confirm-button>
+            <div class="flex items-center gap-2">
+                @if ($this->isDirty)
+                    <x-nx-button variant="primary" size="sm" wire:click="save">
+                        @svg('heroicon-o-check', 'w-4 h-4')
+                        <span>Speichern</span>
+                    </x-nx-button>
+                @endif
+                <x-nx-dropdown>
+                    @if ($this->isDirty)
+                        <x-nx-dropdown-item wire:click="loadForm">
+                            @svg('heroicon-o-arrow-uturn-left', 'w-4 h-4')
+                            Änderungen verwerfen
+                        </x-nx-dropdown-item>
+                        <x-nx-dropdown-divider />
+                    @endif
+                    <x-nx-dropdown-item variant="danger" wire:click="delete" wire:confirm="Beziehungstyp „{{ $relationType->name }}“ wirklich löschen?">
+                        @svg('heroicon-o-trash', 'w-4 h-4')
+                        Löschen
+                    </x-nx-dropdown-item>
+                </x-nx-dropdown>
+            </div>
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Informationen" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Status</h3>
-                    <div class="space-y-3">
-                        @if($relationType->is_active)
-                            <x-ui-badge variant="success" size="sm">Aktiv</x-ui-badge>
-                        @else
-                            <x-ui-badge variant="danger" size="sm">Inaktiv</x-ui-badge>
-                        @endif
-                    </div>
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Eigenschaften</h3>
-                    <div class="space-y-3">
-                        <div class="flex items-center gap-1 flex-wrap">
-                            @if($relationType->is_directional)
-                                <x-ui-badge variant="info" size="sm">Direktional</x-ui-badge>
-                            @endif
-                            @if($relationType->is_hierarchical)
-                                <x-ui-badge variant="warning" size="sm">Hierarchisch</x-ui-badge>
-                            @endif
-                            @if($relationType->is_reciprocal)
-                                <x-ui-badge variant="secondary" size="sm">Reziprok</x-ui-badge>
-                            @endif
-                        </div>
-                    </div>
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Berechtigung</h3>
-                    <div class="flex items-center gap-1 flex-wrap">
-                        @forelse($relationType->capabilities ?? [] as $cap)
-                            <x-ui-badge variant="primary" size="sm">{{ $cap }}</x-ui-badge>
-                        @empty
-                            <span class="text-xs text-[var(--ui-muted)]">Kein Zugriff (verleiht keine Rechte)</span>
-                        @endforelse
-                    </div>
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Details</h3>
-                    <div class="space-y-3">
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <span class="text-xs text-[var(--ui-muted)]">Code</span>
-                            <div class="text-sm font-medium text-[var(--ui-secondary)]">
-                                <code>{{ $relationType->code }}</code>
-                            </div>
-                        </div>
-                        @if($relationType->description)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Beschreibung</span>
-                                <div class="text-sm text-[var(--ui-secondary)]">{{ $relationType->description }}</div>
-                            </div>
-                        @endif
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <span class="text-xs text-[var(--ui-muted)]">Erstellt</span>
-                            <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $relationType->created_at->format('d.m.Y H:i') }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <div class="p-6 text-sm text-[var(--ui-muted)]">Keine Aktivitäten verfügbar</div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-ui-page-container>
-        <div class="space-y-6">
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Grunddaten</h2>
-                <div class="space-y-4">
-                    <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required />
-                    <x-ui-input-text name="code" label="Code" wire:model.live="form.code" required />
-                    <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" />
-                    <x-ui-input-text name="icon" label="Icon" wire:model.live="form.icon" placeholder="z.B. heroicon-o-arrow-right" />
-                    <x-ui-input-number name="sort_order" label="Sortierung" wire:model.live="form.sort_order" min="0" />
-                </div>
+    <x-ui-page-container width="contained">
+        <div class="space-y-5">
+            {{-- Kopf: Identität + Zustand --}}
+            <div class="flex flex-wrap items-center gap-2">
+                <h1 class="m-0 text-2xl font-semibold tracking-tight text-[color:var(--nx-text)]">{{ $relationType->name }}</h1>
+                <span class="font-mono text-xs text-[color:var(--nx-faint)]">{{ $relationType->code }}</span>
+                <x-nx-badge :variant="$relationType->is_active ? 'success' : 'neutral'" dot>{{ $relationType->is_active ? 'Aktiv' : 'Inaktiv' }}</x-nx-badge>
+                <span class="ml-auto text-xs text-[color:var(--nx-faint)]">angelegt {{ $relationType->created_at->format('d.m.Y') }}</span>
             </div>
 
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Eigenschaften</h2>
-                <div class="space-y-4">
-                    <div class="flex items-center">
-                        <input type="checkbox" wire:model.live="form.is_directional" id="is_directional" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                        <label for="is_directional" class="ml-2 text-sm text-[var(--ui-secondary)]">
-                            Direktional
-                            <span class="text-xs text-[var(--ui-muted)] block">Die Relation hat eine Richtung (von → nach)</span>
-                        </label>
+            <x-nx-panel title="Grunddaten">
+                <div class="space-y-3 p-4">
+                    <div class="grid grid-cols-2 gap-3">
+                        <x-nx-input-text name="name" label="Name" wire:model.live="form.name" errorKey="form.name" required />
+                        <x-nx-input-text name="code" label="Code" wire:model.live="form.code" errorKey="form.code" required />
                     </div>
-                    <div class="flex items-center">
-                        <input type="checkbox" wire:model.live="form.is_hierarchical" id="is_hierarchical" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                        <label for="is_hierarchical" class="ml-2 text-sm text-[var(--ui-secondary)]">
-                            Hierarchisch
-                            <span class="text-xs text-[var(--ui-muted)] block">Die Relation bildet eine Hierarchie (Über-/Unterordnung)</span>
-                        </label>
-                    </div>
-                    <div class="flex items-center">
-                        <input type="checkbox" wire:model.live="form.is_reciprocal" id="is_reciprocal" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                        <label for="is_reciprocal" class="ml-2 text-sm text-[var(--ui-secondary)]">
-                            Reziprok
-                            <span class="text-xs text-[var(--ui-muted)] block">Die Relation gilt in beide Richtungen gleichermaßen</span>
-                        </label>
-                    </div>
-                    <div class="flex items-center">
-                        <input type="checkbox" wire:model.live="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                        <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
+                    <x-nx-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" rows="3" />
+                    <div class="grid grid-cols-2 gap-3">
+                        <x-nx-input-text name="icon" label="Icon" wire:model.live="form.icon" placeholder="heroicon-o-arrow-right" />
+                        <x-nx-input-number name="sort_order" label="Sortierung" wire:model.live="form.sort_order" min="0" />
                     </div>
                 </div>
-            </div>
+            </x-nx-panel>
 
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-1">Berechtigungen (Autorisierung)</h2>
-                <p class="text-xs text-[var(--ui-muted)] mb-4">
-                    Ist eine <strong>Person</strong> über diese Relation mit einer Entity verbunden, erhält sie die gewählte Content-Capability auf diese Entity und ihren gesamten Teilbaum. Ohne Auswahl verleiht die Relation keinen Zugriff. Nur <em>Person&nbsp;→&nbsp;Entity</em>-Relationen wirken; rein strukturelle Entity↔Entity-Relationen bleiben ohne Effekt. Die höchste gewählte Stufe gewinnt (manage&nbsp;&gt;&nbsp;write&nbsp;&gt;&nbsp;read).
-                </p>
-                <div class="space-y-3">
-                    <div class="flex items-center">
-                        <input type="checkbox" wire:model.live="form.capabilities" value="read" id="cap_read" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                        <label for="cap_read" class="ml-2 text-sm text-[var(--ui-secondary)]">
-                            Lesen <code class="text-xs">read</code>
-                            <span class="text-xs text-[var(--ui-muted)] block">Objekte im Teilbaum sehen</span>
-                        </label>
+            <x-nx-panel title="Eigenschaften">
+                <div class="space-y-2.5 p-4">
+                    <x-nx-input-checkbox wire:model.live="form.is_directional">
+                        <span>Gerichtet <span class="text-xs text-[color:var(--nx-muted)]">— die Beziehung hat eine Richtung (von → nach)</span></span>
+                    </x-nx-input-checkbox>
+                    <x-nx-input-checkbox wire:model.live="form.is_hierarchical">
+                        <span>Hierarchisch <span class="text-xs text-[color:var(--nx-muted)]">— bildet Über-/Unterordnung</span></span>
+                    </x-nx-input-checkbox>
+                    <x-nx-input-checkbox wire:model.live="form.is_reciprocal">
+                        <span>Wechselseitig <span class="text-xs text-[color:var(--nx-muted)]">— gilt in beide Richtungen gleichermaßen</span></span>
+                    </x-nx-input-checkbox>
+                    <div class="border-t border-[color:var(--nx-line)] pt-2.5">
+                        <x-nx-input-checkbox label="Aktiv" wire:model.live="form.is_active" />
                     </div>
-                    <div class="flex items-center">
-                        <input type="checkbox" wire:model.live="form.capabilities" value="write" id="cap_write" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                        <label for="cap_write" class="ml-2 text-sm text-[var(--ui-secondary)]">
-                            Bearbeiten <code class="text-xs">write</code>
-                            <span class="text-xs text-[var(--ui-muted)] block">Objekte im Teilbaum sehen und ändern</span>
+                </div>
+            </x-nx-panel>
+
+            <x-nx-panel title="Berechtigungen" subtitle="Was eine Person über diese Beziehung auf die Einheit und ihren Teilbaum erhält">
+                <div class="space-y-3 p-4">
+                    <x-nx-callout variant="neutral" icon="heroicon-o-information-circle">
+                        Wirkt nur bei <strong>Person → Einheit</strong>. Rein strukturelle Beziehungen zwischen Einheiten verleihen nichts.
+                        Ohne Auswahl entsteht kein Zugriff; die höchste Stufe gewinnt (Verwalten &gt; Bearbeiten &gt; Lesen).
+                    </x-nx-callout>
+                    <div class="space-y-2.5">
+                        <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-[color:var(--nx-text)]">
+                            <input type="checkbox" value="read" wire:model.live="form.capabilities" class="h-4 w-4 rounded-[4px] accent-[var(--nx-accent)]" />
+                            <span>Lesen <code class="text-xs text-[color:var(--nx-faint)]">read</code> <span class="text-xs text-[color:var(--nx-muted)]">— Objekte im Teilbaum sehen</span></span>
                         </label>
-                    </div>
-                    <div class="flex items-center">
-                        <input type="checkbox" wire:model.live="form.capabilities" value="manage" id="cap_manage" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                        <label for="cap_manage" class="ml-2 text-sm text-[var(--ui-secondary)]">
-                            Verwalten <code class="text-xs">manage</code>
-                            <span class="text-xs text-[var(--ui-muted)] block">Voller Zugriff inkl. Verwalten/Löschen</span>
+                        <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-[color:var(--nx-text)]">
+                            <input type="checkbox" value="write" wire:model.live="form.capabilities" class="h-4 w-4 rounded-[4px] accent-[var(--nx-accent)]" />
+                            <span>Bearbeiten <code class="text-xs text-[color:var(--nx-faint)]">write</code> <span class="text-xs text-[color:var(--nx-muted)]">— sehen und ändern</span></span>
+                        </label>
+                        <label class="inline-flex cursor-pointer items-center gap-2 text-sm text-[color:var(--nx-text)]">
+                            <input type="checkbox" value="manage" wire:model.live="form.capabilities" class="h-4 w-4 rounded-[4px] accent-[var(--nx-accent)]" />
+                            <span>Verwalten <code class="text-xs text-[color:var(--nx-faint)]">manage</code> <span class="text-xs text-[color:var(--nx-muted)]">— voller Zugriff inkl. Löschen</span></span>
                         </label>
                     </div>
                 </div>
-            </div>
+            </x-nx-panel>
         </div>
     </x-ui-page-container>
 </x-ui-page>

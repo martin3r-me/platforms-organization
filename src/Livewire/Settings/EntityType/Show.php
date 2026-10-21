@@ -30,6 +30,7 @@ class Show extends Component
             'sort_order' => $this->entityType->sort_order,
             'is_active' => $this->entityType->is_active,
             'entity_type_group_id' => $this->entityType->entity_type_group_id,
+            'vsm_class' => $this->entityType->vsm_class,
         ];
     }
 
@@ -42,7 +43,8 @@ class Show extends Component
                $this->form['icon'] !== $this->entityType->icon ||
                $this->form['sort_order'] != $this->entityType->sort_order ||
                $this->form['is_active'] !== $this->entityType->is_active ||
-               $this->form['entity_type_group_id'] != $this->entityType->entity_type_group_id;
+               $this->form['entity_type_group_id'] != $this->entityType->entity_type_group_id ||
+               ($this->form['vsm_class'] ?: null) !== $this->entityType->vsm_class;
     }
 
     public function save()
@@ -55,10 +57,16 @@ class Show extends Component
             'form.sort_order' => 'integer|min:0',
             'form.is_active' => 'boolean',
             'form.entity_type_group_id' => 'nullable|exists:organization_entity_type_groups,id',
+            'form.vsm_class' => 'nullable|in:' . implode(',', OrganizationEntityType::VSM_CLASSES),
         ]);
 
         try {
-            $this->entityType->update($this->form);
+            // can_be_perspective leitet das Model beim Speichern aus vsm_class ab
+            $this->entityType->update([
+                ...$this->form,
+                'entity_type_group_id' => $this->form['entity_type_group_id'] ?: null,
+                'vsm_class' => $this->form['vsm_class'] ?: null,
+            ]);
             $this->loadForm();
             $this->dispatch('toast', message: 'Entity Type gespeichert');
         } catch (\Exception $e) {

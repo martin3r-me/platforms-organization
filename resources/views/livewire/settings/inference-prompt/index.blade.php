@@ -1,109 +1,95 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar title="Inference-Prompts" icon="heroicon-o-sparkles" />
+    </x-slot>
+
+    <x-slot name="sidebar">
+        <x-ui-page-sidebar title="Einstellungen" width="w-64" :defaultOpen="true" side="left">
+            @include('organization::livewire.settings.partials.nav', ['aktiv' => 'inference-prompts'])
+        </x-ui-page-sidebar>
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Settings'],
-            ['label' => 'Inference Prompts'],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Inference-Prompts'],
         ]">
+            <x-slot name="left">
+                <div class="flex items-center gap-3">
+                    <div class="w-56">
+                        <x-nx-input-text name="search" size="sm" placeholder="Suchen…" wire:model.live.debounce.300ms="search" />
+                    </div>
+                    <div class="w-48">
+                        <x-nx-input-select
+                            name="vsmSystemFilter"
+                            size="sm"
+                            wire:model.live="vsmSystemFilter"
+                            :options="\Platform\Organization\Livewire\Settings\InferencePrompt\Show::VSM_OPTIONS"
+                            nullable
+                            nullLabel="Alle Systeme"
+                        />
+                    </div>
+                    <x-nx-input-checkbox label="Inaktive" wire:model.live="showInactive" />
+                </div>
+            </x-slot>
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Filter" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Suche</h3>
-                    <x-ui-input-text name="search" wire:model.live="search" placeholder="Suche Inference Prompts..." class="w-full" size="sm" />
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>
-                    <div class="space-y-3">
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">VSM-System</label>
-                            <select wire:model.live="vsmSystemFilter" class="w-full rounded-md border-gray-300 shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50 text-sm">
-                                <option value="">Alle Systeme</option>
-                                <option value="S1">S1 - Operations</option>
-                                <option value="S2">S2 - Coordination</option>
-                                <option value="S3">S3 - Control</option>
-                                <option value="S3*">S3* - Audit</option>
-                                <option value="S4">S4 - Intelligence</option>
-                                <option value="S5">S5 - Policy</option>
-                            </select>
-                        </div>
-                        <div class="flex items-center">
-                            <input type="checkbox" wire:model.live="showInactive" id="showInactive" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                            <label for="showInactive" class="ml-2 text-sm text-[var(--ui-secondary)]">Inaktive anzeigen</label>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <div class="p-6 text-sm text-[var(--ui-muted)]">Keine Aktivitäten verfügbar</div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-ui-page-container>
-        <x-ui-table compact="true">
-            <x-ui-table-header>
-                <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">VSM-System</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Dimension</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Severity</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Scope</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Letzte Auswertung</x-ui-table-header-cell>
-            </x-ui-table-header>
-
-            <x-ui-table-body>
-                @forelse($this->inferencePrompts as $prompt)
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true">
-                            <a href="{{ route('organization.settings.inference-prompts.show', $prompt) }}" class="font-medium text-[var(--ui-secondary)] hover:text-[var(--ui-primary)] hover:underline">{{ $prompt->name }}</a>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="info">{{ $prompt->vsm_system ?? '–' }}</x-ui-badge>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <span class="text-sm text-[var(--ui-secondary)]">{{ $prompt->dimension ?? '–' }}</span>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="{{ match($prompt->default_severity) { 'critical' => 'danger', 'warning' => 'warning', default => 'info' } }}">
-                                {{ ucfirst($prompt->default_severity ?? 'info') }}
-                            </x-ui-badge>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <span class="text-sm text-[var(--ui-secondary)]">{{ $prompt->scope_type ?? 'all' }}</span>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="{{ $prompt->is_active ? 'success' : 'muted' }}">
-                                {{ $prompt->is_active ? 'Aktiv' : 'Inaktiv' }}
-                            </x-ui-badge>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <span class="text-sm text-[var(--ui-muted)]">
-                                {{ $prompt->last_evaluated_at ? $prompt->last_evaluated_at->format('d.m.Y H:i') : '–' }}
-                            </span>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @empty
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="7">
-                            <div class="text-center py-8">
-                                @svg('heroicon-o-cpu-chip', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
-                                <p class="text-sm text-[var(--ui-muted)]">Keine Inference Prompts gefunden.</p>
-                            </div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @endforelse
-            </x-ui-table-body>
-        </x-ui-table>
+    <x-ui-page-container width="contained">
+        <x-nx-card flush>
+            @if ($this->inferencePrompts->isEmpty())
+                <x-nx-empty icon="heroicon-o-sparkles">
+                    Keine Inference-Prompts gefunden.
+                </x-nx-empty>
+            @else
+                <x-nx-table>
+                    <x-nx-table-header>
+                        <x-nx-table-header-cell>Name</x-nx-table-header-cell>
+                        <x-nx-table-header-cell>VSM-System</x-nx-table-header-cell>
+                        <x-nx-table-header-cell>Dimension</x-nx-table-header-cell>
+                        <x-nx-table-header-cell>Severity</x-nx-table-header-cell>
+                        <x-nx-table-header-cell>Scope</x-nx-table-header-cell>
+                        <x-nx-table-header-cell>Letzte Auswertung</x-nx-table-header-cell>
+                        <x-nx-table-header-cell align="right">Status</x-nx-table-header-cell>
+                    </x-nx-table-header>
+                    <x-nx-table-body>
+                        @foreach ($this->inferencePrompts as $prompt)
+                            <x-nx-table-row wire:key="ip-{{ $prompt->id }}" clickable :href="route('organization.settings.inference-prompts.show', $prompt)">
+                                <x-nx-table-cell>
+                                    <div class="font-medium text-[color:var(--nx-text)]">{{ $prompt->name }}</div>
+                                    @if ($prompt->description)
+                                        <div class="text-xs text-[color:var(--nx-faint)]">{{ \Illuminate\Support\Str::limit($prompt->description, 80) }}</div>
+                                    @endif
+                                </x-nx-table-cell>
+                                <x-nx-table-cell>
+                                    <x-nx-badge>{{ \Platform\Organization\Livewire\Settings\InferencePrompt\Show::VSM_OPTIONS[$prompt->vsm_system] ?? ($prompt->vsm_system ?? '–') }}</x-nx-badge>
+                                </x-nx-table-cell>
+                                <x-nx-table-cell>
+                                    <span class="text-sm text-[color:var(--nx-muted)]">{{ $prompt->dimension ?? '–' }}</span>
+                                </x-nx-table-cell>
+                                <x-nx-table-cell>
+                                    <x-nx-badge :variant="match ($prompt->default_severity) { 'critical' => 'danger', 'warning' => 'warning', default => 'info' }">
+                                        {{ ucfirst($prompt->default_severity ?? 'info') }}
+                                    </x-nx-badge>
+                                </x-nx-table-cell>
+                                <x-nx-table-cell>
+                                    <span class="text-sm text-[color:var(--nx-muted)]">{{ \Platform\Organization\Livewire\Settings\InferencePrompt\Show::SCOPE_OPTIONS[$prompt->scope_type ?? 'all'] ?? $prompt->scope_type }}</span>
+                                </x-nx-table-cell>
+                                <x-nx-table-cell>
+                                    <span class="text-sm tabular-nums text-[color:var(--nx-muted)]">
+                                        {{ $prompt->last_evaluated_at ? $prompt->last_evaluated_at->format('d.m.Y H:i') : '–' }}
+                                    </span>
+                                </x-nx-table-cell>
+                                <x-nx-table-cell align="right">
+                                    <x-nx-badge :variant="$prompt->is_active ? 'success' : 'neutral'" dot>
+                                        {{ $prompt->is_active ? 'Aktiv' : 'Inaktiv' }}
+                                    </x-nx-badge>
+                                </x-nx-table-cell>
+                            </x-nx-table-row>
+                        @endforeach
+                    </x-nx-table-body>
+                </x-nx-table>
+            @endif
+        </x-nx-card>
     </x-ui-page-container>
 </x-ui-page>

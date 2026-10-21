@@ -92,7 +92,10 @@ class Show extends Component
                $this->form['scope_type'] !== $this->signalDefinition->scope_type ||
                $this->form['frequency'] !== $this->signalDefinition->frequency ||
                $this->form['severity'] !== $this->signalDefinition->severity ||
-               $this->form['is_active'] !== $this->signalDefinition->is_active;
+               $this->form['is_active'] !== $this->signalDefinition->is_active ||
+               // Bedingung und Geltungsbereich so bauen wie save() — loser Vergleich, "5" == 5.0
+               $this->buildConditions() != ($this->signalDefinition->conditions ?? []) ||
+               $this->parseScopeValue() != $this->signalDefinition->scope_value;
     }
 
     #[Computed]

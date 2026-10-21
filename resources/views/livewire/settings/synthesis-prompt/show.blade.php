@@ -1,122 +1,102 @@
+@php
+    $reportTypeOptions = [
+        'weekly' => 'Wöchentlich',
+        'monthly' => 'Monatlich',
+        'quarterly' => 'Quartalsweise',
+    ];
+@endphp
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar :title="$definition->name" icon="heroicon-o-chat-bubble-left-right" />
+    </x-slot>
+
+    <x-slot name="sidebar">
+        <x-ui-page-sidebar title="Einstellungen" width="w-64" :defaultOpen="true" side="left">
+            @include('organization::livewire.settings.partials.nav', ['aktiv' => 'synthesis-prompts'])
+        </x-ui-page-sidebar>
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Einstellungen'],
-            ['label' => 'Synthesis-Prompts', 'href' => route('organization.settings.synthesis-prompts.index')],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Synthese-Prompts', 'href' => route('organization.settings.synthesis-prompts.index')],
             ['label' => $definition->name],
         ]">
-            <x-ui-button variant="primary" size="sm" wire:click="save">
-                @svg('heroicon-o-check', 'w-4 h-4')
-                <span>Speichern</span>
-            </x-ui-button>
+            <div class="flex items-center gap-2">
+                <x-nx-button variant="primary" size="sm" wire:click="save">
+                    @svg('heroicon-o-check', 'w-4 h-4')
+                    <span>Speichern</span>
+                </x-nx-button>
+            </div>
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-ui-page-container>
-        <div class="max-w-4xl mx-auto space-y-6">
-            @if($savedMessage)
-                <div class="p-3 rounded-md bg-green-50 border border-green-200 text-sm text-green-800 inline-flex items-center gap-2">
-                    @svg('heroicon-o-check-circle', 'w-4 h-4')
-                    {{ $savedMessage }}
-                </div>
+    <x-ui-page-container width="contained">
+        <div class="space-y-5">
+            {{-- Kopf: Identität + Zustand --}}
+            <div class="flex flex-wrap items-center gap-2">
+                <h1 class="m-0 text-2xl font-semibold tracking-tight text-[color:var(--nx-text)]">{{ $definition->name }}</h1>
+                <x-nx-badge>{{ $reportTypeOptions[$definition->report_type] ?? $definition->report_type }}</x-nx-badge>
+                <x-nx-badge :variant="$definition->is_active ? 'success' : 'neutral'" dot>{{ $definition->is_active ? 'Aktiv' : 'Inaktiv' }}</x-nx-badge>
+                <span class="ml-auto text-xs text-[color:var(--nx-faint)]">angelegt {{ $definition->created_at?->format('d.m.Y') }}</span>
+            </div>
+
+            @if ($savedMessage)
+                <x-nx-callout variant="success" icon="heroicon-o-check-circle">{{ $savedMessage }}</x-nx-callout>
             @endif
 
-            {{-- Metadata --}}
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Metadaten</h2>
-
-                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Name</label>
-                        <input wire:model="name" type="text" class="w-full rounded-md border-gray-300 shadow-sm text-sm">
-                        @error('name') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
-                    </div>
-
-                    <div class="md:col-span-2">
-                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Beschreibung (optional)</label>
-                        <input wire:model="description" type="text" class="w-full rounded-md border-gray-300 shadow-sm text-sm" placeholder="Kurze Notiz wofür dieser Prompt verwendet wird">
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Report-Typ</label>
-                        <select wire:model="report_type" class="w-full rounded-md border-gray-300 shadow-sm text-sm">
-                            <option value="weekly">Wöchentlich</option>
-                            <option value="monthly">Monatlich</option>
-                            <option value="quarterly">Quartalsweise</option>
-                        </select>
-                    </div>
-
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Status</label>
-                        <label class="flex items-center gap-2 mt-2 text-sm text-[var(--ui-secondary)]">
-                            <input wire:model="is_active" type="checkbox" class="rounded border-gray-300 text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]">
-                            Prompt ist aktiv
-                        </label>
+            <x-nx-panel title="Grunddaten">
+                <div class="space-y-3 p-4">
+                    <x-nx-input-text name="name" label="Name" wire:model="name" errorKey="name" required />
+                    <x-nx-input-text name="description" label="Beschreibung" wire:model="description" errorKey="description" placeholder="Kurze Notiz, wofür dieser Prompt verwendet wird (optional)" />
+                    <div class="grid grid-cols-1 gap-3 md:grid-cols-2">
+                        <x-nx-input-select name="report_type" label="Report-Typ" wire:model="report_type" errorKey="report_type" :options="$reportTypeOptions" required />
+                        <div class="flex items-end pb-2">
+                            <x-nx-input-checkbox label="Prompt ist aktiv" wire:model="is_active" />
+                        </div>
                     </div>
                 </div>
-            </div>
+            </x-nx-panel>
 
-            {{-- LLM Settings --}}
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">LLM-Einstellungen</h2>
-
-                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Model (leer = Default)</label>
-                        <input wire:model="model" type="text" class="w-full rounded-md border-gray-300 shadow-sm text-sm font-mono" placeholder="claude-sonnet-4-6">
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Max. Signale</label>
-                        <input wire:model="max_signals" type="number" min="1" max="1000" class="w-full rounded-md border-gray-300 shadow-sm text-sm">
-                        @error('max_signals') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
-                    </div>
-                    <div>
-                        <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Max. Tokens</label>
-                        <input wire:model="max_tokens" type="number" min="512" max="32768" step="512" class="w-full rounded-md border-gray-300 shadow-sm text-sm">
-                        @error('max_tokens') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
-                    </div>
+            <x-nx-panel title="LLM-Einstellungen">
+                <div class="grid grid-cols-1 gap-3 p-4 md:grid-cols-3">
+                    <x-nx-input-text name="model" label="Model" hint="leer = Default" wire:model="model" errorKey="model" class="font-mono" placeholder="claude-sonnet-4-6" />
+                    <x-nx-input-number name="max_signals" label="Max. Signale" wire:model="max_signals" errorKey="max_signals" min="1" max="1000" required />
+                    <x-nx-input-number name="max_tokens" label="Max. Tokens" wire:model="max_tokens" errorKey="max_tokens" min="512" max="32768" step="512" required />
                 </div>
-            </div>
+            </x-nx-panel>
 
-            {{-- System Prompt --}}
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">System-Prompt</h2>
-                    <button wire:click="resetToDefault('system_prompt')" type="button" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-primary)] inline-flex items-center gap-1">
+            <x-nx-panel title="System-Prompt" subtitle="Definiert Rolle und Aufgabe des LLM (z. B. „Du bist ein strategischer Analyst…“). Markdown im Output.">
+                <x-slot name="actions">
+                    <x-nx-button variant="ghost" size="sm" type="button" wire:click="resetToDefault('system_prompt')">
                         @svg('heroicon-o-arrow-uturn-left', 'w-3.5 h-3.5')
-                        Auf Default zurücksetzen
-                    </button>
+                        <span>Auf Default zurücksetzen</span>
+                    </x-nx-button>
+                </x-slot>
+                <div class="p-4">
+                    <x-nx-input-textarea name="system_prompt" wire:model="system_prompt" errorKey="system_prompt" rows="16" class="font-mono" />
                 </div>
-                <p class="text-xs text-[var(--ui-muted)] mb-2">Definiert die Rolle und Aufgabe des LLM (z.B. „Du bist ein strategischer Analyst…"). Markdown im Output.</p>
-                <textarea wire:model="system_prompt" rows="8" class="w-full rounded-md border-gray-300 shadow-sm text-sm font-mono"></textarea>
-                @error('system_prompt') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
-            </div>
+            </x-nx-panel>
 
-            {{-- User Message Template --}}
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <div class="flex items-center justify-between mb-4">
-                    <h2 class="text-lg font-semibold text-[var(--ui-secondary)]">User-Message-Template</h2>
-                    <button wire:click="resetToDefault('user_message_template')" type="button" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-primary)] inline-flex items-center gap-1">
+            <x-nx-panel title="User-Message-Template" subtitle="Die Nachricht an das LLM">
+                <x-slot name="actions">
+                    <x-nx-button variant="ghost" size="sm" type="button" wire:click="resetToDefault('user_message_template')">
                         @svg('heroicon-o-arrow-uturn-left', 'w-3.5 h-3.5')
-                        Auf Default zurücksetzen
-                    </button>
+                        <span>Auf Default zurücksetzen</span>
+                    </x-nx-button>
+                </x-slot>
+                <div class="space-y-3 p-4">
+                    <x-nx-callout variant="neutral" icon="heroicon-o-information-circle">
+                        Verfügbare Platzhalter:
+                        <code class="font-mono text-xs">{report_type}</code>
+                        <code class="font-mono text-xs">{period_start}</code>
+                        <code class="font-mono text-xs">{period_end}</code>
+                        <code class="font-mono text-xs">{signals_count}</code>
+                        <code class="font-mono text-xs">{signals_json}</code>
+                    </x-nx-callout>
+                    <x-nx-input-textarea name="user_message_template" wire:model="user_message_template" errorKey="user_message_template" rows="16" class="font-mono" />
                 </div>
-                <p class="text-xs text-[var(--ui-muted)] mb-2">
-                    Die Nachricht an das LLM. Verfügbare Platzhalter:
-                    <code class="px-1 bg-[var(--ui-muted-5)] rounded">{report_type}</code>
-                    <code class="px-1 bg-[var(--ui-muted-5)] rounded">{period_start}</code>
-                    <code class="px-1 bg-[var(--ui-muted-5)] rounded">{period_end}</code>
-                    <code class="px-1 bg-[var(--ui-muted-5)] rounded">{signals_count}</code>
-                    <code class="px-1 bg-[var(--ui-muted-5)] rounded">{signals_json}</code>
-                </p>
-                <textarea wire:model="user_message_template" rows="8" class="w-full rounded-md border-gray-300 shadow-sm text-sm font-mono"></textarea>
-                @error('user_message_template') <p class="text-xs text-red-600 mt-1">{{ $message }}</p> @enderror
-            </div>
+            </x-nx-panel>
         </div>
     </x-ui-page-container>
 </x-ui-page>

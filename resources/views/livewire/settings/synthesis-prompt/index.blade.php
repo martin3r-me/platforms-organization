@@ -1,127 +1,120 @@
+@php
+    $reportTypeOptions = [
+        'weekly' => 'Wöchentlich',
+        'monthly' => 'Monatlich',
+        'quarterly' => 'Quartalsweise',
+    ];
+@endphp
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar title="Synthese-Prompts" icon="heroicon-o-chat-bubble-left-right" />
+    </x-slot>
+
+    <x-slot name="sidebar">
+        <x-ui-page-sidebar title="Einstellungen" width="w-64" :defaultOpen="true" side="left">
+            @include('organization::livewire.settings.partials.nav', ['aktiv' => 'synthesis-prompts'])
+        </x-ui-page-sidebar>
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Einstellungen'],
-            ['label' => 'Synthesis-Prompts'],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Synthese-Prompts'],
         ]">
-            <x-ui-button variant="primary" size="sm" wire:click="createNew">
+            <x-slot name="left">
+                <div class="flex items-center gap-3">
+                    <div class="w-56">
+                        <x-nx-input-text name="search" size="sm" placeholder="Suchen…" wire:model.live.debounce.300ms="search" />
+                    </div>
+                    <div class="w-44">
+                        <x-nx-input-select
+                            name="reportTypeFilter"
+                            size="sm"
+                            wire:model.live="reportTypeFilter"
+                            :options="$reportTypeOptions"
+                            nullable
+                            nullLabel="Alle Report-Typen"
+                        />
+                    </div>
+                    <x-nx-input-checkbox label="Inaktive" wire:model.live="showInactive" />
+                </div>
+            </x-slot>
+            <x-nx-button variant="primary" size="sm" wire:click="createNew">
                 @svg('heroicon-o-plus', 'w-4 h-4')
-                <span>Neuer Prompt</span>
-            </x-ui-button>
+                <span>Neuer Synthese-Prompt</span>
+            </x-nx-button>
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Filter" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Suche</h3>
-                    <x-ui-input-text name="search" wire:model.live="search" placeholder="Suche..." class="w-full" size="sm" />
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Filter</h3>
-                    <div class="space-y-3">
-                        <label class="flex items-center gap-2 text-sm text-[var(--ui-secondary)] cursor-pointer">
-                            <input type="checkbox" wire:model.live="showInactive" class="rounded border-gray-300 text-[var(--ui-primary)] focus:ring-[var(--ui-primary)]">
-                            Inaktive anzeigen
-                        </label>
-                        <div>
-                            <label class="block text-sm font-medium text-[var(--ui-secondary)] mb-1">Report-Typ</label>
-                            <select wire:model.live="reportTypeFilter" class="w-full rounded-md border-gray-300 shadow-sm text-sm">
-                                <option value="">Alle</option>
-                                <option value="weekly">Wöchentlich</option>
-                                <option value="monthly">Monatlich</option>
-                                <option value="quarterly">Quartalsweise</option>
-                            </select>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </x-ui-page-sidebar>
-    </x-slot>
+    <x-ui-page-container width="contained">
+        <div class="space-y-5">
+            <x-nx-callout variant="neutral" icon="heroicon-o-information-circle">
+                Synthese-Prompts steuern, wie Wochen-/Monats-Berichte erzeugt werden. Pro Report-Typ wird der erste aktive Prompt verwendet.
+                Ohne aktiven Prompt nutzt das System einen fest hinterlegten Default.
+            </x-nx-callout>
 
-    <x-ui-page-container>
-        <div class="mb-4 p-4 rounded-lg border border-blue-200 bg-blue-50/40 text-sm text-[var(--ui-secondary)]">
-            @svg('heroicon-o-information-circle', 'w-4 h-4 inline-block -mt-0.5 mr-1 text-blue-600')
-            Synthesis-Prompts steuern wie Wochen-/Monats-Berichte erzeugt werden. Pro Report-Typ wird der erste aktive Prompt verwendet. Ohne aktiven Prompt nutzt das System einen hardcoded Default.
+            <x-nx-card flush>
+                @if ($this->definitions->isEmpty())
+                    <x-nx-empty icon="heroicon-o-chat-bubble-left-right">
+                        Noch keine Synthese-Prompts angelegt. Das System nutzt aktuell den fest hinterlegten Default-Prompt.
+                        <x-slot name="action">
+                            <x-nx-button size="sm" wire:click="createNew">Synthese-Prompt anlegen</x-nx-button>
+                        </x-slot>
+                    </x-nx-empty>
+                @else
+                    <x-nx-table>
+                        <x-nx-table-header>
+                            <x-nx-table-header-cell>Name</x-nx-table-header-cell>
+                            <x-nx-table-header-cell>Report-Typ</x-nx-table-header-cell>
+                            <x-nx-table-header-cell>Model</x-nx-table-header-cell>
+                            <x-nx-table-header-cell align="right">Max. Signale</x-nx-table-header-cell>
+                            <x-nx-table-header-cell align="right">Status</x-nx-table-header-cell>
+                            <x-nx-table-header-cell align="right"><span class="sr-only">Aktionen</span></x-nx-table-header-cell>
+                        </x-nx-table-header>
+                        <x-nx-table-body>
+                            @foreach ($this->definitions as $def)
+                                <x-nx-table-row wire:key="sp-{{ $def->id }}" clickable :href="route('organization.settings.synthesis-prompts.show', $def)">
+                                    <x-nx-table-cell>
+                                        <div class="font-medium text-[color:var(--nx-text)]">{{ $def->name }}</div>
+                                        @if ($def->description)
+                                            <div class="text-xs text-[color:var(--nx-faint)]">{{ \Illuminate\Support\Str::limit($def->description, 80) }}</div>
+                                        @endif
+                                    </x-nx-table-cell>
+                                    <x-nx-table-cell>
+                                        <x-nx-badge>{{ $reportTypeOptions[$def->report_type] ?? $def->report_type }}</x-nx-badge>
+                                    </x-nx-table-cell>
+                                    <x-nx-table-cell>
+                                        <span class="font-mono text-xs text-[color:var(--nx-muted)]">{{ $def->model ?: 'default' }}</span>
+                                    </x-nx-table-cell>
+                                    <x-nx-table-cell align="right">
+                                        <span class="text-sm tabular-nums text-[color:var(--nx-text)]">{{ $def->max_signals }}</span>
+                                    </x-nx-table-cell>
+                                    <x-nx-table-cell align="right">
+                                        <button type="button" wire:click="toggleActive({{ $def->id }})" onclick="event.stopPropagation()" class="inline-flex" title="Status umschalten">
+                                            <x-nx-badge :variant="$def->is_active ? 'success' : 'neutral'" dot>
+                                                {{ $def->is_active ? 'Aktiv' : 'Inaktiv' }}
+                                            </x-nx-badge>
+                                        </button>
+                                    </x-nx-table-cell>
+                                    <x-nx-table-cell align="right">
+                                        <x-nx-button
+                                            variant="ghost"
+                                            size="sm"
+                                            icon
+                                            title="Löschen"
+                                            onclick="event.stopPropagation()"
+                                            wire:click="delete({{ $def->id }})"
+                                            wire:confirm="Diesen Synthese-Prompt wirklich löschen?"
+                                        >
+                                            @svg('heroicon-o-trash', 'w-4 h-4 text-[color:var(--nx-danger)]')
+                                        </x-nx-button>
+                                    </x-nx-table-cell>
+                                </x-nx-table-row>
+                            @endforeach
+                        </x-nx-table-body>
+                    </x-nx-table>
+                @endif
+            </x-nx-card>
         </div>
-
-        <x-ui-table compact="true">
-            <x-ui-table-header>
-                <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Report-Typ</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Model</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true" class="text-center">Max. Signale</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
-                <x-ui-table-header-cell compact="true" class="text-right">Aktionen</x-ui-table-header-cell>
-            </x-ui-table-header>
-
-            <x-ui-table-body>
-                @forelse($this->definitions as $def)
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true">
-                            <a href="{{ route('organization.settings.synthesis-prompts.show', $def) }}" class="link font-medium">
-                                {{ $def->name }}
-                            </a>
-                            @if($def->description)
-                                <p class="text-xs text-[var(--ui-muted)]">{{ \Illuminate\Support\Str::limit($def->description, 80) }}</p>
-                            @endif
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <x-ui-badge variant="info">
-                                @switch($def->report_type)
-                                    @case('weekly') Wöchentlich @break
-                                    @case('monthly') Monatlich @break
-                                    @case('quarterly') Quartalsweise @break
-                                @endswitch
-                            </x-ui-badge>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <span class="text-xs text-[var(--ui-muted)] font-mono">{{ $def->model ?: 'default' }}</span>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true" class="text-center tabular-nums">
-                            <span class="text-sm text-[var(--ui-secondary)]">{{ $def->max_signals }}</span>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true">
-                            <button wire:click="toggleActive({{ $def->id }})" type="button" class="inline-flex">
-                                <x-ui-badge :variant="$def->is_active ? 'success' : 'muted'">
-                                    {{ $def->is_active ? 'Aktiv' : 'Inaktiv' }}
-                                </x-ui-badge>
-                            </button>
-                        </x-ui-table-cell>
-                        <x-ui-table-cell compact="true" class="text-right">
-                            <a href="{{ route('organization.settings.synthesis-prompts.show', $def) }}" class="text-xs text-[var(--ui-muted)] hover:text-[var(--ui-primary)] inline-flex items-center gap-1 mr-3">
-                                @svg('heroicon-o-pencil-square', 'w-3.5 h-3.5')
-                                Bearbeiten
-                            </a>
-                            <button
-                                wire:click="delete({{ $def->id }})"
-                                wire:confirm="Diesen Synthesis-Prompt wirklich löschen?"
-                                type="button"
-                                class="text-xs text-[var(--ui-muted)] hover:text-red-600 inline-flex items-center gap-1"
-                            >
-                                @svg('heroicon-o-trash', 'w-3.5 h-3.5')
-                                Löschen
-                            </button>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @empty
-                    <x-ui-table-row compact="true">
-                        <x-ui-table-cell compact="true" colspan="6">
-                            <div class="text-center py-8">
-                                @svg('heroicon-o-document-text', 'w-8 h-8 text-[var(--ui-muted)] mx-auto mb-2')
-                                <p class="text-sm text-[var(--ui-muted)] mb-2">Noch keine Synthesis-Prompts angelegt.</p>
-                                <p class="text-xs text-[var(--ui-muted)]">System nutzt aktuell den hardcoded Default-Prompt.</p>
-                            </div>
-                        </x-ui-table-cell>
-                    </x-ui-table-row>
-                @endforelse
-            </x-ui-table-body>
-        </x-ui-table>
     </x-ui-page-container>
 </x-ui-page>

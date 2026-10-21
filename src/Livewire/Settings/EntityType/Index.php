@@ -23,6 +23,7 @@ class Index extends Component
         'sort_order' => 0,
         'is_active' => true,
         'entity_type_group_id' => null,
+        'vsm_class' => null,
     ];
 
     protected $queryString = [
@@ -94,7 +95,11 @@ class Index extends Component
             'form.sort_order' => ['integer', 'min:0'],
             'form.is_active' => ['boolean'],
             'form.entity_type_group_id' => ['nullable', 'exists:organization_entity_type_groups,id'],
+            'form.vsm_class' => ['nullable', 'in:' . implode(',', OrganizationEntityType::VSM_CLASSES)],
         ])['form'];
+
+        $data['entity_type_group_id'] = $data['entity_type_group_id'] ?: null;
+        $data['vsm_class'] = $data['vsm_class'] ?: null;
 
         OrganizationEntityType::create($data);
 

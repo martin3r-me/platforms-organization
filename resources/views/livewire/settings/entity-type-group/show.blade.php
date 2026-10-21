@@ -1,118 +1,90 @@
 <x-ui-page>
     <x-slot name="navbar">
-        <x-ui-page-navbar title="" />
+        <x-ui-page-navbar :title="$entityTypeGroup->name" icon="heroicon-o-rectangle-stack" />
+    </x-slot>
+
+    <x-slot name="sidebar">
+        <x-ui-page-sidebar title="Einstellungen" width="w-64" :defaultOpen="true" side="left">
+            @include('organization::livewire.settings.partials.nav', ['aktiv' => 'entity-type-groups'])
+        </x-ui-page-sidebar>
     </x-slot>
 
     <x-slot name="actionbar">
         <x-ui-page-actionbar :breadcrumbs="[
-            ['label' => 'Organization', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
-            ['label' => 'Settings'],
-            ['label' => 'Entity Type Groups', 'href' => route('organization.settings.entity-type-groups.index')],
+            ['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
+            ['label' => 'Typ-Gruppen', 'href' => route('organization.settings.entity-type-groups.index')],
             ['label' => $entityTypeGroup->name],
         ]">
-            @if($this->isDirty)
-                <x-ui-button variant="secondary-ghost" size="sm" wire:click="loadForm">
-                    @svg('heroicon-o-x-mark', 'w-4 h-4')
-                    <span>Abbrechen</span>
-                </x-ui-button>
-                <x-ui-button variant="primary" size="sm" wire:click="save">
-                    @svg('heroicon-o-check', 'w-4 h-4')
-                    <span>Speichern</span>
-                </x-ui-button>
-            @endif
-            <x-ui-confirm-button
-                variant="danger-outline"
-                size="sm"
-                wire:click="delete"
-                confirm-text="Entity Type Group wirklich löschen?"
-            >
-                @svg('heroicon-o-trash', 'w-4 h-4')
-            </x-ui-confirm-button>
+            <div class="flex items-center gap-2">
+                @if ($this->isDirty)
+                    <x-nx-button variant="primary" size="sm" wire:click="save">
+                        @svg('heroicon-o-check', 'w-4 h-4')
+                        <span>Speichern</span>
+                    </x-nx-button>
+                @endif
+                <x-nx-dropdown>
+                    @if ($this->isDirty)
+                        <x-nx-dropdown-item wire:click="loadForm">
+                            @svg('heroicon-o-arrow-uturn-left', 'w-4 h-4')
+                            Änderungen verwerfen
+                        </x-nx-dropdown-item>
+                        <x-nx-dropdown-divider />
+                    @endif
+                    <x-nx-dropdown-item variant="danger" wire:click="delete" wire:confirm="Typ-Gruppe „{{ $entityTypeGroup->name }}“ wirklich löschen?">
+                        @svg('heroicon-o-trash', 'w-4 h-4')
+                        Löschen
+                    </x-nx-dropdown-item>
+                </x-nx-dropdown>
+            </div>
         </x-ui-page-actionbar>
     </x-slot>
 
-    <x-slot name="sidebar">
-        <x-ui-page-sidebar title="Informationen" width="w-80" :defaultOpen="true" side="left">
-            <div class="p-6 space-y-6">
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Status</h3>
-                    <div class="space-y-3">
-                        @if($entityTypeGroup->is_active)
-                            <x-ui-badge variant="success" size="sm">Aktiv</x-ui-badge>
-                        @else
-                            <x-ui-badge variant="danger" size="sm">Inaktiv</x-ui-badge>
-                        @endif
-                    </div>
-                </div>
-                <div>
-                    <h3 class="text-sm font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Details</h3>
-                    <div class="space-y-3">
-                        @if($entityTypeGroup->description)
-                            <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                                <span class="text-xs text-[var(--ui-muted)]">Beschreibung</span>
-                                <div class="text-sm text-[var(--ui-secondary)]">{{ $entityTypeGroup->description }}</div>
-                            </div>
-                        @endif
-                        <div class="py-3 px-4 bg-[var(--ui-muted-5)] rounded-lg border border-[var(--ui-border)]/40">
-                            <span class="text-xs text-[var(--ui-muted)]">Erstellt</span>
-                            <div class="text-sm font-medium text-[var(--ui-secondary)]">{{ $entityTypeGroup->created_at->format('d.m.Y H:i') }}</div>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Aktivitäten" width="w-80" :defaultOpen="false" storeKey="activityOpen" side="right">
-            <div class="p-6 text-sm text-[var(--ui-muted)]">Keine Aktivitäten verfügbar</div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
-    <x-ui-page-container>
+    <x-ui-page-container width="contained">
         <div class="space-y-6">
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Grunddaten</h2>
-                <div class="space-y-4">
-                    <x-ui-input-text name="name" label="Name" wire:model.live="form.name" required />
-                    <x-ui-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" />
-                    <x-ui-input-number name="sort_order" label="Sortierung" wire:model.live="form.sort_order" min="0" />
-                    <div class="flex items-center">
-                        <input type="checkbox" wire:model.live="form.is_active" id="is_active" class="rounded border-gray-300 text-primary shadow-sm focus:border-primary focus:ring focus:ring-primary focus:ring-opacity-50" />
-                        <label for="is_active" class="ml-2 text-sm text-[var(--ui-secondary)]">Aktiv</label>
-                    </div>
-                </div>
+            <div class="flex flex-wrap items-center gap-3">
+                <h1 class="m-0 text-2xl font-semibold tracking-tight text-[color:var(--nx-text)]">{{ $entityTypeGroup->name }}</h1>
+                <x-nx-badge :variant="$entityTypeGroup->is_active ? 'success' : 'neutral'" dot>{{ $entityTypeGroup->is_active ? 'Aktiv' : 'Inaktiv' }}</x-nx-badge>
+                <span class="ml-auto text-xs text-[color:var(--nx-faint)]">angelegt {{ $entityTypeGroup->created_at->format('d.m.Y') }}</span>
             </div>
 
-            <div class="bg-white rounded-lg border border-[var(--ui-border)] p-6">
-                <h2 class="text-lg font-semibold text-[var(--ui-secondary)] mb-4">Zugehörige Entity Types</h2>
-                @if($this->entityTypes->count() > 0)
-                    <x-ui-table compact="true">
-                        <x-ui-table-header>
-                            <x-ui-table-header-cell compact="true">Name</x-ui-table-header-cell>
-                            <x-ui-table-header-cell compact="true">Status</x-ui-table-header-cell>
-                        </x-ui-table-header>
-                        <x-ui-table-body>
-                            @foreach($this->entityTypes as $entityType)
-                                <x-ui-table-row compact="true">
-                                    <x-ui-table-cell compact="true">
-                                        <a href="{{ route('organization.settings.entity-types.show', $entityType) }}" class="link font-medium">
-                                            {{ $entityType->name }}
-                                        </a>
-                                    </x-ui-table-cell>
-                                    <x-ui-table-cell compact="true">
-                                        <x-ui-badge variant="{{ $entityType->is_active ? 'success' : 'muted' }}">
+            <x-nx-panel title="Grunddaten">
+                <div class="space-y-3 p-4">
+                    <x-nx-input-text name="name" label="Name" wire:model.live="form.name" errorKey="form.name" required />
+                    <x-nx-input-textarea name="description" label="Beschreibung" wire:model.live="form.description" errorKey="form.description" rows="3" />
+                    <x-nx-input-number name="sort_order" label="Sortierung" wire:model.live="form.sort_order" errorKey="form.sort_order" min="0" />
+                    <div class="border-t border-[color:var(--nx-line)] pt-3">
+                        <x-nx-input-checkbox label="Aktiv" wire:model.live="form.is_active" />
+                    </div>
+                </div>
+            </x-nx-panel>
+
+            <x-nx-panel title="Zugehörige Einheitstypen" flush>
+                @if ($this->entityTypes->count() > 0)
+                    <x-nx-table>
+                        <x-nx-table-header>
+                            <x-nx-table-header-cell>Name</x-nx-table-header-cell>
+                            <x-nx-table-header-cell align="right">Status</x-nx-table-header-cell>
+                        </x-nx-table-header>
+                        <x-nx-table-body>
+                            @foreach ($this->entityTypes as $entityType)
+                                <x-nx-table-row wire:key="et-{{ $entityType->id }}" clickable :href="route('organization.settings.entity-types.show', $entityType)">
+                                    <x-nx-table-cell>
+                                        <div class="font-medium text-[color:var(--nx-text)]">{{ $entityType->name }}</div>
+                                        <div class="font-mono text-xs text-[color:var(--nx-faint)]">{{ $entityType->code }}</div>
+                                    </x-nx-table-cell>
+                                    <x-nx-table-cell align="right">
+                                        <x-nx-badge :variant="$entityType->is_active ? 'success' : 'neutral'" dot>
                                             {{ $entityType->is_active ? 'Aktiv' : 'Inaktiv' }}
-                                        </x-ui-badge>
-                                    </x-ui-table-cell>
-                                </x-ui-table-row>
+                                        </x-nx-badge>
+                                    </x-nx-table-cell>
+                                </x-nx-table-row>
                             @endforeach
-                        </x-ui-table-body>
-                    </x-ui-table>
+                        </x-nx-table-body>
+                    </x-nx-table>
                 @else
-                    <p class="text-sm text-[var(--ui-muted)]">Keine Entity Types in dieser Gruppe.</p>
+                    <x-nx-empty icon="heroicon-o-cube">Keine Einheitstypen in dieser Gruppe.</x-nx-empty>
                 @endif
-            </div>
+            </x-nx-panel>
         </div>
     </x-ui-page-container>
 </x-ui-page>

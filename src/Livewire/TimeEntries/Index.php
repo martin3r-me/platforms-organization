@@ -8,7 +8,6 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationTimeEntry;
-use Platform\Organization\Services\EntityTimeResolver;
 use Platform\Core\Models\Team;
 use Illuminate\Support\Facades\Auth;
 
@@ -141,9 +140,16 @@ class Index extends Component
     }
 
     /**
-     * Baut eine Reverse-Map: "context_type:context_id" → Entity
-     * für alle geladenen Entries, basierend auf EntityLinks + Cascade-Registry.
+     * Reverse-Map "context_type:context_id" → Entity für die geladenen Einträge.
+     *
+     * Löst nur die Objekte auf, die in den Einträgen vorkommen: erst ihre eigenen
+     * Entity-Links, für den Rest die Eltern-Kette laut Modul (HasContextParent,
+     * Task → Projekt, Issue → Package …), bis zu MAX_PARENT_HOPS Schritte.
+     * Vorher: alle Links aller trackbaren Typen der Plattform + je Projekt/Package
+     * ein find() samt aller Kinder (N+1) — bei jedem Seitenaufruf.
      */
+    private const MAX_PARENT_HOPS = 3;
+
     #[Computed]
     public function contextToEntityMap()
     {
@@ -152,88 +158,65 @@ class Index extends Component
             return collect();
         }
 
-        // Nur die Kontexte aufloesen, die in den geladenen Entries wirklich
-        // vorkommen (ein Monat/Team). Ohne diese Begrenzung wuerde die Map fuer
-        // ALLE trackbaren Objekte der ganzen Plattform gebaut → OOM.
-        $neededKeys = $entries
-            ->map(fn ($e) => ($e->context_type ?? '') . ':' . ($e->context_id ?? 0))
-            ->unique()
-            ->flip()
-            ->all(); // ['context_type:id' => index] als Array, fuer O(1)-isset-Lookup
+        $aliasOf = array_flip(\Illuminate\Database\Eloquent\Relations\Relation::morphMap());
+        $registry = app(\Platform\Organization\Services\EntityLinkRegistry::class);
 
-        $cascades = EntityTimeResolver::getTimeTrackableCascades();
-
-        // Alle EntityLinks laden via DimensionBridge
-        $links = EntityDimensionBridge::linksForLinkableTypes(array_keys($cascades));
+        // Objekt "alias:id" → Liste der Eintrags-Keys "FQCN:id", die es auflöst
+        $origins = [];
+        foreach ($entries as $e) {
+            if (! $e->context_type || ! $e->context_id) {
+                continue;
+            }
+            $entryKey = $e->context_type . ':' . $e->context_id;
+            $alias = $aliasOf[$e->context_type] ?? $e->context_type;
+            $origins[$alias . ':' . $e->context_id][$entryKey] = true;
+        }
 
         $map = [];
-
-        foreach ($links as $link) {
-            $morphAlias = $link->linkable_type;
-
-            if (!isset($cascades[$morphAlias])) {
-                continue;
+        for ($hop = 0; $origins !== [] && $hop <= self::MAX_PARENT_HOPS; $hop++) {
+            $idsByAlias = [];
+            foreach (array_keys($origins) as $objKey) {
+                [$alias, $id] = explode(':', $objKey, 2);
+                $idsByAlias[$alias][] = (int) $id;
             }
 
-            $entity = $link->entity;
-            if (!$entity) {
-                continue;
-            }
-
-            [$fqcn, $childRelations] = $cascades[$morphAlias];
-
-            // Direkte Zuordnung: FQCN:ID → Entity — nur speichern, wenn benoetigt.
-            $directKey = $fqcn . ':' . $link->linkable_id;
-            if (isset($neededKeys[$directKey])) {
-                $map[$directKey] = $entity;
-            }
-
-            // Child-Relations traversieren
-            if (!empty($childRelations) && class_exists($fqcn)) {
-                $model = $fqcn::find($link->linkable_id);
-                if ($model) {
-                    foreach ($childRelations as $relationPath) {
-                        $this->resolveRelationPathForMapping($model, $relationPath, $entity, $map, $neededKeys);
+            // 1) Eigene Links der Objekte (eine Query je Typ)
+            foreach ($idsByAlias as $alias => $ids) {
+                $types = array_values(array_unique(array_filter([$alias, \Illuminate\Database\Eloquent\Relations\Relation::getMorphedModel($alias)])));
+                foreach (EntityDimensionBridge::linksForLinkables($types, $ids, true) as $link) {
+                    $linkAlias = $aliasOf[$link->linkable_type] ?? $link->linkable_type;
+                    $objKey = $linkAlias . ':' . $link->linkable_id;
+                    if (! $link->entity || ! isset($origins[$objKey])) {
+                        continue;
                     }
+                    foreach (array_keys($origins[$objKey]) as $entryKey) {
+                        $map[$entryKey] ??= $link->entity;
+                    }
+                    unset($origins[$objKey]);
                 }
             }
+
+            // 2) Rest: Eltern-Objekt laut Modul, nächste Runde
+            $next = [];
+            foreach ($idsByAlias as $alias => $ids) {
+                $class = \Illuminate\Database\Eloquent\Relations\Relation::getMorphedModel($alias) ?? $alias;
+                $open = array_values(array_filter($ids, fn ($id) => isset($origins[$alias . ':' . $id])));
+                if ($open === [] || ! class_exists($class)) {
+                    continue;
+                }
+                foreach ($class::whereIn((new $class)->getKeyName(), $open)->get() as $model) {
+                    $parent = $registry->contextParent($alias, $model);
+                    if (! $parent) {
+                        continue;
+                    }
+                    $parentKey = $parent[0] . ':' . (int) $parent[1];
+                    $next[$parentKey] = ($next[$parentKey] ?? []) + $origins[$alias . ':' . $model->getKey()];
+                }
+            }
+            $origins = $next;
         }
 
         return collect($map);
-    }
-
-    /**
-     * Traversiert eine (verschachtelte) Relation und ordnet nur die tatsaechlich
-     * benoetigten Blatt-Objekte (Keys aus $neededKeys) der Entity zu — damit die
-     * Map nicht mit dem gesamten Objektgraph (alle Kinder aller Links) vollaeuft.
-     */
-    protected function resolveRelationPathForMapping($model, string $path, $entity, array &$map, array $neededKeys): void
-    {
-        $segments = explode('.', $path);
-        $currentModels = collect([$model]);
-
-        foreach ($segments as $segment) {
-            $nextModels = collect();
-            foreach ($currentModels as $currentModel) {
-                if (!method_exists($currentModel, $segment)) {
-                    continue;
-                }
-                $related = $currentModel->{$segment};
-                if ($related instanceof \Illuminate\Database\Eloquent\Collection) {
-                    $nextModels = $nextModels->merge($related);
-                } elseif ($related instanceof \Illuminate\Database\Eloquent\Model) {
-                    $nextModels->push($related);
-                }
-            }
-            $currentModels = $nextModels;
-        }
-
-        foreach ($currentModels as $leafModel) {
-            $leafKey = get_class($leafModel) . ':' . $leafModel->id;
-            if (isset($neededKeys[$leafKey])) {
-                $map[$leafKey] = $entity;
-            }
-        }
     }
 
     /**

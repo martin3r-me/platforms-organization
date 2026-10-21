@@ -220,7 +220,7 @@
                                                     <div class="flex items-center">
                                                         <div class="size-11 shrink-0">
                                                             @if($entry->user && $entry->user->avatar)
-                                                                <img src="{{ $entry->user->avatar }}" alt="{{ $entry->user->name ?? 'User' }}" class="size-11 rounded-full object-cover dark:outline dark:outline-white/10" />
+                                                                <img src="{{ $entry->user->avatarUrl() }}" loading="lazy" alt="{{ $entry->user->name ?? 'User' }}" class="size-11 rounded-full object-cover dark:outline dark:outline-white/10" />
                                                             @else
                                                                 <div class="size-11 rounded-full bg-[var(--ui-primary-5)] flex items-center justify-center text-xs font-medium text-[var(--ui-primary)] dark:outline dark:outline-white/10">
                                                                     {{ strtoupper(substr($entry->user->name ?? 'U', 0, 1)) }}

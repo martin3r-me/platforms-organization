@@ -68,7 +68,7 @@
                         <x-ui-table-cell compact="true">
                             <div class="flex items-center gap-2">
                                 @if($planned->user && $planned->user->avatar)
-                                    <img src="{{ $planned->user->avatar }}" alt="{{ $planned->user->name ?? 'User' }}" class="w-8 h-8 rounded-full object-cover" />
+                                    <img src="{{ $planned->user->avatarUrl() }}" loading="lazy" alt="{{ $planned->user->name ?? 'User' }}" class="w-8 h-8 rounded-full object-cover" />
                                 @else
                                     <div class="w-8 h-8 rounded-full bg-[var(--ui-primary-5)] flex items-center justify-center text-xs font-medium text-[var(--ui-primary)]">
                                         {{ strtoupper(substr($planned->user->name ?? 'U', 0, 1)) }}

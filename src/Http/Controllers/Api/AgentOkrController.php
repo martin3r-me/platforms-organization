@@ -25,6 +25,9 @@ class AgentOkrController extends Controller
     private const CURRENT_CYCLE_STATES = ['active', 'ending_soon'];
     private const OKR_MORPH = 'okr';
 
+    /** Erster gesehener Zyklus (für Start/Ende in der Antwort — Basis der Quartals-Rituale im Daemon). */
+    private $cycleModel = null;
+
     /**
      * GET /api/org/agent/okrs — persönliches OKR (voll) + zugewiesene Objectives (im OKR-Kontext).
      */
@@ -59,6 +62,8 @@ class AgentOkrController extends Controller
 
         return response()->json(['data' => [
             'cycle' => $cycleLabel,
+            'cycle_starts_at' => $this->isoDate($this->cycleModel?->starts_at),
+            'cycle_ends_at' => $this->isoDate($this->cycleModel?->ends_at),
             'personal' => $personal,
             'assigned' => $assigned,
         ]]);
@@ -152,7 +157,12 @@ class AgentOkrController extends Controller
     {
         return $objectiveClass::query()
             ->whereHas('cycle', fn ($q) => $q->whereIn('status', self::CURRENT_CYCLE_STATES))
-            ->with(['keyResults', 'cycle.template']);
+            // Check-in-Historie (performances), verknüpfte Arbeit (contexts) und Measures für die
+            // Zielordnung des Agenten — eager, damit pro KR keine Einzel-Queries entstehen.
+            ->with([
+                'keyResults' => fn ($q) => $q->withCount(['performances', 'contexts'])->with(['performance', 'measures']),
+                'cycle.template',
+            ]);
     }
 
     /** Ein Objective als Array: Titel + Beschreibung + KRs (Progress als „X% → 100%" = die Lücke). */
@@ -167,6 +177,11 @@ class AgentOkrController extends Controller
                 'target' => 100,
                 'unit' => '%',
                 'progress' => $progress,
+                // Zielordnung: wann zuletzt eingecheckt, wie oft, hängt echte Arbeit dran, misst eine Kennzahl?
+                'last_checkin_at' => $this->isoDate($kr->performance?->created_at),
+                'checkins' => (int) ($kr->performances_count ?? 0),
+                'linked_work' => (int) ($kr->contexts_count ?? 0),
+                'metric_driven' => $kr->isMetricDriven(),
             ];
         }
         return [
@@ -186,9 +201,23 @@ class AgentOkrController extends Controller
             $c = $o->cycle;
             if ($c) {
                 $cycleLabel = (string) ($c->template?->title ?: $c->status ?: '');
+                $this->cycleModel = $c;
             }
         } catch (\Throwable $e) {
             // ignore
+        }
+    }
+
+    /** Datum als ISO-8601 (Carbon oder String), sonst null. */
+    private function isoDate($v): ?string
+    {
+        if ($v === null || $v === '') {
+            return null;
+        }
+        try {
+            return \Illuminate\Support\Carbon::parse($v)->toIso8601String();
+        } catch (\Throwable $e) {
+            return null;
         }
     }
 }

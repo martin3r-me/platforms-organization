@@ -49,10 +49,8 @@ Route::get('/parlan/jump', function (\Illuminate\Http\Request $request) {
     $id = (int) $request->query('id', 0);
     abort_unless(class_exists($type) && is_subclass_of($type, \Illuminate\Database\Eloquent\Model::class) && $id > 0, 404);
     $model = $type::findOrFail($id);
-    // Wer das Objekt nicht sehen darf, kommt auch nicht ins Gespräch (Policy, wo vorhanden).
-    if (\Illuminate\Support\Facades\Gate::getPolicyFor($model)) {
-        abort_unless(\Illuminate\Support\Facades\Gate::allows('view', $model), 403);
-    }
+    // Wer das Objekt nicht sehen darf, kommt auch nicht ins Gespräch.
+    abort_unless(\Platform\Organization\Support\ParlanContext::canView($request->user(), $model), 403);
     $url = \Platform\Organization\Support\ParlanContext::jumpUrl($type, $id,
         (string) $request->query('title', ''), $request->query('url'), (string) $request->user()->email);
     abort_if($url === null, 404);

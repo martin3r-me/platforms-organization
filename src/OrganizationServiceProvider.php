@@ -138,6 +138,12 @@ class OrganizationServiceProvider extends ServiceProvider
             ->prefix('api')
             ->group(__DIR__.'/../routes/agent.php');
 
+        // Parlan-Rückfragen (Kontext-Räume): eigene Auth über das Integrations-Geheimnis.
+        \Illuminate\Support\Facades\Route::domain(parse_url(config('app.url'), PHP_URL_HOST))
+            ->middleware(['api'])
+            ->prefix('api')
+            ->group(__DIR__.'/../routes/parlan.php');
+
         // Schritt 4: Migrationen laden
         $this->loadMigrationsFrom(__DIR__ . '/../database/migrations');
 

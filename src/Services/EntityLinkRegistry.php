@@ -90,6 +90,27 @@ class EntityLinkRegistry
     }
 
     /**
+     * Beteiligte eines Objekts laut Modul (HasContextParticipants) — User-IDs, dedupliziert.
+     *
+     * @return list<int>
+     */
+    public function contextParticipants(string $morphAlias, \Illuminate\Database\Eloquent\Model $object): array
+    {
+        $ids = [];
+        foreach ($this->providers as $p) {
+            // Vertrag HasContextParticipants — per method_exists, damit ein Modul die Methode schon
+            // liefern kann, bevor diese organization-Version überall ausgerollt ist.
+            if ($p instanceof \Platform\Organization\Contracts\HasContextParticipants || method_exists($p, 'contextParticipants')) {
+                foreach ($p->contextParticipants($morphAlias, $object) as $id) {
+                    $ids[(int) $id] = true;
+                }
+            }
+        }
+
+        return array_keys(array_filter($ids));
+    }
+
+    /**
      * Merged linkTypeConfig from all providers.
      * @return array<string, array{label: string, icon: string, route: string|null}>
      */

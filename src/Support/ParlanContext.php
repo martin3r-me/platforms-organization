@@ -40,7 +40,62 @@ class ParlanContext
     }
 
     /**
-     * Signierter Absprung-Link nach Parlan (gilt 5 Minuten, nur für diesen Nutzer).
+     * Darf dieser Nutzer das Objekt sehen? Policy (view), wo das Modell eine hat; sonst nur im
+     * selben Team (team_id), sonst nein. Dieselbe Regel für Absprung, Mitnehmen und Einladen.
+     */
+    public static function canView($user, \Illuminate\Database\Eloquent\Model $model): bool
+    {
+        if (! $user) {
+            return false;
+        }
+        if (\Illuminate\Support\Facades\Gate::getPolicyFor($model)) {
+            return \Illuminate\Support\Facades\Gate::forUser($user)->allows('view', $model);
+        }
+        $team = $model->getAttribute('team_id');
+        if ($team && method_exists($user, 'teams')) {
+            return $user->teams()->where('teams.id', $team)->exists();
+        }
+
+        return false;
+    }
+
+    /** Ref → Modell dieser Instanz (oder null). */
+    public static function modelForRef(string $ref): ?\Illuminate\Database\Eloquent\Model
+    {
+        $parts = explode('/', $ref);
+        if (count($parts) !== 3 || $parts[0] !== self::origin() || ! ctype_digit($parts[2])) {
+            return null;
+        }
+        $class = ObjectTypeRegistry::modelClass($parts[1]) ?? Relation::getMorphedModel($parts[1]);
+
+        return $class && class_exists($class) ? $class::find((int) $parts[2]) : null;
+    }
+
+    /**
+     * Beteiligte des Objekts (laut Modul), die es auch sehen dürfen — als E-Mails.
+     *
+     * @return list<string>
+     */
+    public static function participantEmails(string $alias, \Illuminate\Database\Eloquent\Model $model, ?int $exceptUserId = null): array
+    {
+        $ids = array_values(array_diff(app(EntityLinkRegistry::class)->contextParticipants($alias, $model), [$exceptUserId]));
+        if ($ids === []) {
+            return [];
+        }
+        $userClass = config('auth.providers.users.model');
+        $out = [];
+        foreach ($userClass::whereIn('id', array_slice($ids, 0, 30))->get() as $u) {
+            if ($u->email && self::canView($u, $model)) {
+                $out[] = strtolower($u->email);
+            }
+        }
+
+        return $out;
+    }
+
+    /**
+     * Signierter Absprung-Link nach Parlan (gilt 5 Minuten, nur für diesen Nutzer). Nimmt die
+     * Beteiligten des Objekts mit (m), damit das Gespräch gleich die richtigen Leute hat.
      */
     public static function jumpUrl(string $contextType, int $contextId, string $title, ?string $url, string $email): ?string
     {
@@ -49,8 +104,13 @@ class ParlanContext
             return null;
         }
         $parent = '';
+        $members = [];
         try {
             $model = $contextType::find($contextId);
+            if ($model) {
+                $me = auth()->id();
+                $members = array_values(array_diff(self::participantEmails($alias, $model, $me), [strtolower($email)]));
+            }
             if ($model && ($p = app(EntityLinkRegistry::class)->contextParent($alias, $model)) && ! empty($p[1])) {
                 $parent = self::ref((string) $p[0], (int) $p[1]);
             }
@@ -67,7 +127,12 @@ class ParlanContext
             'e' => $email,
             'x' => (string) (time() + 300),
         ];
-        $canonical = implode("\n", array_map(static fn ($k) => $q[$k], ['o', 'ref', 't', 'u', 'p', 'l', 'e', 'x']));
+        $keys = ['o', 'ref', 't', 'u', 'p', 'l', 'e', 'x'];
+        if ($members !== []) {
+            $q['m'] = implode(',', $members);
+            $keys[] = 'm';
+        }
+        $canonical = implode("\n", array_map(static fn ($k) => $q[$k], $keys));
         $q['s'] = hash_hmac('sha256', $canonical, (string) config('organization.parlan.secret'));
 
         return rtrim((string) config('organization.parlan.url'), '/') . '/ctx?' . http_build_query($q, '', '&', PHP_QUERY_RFC3986);

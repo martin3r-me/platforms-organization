@@ -2,8 +2,13 @@
 
 namespace Platform\Organization\Terminal;
 
+use Platform\Core\Terminal\Contracts\HasBadge;
 use Platform\Core\Terminal\Contracts\TerminalApp;
 use Platform\Core\Terminal\TerminalContext;
+use Platform\Organization\Authz\DimensionLinkAuthorizer;
+use Platform\Organization\Models\OrganizationDimensionDefinition;
+use Platform\Organization\Models\OrganizationDimensionLink;
+use Platform\Organization\Services\DimensionLinkService;
 
 /**
  * Terminal-App: zeigt die DimensionLink-Verknüpfungen des aktuell im Terminal
@@ -13,7 +18,7 @@ use Platform\Core\Terminal\TerminalContext;
  * Dependency-Pfeil zeigt auf den TerminalApp-Contract in core, nie umgekehrt.
  * Nur verfügbar, wenn das Terminal auf ein konkretes Objekt gepinnt ist.
  */
-class DimensionLinksTerminalApp implements TerminalApp
+class DimensionLinksTerminalApp implements TerminalApp, HasBadge
 {
     public function key(): string
     {
@@ -56,5 +61,44 @@ class DimensionLinksTerminalApp implements TerminalApp
         // Datensatz selbst die Einheit. Terminal liefert keine apps → bisheriges Verhalten.
         return $context->apps === []
             || ! str_starts_with((string) $context->contextType, 'Platform\\Organization\\');
+    }
+
+    /**
+     * Anzahl der Verknüpfungen fürs Kontext-Panel — gleiche Sicht wie der Reiter:
+     * aktive Dimensionen, entity-basierte Links nur auf lesbare Einheiten.
+     */
+    public function badge(TerminalContext $context): ?string
+    {
+        $user = auth()->user();
+        if (! $user || ! $context->hasContext()) {
+            return null;
+        }
+
+        $defs = OrganizationDimensionDefinition::active()->get(['id', 'value_source'])->keyBy('id');
+        if ($defs->isEmpty()) {
+            return null;
+        }
+
+        $links = OrganizationDimensionLink::whereIn('dimension_definition_id', $defs->keys())
+            ->where('linkable_type', DimensionLinkService::resolveContextType((string) $context->contextType))
+            ->where('linkable_id', $context->contextId)
+            ->with('value:id,metadata')
+            ->get(['id', 'dimension_definition_id', 'dimension_value_id']);
+        if ($links->isEmpty()) {
+            return null;
+        }
+
+        $readable = null;
+        $n = $links->filter(function ($link) use ($defs, $user, &$readable) {
+            if ($defs[$link->dimension_definition_id]->value_source !== 'entity') {
+                return true;
+            }
+            $readable ??= array_flip((new DimensionLinkAuthorizer())->readableEntityIds($user));
+            $entityId = ($link->value?->metadata ?? [])['source_entity_id'] ?? null;
+
+            return $entityId !== null && isset($readable[$entityId]);
+        })->count();
+
+        return $n > 0 ? ($n > 99 ? '99+' : (string) $n) : null;
     }
 }

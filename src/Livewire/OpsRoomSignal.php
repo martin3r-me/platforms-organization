@@ -4,6 +4,8 @@ namespace Platform\Organization\Livewire;
 
 use Livewire\Attributes\Computed;
 use Livewire\Component;
+use Illuminate\Database\Eloquent\Model;
+use Platform\Core\Livewire\Concerns\HasPageContext;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntityVsmAssignment;
@@ -17,6 +19,8 @@ use Platform\Organization\Services\PerspectiveService;
  */
 class OpsRoomSignal extends Component
 {
+    use HasPageContext;
+
     public OrganizationSignal $signal;
 
     public function mount(OrganizationSignal $signal): void
@@ -137,6 +141,22 @@ class OpsRoomSignal extends Component
         $lo = min($iOrigin, $iCurrent);
         $hi = max($iOrigin, $iCurrent);
         return $iCode >= $lo && $iCode <= $hi;
+    }
+
+    protected function pageContext(): ?Model
+    {
+        return $this->signal;
+    }
+
+    protected function pageContextOptions(): array
+    {
+        // Dasselbe Signal wie Signal\Show → gleicher Kontext/Kanal (URL bleibt kanonisch)
+        return [
+            'subject' => ($this->signal->definition?->name ?? 'Signal') . ($this->signal->entity ? ' · ' . $this->signal->entity->name : ''),
+            'description' => $this->signal->message ?? '',
+            'url' => route('organization.signals.show', $this->signal),
+            'source' => 'organization.signal.view',
+        ];
     }
 
     public function render()

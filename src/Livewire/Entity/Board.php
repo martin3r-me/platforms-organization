@@ -3,6 +3,8 @@
 namespace Platform\Organization\Livewire\Entity;
 
 use Livewire\Component;
+use Illuminate\Database\Eloquent\Model;
+use Platform\Core\Livewire\Concerns\HasPageContext;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Url;
@@ -19,6 +21,8 @@ use Platform\Organization\Services\SnapshotMovementService;
 
 class Board extends Component
 {
+    use HasPageContext;
+
     public OrganizationEntity $entity;
 
     public ?string $viewMode = 'system';
@@ -755,6 +759,20 @@ class Board extends Component
             if ($ent['id'] === $entityId) return $ent['name'];
         }
         return 'Unknown';
+    }
+
+    protected function pageContext(): ?Model
+    {
+        return $this->entity;
+    }
+
+    protected function pageContextOptions(): array
+    {
+        // Ansicht derselben Einheit → gleicher Kontext/Kanal wie die Detailseite (URL bleibt kanonisch)
+        return [
+            'url' => route('organization.entities.show', $this->entity),
+            'source' => 'organization.entity.view',
+        ];
     }
 
     public function render()

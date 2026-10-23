@@ -3,6 +3,8 @@
 namespace Platform\Organization\Livewire\Signal;
 
 use Livewire\Component;
+use Illuminate\Database\Eloquent\Model;
+use Platform\Core\Livewire\Concerns\HasPageContext;
 use Livewire\Attributes\Computed;
 use Platform\Organization\Models\OrganizationInferencePromptStat;
 use Platform\Organization\Models\OrganizationMemoryEntry;
@@ -13,6 +15,8 @@ use Platform\Organization\Models\OrganizationSignalFocus;
 
 class Show extends Component
 {
+    use HasPageContext;
+
     public OrganizationSignal $signal;
     public string $newNote = '';
     public string $actionReason = '';
@@ -571,6 +575,21 @@ class Show extends Component
 
         $this->signal->refresh();
         unset($this->signalComments);
+    }
+
+    protected function pageContext(): ?Model
+    {
+        return $this->signal;
+    }
+
+    protected function pageContextOptions(): array
+    {
+        return [
+            'subject' => ($this->signal->definition?->name ?? 'Signal') . ($this->signal->entity ? ' · ' . $this->signal->entity->name : ''),
+            'description' => $this->signal->message ?? '',
+            'url' => route('organization.signals.show', $this->signal),
+            'source' => 'organization.signal.view',
+        ];
     }
 
     public function render()

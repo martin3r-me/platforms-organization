@@ -3,12 +3,16 @@
 namespace Platform\Organization\Livewire\Inquiry;
 
 use Livewire\Component;
+use Illuminate\Database\Eloquent\Model;
+use Platform\Core\Livewire\Concerns\HasPageContext;
 use Platform\Organization\Models\OrganizationInquiryRecipient;
 use Platform\Organization\Models\OrganizationInferenceTrigger;
 use Platform\Organization\Models\OrganizationMemoryEntry;
 
 class Respond extends Component
 {
+    use HasPageContext;
+
     public OrganizationInquiryRecipient $recipient;
     public array $responses = [];
 
@@ -99,6 +103,24 @@ class Respond extends Component
         } catch (\Throwable) {
             // Memory creation should never block response saving
         }
+    }
+
+    protected function pageContext(): ?Model
+    {
+        return $this->recipient->inquiry;
+    }
+
+    protected function pageContextOptions(): array
+    {
+        // Kontext ist die Rückfrage selbst, nicht der persönliche Empfänger-Datensatz
+        $inquiry = $this->recipient->inquiry;
+
+        return [
+            'subject' => 'Rückfrage' . ($inquiry?->entity ? ' · ' . $inquiry->entity->name : ''),
+            'description' => $inquiry?->context_summary ?? '',
+            'url' => route('organization.my-inquiries.respond', $this->recipient),
+            'source' => 'organization.inquiry.view',
+        ];
     }
 
     public function render()

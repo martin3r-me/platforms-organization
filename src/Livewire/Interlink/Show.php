@@ -3,6 +3,8 @@
 namespace Platform\Organization\Livewire\Interlink;
 
 use Livewire\Component;
+use Illuminate\Database\Eloquent\Model;
+use Platform\Core\Livewire\Concerns\HasPageContext;
 use Livewire\Attributes\Computed;
 use Platform\Organization\Models\OrganizationInterlink;
 use Platform\Organization\Models\OrganizationInterlinkCategory;
@@ -11,6 +13,8 @@ use Platform\Organization\Models\OrganizationEntityRelationshipInterlink;
 
 class Show extends Component
 {
+    use HasPageContext;
+
     public OrganizationInterlink $interlink;
     public array $form = [];
     public string $activeTab = 'details';
@@ -115,6 +119,19 @@ class Show extends Component
         } catch (\Exception $e) {
             $this->dispatch('toast', message: 'Fehler beim Löschen: ' . $e->getMessage(), variant: 'danger');
         }
+    }
+
+    protected function pageContext(): ?Model
+    {
+        return $this->interlink;
+    }
+
+    protected function pageContextOptions(): array
+    {
+        return [
+            'url' => route('organization.interlinks.show', $this->interlink),
+            'source' => 'organization.interlink.view',
+        ];
     }
 
     public function render()

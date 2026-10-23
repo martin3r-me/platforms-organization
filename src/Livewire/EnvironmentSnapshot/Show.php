@@ -3,6 +3,8 @@
 namespace Platform\Organization\Livewire\EnvironmentSnapshot;
 
 use Livewire\Component;
+use Illuminate\Database\Eloquent\Model;
+use Platform\Core\Livewire\Concerns\HasPageContext;
 use Livewire\Attributes\Computed;
 use Platform\Organization\Models\OrganizationEnvironmentSnapshot;
 use Platform\Organization\Models\OrganizationEnvironmentSource;
@@ -10,6 +12,8 @@ use Platform\Organization\Models\OrganizationMemoryEntry;
 
 class Show extends Component
 {
+    use HasPageContext;
+
     public OrganizationEnvironmentSnapshot $snapshot;
 
     public function mount(OrganizationEnvironmentSnapshot $snapshot)
@@ -131,6 +135,21 @@ class Show extends Component
             ? "Topic \"{$topic}\" als relevant markiert"
             : "Topic \"{$topic}\" als Rauschen markiert"
         );
+    }
+
+    protected function pageContext(): ?Model
+    {
+        return $this->snapshot;
+    }
+
+    protected function pageContextOptions(): array
+    {
+        return [
+            'subject' => ($this->snapshot->source?->name ?? 'Snapshot') . ' · ' . $this->snapshot->snapshot_date?->format('d.m.Y'),
+            'description' => $this->snapshot->summary ?? '',
+            'url' => route('organization.environment-snapshots.show', $this->snapshot),
+            'source' => 'organization.environment-snapshot.view',
+        ];
     }
 
     public function render()

@@ -3,10 +3,14 @@
 namespace Platform\Organization\Livewire\Inference;
 
 use Livewire\Component;
+use Illuminate\Database\Eloquent\Model;
+use Platform\Core\Livewire\Concerns\HasPageContext;
 use Platform\Organization\Models\OrganizationInferenceRun;
 
 class RunShow extends Component
 {
+    use HasPageContext;
+
     public OrganizationInferenceRun $run;
 
     public function mount(OrganizationInferenceRun $run): void
@@ -24,6 +28,21 @@ class RunShow extends Component
             'steps:id,inference_run_id,inference_prompt_id,step_index,step_type,tool_name,arguments,result,result_ok,error_message,duration_ms,occurred_at',
             'steps.prompt:id,name,vsm_system',
         ]);
+    }
+
+    protected function pageContext(): ?Model
+    {
+        return $this->run;
+    }
+
+    protected function pageContextOptions(): array
+    {
+        return [
+            'subject' => 'Inference-Lauf #' . $this->run->id,
+            'description' => $this->run->summary ?? '',
+            'url' => route('organization.inference-runs.show', $this->run),
+            'source' => 'organization.inference-run.view',
+        ];
     }
 
     public function render()

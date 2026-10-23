@@ -3,6 +3,8 @@
 namespace Platform\Organization\Livewire\Entity;
 
 use Livewire\Component;
+use Illuminate\Database\Eloquent\Model;
+use Platform\Core\Livewire\Concerns\HasPageContext;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Livewire\Attributes\Renderless;
@@ -37,6 +39,8 @@ use Carbon\Carbon;
 
 class Show extends Component
 {
+    use HasPageContext;
+
     public OrganizationEntity $entity;
     public array $form = [];
     public string $activeTab = 'hierarchy';
@@ -2381,6 +2385,19 @@ class Show extends Component
         } catch (\Throwable $e) {
             return [];
         }
+    }
+
+    protected function pageContext(): ?Model
+    {
+        return $this->entity;
+    }
+
+    protected function pageContextOptions(): array
+    {
+        return [
+            'url' => route('organization.entities.show', $this->entity),
+            'source' => 'organization.entity.view',
+        ];
     }
 
     public function render()

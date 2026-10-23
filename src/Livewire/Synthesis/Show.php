@@ -3,10 +3,14 @@
 namespace Platform\Organization\Livewire\Synthesis;
 
 use Livewire\Component;
+use Illuminate\Database\Eloquent\Model;
+use Platform\Core\Livewire\Concerns\HasPageContext;
 use Platform\Organization\Models\OrganizationSynthesisReport;
 
 class Show extends Component
 {
+    use HasPageContext;
+
     public OrganizationSynthesisReport $report;
 
     public function mount(OrganizationSynthesisReport $report)
@@ -29,6 +33,19 @@ class Show extends Component
             'status' => 'archived',
         ]);
         $this->report->refresh();
+    }
+
+    protected function pageContext(): ?Model
+    {
+        return $this->report;
+    }
+
+    protected function pageContextOptions(): array
+    {
+        return [
+            'url' => route('organization.synthesis-reports.show', $this->report),
+            'source' => 'organization.synthesis-report.view',
+        ];
     }
 
     public function render()

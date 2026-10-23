@@ -3,6 +3,8 @@
 namespace Platform\Organization\Livewire\Entity;
 
 use Livewire\Component;
+use Illuminate\Database\Eloquent\Model;
+use Platform\Core\Livewire\Concerns\HasPageContext;
 use Livewire\Attributes\Computed;
 use Livewire\Attributes\On;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -18,6 +20,8 @@ use Platform\Organization\Services\PerspectiveService;
 
 class Mindmap extends Component
 {
+    use HasPageContext;
+
     public OrganizationEntity $entity;
 
     public ?string $snapshotDate = null;
@@ -700,6 +704,20 @@ class Mindmap extends Component
                 return null;
             }
         }
+    }
+
+    protected function pageContext(): ?Model
+    {
+        return $this->entity;
+    }
+
+    protected function pageContextOptions(): array
+    {
+        // Ansicht derselben Einheit → gleicher Kontext/Kanal wie die Detailseite (URL bleibt kanonisch)
+        return [
+            'url' => route('organization.entities.show', $this->entity),
+            'source' => 'organization.entity.view',
+        ];
     }
 
     public function render()

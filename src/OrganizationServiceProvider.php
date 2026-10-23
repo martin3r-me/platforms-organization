@@ -49,6 +49,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 \Platform\Organization\Console\Commands\AuthzMaterializeCommand::class,
                 \Platform\Organization\Console\Commands\PurgeSignalsCommand::class,
                 \Platform\Organization\Console\Commands\DimensionLinkAuditCommand::class,
+                \Platform\Organization\Console\Commands\ParlanPullCommand::class,
             ]);
         }
 
@@ -234,6 +235,11 @@ class OrganizationServiceProvider extends ServiceProvider
 
     protected function registerSchedule(): void
     {
+        // Kontext-Kommunikation aus Parlan abholen (no-op ohne Parlan-Konfiguration)
+        Schedule::command('organization:parlan-pull')
+            ->everyFifteenMinutes()
+            ->withoutOverlapping();
+
         // Snapshots: 2x daily
         Schedule::command('organization:snapshot-entities --period=morning')
             ->dailyAt('08:00')

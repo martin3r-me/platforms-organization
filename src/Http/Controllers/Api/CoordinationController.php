@@ -5,8 +5,6 @@ namespace Platform\Organization\Http\Controllers\Api;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
-use Illuminate\Support\Facades\DB;
-use Platform\Organization\Models\OrganizationCoordinationEvent;
 
 /**
  * Comms/Koordinations-Sink: Parlan (hält den gefalteten Fabric-Stand) pusht ROHE Koordinations-
@@ -36,45 +34,12 @@ class CoordinationController extends Controller
             'events.*.occurred_at' => ['nullable', 'date'],
         ]);
 
-        // actor_handles → user_id in EINER Abfrage (Handle = E-Mail des Org-Users).
-        $handles = array_values(array_unique(array_map(
-            fn ($e) => strtolower(trim((string) $e['actor_handle'])),
-            $data['events'],
-        )));
-        $usersByEmail = DB::table('users')
-            ->whereIn(DB::raw('LOWER(email)'), $handles)
-            ->pluck('id', DB::raw('LOWER(email)'));
-
-        $stored = 0;
-        $unresolved = [];
-        foreach ($data['events'] as $e) {
-            $handle = strtolower(trim((string) $e['actor_handle']));
-            $userId = $usersByEmail[$handle] ?? null;
-            if ($userId === null) {
-                $unresolved[] = $handle; // kein Org-User → ehrlich zurückmelden, Event verwerfen
-                continue;
-            }
-            OrganizationCoordinationEvent::updateOrCreate(
-                ['event_id' => (string) $e['event_id']],
-                [
-                    'actor_user_id' => $userId,
-                    'actor_handle' => $handle,
-                    'counterpart_handle' => isset($e['counterpart_handle']) ? strtolower(trim((string) $e['counterpart_handle'])) : null,
-                    'kind' => (string) $e['kind'],
-                    'thread' => $e['thread'] ?? null,
-                    'context_ref' => $e['context_ref'] ?? null,
-                    'latency_seconds' => $e['latency_seconds'] ?? null,
-                    'occurred_at' => $e['occurred_at'] ?? now(),
-                    'created_at' => now(),
-                ],
-            );
-            $stored++;
-        }
+        $r = \Platform\Organization\Services\CoordinationIngest::store($data['events']);
 
         return response()->json([
             'ok' => true,
-            'stored' => $stored,
-            'unresolved' => array_values(array_unique($unresolved)),
+            'stored' => $r['stored'],
+            'unresolved' => $r['unresolved'],
         ]);
     }
 }

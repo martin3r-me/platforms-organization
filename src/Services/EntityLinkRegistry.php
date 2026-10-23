@@ -111,6 +111,24 @@ class EntityLinkRegistry
     }
 
     /**
+     * Ist das Objekt im Herkunftsmodul erledigt? Erstes Modul mit einer Antwort gewinnt;
+     * null = kein Modul weiß es (dann bleibt das Gespräch, wie es ist).
+     */
+    public function contextDone(string $morphAlias, \Illuminate\Database\Eloquent\Model $object): ?bool
+    {
+        foreach ($this->providers as $p) {
+            if (method_exists($p, 'contextDone')) {
+                $done = $p->contextDone($morphAlias, $object);
+                if ($done !== null) {
+                    return (bool) $done;
+                }
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Merged linkTypeConfig from all providers.
      * @return array<string, array{label: string, icon: string, route: string|null}>
      */

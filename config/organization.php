@@ -146,4 +146,11 @@ return [
         's5' => 336, // 14 Tage — strategisch, langsamer Takt
         'algedonic' => 1, // 1h — Schmerz-Kanal nach Beer
     ],
+
+    // Kommunikation im Kontext läuft in Parlan (TRAAN rooms/0.2): das ERP chattet nicht, es löst
+    // aus (signierter Absprung) und hält den Ref. Leer = Reiter „Gespräch" ausgeblendet.
+    'parlan' => [
+        'url' => env('PARLAN_URL'),
+        'secret' => env('PARLAN_CONTEXT_SECRET'),
+    ],
 ];

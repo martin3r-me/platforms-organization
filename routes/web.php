@@ -42,6 +42,24 @@ use Platform\Organization\Livewire\EnvironmentSnapshot\Show as EnvironmentSnapsh
 
 Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organization.dashboard');
 
+// Absprung in den Parlan-Kontext-Raum (TRAAN rooms/0.2): erzeugt beim Klick einen frischen,
+// signierten Link und leitet weiter — im ERP wird nicht gechattet, nur ausgelöst.
+Route::get('/parlan/jump', function (\Illuminate\Http\Request $request) {
+    $type = (string) $request->query('type', '');
+    $id = (int) $request->query('id', 0);
+    abort_unless(class_exists($type) && is_subclass_of($type, \Illuminate\Database\Eloquent\Model::class) && $id > 0, 404);
+    $model = $type::findOrFail($id);
+    // Wer das Objekt nicht sehen darf, kommt auch nicht ins Gespräch (Policy, wo vorhanden).
+    if (\Illuminate\Support\Facades\Gate::getPolicyFor($model)) {
+        abort_unless(\Illuminate\Support\Facades\Gate::allows('view', $model), 403);
+    }
+    $url = \Platform\Organization\Support\ParlanContext::jumpUrl($type, $id,
+        (string) $request->query('title', ''), $request->query('url'), (string) $request->user()->email);
+    abort_if($url === null, 404);
+
+    return redirect()->away($url);
+})->name('organization.parlan.jump');
+
 // Operations Room — Hommage an Stafford Beer, Santiago 1972 (VSM-Steuerung)
 Route::get('/ops-room', \Platform\Organization\Livewire\OpsRoom::class)->name('organization.ops-room');
 Route::get('/ops-room/perspective/{perspective}', \Platform\Organization\Livewire\OpsRoom::class)->name('organization.ops-room.perspective');

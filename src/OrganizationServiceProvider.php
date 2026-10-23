@@ -86,6 +86,10 @@ class OrganizationServiceProvider extends ServiceProvider
             \Platform\Core\Terminal\TerminalAppRegistry::register(
                 new \Platform\Organization\Terminal\DimensionLinksTerminalApp()
             );
+            // „Gespräch": Absprung in den Parlan-Kontext-Raum (rooms/0.2) — im ERP wird nicht gechattet.
+            \Platform\Core\Terminal\TerminalAppRegistry::register(
+                new \Platform\Organization\Terminal\ParlanConversationTerminalApp()
+            );
         } catch (\Throwable $e) {
             // Terminal/Registry (noch) nicht verfügbar — überspringen.
         }
@@ -159,6 +163,7 @@ class OrganizationServiceProvider extends ServiceProvider
         Livewire::component('organization.entity.modal-relations', \Platform\Organization\Livewire\Entity\ModalRelations::class);
         Livewire::component('organization.entity.person-activity', \Platform\Organization\Livewire\Entity\PersonActivity::class);
         Livewire::component('organization.terminal.dimension-links', \Platform\Organization\Livewire\Terminal\DimensionLinks::class);
+        Livewire::component('organization.terminal.parlan-conversation', \Platform\Organization\Livewire\Terminal\ParlanConversation::class);
 
         // Tools registrieren (loose gekoppelt - für AI/Chat)
         $this->registerTools();

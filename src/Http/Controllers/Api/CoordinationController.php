@@ -14,6 +14,10 @@ use Platform\Organization\Models\OrganizationCoordinationEvent;
  * speichern das Event idempotent (upsert über event_id). Die Org rechnet NICHTS live — der Snapshot
  * aggregiert daraus die 7½-Dimensionen-Kennzahlen, wie terminal_messages → terminal-Metriken.
  *
+ * Kontext (TRAAN rooms/0.2): Events aus einem Kontext-Raum tragen `context_ref`
+ * (`<herkunft>/<morph-alias>/<id>`); der Snapshot verortet sie darüber an der Einheit des
+ * Objekts. Dort kommen auch Nachrichten (kind `message`, nur Metadaten) an.
+ *
  * Auth: auth:api (Admin-/Service-Token) — wie dev/helpdesk/agent.
  */
 class CoordinationController extends Controller
@@ -27,6 +31,7 @@ class CoordinationController extends Controller
             'events.*.counterpart_handle' => ['nullable', 'string', 'max:190'],
             'events.*.kind' => ['required', 'string', 'max:32'],
             'events.*.thread' => ['nullable', 'string', 'max:64'],
+            'events.*.context_ref' => ['nullable', 'string', 'max:300'],
             'events.*.latency_seconds' => ['nullable', 'integer', 'min:0'],
             'events.*.occurred_at' => ['nullable', 'date'],
         ]);
@@ -57,6 +62,7 @@ class CoordinationController extends Controller
                     'counterpart_handle' => isset($e['counterpart_handle']) ? strtolower(trim((string) $e['counterpart_handle'])) : null,
                     'kind' => (string) $e['kind'],
                     'thread' => $e['thread'] ?? null,
+                    'context_ref' => $e['context_ref'] ?? null,
                     'latency_seconds' => $e['latency_seconds'] ?? null,
                     'occurred_at' => $e['occurred_at'] ?? now(),
                     'created_at' => now(),

@@ -303,6 +303,19 @@ class SnapshotEntitiesCommand extends Command
             Log::warning('Snapshot: Coordination aggregation failed', ['error' => $e->getMessage()]);
         }
 
+        // 5e. Kommunikation IM KONTEXT (TRAAN rooms/0.2, Parlan-Kontext-Räume): Events tragen den Ref
+        // des Objekts (`<herkunft>/<morph-alias>/<id>`). Über ObjectContextResolver landen sie an der
+        // Einheit, an der das Objekt hängt — direkt oder über die Eltern-Kette (HasContextParent).
+        // Löst das Terminal-Kontext-Chat ab: Gesprochen wird in Parlan, das Lebenszeichen kommt hierher.
+        $ctxMetrics = [];
+        try {
+            if (Schema::hasTable('organization_coordination_events') && Schema::hasColumn('organization_coordination_events', 'context_ref')) {
+                $ctxMetrics = $this->contextCommsMetrics($entityIds);
+            }
+        } catch (\Throwable $e) {
+            Log::warning('Snapshot: Context comms aggregation failed', ['error' => $e->getMessage()]);
+        }
+
         // 6. Cascade metrics through entity hierarchy
         $hierarchyService = new EntityHierarchyService();
         $childMap = $hierarchyService->buildChildMap($entities);
@@ -346,6 +359,11 @@ class SnapshotEntitiesCommand extends Command
                         $metrics[$key] = $value;
                     }
                 }
+            }
+
+            // Merge context-communication metrics (Parlan-Kontext-Räume)
+            foreach ($ctxMetrics[$entity->id] ?? [] as $key => $value) {
+                $metrics[$key] = $value;
             }
 
             $ownMetricsMap[$entity->id] = $metrics;
@@ -623,5 +641,92 @@ class SnapshotEntitiesCommand extends Command
         }
 
         $this->info("Created/updated " . $entitiesByTeam->count() . " team structure snapshots.");
+    }
+
+    /**
+     * Kontext-Kommunikation je Einheit aus organization_coordination_events.context_ref.
+     * Ref → (Alias, ID) → Einheiten (ObjectContextResolver, inkl. Eltern-Kette); eine Einheit als
+     * Objekt selbst zählt direkt. Fenster 30 Tage; Kennzahlen 7/30 Tage, Teilnehmer, Entscheidungen.
+     *
+     * @param  int[]  $entityIds
+     * @return array<int, array<string, int|null>>
+     */
+    protected function contextCommsMetrics(array $entityIds): array
+    {
+        $now = Carbon::now();
+        $since30 = $now->copy()->subDays(30);
+        $since7 = $now->copy()->subDays(7);
+        $rows = DB::table('organization_coordination_events')
+            ->whereNotNull('context_ref')
+            ->where('occurred_at', '>=', $since30)
+            ->get(['context_ref', 'kind', 'actor_user_id', 'occurred_at']);
+        if ($rows->isEmpty()) {
+            return [];
+        }
+
+        $wanted = array_flip($entityIds);
+        $entityClass = OrganizationEntity::class;
+        $entitiesOfRef = [];
+        foreach ($rows->pluck('context_ref')->unique() as $ref) {
+            $parts = explode('/', (string) $ref);
+            if (count($parts) < 3 || ! ctype_digit((string) end($parts))) {
+                $entitiesOfRef[$ref] = [];
+                continue;
+            }
+            $id = (int) array_pop($parts);
+            $alias = \Platform\Organization\Services\ObjectContextResolver::resolveAlias((string) array_pop($parts));
+            if (! $alias) {
+                $entitiesOfRef[$ref] = [];
+                continue;
+            }
+            if (\Platform\Organization\Services\ObjectTypeRegistry::modelClass($alias) === $entityClass) {
+                $entitiesOfRef[$ref] = [$id];
+                continue;
+            }
+            $links = \Platform\Organization\Services\ObjectContextResolver::entityLinks($alias, $id)['links'];
+            $entitiesOfRef[$ref] = $links->pluck('entity_id')->filter()->unique()->values()->all();
+        }
+
+        $acc = []; // entityId => [m7, m30, dec7, users7{}, last]
+        foreach ($rows as $r) {
+            $at = Carbon::parse($r->occurred_at);
+            foreach ($entitiesOfRef[$r->context_ref] ?? [] as $eid) {
+                if (! isset($wanted[$eid])) {
+                    continue;
+                }
+                $a = $acc[$eid] ?? ['m7' => 0, 'm30' => 0, 'dec7' => 0, 'users7' => [], 'last' => null];
+                if ($r->kind === 'message') {
+                    $a['m30']++;
+                    if ($at->gte($since7)) {
+                        $a['m7']++;
+                    }
+                }
+                if ($at->gte($since7)) {
+                    if ($r->kind === 'decision') {
+                        $a['dec7']++;
+                    }
+                    if ($r->actor_user_id) {
+                        $a['users7'][$r->actor_user_id] = true;
+                    }
+                }
+                if ($a['last'] === null || $at->gt($a['last'])) {
+                    $a['last'] = $at;
+                }
+                $acc[$eid] = $a;
+            }
+        }
+
+        $out = [];
+        foreach ($acc as $eid => $a) {
+            $out[$eid] = [
+                'ctx_messages_7d' => $a['m7'],
+                'ctx_messages_30d' => $a['m30'],
+                'ctx_decisions_7d' => $a['dec7'],
+                'ctx_participants_7d' => count($a['users7']),
+                'ctx_last_activity_days' => $a['last'] ? (int) $a['last']->diffInDays($now) : null,
+            ];
+        }
+
+        return $out;
     }
 }

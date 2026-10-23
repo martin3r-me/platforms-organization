@@ -23,6 +23,7 @@ class OrganizationCoordinationEvent extends Model
         'counterpart_handle',
         'kind',
         'thread',
+        'context_ref',
         'latency_seconds',
         'occurred_at',
         'created_at',

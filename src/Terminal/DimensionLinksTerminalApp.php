@@ -37,7 +37,8 @@ class DimensionLinksTerminalApp implements TerminalApp
 
     public function order(): int
     {
-        return 50;
+        // Im Kontext-Panel der erste Reiter
+        return 5;
     }
 
     public function livewireComponent(): string
@@ -47,6 +48,13 @@ class DimensionLinksTerminalApp implements TerminalApp
 
     public function isAvailable(TerminalContext $context): bool
     {
-        return $context->hasContext();
+        if (! $context->hasContext()) {
+            return false;
+        }
+
+        // Kontext-Panel (liefert apps): nicht an organization-Modellen — dort ist der
+        // Datensatz selbst die Einheit. Terminal liefert keine apps → bisheriges Verhalten.
+        return $context->apps === []
+            || ! str_starts_with((string) $context->contextType, 'Platform\\Organization\\');
     }
 }

@@ -175,6 +175,8 @@ class OrganizationServiceProvider extends ServiceProvider
         Livewire::component('organization.entity.person-activity', \Platform\Organization\Livewire\Entity\PersonActivity::class);
         Livewire::component('organization.terminal.dimension-links', \Platform\Organization\Livewire\Terminal\DimensionLinks::class);
         Livewire::component('organization.terminal.parlan-conversation', \Platform\Organization\Livewire\Terminal\ParlanConversation::class);
+        Livewire::component('organization.terminal.share', \Platform\Organization\Livewire\Terminal\Share::class);
+        Livewire::component('organization.share.public-share', \Platform\Organization\Livewire\Share\PublicShare::class);
 
         // Tools registrieren (loose gekoppelt - für AI/Chat)
         $this->registerTools();

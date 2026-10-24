@@ -91,6 +91,10 @@ class OrganizationServiceProvider extends ServiceProvider
             \Platform\Core\Terminal\TerminalAppRegistry::register(
                 new \Platform\Organization\Terminal\ParlanConversationTerminalApp()
             );
+            // „Freigabe": Knoten nach außen teilen (Kunden-Tor)
+            \Platform\Core\Terminal\TerminalAppRegistry::register(
+                new \Platform\Organization\Terminal\ShareTerminalApp()
+            );
         } catch (\Throwable $e) {
             // Terminal/Registry (noch) nicht verfügbar — überspringen.
         }

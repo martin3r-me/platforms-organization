@@ -7,6 +7,7 @@ use Platform\Organization\Contracts\HasContextParent;
 use Platform\Organization\Contracts\HasCostDriverMetrics;
 use Platform\Organization\Contracts\HasMetricDefinitions;
 use Platform\Organization\Contracts\HasPersonMetrics;
+use Platform\Organization\Contracts\ProvidesShareView;
 
 class EntityLinkRegistry
 {
@@ -54,6 +55,36 @@ class EntityLinkRegistry
     public function getProvider(string $morphAlias): ?EntityLinkProvider
     {
         return $this->aliasMap[$morphAlias] ?? null;
+    }
+
+    /** @var array<string, ProvidesShareView> morph alias => Kundenansicht (Kunden-Tor) */
+    protected array $shareViews = [];
+
+    /**
+     * Kundenansicht eines Moduls registrieren — nur diese Typen erscheinen mit
+     * Inhalt auf geteilten Knoten-Seiten.
+     */
+    public function registerShareView(ProvidesShareView $view): void
+    {
+        foreach (array_keys($view->shareTypes()) as $alias) {
+            $this->shareViews[$alias] = $view;
+        }
+    }
+
+    public function shareView(string $morphAlias): ?ProvidesShareView
+    {
+        return $this->shareViews[$morphAlias] ?? null;
+    }
+
+    /** @return array<string, array> alias => ['label', 'singular', 'icon', 'featured'] */
+    public function allShareTypes(): array
+    {
+        $types = [];
+        foreach ($this->shareViews as $alias => $view) {
+            $types[$alias] = $view->shareTypes()[$alias];
+        }
+
+        return $types;
     }
 
     /**

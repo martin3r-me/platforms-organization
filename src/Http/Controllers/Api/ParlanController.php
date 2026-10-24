@@ -36,4 +36,57 @@ class ParlanController extends Controller
 
         return response()->json(['ref' => $v['ref'], 'allowed' => $allowed]);
     }
+
+    /**
+     * Profilkarte in Parlan: wer ist das? Name, Rolle (aktive Stellenbeschreibung, sonst gültige
+     * Org-Rolle), Einheit (Eltern-Entity der Person/des Agenten) und Bild. Parlan zeigt das nur an —
+     * gepflegt wird es hier. Unbekannte E-Mails fehlen in der Antwort.
+     */
+    public function people(Request $request): JsonResponse
+    {
+        $secret = (string) config('organization.parlan.secret');
+        abort_unless($secret !== '' && hash_equals($secret, (string) $request->bearerToken()), 401);
+        $v = $request->validate([
+            'emails' => ['required', 'array', 'max:50'],
+            'emails.*' => ['string', 'email'],
+        ]);
+        $userClass = config('auth.providers.users.model');
+        $users = $userClass::whereIn(\Illuminate\Support\Facades\DB::raw('LOWER(email)'), array_map('strtolower', $v['emails']))->get();
+        $out = [];
+        foreach ($users as $u) {
+            $entity = \Platform\Organization\Models\OrganizationEntity::with(['type', 'parent'])
+                ->where('linked_user_id', $u->id)->orderByDesc('id')->first();
+            $out[] = [
+                'email' => strtolower($u->email),
+                'name' => trim((string) ($u->fullname ?? '')) ?: (string) $u->name,
+                'role' => $entity ? (string) ($this->roleOf($entity->id) ?? '') : '',
+                'unit' => (string) ($entity?->parent?->name ?? ''),
+                'avatar' => method_exists($u, 'avatarUrl') ? (string) ($u->avatarUrl() ?? '') : '',
+                'agent' => ($entity?->type?->code === 'agent') || (method_exists($u, 'isAiUser') && $u->isAiUser()),
+            ];
+        }
+
+        return response()->json(['people' => $out]);
+    }
+
+    /** Rollen-Titel: aktive Stellenbeschreibung (People, weich gekoppelt), sonst gültige Org-Rolle. */
+    private function roleOf(int $entityId): ?string
+    {
+        $jp = \Platform\People\Models\JobProfile::class;
+        if (class_exists($jp)) {
+            try {
+                $name = $jp::query()->where('owner_entity_id', $entityId)->where('status', 'active')->orderByDesc('id')->value('name');
+                if ($name) {
+                    return (string) $name;
+                }
+            } catch (\Throwable $e) {
+                // People nicht migriert → weiter mit Org-Rollen
+            }
+        }
+        $a = \Platform\Organization\Models\OrganizationRoleAssignment::with('role')->forPerson($entityId)
+            ->where(fn ($q) => $q->whereNull('valid_to')->orWhere('valid_to', '>=', now()->toDateString()))
+            ->orderByDesc('percentage')->first();
+
+        return $a?->role?->name;
+    }
 }

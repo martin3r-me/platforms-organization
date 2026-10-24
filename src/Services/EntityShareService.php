@@ -155,7 +155,7 @@ class EntityShareService
         foreach ($this->linkedIds($this->scopeEntities($root, $depth)->keys()->all()) as $alias => $ids) {
             $types[$alias] = [
                 'label' => $shareTypes[$alias]['label'] ?? $config[$alias]['label'] ?? $alias,
-                'icon' => $shareTypes[$alias]['icon'] ?? $config[$alias]['icon'] ?? 'cube',
+                'icon' => $this->icon($shareTypes[$alias]['icon'] ?? $config[$alias]['icon'] ?? null),
                 'count' => count($ids),
                 'has_view' => isset($shareTypes[$alias]),
             ];
@@ -227,7 +227,7 @@ class EntityShareService
             $group = [
                 'alias' => $alias,
                 'label' => $shareTypes[$alias]['label'] ?? $config[$alias]['label'] ?? $alias,
-                'icon' => $shareTypes[$alias]['icon'] ?? $config[$alias]['icon'] ?? 'cube',
+                'icon' => $this->icon($shareTypes[$alias]['icon'] ?? $config[$alias]['icon'] ?? null),
                 'items' => $this->sortItems($items),
             ];
 
@@ -312,5 +312,28 @@ class EntityShareService
             'steps_total' => $total,
             'next_due' => $nextDue,
         ];
+    }
+
+    /**
+     * Icons kommen aus fremden Link-Konfigurationen und sind nicht immer
+     * Heroicons (z. B. „arrow-right-left") — unbekannte fallen auf „cube" zurück.
+     */
+    protected function icon(?string $name): string
+    {
+        static $known = [];
+
+        if (! $name) {
+            return 'cube';
+        }
+
+        return $known[$name] ??= (function () use ($name) {
+            try {
+                svg('heroicon-o-' . $name);
+
+                return $name;
+            } catch (\Throwable) {
+                return 'cube';
+            }
+        })();
     }
 }

@@ -637,44 +637,6 @@ class EntityLinkRegistry
                 'subset_of' => 'time_total_minutes',
             ],
 
-            // Terminal-Kommunikation
-            'terminal_messages_7d' => [
-                'label' => 'Nachrichten (7 Tage)',
-                'group' => 'core',
-                'direction' => 'neutral',
-                'unit' => 'count',
-                'dimension' => self::DIMENSION_ENERGY,
-                'type' => self::TYPE_FLOW,
-                'basis' => 'window_7d',
-            ],
-            'terminal_messages_30d' => [
-                'label' => 'Nachrichten (30 Tage)',
-                'group' => 'core',
-                'direction' => 'neutral',
-                'unit' => 'count',
-                'dimension' => self::DIMENSION_ENERGY,
-                'type' => self::TYPE_FLOW,
-                'basis' => 'window_30d',
-            ],
-            'terminal_participants_7d' => [
-                'label' => 'Aktive Teilnehmer (7 Tage)',
-                'group' => 'core',
-                'direction' => 'neutral',
-                'unit' => 'count',
-                'dimension' => self::DIMENSION_ORG_CAPITAL,
-                'type' => self::TYPE_STOCK,
-                'basis' => 'window_7d',
-            ],
-            'terminal_last_message_days' => [
-                'label' => 'Tage seit letzter Nachricht',
-                'group' => 'core',
-                'direction' => 'neutral',
-                'unit' => 'days',
-                'dimension' => self::DIMENSION_ENERGY,
-                'type' => self::TYPE_MODULATOR,
-                'basis' => 'modulator_factor',
-            ],
-
             // TRAAN/Parlan-Koordination — was die Mitglieder untereinander & mit Menschen abstimmen,
             // als messbare Org-Substanz. Von Parlan pro Handle gepusht (siehe organization_coordination_metrics),
             // vom Snapshot gemerged. Verbindlichkeit wird so zur Durchsatz-/Energie-/Qualitäts-Dimension.
@@ -715,7 +677,7 @@ class EntityLinkRegistry
                 'basis' => 'stichtag',
             ],
             // Kommunikation IM KONTEXT (Parlan-Kontext-Räume, TRAAN rooms/0.2): was über die Objekte
-            // dieser Einheit gesprochen/entschieden wird — löst die terminal_*-Kennzahlen ab.
+            // dieser Einheit gesprochen/entschieden wird (Nachfolger der entfernten Terminal-Chat-Kennzahlen).
             'ctx_messages_7d' => [
                 'label' => 'Nachrichten im Kontext (7 Tage)',
                 'group' => 'coordination',

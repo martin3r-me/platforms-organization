@@ -10,7 +10,7 @@ use Illuminate\Routing\Controller;
  * Comms/Koordinations-Sink: Parlan (hält den gefalteten Fabric-Stand) pusht ROHE Koordinations-
  * Events (ein Event je verbindlicher Handlung). Wir lösen actor_handle→User (users.email) auf und
  * speichern das Event idempotent (upsert über event_id). Die Org rechnet NICHTS live — der Snapshot
- * aggregiert daraus die 7½-Dimensionen-Kennzahlen, wie terminal_messages → terminal-Metriken.
+ * aggregiert daraus die 7½-Dimensionen-Kennzahlen.
  *
  * Kontext (TRAAN rooms/0.2): Events aus einem Kontext-Raum tragen `context_ref`
  * (`<herkunft>/<morph-alias>/<id>`); der Snapshot verortet sie darüber an der Einheit des

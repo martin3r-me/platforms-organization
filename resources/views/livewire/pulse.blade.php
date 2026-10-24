@@ -107,54 +107,6 @@
         </x-ui-page-sidebar>
     </x-slot>
 
-    <x-slot name="activity">
-        <x-ui-page-sidebar title="Teams" width="w-80" :defaultOpen="true" storeKey="pulseTeamsOpen" side="right">
-            <div class="p-5 space-y-4">
-                @if($perTeam->isNotEmpty())
-                    <div class="space-y-3">
-                        @foreach($perTeam as $tm)
-                            <div class="p-3 rounded-md border border-[var(--ui-border)]/40 bg-white">
-                                <div class="flex items-center justify-between mb-2">
-                                    <div class="flex items-center gap-1.5 min-w-0">
-                                        @svg('heroicon-o-building-office-2', 'w-4 h-4 text-[var(--ui-secondary)] flex-shrink-0')
-                                        <span class="text-sm font-semibold text-[var(--ui-secondary)] truncate">{{ $tm['name'] }}</span>
-                                    </div>
-                                    <span class="text-xs text-[var(--ui-muted)] flex-shrink-0">{{ $tm['total'] }}</span>
-                                </div>
-                                @php
-                                    $tot = max(1, $tm['total']);
-                                    $rPct = round($tm['byColor']['red'] / $tot * 100);
-                                    $yPct = round($tm['byColor']['yellow'] / $tot * 100);
-                                    $gPct = round($tm['byColor']['green'] / $tot * 100);
-                                    $xPct = max(0, 100 - $rPct - $yPct - $gPct);
-                                @endphp
-                                <div class="flex h-2 rounded overflow-hidden">
-                                    @if($rPct > 0)<div class="bg-rose-500" style="width: {{ $rPct }}%"></div>@endif
-                                    @if($yPct > 0)<div class="bg-amber-400" style="width: {{ $yPct }}%"></div>@endif
-                                    @if($gPct > 0)<div class="bg-emerald-500" style="width: {{ $gPct }}%"></div>@endif
-                                    @if($xPct > 0)<div class="bg-zinc-300" style="width: {{ $xPct }}%"></div>@endif
-                                </div>
-                                <div class="flex items-center justify-between mt-2 text-[10px] text-[var(--ui-muted)]">
-                                    <div class="inline-flex items-center gap-2">
-                                        @if($tm['byColor']['red'])<span class="text-rose-600 font-semibold">{{ $tm['byColor']['red'] }} rot</span>@endif
-                                        @if($tm['byColor']['yellow'])<span class="text-amber-700 font-semibold">{{ $tm['byColor']['yellow'] }} gelb</span>@endif
-                                        @if($tm['byColor']['green'])<span class="text-emerald-700 font-semibold">{{ $tm['byColor']['green'] }} grün</span>@endif
-                                        @if($tm['byColor']['gray'])<span class="text-zinc-500">{{ $tm['byColor']['gray'] }} grau</span>@endif
-                                    </div>
-                                    @if($tm['avgScore'] !== null)
-                                        <span>Ø <span class="font-semibold text-[var(--ui-secondary)]">{{ $tm['avgScore'] }}</span></span>
-                                    @endif
-                                </div>
-                            </div>
-                        @endforeach
-                    </div>
-                @else
-                    <div class="text-center text-xs text-zinc-400 py-8">Keine Team-Daten</div>
-                @endif
-            </div>
-        </x-ui-page-sidebar>
-    </x-slot>
-
     <x-ui-page-container>
     <div wire:poll.60s class="space-y-6">
 
@@ -181,6 +133,50 @@
                 <div class="text-xs text-zinc-600/70 mt-1">Karteileichen</div>
             </div>
         </div>
+
+        {{-- ═══════════ Pro Team ═══════════ --}}
+        @if($perTeam->isNotEmpty())
+            <div>
+                <h2 class="text-xs font-bold text-[var(--ui-secondary)] uppercase tracking-wider mb-3">Pro Team</h2>
+                <div class="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
+                    @foreach($perTeam as $tm)
+                        <div class="p-3 rounded-md border border-[var(--ui-border)]/40 bg-white">
+                            <div class="flex items-center justify-between mb-2">
+                                <div class="flex items-center gap-1.5 min-w-0">
+                                    @svg('heroicon-o-building-office-2', 'w-4 h-4 text-[var(--ui-secondary)] flex-shrink-0')
+                                    <span class="text-sm font-semibold text-[var(--ui-secondary)] truncate">{{ $tm['name'] }}</span>
+                                </div>
+                                <span class="text-xs text-[var(--ui-muted)] flex-shrink-0">{{ $tm['total'] }}</span>
+                            </div>
+                            @php
+                                $tot = max(1, $tm['total']);
+                                $rPct = round($tm['byColor']['red'] / $tot * 100);
+                                $yPct = round($tm['byColor']['yellow'] / $tot * 100);
+                                $gPct = round($tm['byColor']['green'] / $tot * 100);
+                                $xPct = max(0, 100 - $rPct - $yPct - $gPct);
+                            @endphp
+                            <div class="flex h-2 rounded overflow-hidden">
+                                @if($rPct > 0)<div class="bg-rose-500" style="width: {{ $rPct }}%"></div>@endif
+                                @if($yPct > 0)<div class="bg-amber-400" style="width: {{ $yPct }}%"></div>@endif
+                                @if($gPct > 0)<div class="bg-emerald-500" style="width: {{ $gPct }}%"></div>@endif
+                                @if($xPct > 0)<div class="bg-zinc-300" style="width: {{ $xPct }}%"></div>@endif
+                            </div>
+                            <div class="flex items-center justify-between mt-2 text-[10px] text-[var(--ui-muted)]">
+                                <div class="inline-flex items-center gap-2">
+                                    @if($tm['byColor']['red'])<span class="text-rose-600 font-semibold">{{ $tm['byColor']['red'] }} rot</span>@endif
+                                    @if($tm['byColor']['yellow'])<span class="text-amber-700 font-semibold">{{ $tm['byColor']['yellow'] }} gelb</span>@endif
+                                    @if($tm['byColor']['green'])<span class="text-emerald-700 font-semibold">{{ $tm['byColor']['green'] }} grün</span>@endif
+                                    @if($tm['byColor']['gray'])<span class="text-zinc-500">{{ $tm['byColor']['gray'] }} grau</span>@endif
+                                </div>
+                                @if($tm['avgScore'] !== null)
+                                    <span>Ø <span class="font-semibold text-[var(--ui-secondary)]">{{ $tm['avgScore'] }}</span></span>
+                                @endif
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+            </div>
+        @endif
 
         {{-- ═══════════ Brennt-Liste ═══════════ --}}
         @if($brennt->isNotEmpty())

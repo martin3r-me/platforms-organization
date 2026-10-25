@@ -75,12 +75,17 @@
     $projectsAll = collect($data['nav'] ?? [])->flatMap(fn ($g) => collect($g['items'])->map(fn ($i) => $i + ['slug' => $g['slug']]));
 @endphp
 
-<div class="gp" x-data="{ nav: false }" @keydown.escape.window="nav = false">
+<div class="gp" x-data="{
+        nav: false,
+        collapsed: (() => { try { return localStorage.getItem('gp-nav') === '0' } catch (e) { return false } })(),
+        toggle() { this.collapsed = ! this.collapsed; try { localStorage.setItem('gp-nav', this.collapsed ? '0' : '1') } catch (e) {} },
+    }" @keydown.escape.window="nav = false"
+    @keydown.window="if ($event.key === '[' && ! ['INPUT', 'TEXTAREA'].includes($event.target.tagName)) toggle()">
     <style>
         .gp { min-height: 100vh; background: var(--nx-surface); color: var(--nx-text); -webkit-font-smoothing: antialiased;
               font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Helvetica, Arial, sans-serif; }
         .gp-shell { display: flex; min-height: 100vh; }
-        .gp-nav { position: fixed; inset: 0 auto 0 0; z-index: 40; width: 264px; display: flex; flex-direction: column;
+        .gp-nav { position: fixed; inset: 0 auto 0 0; z-index: 40; width: 300px; max-width: 86vw; display: flex; flex-direction: column;
                   background: var(--nx-bg); border-right: 1px solid var(--nx-line); transform: translateX(-100%); transition: transform .2s ease; }
         .gp-nav.is-open { transform: none; box-shadow: var(--nx-shadow-pop); }
         .gp-scrim { position: fixed; inset: 0; z-index: 30; background: rgba(15, 15, 15, .25); }
@@ -88,7 +93,9 @@
         @media (min-width: 900px) {
             .gp-nav { position: sticky; top: 0; height: 100vh; flex-shrink: 0; transform: none; box-shadow: none !important; }
             .gp-scrim, .gp-burger { display: none !important; }
+            .gp-nav.is-collapsed { display: none; }
         }
+        @media (max-width: 899px) { .gp-desk { display: none !important; } }
         .gp-avatar { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 999px; object-fit: cover; font-weight: 600; line-height: 1; }
         .gp-card { border: 1px solid var(--nx-line); border-radius: 12px; background: var(--nx-surface); }
         .gp-h2 { font-size: 15px; font-weight: 600; }
@@ -111,9 +118,11 @@
                   color: var(--nx-muted); transition: color .12s, border-color .12s; }
         .gp-tab:hover { color: var(--nx-text); }
         .gp-tab.is-on { border-bottom-color: var(--nx-text); color: var(--nx-text); font-weight: 500; }
-        /* Breite Inhalte (Board) laufen randlos, beginnen aber bündig mit dem Seitenraster (max 1120px) */
-        .gp-bleed { padding-left: max(1rem, calc((100% - 1120px) / 2 + 1rem)); padding-right: 1rem; }
-        @media (min-width: 640px) { .gp-bleed { padding-left: max(2rem, calc((100% - 1120px) / 2 + 2rem)); padding-right: 2rem; } }
+        /* Inhalt nutzt die volle Breite von main; gp-bleed (Board) läuft rechts randlos */
+        .gp-wrap { width: 100%; padding-left: 1rem; padding-right: 1rem; }
+        .gp-bleed { padding-left: 1rem; padding-right: 1rem; }
+        @media (min-width: 640px) { .gp-wrap, .gp-bleed { padding-left: 2rem; padding-right: 2rem; } }
+        @media (min-width: 1280px) { .gp-wrap, .gp-bleed { padding-left: 2.5rem; padding-right: 2.5rem; } }
     </style>
 
     @if ($status !== 'ok')
@@ -156,13 +165,16 @@
             <div class="gp-scrim" x-show="nav" x-transition.opacity @click="nav = false" style="display: none"></div>
 
             {{-- Navigation — wie die Hauptsidebar; schmal als Schublade --}}
-            <aside class="gp-nav" :class="nav && 'is-open'">
+            <aside class="gp-nav" :class="{ 'is-open': nav, 'is-collapsed': collapsed }">
                 <div class="flex items-center gap-2.5 border-b border-[color:var(--nx-line)] px-3 py-3">
                     {!! $tile($entity->name, 'e' . $entity->id, 32) !!}
                     <div class="min-w-0 flex-1">
                         <div class="truncate text-sm font-semibold leading-tight">{{ $title }}</div>
                         <div class="truncate text-xs text-[color:var(--nx-faint)]">Portal von {{ $teamName }}</div>
                     </div>
+                    <button type="button" class="gp-desk -mr-1 inline-flex h-8 w-8 items-center justify-center rounded-[6px] text-[color:var(--nx-faint)] hover:bg-[color:var(--nx-hover)] hover:text-[color:var(--nx-text)]" @click="toggle()" title="Seitenleiste einklappen ( [ )">
+                        @svg('heroicon-o-chevron-double-left', 'w-4 h-4')
+                    </button>
                     <button type="button" class="gp-burger -mr-1 inline-flex h-8 w-8 items-center justify-center rounded-[6px] text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]" @click="nav = false" title="Schließen">
                         @svg('heroicon-o-x-mark', 'w-5 h-5')
                     </button>
@@ -261,6 +273,9 @@
                     <button type="button" class="gp-burger -ml-1.5 inline-flex h-8 w-8 items-center justify-center rounded-[6px] text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]" @click="nav = true" title="Navigation">
                         @svg('heroicon-o-bars-3', 'w-5 h-5')
                     </button>
+                    <button type="button" x-show="collapsed" style="display: none" class="gp-desk -ml-1.5 inline-flex h-8 w-8 items-center justify-center rounded-[6px] text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]" @click="toggle()" title="Seitenleiste ausklappen ( [ )">
+                        @svg('heroicon-o-bars-3', 'w-5 h-5')
+                    </button>
                     <nav class="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
                         @if ($section && ! $notFound)
                             <a href="{{ $link() }}" wire:navigate class="shrink-0 text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">Übersicht</a>
@@ -297,22 +312,22 @@
                             <a href="{{ $link() }}" wire:navigate class="mt-5 inline-flex rounded-[6px] border border-[color:var(--nx-line-strong)] px-3 py-1.5 text-sm hover:bg-[color:var(--nx-hover)]">Zur Übersicht</a>
                         </div>
                     @elseif ($section === 'leistung')
-                        <div class="mx-auto max-w-[1120px] px-4 py-8 sm:px-8 md:py-10">
+                        <div class="gp-wrap py-8 md:py-10">
                             <h1 class="text-2xl font-bold tracking-tight">Leistung</h1>
                             <p class="mt-1 text-sm text-[color:var(--nx-muted)]">Alle gebuchten Zeiten — wer wann woran gearbeitet hat.</p>
                             @include('organization::livewire.share._work', ['work' => $data['work'], 'compact' => false])
                         </div>
                     @elseif ($section === 'rechnungen')
-                        <div class="mx-auto max-w-[1120px] px-4 py-8 sm:px-8 md:py-10">
+                        <div class="gp-wrap py-8 md:py-10">
                             <h1 class="text-2xl font-bold tracking-tight">Rechnungen &amp; Zahlungen</h1>
                             <p class="mt-1 text-sm text-[color:var(--nx-muted)]">Alle Rechnungen mit Beleg, ihr Bezahlstand und die eingegangenen Zahlungen.</p>
                             @include('organization::livewire.share._finance', ['finance' => $data['finance'], 'compact' => false])
                         </div>
                     @elseif ($section === 'aktivitaet')
-                        <div class="mx-auto max-w-[1120px] px-4 py-8 sm:px-8 md:py-10">
+                        <div class="gp-wrap py-8 md:py-10">
                             <h1 class="text-2xl font-bold tracking-tight">Aktivität</h1>
                             <p class="mt-1 text-sm text-[color:var(--nx-muted)]">Was in den letzten 60 Tagen passiert ist — Arbeit, erledigte Schritte, Canvases, Zahlungen.</p>
-                            <div class="mt-6 max-w-3xl">@include('organization::livewire.share._activity', ['events' => $data['activity'], 'limit' => null])</div>
+                            <div class="mt-6 max-w-5xl">@include('organization::livewire.share._activity', ['events' => $data['activity'], 'limit' => null])</div>
                         </div>
                     @elseif ($detail)
                         @include('organization::livewire.share._detail', ['detail' => $detail, 'detailLink' => fn (?string $sub = null) => $link($activeSlug, $activeId, $sub)])

@@ -25,7 +25,7 @@
     {{-- Reiter merken sich ihren Stand im Anker (#board, #verlauf …) — Zurück/Teilen funktioniert --}}
     <div x-data="{ tab: @js($tabKeys[0] ?? null), keys: @js($tabKeys) }"
          x-init="const h = location.hash.slice(1); if (keys.includes(h)) tab = h; $watch('tab', v => history.replaceState(null, '', '#' + v))">
-        <div class="mx-auto max-w-[1120px] px-4 pt-8 sm:px-8">
+        <div class="gp-wrap pt-8">
             <div class="flex items-start gap-4">
                 {!! $tile($detail['title'], $activeSlug . $activeId, 44) !!}
                 <div class="min-w-0 flex-1">

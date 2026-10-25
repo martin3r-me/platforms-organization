@@ -19,7 +19,7 @@
     ]);
     $lastWork = $work['last_date'] ?? null;
 @endphp
-<div class="mx-auto max-w-[1120px] px-4 py-8 sm:px-8 md:py-10">
+<div class="gp-wrap py-8 md:py-10">
     {{-- Kopf --}}
     <div class="flex items-start gap-4">
         {!! $tile($entity->name, 'e' . $entity->id, 48) !!}
@@ -33,7 +33,7 @@
     </div>
 
     @if ($share->message)
-        <div class="mt-6 max-w-3xl rounded-[12px] border border-[color:var(--nx-line)] bg-[color:var(--nx-bg)] p-4 sm:p-5">
+        <div class="mt-6 rounded-[12px] border border-[color:var(--nx-line)] bg-[color:var(--nx-bg)] p-4 sm:p-5">
             @if ($senderName)
                 <div class="mb-2 flex items-center gap-2">
                     <span class="inline-flex h-6 w-6 items-center justify-center rounded-full bg-[color:var(--nx-accent)] text-[10px] font-semibold text-[color:var(--nx-on-accent)]">{{ mb_strtoupper(mb_substr($senderName, 0, 1)) }}</span>
@@ -41,7 +41,7 @@
                     <span class="text-xs text-[color:var(--nx-faint)]">{{ $teamName }}</span>
                 </div>
             @endif
-            <div class="whitespace-pre-line text-[15px] leading-relaxed">{{ $share->message }}</div>
+            <div class="max-w-4xl whitespace-pre-line text-[15px] leading-relaxed">{{ $share->message }}</div>
         </div>
     @endif
 

@@ -37,8 +37,8 @@ use Illuminate\Support\Collection;
  * liefert Ereignisse für den Aktivitätsstrom der Übersicht (neueste zuerst, höchstens
  * ~60 Tage): [['at' => Carbon, 'kind' => 'done'|'canvas'|'state'|…, 'title' => string,
  * 'text' => ?string, 'parent_id' => ?int (Objekt-ID des Typs, für den Link)]].
- * Views bekommen data + $link und sollten nur --nx-*-Tokens/x-nx-* nutzen; Inhalt im Raster
- * `mx-auto max-w-[1120px] px-4 sm:px-8`, randlos Breites (Board) mit der Klasse `gp-bleed`.
+ * Views bekommen data + $link und sollten nur --nx-*-Tokens/x-nx-* nutzen; Inhalt in voller
+ * Breite mit der Klasse `gp-wrap` (Seitenränder wie die Hülle), Randloses (Board) mit `gp-bleed`.
  */
 interface ProvidesShareView
 {

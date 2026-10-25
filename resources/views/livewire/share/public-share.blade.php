@@ -78,7 +78,15 @@
         nav: false,
         collapsed: (() => { try { return localStorage.getItem('gp-nav') === '0' } catch (e) { return false } })(),
         toggle() { this.collapsed = ! this.collapsed; try { localStorage.setItem('gp-nav', this.collapsed ? '0' : '1') } catch (e) {} },
-    }" @keydown.escape.window="nav = false"
+        // Über der Seitenleiste scrollt nur deren Liste, nie die Seite dahinter
+        trapWheel(e) {
+            if (Math.abs(e.deltaY) <= Math.abs(e.deltaX)) return;
+            const s = e.target.closest('.gp-navscroll');
+            const can = s && (e.deltaY < 0 ? s.scrollTop > 0 : s.scrollTop + s.clientHeight < s.scrollHeight - 1);
+            if (! can) e.preventDefault();
+        },
+    }" x-init="document.documentElement.classList.remove('gp-lock'); $watch('nav', v => document.documentElement.classList.toggle('gp-lock', v))"
+    @keydown.escape.window="nav = false"
     @keydown.window="if ($event.key === '[' && ! ['INPUT', 'TEXTAREA'].includes($event.target.tagName)) toggle()">
     <style>
         .gp { min-height: 100vh; background: var(--nx-surface); color: var(--nx-text); -webkit-font-smoothing: antialiased;
@@ -87,7 +95,11 @@
         .gp-nav { position: fixed; inset: 0 auto 0 0; z-index: 40; width: 336px; max-width: 88vw; display: flex; flex-direction: column;
                   background: var(--nx-bg); border-right: 1px solid var(--nx-line); transform: translateX(-100%); transition: transform .2s ease; }
         .gp-nav.is-open { transform: none; box-shadow: var(--nx-shadow-pop); }
-        .gp-scrim { position: fixed; inset: 0; z-index: 30; background: rgba(15, 15, 15, .25); }
+        .gp-scrim { position: fixed; inset: 0; z-index: 30; background: rgba(15, 15, 15, .25); overscroll-behavior: contain; touch-action: none; }
+        /* Scroll-Sperre der Seite, solange Schublade oder Blatt offen sind; Rinne verhindert Springen */
+        html { scrollbar-gutter: stable; }
+        html.gp-lock { overflow: hidden; }
+        .gp-navscroll { overscroll-behavior: contain; }
         .gp-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
         @media (min-width: 900px) {
             .gp-nav { position: sticky; top: 0; height: 100vh; flex-shrink: 0; transform: none; box-shadow: none !important; }
@@ -131,6 +143,23 @@
         .gp-bleed { padding-left: 1rem; padding-right: 1rem; }
         @media (min-width: 640px) { .gp-wrap, .gp-bleed { padding-left: 2rem; padding-right: 2rem; } }
         @media (min-width: 1280px) { .gp-wrap, .gp-bleed { padding-left: 2.5rem; padding-right: 2.5rem; } }
+        /* Board wie im Planner: füllt den Rest des Fensters, Spalten scrollen einzeln, die Seite steht */
+        .gp-board { display: flex; gap: 20px; height: var(--gp-board-h, calc(100dvh - 12rem)); min-height: 420px; padding-top: 12px; padding-bottom: 16px;
+                    overflow-x: auto; overflow-y: hidden; overscroll-behavior-x: contain; }
+        /* rechts randlos, damit der Erledigt-Streifen (sticky) bündig am Fensterrand klebt */
+        .gp-board.gp-bleed { padding-right: 0; }
+        .gp-col { display: flex; flex: 0 0 19rem; width: 19rem; min-height: 0; flex-direction: column; border-radius: 10px; padding: 6px; }
+        .gp-col-body { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; padding: 0 2px; }
+        .gp-col-body > * + * { margin-top: 8px; }
+        .gp-col-body > :first-child { margin-top: 4px; }
+        .gp-col-strip { position: sticky; right: 0; z-index: 10; display: flex; flex: 0 0 2.75rem; flex-direction: column; align-items: center; justify-content: space-between;
+                        padding: 16px 8px; border-left: 1px solid var(--nx-line); background: var(--nx-surface); color: var(--nx-success); transition: background .12s; }
+        .gp-col-strip:hover { background: var(--nx-hover); }
+        .gp-col-strip .gp-vert { flex: 1; margin: 8px 0; writing-mode: vertical-rl; transform: rotate(180deg); font-size: 10px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+        .gp-card-task { position: relative; display: block; width: 100%; border: 1px solid var(--nx-line); border-radius: 8px; background: var(--nx-surface);
+                        padding: 10px 12px 10px 24px; text-align: left; box-shadow: var(--nx-shadow-card); transition: box-shadow .12s; }
+        .gp-card-task:hover { box-shadow: 0 2px 8px rgba(15, 15, 15, .08), 0 1px 2px rgba(15, 15, 15, .05); }
+        .gp-card-task .gp-edge { position: absolute; top: 10px; bottom: 10px; left: 6px; width: 3px; border-radius: 999px; }
     </style>
 
     @if ($status !== 'ok')
@@ -173,7 +202,7 @@
             <div class="gp-scrim" x-show="nav" x-transition.opacity @click="nav = false" style="display: none"></div>
 
             {{-- Navigation — wie die Hauptsidebar; schmal als Schublade --}}
-            <aside class="gp-nav" :class="{ 'is-open': nav, 'is-collapsed': collapsed }">
+            <aside class="gp-nav" :class="{ 'is-open': nav, 'is-collapsed': collapsed }" @wheel="trapWheel($event)">
                 <div class="flex items-center gap-2.5 border-b border-[color:var(--nx-line)] px-3 py-3">
                     {!! $tile($entity->name, 'e' . $entity->id, 32) !!}
                     <div class="min-w-0 flex-1">
@@ -203,7 +232,7 @@
                     </div>
                 @endif
 
-                <nav class="flex-1 overflow-y-auto px-2 py-3">
+                <nav class="gp-navscroll flex-1 overflow-y-auto px-2 py-3">
                     <a href="{{ $link() }}" wire:navigate @class(['gp-navlink', 'is-active' => ! $activeSlug && ! $section && ! $notFound])>
                         @svg('heroicon-o-squares-2x2', 'w-4 h-4 shrink-0')
                         <span class="truncate">Übersicht</span>

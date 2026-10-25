@@ -335,7 +335,8 @@ class EntityShareService
                 ->filter(fn ($g) => $g['has_detail'] || $g['has_section'])
                 ->sortBy(fn ($g) => [array_search($g['group'], self::NAV_GROUPS, true), $g['order']])
                 ->groupBy('group')->all(),
-            'impact' => collect(array_merge($featured, $sections))->filter(fn ($g) => ! empty($g['summary']['kpis']))->values()->all(),
+            'impact' => collect(array_merge($featured, $sections))->filter(fn ($g) => ! empty($g['summary']['kpis']))
+                ->sortBy(fn ($g) => [array_search($g['group'], self::NAV_GROUPS, true), $g['order']])->values()->all(),
             'areas' => $areas,
             'area' => $areaId,
             'recent' => $recent,

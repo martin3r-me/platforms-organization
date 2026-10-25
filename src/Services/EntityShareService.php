@@ -382,15 +382,21 @@ class EntityShareService
         }
 
         $thisMonth = now()->format('Y-m');
+        // Zeiträume: der Moment zählt — Gesamt nur als Rückblick
+        $cut = ['30' => now()->subDays(30)->startOfDay(), '90' => now()->subDays(90)->startOfDay(), '365' => now()->subDays(365)->startOfDay()];
+        $inPeriod = fn ($r, $key) => (int) $r->filter(fn ($x) => $x->work_date && $x->work_date->gte($cut[$key]))->sum('minutes');
         $people = $rows->groupBy('user_id')->map(fn ($r, $uid) => [
             'id' => (int) $uid,
             'name' => $name($uid),
             'has_avatar' => (bool) $users->get($uid)?->avatar,
             'minutes' => (int) $r->sum('minutes'),
+            'periods' => ['30' => $inPeriod($r, '30'), '90' => $inPeriod($r, '90'), '365' => $inPeriod($r, '365'), 'all' => (int) $r->sum('minutes')],
             'month_minutes' => (int) $r->filter(fn ($x) => $x->work_date?->format('Y-m') === $thisMonth)->sum('minutes'),
             'last_at' => $r->max('work_date'),
+            'first_at' => $r->min('work_date'),
             'entries' => $r->count(),
-        ])->sortByDesc('minutes')->values()->all();
+            'days' => $r->pluck('work_date')->filter()->map(fn ($d) => $d->format('Y-m-d'))->unique()->count(),
+        ])->sortByDesc(fn ($p) => [$p['periods']['90'], $p['minutes']])->values()->all();
 
         // Neueste Buchungen mit Kontext (Aufgabe/Projekt) für Protokoll und Liste
         $recentRows = $rows->take(250);
@@ -418,6 +424,7 @@ class EntityShareService
 
         return [
             'total_minutes' => $total,
+            'period_minutes' => ['30' => $inPeriod($rows, '30'), '90' => $inPeriod($rows, '90'), '365' => $inPeriod($rows, '365'), 'all' => $total],
             'planned_minutes' => (int) $planned->sum('planned_minutes'),
             'month_minutes' => $months[$thisMonth]['minutes'] ?? 0,
             'prev_month_minutes' => $months[now()->startOfMonth()->subMonthNoOverflow()->format('Y-m')]['minutes'] ?? 0,

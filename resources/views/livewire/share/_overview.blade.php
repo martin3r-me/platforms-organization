@@ -27,7 +27,7 @@
             <div class="text-xs font-medium uppercase tracking-wide text-[color:var(--nx-faint)]">{{ $entity->type?->name ?? 'Ihr Bereich' }}</div>
             <h1 class="mt-0.5 text-2xl font-bold leading-tight tracking-tight md:text-3xl">{{ $title }}</h1>
             <div class="mt-1 text-sm text-[color:var(--nx-muted)]">
-                {{ collect([$runningCount ? $runningCount . ' ' . ($runningCount === 1 ? 'laufendes Projekt' : 'laufende Projekte') : null, $doneCount ? $doneCount . ' abgeschlossen' : null, $work ? $hours($work['total_minutes']) . ' geleistet' : null])->filter()->implode(' · ') }}{{ $projectCount || $work ? ' · ' : '' }}Stand {{ $de(now(), 'D. MMMM YYYY') }}
+                {{ collect([$runningCount ? $runningCount . ' ' . ($runningCount === 1 ? 'laufendes Projekt' : 'laufende Projekte') : null, $doneCount ? $doneCount . ' abgeschlossen' : null, $work && $work['period_minutes']['30'] ? $hours($work['period_minutes']['30']) . ' in den letzten 30 Tagen' : null])->filter()->implode(' · ') }}{{ $projectCount || $work ? ' · ' : '' }}Stand {{ $de(now(), 'D. MMMM YYYY') }}
             </div>
         </div>
     </div>
@@ -92,7 +92,7 @@
                 </div>
             </div>
             @foreach (array_values(array_filter([
-                $work ? ['Geleistet', $hours($work['total_minutes']), $hours($work['month_minutes']) . ' im ' . $de(now(), 'MMMM'), 'heroicon-o-clock', 'var(--nx-tone-violet)', $pageLink('leistung')] : ['Aktive Projekte', $k['active'], $projectCount ? 'von ' . $projectCount : null, 'heroicon-o-bolt', 'var(--nx-info)', null],
+                $work ? ['Letzte 30 Tage', $hours($work['period_minutes']['30']), 'gesamt ' . $hours($work['total_minutes']) . ($work['first_date'] ? ' seit ' . $de($work['first_date'], 'MMM YYYY') : ''), 'heroicon-o-clock', 'var(--nx-tone-violet)', $pageLink('leistung')] : ['Aktive Projekte', $k['active'], $projectCount ? 'von ' . $projectCount : null, 'heroicon-o-bolt', 'var(--nx-info)', null],
                 ($k['overdue'] ?? 0)
                     ? ['Überfällig', $k['overdue'], ($k['overdue'] === 1 ? 'Schritt' : 'Schritte') . ' über dem Termin', 'heroicon-o-exclamation-triangle', 'var(--nx-danger)', null]
                     : ['Offene Schritte', $openSteps, $k['next_due'] ? 'nächster ' . $duePhrase($k['next_due']) : 'nichts terminiert', 'heroicon-o-list-bullet', 'var(--nx-tone-amber)', null],

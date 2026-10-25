@@ -5,14 +5,15 @@
     $planned = $work['planned_minutes'] ?? 0;
     $usedPct = $planned > 0 ? (int) round($work['total_minutes'] / $planned * 100) : null;
     $delta = $work['month_minutes'] - $work['prev_month_minutes'];
-    $maxPerson = max(1, collect($work['people'])->max('minutes'));
+    $periodLabels = ['30' => '30 Tage', '90' => '3 Monate', '365' => '12 Monate', 'all' => 'Gesamt'];
+    $activeNow = collect($work['people'])->filter(fn ($p) => $p['periods']['30'] > 0)->count();
     $weeks = collect($work['entries'])->groupBy(fn ($e) => $e['date']->copy()->startOfWeek()->format('Y-m-d'));
 @endphp
 <div class="mt-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
     <div class="gp-card p-4">
-        <div class="text-xs text-[color:var(--nx-muted)]">Geleistet gesamt</div>
-        <div class="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight">{{ $hours($work['total_minutes']) }}</div>
-        <div class="mt-0.5 text-xs text-[color:var(--nx-faint)]">{{ $work['first_date'] ? 'seit ' . $de($work['first_date'], 'MMMM YYYY') : '' }} · {{ $work['entry_count'] }} Buchungen</div>
+        <div class="text-xs text-[color:var(--nx-muted)]">Letzte 30 Tage</div>
+        <div class="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight">{{ $hours($work['period_minutes']['30']) }}</div>
+        <div class="mt-0.5 text-xs text-[color:var(--nx-faint)]">{{ $activeNow ? $activeNow . ' ' . ($activeNow === 1 ? 'Person' : 'Personen') . ' aktiv' : 'gerade niemand gebucht' }}</div>
     </div>
     <div class="gp-card p-4">
         <div class="text-xs text-[color:var(--nx-muted)]">{{ $de(now(), 'MMMM') }}</div>
@@ -36,13 +37,9 @@
         </div>
     @endif
     <div class="gp-card p-4">
-        <div class="text-xs text-[color:var(--nx-muted)]">Im Team</div>
-        <div class="mt-1.5 flex items-center">
-            @foreach (array_slice($work['people'], 0, 5) as $p)
-                <span @class(['rounded-full ring-2 ring-[color:var(--nx-surface)]', '-ml-1.5' => ! $loop->first])>{!! $person($p, 28) !!}</span>
-            @endforeach
-        </div>
-        <div class="mt-1.5 text-xs text-[color:var(--nx-faint)]">{{ count($work['people']) }} {{ count($work['people']) === 1 ? 'Person' : 'Personen' }}</div>
+        <div class="text-xs text-[color:var(--nx-muted)]">Gesamt</div>
+        <div class="mt-1.5 text-2xl font-semibold tabular-nums tracking-tight">{{ $hours($work['total_minutes']) }}</div>
+        <div class="mt-0.5 text-xs text-[color:var(--nx-faint)]">{{ $work['first_date'] ? 'seit ' . $de($work['first_date'], 'MMMM YYYY') . ' · ' : '' }}{{ $work['entry_count'] }} Buchungen</div>
     </div>
 </div>
 
@@ -64,25 +61,57 @@
             @endforeach
         </div>
     </div>
-    <div class="gp-card p-4 lg:col-span-2">
-        <div class="mb-2 text-sm font-medium">Wer gearbeitet hat</div>
-        <div class="space-y-2.5">
-            @foreach ($work['people'] as $p)
-                <div class="flex items-center gap-3">
-                    {!! $person($p, 28) !!}
-                    <div class="min-w-0 flex-1">
-                        <div class="flex items-baseline justify-between gap-2 text-sm">
-                            <span class="truncate font-medium">{{ $p['name'] }}</span>
-                            <span class="shrink-0 tabular-nums">{{ $hours($p['minutes']) }}</span>
-                        </div>
-                        <div class="mt-1 h-1 overflow-hidden rounded-full bg-[color:var(--nx-line)]">
-                            <div class="h-full rounded-full bg-[color:var(--nx-tone-violet)]" style="width: {{ (int) round($p['minutes'] / $maxPerson * 100) }}%"></div>
-                        </div>
-                        <div class="mt-0.5 text-[11px] text-[color:var(--nx-faint)]">zuletzt {{ $dayLabel($p['last_at']) }}{{ $p['month_minutes'] ? ' · ' . $hours($p['month_minutes']) . ' diesen Monat' : '' }}</div>
-                    </div>
-                </div>
-            @endforeach
+    <div class="gp-card p-4 lg:col-span-2" x-data="{ p: '90' }">
+        <div class="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <span class="text-sm font-medium">Wer gearbeitet hat</span>
+            <div class="inline-flex rounded-[6px] bg-[color:var(--nx-hover)] p-0.5 text-[11px]">
+                @foreach ($periodLabels as $key => $label)
+                    <button type="button" @click="p = '{{ $key }}'" class="rounded-[5px] px-2 py-0.5 transition-colors"
+                            :style="p === '{{ $key }}' ? 'background: var(--nx-surface); color: var(--nx-text); box-shadow: 0 1px 2px rgba(0,0,0,.06)' : 'color: var(--nx-muted)'">{{ $label }}</button>
+                @endforeach
+            </div>
         </div>
+        @foreach ($periodLabels as $key => $label)
+            @php
+                [$active, $former] = collect($work['people'])->partition(fn ($x) => $x['periods'][$key] > 0);
+                $active = $active->sortByDesc(fn ($x) => $x['periods'][$key])->values();
+                $maxP = max(1, $active->max(fn ($x) => $x['periods'][$key]));
+            @endphp
+            <div x-show="p === '{{ $key }}'" @if ($key !== '90') style="display: none" @endif>
+                @if ($active->isEmpty())
+                    <div class="py-4 text-center text-sm text-[color:var(--nx-faint)]">In diesem Zeitraum keine Buchungen.</div>
+                @endif
+                <div class="space-y-2.5">
+                    @foreach ($active as $person_)
+                        <div class="flex items-center gap-3">
+                            {!! $person($person_, 28) !!}
+                            <div class="min-w-0 flex-1">
+                                <div class="flex items-baseline justify-between gap-2 text-sm">
+                                    <span class="truncate font-medium">{{ $person_['name'] }}</span>
+                                    <span class="shrink-0 tabular-nums">{{ $hours($person_['periods'][$key]) }}</span>
+                                </div>
+                                <div class="mt-1 h-1 overflow-hidden rounded-full bg-[color:var(--nx-line)]">
+                                    <div class="h-full rounded-full bg-[color:var(--nx-tone-violet)]" style="width: {{ (int) round($person_['periods'][$key] / $maxP * 100) }}%"></div>
+                                </div>
+                                <div class="mt-0.5 text-[11px] text-[color:var(--nx-faint)]">zuletzt {{ $dayLabel($person_['last_at']) }} · {{ $person_['entries'] }} {{ $person_['entries'] === 1 ? 'Buchung' : 'Buchungen' }} an {{ $person_['days'] }} {{ $person_['days'] === 1 ? 'Tag' : 'Tagen' }} insgesamt</div>
+                            </div>
+                        </div>
+                    @endforeach
+                </div>
+                @if ($key !== 'all' && $former->isNotEmpty())
+                    <div class="mt-3 border-t border-[color:var(--nx-line)] pt-2.5">
+                        <div class="mb-1.5 text-[11px] font-medium uppercase tracking-wide text-[color:var(--nx-faint)]">Früher beteiligt</div>
+                        @foreach ($former->sortByDesc('last_at') as $person_)
+                            <div class="flex items-center gap-2 py-0.5 text-xs text-[color:var(--nx-muted)]">
+                                <span class="opacity-60">{!! $person($person_, 18) !!}</span>
+                                <span class="truncate">{{ $person_['name'] }}</span>
+                                <span class="ml-auto shrink-0 text-[color:var(--nx-faint)]">bis {{ $de($person_['last_at'], 'MMMM YYYY') }} · {{ $hours($person_['minutes']) }}</span>
+                            </div>
+                        @endforeach
+                    </div>
+                @endif
+            </div>
+        @endforeach
     </div>
 </div>
 

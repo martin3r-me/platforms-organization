@@ -187,7 +187,7 @@
                     </a>
 
                     @foreach (array_filter([
-                        ! empty($data['work']['entry_count']) ? ['leistung', 'Leistung', 'heroicon-o-clock', $hours($data['work']['total_minutes'])] : null,
+                        ! empty($data['work']['entry_count']) ? ['leistung', 'Leistung', 'heroicon-o-clock', $data['work']['period_minutes']['30'] ? $hours($data['work']['period_minutes']['30']) . ' / 30 T.' : null] : null,
                         ! empty($data['finance']) ? ['rechnungen', 'Rechnungen', 'heroicon-o-document-text', ($data['finance']['summary']['open'] ?? 0) > 0 ? $money($data['finance']['summary']['open'], $data['finance']['currency']) . ' offen' : null] : null,
                         $data['activity'] ? ['aktivitaet', 'Aktivität', 'heroicon-o-bolt', null] : null,
                     ]) as [$key, $label, $icon, $meta])

@@ -31,6 +31,7 @@ class OrganizationEntityExternalId extends Model
         'buchungskonto' => 'Buchungskonto',
         'kreditor'      => 'Kreditor',
         'debitor'       => 'Debitor',
+        'easybill'      => 'easybill-Kunde',
     ];
 
     protected $fillable = [

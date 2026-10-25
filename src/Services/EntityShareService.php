@@ -11,6 +11,9 @@ use Platform\Organization\Mail\ShareInvitationMail;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityShare;
 use Platform\Organization\Models\OrganizationEntityShareRecipient;
+use Platform\Organization\Models\OrganizationTimeEntry;
+use Platform\Organization\Models\OrganizationTimePlanned;
+use Platform\Core\Models\User;
 
 /**
  * Kunden-Tor: löst eine Freigabe in ihren Ausschnitt des Baums auf und baut daraus
@@ -179,27 +182,26 @@ class EntityShareService
     /**
      * Alles für die Übersicht der öffentlichen Seite.
      *
-     * @return array{featured: array, sections: array, nav: array, recent: array, upcoming: array, kpis: array}
+     * @param \Carbon\CarbonInterface|null $since letzter Besuch (für „Seit Ihrem letzten Besuch")
+     * @return array{featured: array, sections: array, nav: array, recent: array, upcoming: array, kpis: array, work: ?array, finance: ?array, activity: array, since: array}
      */
-    public function pageData(OrganizationEntityShare $share): array
+    public function pageData(OrganizationEntityShare $share, ?\Carbon\CarbonInterface $since = null): array
     {
         $root = $share->entity;
         $entities = $this->scopeEntities($root, $share->depth);
-        $allowed = array_flip($this->allowedTypes($share));
         $shareTypes = $this->registry->allShareTypes();
         $config = $this->registry->allLinkTypeConfig();
-        $options = ['details' => (bool) $share->setting('details', true)];
+        $options = ['details' => (bool) $share->setting('details', true), 'since' => $since];
+        $visible = $this->visibleObjects($share, $entities);
+        $work = $share->setting('work', true) ? $this->workData($visible, $entities, $since) : null;
 
         $featured = [];
         $sections = [];
+        $events = [];
 
-        foreach ($this->linkedIds($entities->keys()->all(), true) as $alias => $idToEntity) {
-            if (! isset($allowed[$alias])) {
-                continue;
-            }
-            $idToEntity = array_diff_key($idToEntity, array_flip($this->hiddenIds($share, $alias)));
+        foreach ($visible as $alias => $idToEntity) {
             $fqcn = $this->modelClass($alias);
-            if (! $idToEntity || ! $fqcn) {
+            if (! $fqcn) {
                 continue;
             }
 
@@ -218,17 +220,38 @@ class EntityShareService
             }
 
             $hasDetail = $view && method_exists($view, 'shareDetail');
+            $slug = $this->slugFor($alias);
             foreach ($items as &$item) {
                 // Herkunft im Baum, wenn nicht direkt am geteilten Knoten
                 $entityId = $idToEntity[$item['id']] ?? null;
                 $item['area'] = ($entityId && $entityId !== $root->id) ? ($entities[$entityId]->name ?? null) : null;
                 $item['has_detail'] = $hasDetail;
+                if ($work) {
+                    $item['minutes'] = $work['by_item'][$alias][$item['id']] ?? 0;
+                    $item['planned_minutes'] = $work['planned_by_item'][$alias][$item['id']] ?? 0;
+                }
             }
             unset($item);
 
+            // Ereignisse fürs Protokoll (nur mit „Einzelne Schritte zeigen")
+            if ($view && $options['details'] && method_exists($view, 'shareActivity')) {
+                try {
+                    $titles = collect($items)->pluck('title', 'id');
+                    foreach ($view->shareActivity($alias, $models, $options) as $event) {
+                        $pid = $event['parent_id'] ?? null;
+                        $events[] = $event + [
+                            'parent' => $pid ? ($titles[$pid] ?? null) : null,
+                            'href' => $pid && $hasDetail && isset($titles[$pid]) ? [$slug, $pid, $event['sub'] ?? null] : null,
+                        ];
+                    }
+                } catch (\Throwable $e) {
+                    Log::warning('Freigabe: Aktivität nicht darstellbar', ['alias' => $alias, 'error' => $e->getMessage()]);
+                }
+            }
+
             $group = [
                 'alias' => $alias,
-                'slug' => $this->slugFor($alias),
+                'slug' => $slug,
                 'label' => $shareTypes[$alias]['label'] ?? $config[$alias]['label'] ?? $alias,
                 'icon' => $this->icon($shareTypes[$alias]['icon'] ?? $config[$alias]['icon'] ?? null),
                 'has_detail' => $hasDetail,
@@ -249,6 +272,33 @@ class EntityShareService
         $upcoming = $steps->flatMap(fn ($i) => collect($i['next'] ?? [])->map(fn ($s) => $s + ['parent' => $i['title'], 'slug' => $i['slug'], 'parent_id' => $i['id'], 'linkable' => $i['has_detail']]))
             ->sortBy(fn ($s) => [empty($s['due']) ? 1 : 0, optional($s['due'] ?? null)->timestamp ?? 0])->take(8)->values()->all();
 
+        $finance = $share->setting('finance', false) ? $this->financeData($share, $entities) : null;
+
+        // Zeiten und Zahlungen gehören mit ins Protokoll
+        $itemLinks = collect($featured)->merge($sections)
+            ->flatMap(fn ($g) => collect($g['items'])->mapWithKeys(fn ($i) => [$g['alias'] . ':' . $i['id'] => $g['has_detail'] ? [$g['slug'], $i['id']] : null]));
+        foreach ($work['entries'] ?? [] as $entry) {
+            if ($entry['at']->lt(now()->subDays(60))) {
+                break;
+            }
+            $events[] = [
+                'at' => $entry['at'], 'kind' => 'work', 'title' => $entry['context'] ?? $entry['item'] ?? 'Arbeit',
+                'text' => $entry['note'], 'person' => $entry['person'], 'minutes' => $entry['minutes'],
+                'parent' => $entry['item'] !== $entry['context'] ? $entry['item'] : null,
+                'href' => $entry['item_key'] ? ($itemLinks[$entry['item_key']] ?? null) : null,
+            ];
+        }
+        foreach ($finance['payments'] ?? [] as $payment) {
+            if ($payment['at'] && $payment['at']->gte(now()->subDays(60))) {
+                $events[] = ['at' => $payment['at'], 'kind' => 'payment', 'title' => 'Zahlung eingegangen', 'text' => $payment['label'], 'amount' => $payment['amount'], 'currency' => $finance['currency'], 'parent' => null, 'href' => null];
+            }
+        }
+        $events = collect($events)->filter(fn ($e) => ! empty($e['at']))
+            ->sortByDesc(fn ($e) => $e['at']->timestamp)->take(80)->values();
+
+        $sinceAt = $since ?? now()->subDays(7);
+        $fresh = $events->filter(fn ($e) => $e['at']->gt($sinceAt));
+
         return [
             'featured' => $featured,
             'sections' => $sections,
@@ -256,7 +306,339 @@ class EntityShareService
             'recent' => $recent,
             'upcoming' => $upcoming,
             'kpis' => $this->kpis($featured),
+            'work' => $work,
+            'finance' => $finance,
+            'activity' => $events->all(),
+            'since' => [
+                'at' => $sinceAt,
+                'is_visit' => $since !== null,
+                'minutes' => $work['since_minutes'] ?? 0,
+                'done' => $fresh->where('kind', 'done')->count(),
+                'canvas' => $fresh->where('kind', 'canvas')->count(),
+                'payments' => $fresh->where('kind', 'payment')->count(),
+                'people' => $fresh->where('kind', 'work')->pluck('person')->unique()->values()->all(),
+            ],
         ];
+    }
+
+    // ── Leistung (gebuchte Zeiten) ─────────────────────────────
+
+    /**
+     * Gebuchte Zeiten im Ausschnitt: an den Knoten selbst und an allem Sichtbaren samt
+     * Kindern (Projekt → Aufgaben, über die timeTrackableCascades der Module).
+     * Mit Personen und Notizen, ohne Beträge.
+     *
+     * @param array<string, array<int, int>> $visible alias => [id => entity_id]
+     */
+    public function workData(array $visible, Collection $entities, ?\Carbon\CarbonInterface $since = null): ?array
+    {
+        [$pairs, $owners] = $this->workPairs($visible, $entities);
+        if (! $pairs) {
+            return null;
+        }
+
+        try {
+            $rows = $this->pairQuery(OrganizationTimeEntry::query(), $pairs)
+                ->orderByDesc('work_date')->orderByDesc('id')
+                ->get(['id', 'user_id', 'context_type', 'context_id', 'work_date', 'minutes', 'note', 'created_at']);
+            $planned = $this->pairQuery(OrganizationTimePlanned::query(), $pairs)
+                ->where('is_active', true)
+                ->get(['context_type', 'context_id', 'planned_minutes']);
+        } catch (\Throwable $e) {
+            Log::warning('Freigabe: Zeiten nicht lesbar', ['error' => $e->getMessage()]);
+
+            return null;
+        }
+
+        $morph = Relation::morphMap();
+        $key = fn ($type, $id) => ($morph[$type] ?? $type) . '|' . $id;
+        $users = User::whereIn('id', $rows->pluck('user_id')->filter()->unique())->get()->keyBy('id');
+        $name = fn ($uid) => ($u = $users->get($uid)) ? (trim((string) $u->fullname) ?: $u->name) : 'Ehemaliges Teammitglied';
+
+        $byItem = [];
+        $plannedByItem = [];
+        foreach ($rows as $row) {
+            if ($owner = $owners[$key($row->context_type, $row->context_id)] ?? null) {
+                $byItem[$owner[0]][$owner[1]] = ($byItem[$owner[0]][$owner[1]] ?? 0) + (int) $row->minutes;
+            }
+        }
+        foreach ($planned as $row) {
+            if ($owner = $owners[$key($row->context_type, $row->context_id)] ?? null) {
+                $plannedByItem[$owner[0]][$owner[1]] = ($plannedByItem[$owner[0]][$owner[1]] ?? 0) + (int) $row->planned_minutes;
+            }
+        }
+
+        // Monate: die letzten 12, auch leere
+        $months = [];
+        for ($i = 11; $i >= 0; $i--) {
+            $m = now()->startOfMonth()->subMonthsNoOverflow($i);
+            $months[$m->format('Y-m')] = ['key' => $m->format('Y-m'), 'label' => $m->locale('de')->isoFormat('MMM'), 'long' => $m->locale('de')->isoFormat('MMMM YYYY'), 'minutes' => 0];
+        }
+        foreach ($rows as $row) {
+            $k = $row->work_date?->format('Y-m');
+            if ($k && isset($months[$k])) {
+                $months[$k]['minutes'] += (int) $row->minutes;
+            }
+        }
+
+        $thisMonth = now()->format('Y-m');
+        $people = $rows->groupBy('user_id')->map(fn ($r, $uid) => [
+            'id' => (int) $uid,
+            'name' => $name($uid),
+            'has_avatar' => (bool) $users->get($uid)?->avatar,
+            'minutes' => (int) $r->sum('minutes'),
+            'month_minutes' => (int) $r->filter(fn ($x) => $x->work_date?->format('Y-m') === $thisMonth)->sum('minutes'),
+            'last_at' => $r->max('work_date'),
+            'entries' => $r->count(),
+        ])->sortByDesc('minutes')->values()->all();
+
+        // Neueste Buchungen mit Kontext (Aufgabe/Projekt) für Protokoll und Liste
+        $recentRows = $rows->take(250);
+        $titles = $this->contextTitles($recentRows, collect($owners)->only($recentRows->map(fn ($r) => $key($r->context_type, $r->context_id))->all())->filter(fn ($o) => $o[0])->values());
+        $entries = $recentRows->map(function ($row) use ($owners, $key, $titles, $name) {
+            $owner = $owners[$key($row->context_type, $row->context_id)] ?? null;
+            $sameDay = $row->created_at && $row->work_date && $row->created_at->isSameDay($row->work_date);
+
+            return [
+                'at' => $sameDay ? $row->created_at : $row->work_date->copy()->setTime(12, 0),
+                'date' => $row->work_date,
+                'person' => $name($row->user_id),
+                'user_id' => (int) $row->user_id,
+                'minutes' => (int) $row->minutes,
+                'note' => trim((string) $row->note) ?: null,
+                'context' => $titles[$key($row->context_type, $row->context_id)] ?? null,
+                'item' => $owner ? ($titles[$this->ownerTitleKey($owner)] ?? null) : null,
+                'item_key' => $owner ? $owner[0] . ':' . $owner[1] : null,
+                'item_alias' => $owner[0] ?? null,
+                'item_id' => $owner[1] ?? null,
+            ];
+        })->values()->all();
+
+        $total = (int) $rows->sum('minutes');
+
+        return [
+            'total_minutes' => $total,
+            'planned_minutes' => (int) $planned->sum('planned_minutes'),
+            'month_minutes' => $months[$thisMonth]['minutes'] ?? 0,
+            'prev_month_minutes' => $months[now()->startOfMonth()->subMonthNoOverflow()->format('Y-m')]['minutes'] ?? 0,
+            'since_minutes' => $since ? (int) $rows->filter(fn ($r) => ($r->created_at && $r->created_at->gt($since)))->sum('minutes') : (int) $rows->filter(fn ($r) => $r->work_date && $r->work_date->gte(now()->subDays(7)->startOfDay()))->sum('minutes'),
+            'first_date' => $rows->min('work_date'),
+            'last_date' => $rows->max('work_date'),
+            'entry_count' => $rows->count(),
+            'months' => array_values($months),
+            'people' => $people,
+            'by_item' => $byItem,
+            'planned_by_item' => $plannedByItem,
+            'entries' => $entries,
+        ];
+    }
+
+    /** Arbeiten an einem einzelnen Objekt (Tab „Arbeiten" der Detailseite). */
+    public function itemWork(OrganizationEntityShare $share, array $found): ?array
+    {
+        if (! $share->setting('work', true)) {
+            return null;
+        }
+        $visible = [$found['alias'] => [$found['model']->getKey() => $share->entity_id]];
+
+        return $this->workData($visible, collect());
+    }
+
+    /**
+     * Kontext-Paare der Zeitbuchungen: [fqcn => ids] und „Typ|id" → [alias, Objekt-ID].
+     *
+     * @return array{0: array<string, int[]>, 1: array<string, array{0: ?string, 1: ?int}>}
+     */
+    protected function workPairs(array $visible, Collection $entities): array
+    {
+        $cascades = EntityTimeResolver::getTimeTrackableCascades();
+        $pairs = [];
+        $owners = [];
+        $add = function (string $fqcn, int $id, ?string $alias, ?int $ownerId) use (&$pairs, &$owners) {
+            $pairs[$fqcn][] = $id;
+            $owners[$fqcn . '|' . $id] ??= [$alias, $ownerId];
+        };
+
+        foreach ($entities->keys() as $entityId) {
+            $add(OrganizationEntity::class, (int) $entityId, null, null);
+        }
+
+        foreach ($visible as $alias => $idToEntity) {
+            $fqcn = $this->modelClass($alias);
+            if (! $fqcn) {
+                continue;
+            }
+            [$cascadeClass, $relations] = $cascades[$alias] ?? [$fqcn, []];
+            try {
+                $models = $cascadeClass::with($relations)->whereIn('id', array_keys($idToEntity))->get();
+            } catch (\Throwable) {
+                $models = $fqcn::whereIn('id', array_keys($idToEntity))->get();
+                $relations = [];
+            }
+            foreach ($models as $model) {
+                $add(get_class($model), (int) $model->getKey(), $alias, (int) $model->getKey());
+                foreach ($relations as $path) {
+                    foreach ($this->walkRelation($model, $path) as $leaf) {
+                        $add(get_class($leaf), (int) $leaf->getKey(), $alias, (int) $model->getKey());
+                    }
+                }
+            }
+        }
+
+        return [array_map(fn ($ids) => array_values(array_unique($ids)), $pairs), $owners];
+    }
+
+    /** Folgt einem Relationspfad wie „projectSlots.tasks" zu den Blatt-Models. */
+    protected function walkRelation(Model $model, string $path): Collection
+    {
+        $current = collect([$model]);
+        foreach (explode('.', $path) as $segment) {
+            $current = $current->flatMap(function ($m) use ($segment) {
+                if (! method_exists($m, $segment)) {
+                    return [];
+                }
+                $related = $m->{$segment};
+
+                return $related instanceof Collection ? $related->all() : ($related instanceof Model ? [$related] : []);
+            });
+        }
+
+        return $current->filter(fn ($m) => $m instanceof Model)->values();
+    }
+
+    /** Zeitbuchungen speichern den Kontext als Klasse, ältere evtl. als Morph-Alias — beides abfragen. */
+    protected function pairQuery($query, array $pairs)
+    {
+        $reverse = array_flip(Relation::morphMap());
+
+        return $query->where(function ($q) use ($pairs, $reverse) {
+            foreach ($pairs as $fqcn => $ids) {
+                $types = array_values(array_filter([$fqcn, $reverse[$fqcn] ?? null]));
+                $q->orWhere(fn ($sq) => $sq->whereIn('context_type', $types)->whereIn('context_id', $ids));
+            }
+        });
+    }
+
+    /** Titel der Kontexte (Aufgabe, Projekt, Knoten) und ihrer Besitzer — „Typ|id" => Titel. */
+    protected function contextTitles(Collection $rows, Collection $owners): array
+    {
+        $morph = Relation::morphMap();
+        $ids = [];
+        foreach ($rows as $row) {
+            $ids[$morph[$row->context_type] ?? $row->context_type][] = (int) $row->context_id;
+        }
+        foreach ($owners as $owner) {
+            if ($fqcn = $this->modelClass((string) $owner[0])) {
+                $ids[$fqcn][] = (int) $owner[1];
+            }
+        }
+
+        $titles = [];
+        foreach ($ids as $fqcn => $list) {
+            if (! class_exists($fqcn) || ! is_subclass_of($fqcn, Model::class)) {
+                continue;
+            }
+            try {
+                foreach ($fqcn::withoutGlobalScopes()->whereIn('id', array_unique($list))->get() as $m) {
+                    $titles[$fqcn . '|' . $m->getKey()] = $this->modelTitle($m);
+                }
+            } catch (\Throwable) {
+                // unbekannter Kontext — bleibt ohne Titel
+            }
+        }
+
+        return $titles;
+    }
+
+    protected function ownerTitleKey(array $owner): string
+    {
+        return ($this->modelClass((string) $owner[0]) ?? $owner[0]) . '|' . $owner[1];
+    }
+
+    protected function modelTitle(Model $m): string
+    {
+        // name zuerst: berechnete Titel tragen oft interne Präfixe (z. B. Projektart)
+        $title = $m->getAttribute('name') ?: $m->getAttribute('title')
+            ?: ($m instanceof \Platform\Core\Contracts\HasDisplayName ? $m->getDisplayName() : null);
+
+        return (string) ($title ?: '—');
+    }
+
+    // ── Geld ───────────────────────────────────────────────────
+
+    /** Rechnungen, Zahlungen, Belege aus den registrierten Finanz-Modulen. */
+    public function financeData(OrganizationEntityShare $share, ?Collection $entities = null): ?array
+    {
+        $entities ??= $this->scopeEntities($share->entity, $share->depth);
+        $linked = $this->linkedIds($entities->keys()->all());
+        $result = null;
+
+        foreach ($this->registry->shareFinanceProviders() as $provider) {
+            try {
+                $part = $provider->shareFinance((int) $share->team_id, $entities->keys()->all(), $linked);
+            } catch (\Throwable $e) {
+                Log::warning('Freigabe: Finanzen nicht darstellbar', ['provider' => get_class($provider), 'error' => $e->getMessage()]);
+                continue;
+            }
+            if (! $part) {
+                continue;
+            }
+            if (! $result) {
+                $result = $part;
+                continue;
+            }
+            foreach (['invoiced', 'paid', 'open', 'overdue'] as $k) {
+                $result['summary'][$k] += $part['summary'][$k] ?? 0;
+            }
+            $result['invoices'] = array_merge($result['invoices'], $part['invoices']);
+            $result['payments'] = array_merge($result['payments'], $part['payments']);
+        }
+
+        return $result;
+    }
+
+    /** Beleg-Datei — nur, was zum Ausschnitt gehört und wenn Geld freigegeben ist. */
+    public function document(OrganizationEntityShare $share, string $ref): ?\Symfony\Component\HttpFoundation\Response
+    {
+        if (! $share->setting('finance', false)) {
+            return null;
+        }
+        $entities = $this->scopeEntities($share->entity, $share->depth);
+        $linked = $this->linkedIds($entities->keys()->all());
+
+        foreach ($this->registry->shareFinanceProviders() as $provider) {
+            try {
+                if ($response = $provider->shareDocument((int) $share->team_id, $entities->keys()->all(), $linked, $ref)) {
+                    return $response;
+                }
+            } catch (\Throwable $e) {
+                Log::warning('Freigabe: Beleg nicht abrufbar', ['provider' => get_class($provider), 'ref' => $ref, 'error' => $e->getMessage()]);
+            }
+        }
+
+        return null;
+    }
+
+    /**
+     * Sichtbare Objekte: erlaubte Typen im Ausschnitt ohne Ausgeblendetes.
+     *
+     * @return array<string, array<int, int>> alias => [id => entity_id]
+     */
+    protected function visibleObjects(OrganizationEntityShare $share, Collection $entities): array
+    {
+        $allowed = array_flip($this->allowedTypes($share));
+        $out = [];
+        foreach ($this->linkedIds($entities->keys()->all(), true) as $alias => $idToEntity) {
+            if (! isset($allowed[$alias])) {
+                continue;
+            }
+            $idToEntity = array_diff_key($idToEntity, array_flip($this->hiddenIds($share, $alias)));
+            if ($idToEntity) {
+                $out[$alias] = $idToEntity;
+            }
+        }
+
+        return $out;
     }
 
     /**
@@ -284,13 +666,14 @@ class EntityShareService
         return $model ? ['alias' => $alias, 'model' => $model, 'view' => $view] : null;
     }
 
-    /** Detailseite eines gefundenen Objekts (siehe ProvidesShareView). */
-    public function detailData(OrganizationEntityShare $share, array $found, ?string $sub, callable $link): ?array
+    /** Detailseite eines gefundenen Objekts (siehe ProvidesShareView) — plus Tab „Arbeiten". */
+    public function detailData(OrganizationEntityShare $share, array $found, ?string $sub, callable $link, ?\Carbon\CarbonInterface $since = null): ?array
     {
         try {
-            return $found['view']->shareDetail($found['alias'], $found['model'], [
+            $detail = $found['view']->shareDetail($found['alias'], $found['model'], [
                 'details' => (bool) $share->setting('details', true),
                 'sub' => $sub,
+                'since' => $since,
                 'link' => $link,
             ]);
         } catch (\Throwable $e) {
@@ -298,6 +681,34 @@ class EntityShareService
 
             return null;
         }
+        if (! $detail || isset($detail['page'])) {
+            return $detail;
+        }
+
+        $work = $this->itemWork($share, $found);
+        if ($work && $work['entry_count'] > 0) {
+            $detail['work'] = $work;
+            $detail['tabs'][] = [
+                'key' => 'arbeiten', 'label' => 'Arbeiten', 'count' => null, 'order' => 20,
+                'view' => 'organization::livewire.share._work',
+                'data' => ['work' => $work, 'compact' => false],
+            ];
+            $detail['facts'][] = ['label' => 'Geleistet', 'value' => self::hours($work['total_minutes']) . ($work['planned_minutes'] ? ' von ' . self::hours($work['planned_minutes']) : '')];
+        }
+        usort($detail['tabs'], fn ($a, $b) => ($a['order'] ?? 50) <=> ($b['order'] ?? 50));
+
+        return $detail;
+    }
+
+    /** „12,5 h" bzw. „45 min" — Stunden ohne Beträge. */
+    public static function hours(int $minutes): string
+    {
+        if ($minutes < 60) {
+            return $minutes . ' min';
+        }
+        $h = $minutes / 60;
+
+        return number_format($h, $h >= 100 || fmod($h, 1.0) === 0.0 ? 0 : 1, ',', '.') . ' h';
     }
 
     /**

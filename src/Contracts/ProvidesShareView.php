@@ -27,8 +27,16 @@ use Illuminate\Support\Collection;
  *     // statt tabs: Unterseite, wenn $options['sub'] gesetzt ist
  *     'page' => ?['title' => string, 'view' => string, 'data' => array],
  *   ]
- * $options: details (bool), sub (?string), link (callable(?string $sub): string — URL zu
- * diesem Objekt bzw. einer Unterseite). null → 404 (z. B. unbekannte Unterseite).
+ * $options: details (bool), sub (?string), since (?Carbon — letzter Besuch, für „neu"-Marken),
+ * link (callable(?string $sub): string — URL zu diesem Objekt bzw. einer Unterseite).
+ * null → 404 (z. B. unbekannte Unterseite). Tabs dürfen 'order' (int, Standard 50) tragen;
+ * organization ergänzt selbst den Tab „Arbeiten" (order 20) mit den gebuchten Zeiten.
+ *
+ *   public function shareActivity(string $alias, Collection $models, array $options): array
+ *
+ * liefert Ereignisse für den Aktivitätsstrom der Übersicht (neueste zuerst, höchstens
+ * ~60 Tage): [['at' => Carbon, 'kind' => 'done'|'canvas'|'state'|…, 'title' => string,
+ * 'text' => ?string, 'parent_id' => ?int (Objekt-ID des Typs, für den Link)]].
  * Views bekommen data + $link und sollten nur --nx-*-Tokens/x-nx-* nutzen; Inhalt im Raster
  * `mx-auto max-w-[1120px] px-4 sm:px-8`, randlos Breites (Board) mit der Klasse `gp-bleed`.
  */

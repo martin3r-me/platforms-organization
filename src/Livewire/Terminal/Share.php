@@ -29,6 +29,8 @@ class Share extends Component
     public string $depth = 'all';          // all | 0 | 1 | 2
     public array $types = [];              // gewählte Aliase
     public bool $details = true;
+    public bool $work = true;              // gebuchte Zeiten mit Personen und Notizen
+    public bool $finance = false;          // Rechnungen, Zahlungen, Belege
     public array $visible = [];            // sichtbare Objekte als "alias:id" (Rest = ausgeblendet)
     public string $expires = '';           // Y-m-d oder leer
 
@@ -46,6 +48,13 @@ class Share extends Component
     public function mount(): void
     {
         $this->loadShare();
+    }
+
+    /** Ist ein Finanz-Modul angebunden (z. B. drip)? Sonst bleibt der Schalter weg. */
+    #[Computed]
+    public function hasFinance(): bool
+    {
+        return app(\Platform\Organization\Services\EntityLinkRegistry::class)->shareFinanceProviders() !== [];
     }
 
     #[Computed]
@@ -129,6 +138,8 @@ class Share extends Component
         $this->depth = $share->depth === null ? 'all' : (string) $share->depth;
         $this->types = app(EntityShareService::class)->allowedTypes($share);
         $this->details = (bool) $share->setting('details', true);
+        $this->work = (bool) $share->setting('work', true);
+        $this->finance = (bool) $share->setting('finance', false);
         $this->expires = $share->expires_at?->format('Y-m-d') ?? '';
         unset($this->shareableItems);
         $this->visible = $this->visibleKeys($share);
@@ -194,7 +205,7 @@ class Share extends Component
     /** Einstellungen sofort speichern. */
     public function updated(string $property): void
     {
-        if (! in_array($property, ['title', 'message', 'access', 'depth', 'types', 'details', 'expires', 'visible'], true)
+        if (! in_array($property, ['title', 'message', 'access', 'depth', 'types', 'details', 'work', 'finance', 'expires', 'visible'], true)
             && ! str_starts_with($property, 'types.') && ! str_starts_with($property, 'visible.')) {
             return;
         }
@@ -218,7 +229,7 @@ class Share extends Component
             'access' => $this->access === OrganizationEntityShare::ACCESS_INVITE ? OrganizationEntityShare::ACCESS_INVITE : OrganizationEntityShare::ACCESS_LINK,
             'depth' => $this->depthValue(),
             'types' => array_values(array_unique(array_filter($this->types, 'is_string'))),
-            'settings' => array_merge($share->settings ?? [], ['details' => $this->details, 'hidden' => $hidden]),
+            'settings' => array_merge($share->settings ?? [], ['details' => $this->details, 'work' => $this->work, 'finance' => $this->finance, 'hidden' => $hidden]),
             'expires_at' => $this->expires !== '' ? Carbon::parse($this->expires)->endOfDay() : null,
         ]);
 

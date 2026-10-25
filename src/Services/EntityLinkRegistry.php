@@ -76,6 +76,20 @@ class EntityLinkRegistry
         return $this->shareViews[$morphAlias] ?? null;
     }
 
+    /** @var \Platform\Organization\Contracts\ProvidesShareFinance[] Geld auf geteilten Seiten (Kunden-Tor) */
+    protected array $shareFinance = [];
+
+    public function registerShareFinance(\Platform\Organization\Contracts\ProvidesShareFinance $finance): void
+    {
+        $this->shareFinance[get_class($finance)] = $finance;
+    }
+
+    /** @return \Platform\Organization\Contracts\ProvidesShareFinance[] */
+    public function shareFinanceProviders(): array
+    {
+        return array_values($this->shareFinance);
+    }
+
     /** @return array<string, array> alias => ['label', 'singular', 'icon', 'featured'] */
     public function allShareTypes(): array
     {

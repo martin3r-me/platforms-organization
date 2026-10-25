@@ -44,6 +44,35 @@
         );
     };
     $teamInitial = mb_strtoupper(mb_substr($teamName ?: 'P', 0, 1));
+    // Stunden ohne Beträge; Geld in Cent
+    $hours = fn (int $min) => \Platform\Organization\Services\EntityShareService::hours($min);
+    $money = fn (int $cents, string $cur = 'EUR') => number_format($cents / 100, 2, ',', '.') . ' ' . ($cur === 'EUR' ? '€' : $cur);
+    // Person: Profilbild hinter der Freigabe, sonst Initialen
+    $person = function (array|string $p, int $size = 24) use ($avatar, $tone) {
+        $name = is_array($p) ? ($p['name'] ?? '?') : $p;
+        $url = is_array($p) ? $avatar($p) : null;
+        $initials = collect(preg_split('/\s+/', trim($name)))->filter()->take(2)->map(fn ($w) => mb_strtoupper(mb_substr($w, 0, 1)))->implode('');
+        $t = $tone('p' . $name);
+
+        return $url
+            ? sprintf('<img src="%1$s" alt="" class="gp-avatar" style="width:%2$dpx;height:%2$dpx" loading="lazy">', e($url), $size)
+            : sprintf('<span class="gp-avatar" style="width:%1$dpx;height:%1$dpx;font-size:%2$dpx;background:color-mix(in srgb, var(--nx-tone-%3$s) 18%%, #fff);color:var(--nx-tone-%3$s)" title="%5$s">%4$s</span>', $size, (int) round($size * 0.4), $t, e($initials ?: '?'), e($name));
+    };
+    $dayLabel = function ($d) use ($de) {
+        if (! $d) {
+            return 'Früher';
+        }
+
+        return match (true) {
+            $d->isToday() => 'Heute',
+            $d->isYesterday() => 'Gestern',
+            $d->greaterThan(now()->subDays(6)->startOfDay()) => $d->copy()->locale('de')->isoFormat('dddd'),
+            $d->year === now()->year => $de($d, 'dd, D. MMMM'),
+            default => $de($d, 'D. MMMM YYYY'),
+        };
+    };
+    $pageLink = $link; // Modul-Views bekommen ein eigenes $link (Unterseiten des Objekts)
+    $projectsAll = collect($data['nav'] ?? [])->flatMap(fn ($g) => collect($g['items'])->map(fn ($i) => $i + ['slug' => $g['slug']]));
 @endphp
 
 <div class="gp" x-data="{ nav: false }" @keydown.escape.window="nav = false">
@@ -60,6 +89,15 @@
             .gp-nav { position: sticky; top: 0; height: 100vh; flex-shrink: 0; transform: none; box-shadow: none !important; }
             .gp-scrim, .gp-burger { display: none !important; }
         }
+        .gp-avatar { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 999px; object-fit: cover; font-weight: 600; line-height: 1; }
+        .gp-card { border: 1px solid var(--nx-line); border-radius: 12px; background: var(--nx-surface); }
+        .gp-h2 { font-size: 15px; font-weight: 600; }
+        .gp-bars { display: flex; align-items: flex-end; gap: 6px; height: 96px; }
+        .gp-bars > div { flex: 1; min-width: 0; display: flex; flex-direction: column; align-items: center; justify-content: flex-end; height: 100%; gap: 6px; }
+        .gp-bars .gp-bar { width: 100%; max-width: 28px; border-radius: 4px 4px 2px 2px; background: color-mix(in srgb, var(--nx-info) 30%, transparent); min-height: 2px; }
+        .gp-bars .gp-bar.is-now { background: var(--nx-info); }
+        .gp-bars span { font-size: 10px; color: var(--nx-faint); }
+        .gp-dot-new { width: 6px; height: 6px; border-radius: 999px; background: var(--nx-info); flex-shrink: 0; }
         .gp-tile { display: inline-flex; flex-shrink: 0; align-items: center; justify-content: center; border-radius: 6px; font-weight: 700; line-height: 1; }
         .gp-live { position: relative; width: 7px; height: 7px; border-radius: 999px; background: var(--nx-success); }
         .gp-live::after { content: ''; position: absolute; inset: -3px; border-radius: 999px; background: var(--nx-success); opacity: .35; animation: gp-pulse 2s ease-out infinite; }
@@ -131,28 +169,71 @@
                 </div>
 
                 <nav class="flex-1 overflow-y-auto px-2 py-3">
-                    <a href="{{ $link() }}" wire:navigate @class(['gp-navlink', 'is-active' => ! $activeSlug && ! $notFound])>
+                    <a href="{{ $link() }}" wire:navigate @class(['gp-navlink', 'is-active' => ! $activeSlug && ! $section && ! $notFound])>
                         @svg('heroicon-o-squares-2x2', 'w-4 h-4 shrink-0')
                         <span class="truncate">Übersicht</span>
                     </a>
 
+                    @foreach (array_filter([
+                        ! empty($data['work']['entry_count']) ? ['leistung', 'Leistung', 'heroicon-o-clock', $hours($data['work']['total_minutes'])] : null,
+                        ! empty($data['finance']) ? ['rechnungen', 'Rechnungen', 'heroicon-o-document-text', ($data['finance']['summary']['open'] ?? 0) > 0 ? $money($data['finance']['summary']['open'], $data['finance']['currency']) . ' offen' : null] : null,
+                        $data['activity'] ? ['aktivitaet', 'Aktivität', 'heroicon-o-bolt', null] : null,
+                    ]) as [$key, $label, $icon, $meta])
+                        <a href="{{ $link($key) }}" wire:navigate @class(['gp-navlink', 'is-active' => $section === $key && ! $notFound]) @click="nav = false">
+                            @svg($icon, 'w-4 h-4 shrink-0')
+                            <span class="min-w-0 truncate">{{ $label }}</span>
+                            @if ($meta)<span class="gp-meta">{{ $meta }}</span>@endif
+                        </a>
+                    @endforeach
+
                     @foreach ($data['nav'] as $group)
+                        @php
+                            [$archived, $running] = collect($group['items'])->partition(fn ($i) => ($i['state'] ?? '') === 'done');
+                            $archiveOpen = $archived->contains(fn ($i) => $activeSlug === $group['slug'] && $activeId === (int) $i['id']);
+                        @endphp
                         <div class="mb-1 mt-5 flex items-center justify-between px-2 text-[11px] font-medium uppercase tracking-wide text-[color:var(--nx-faint)]">
                             <span>{{ $group['label'] }}</span>
-                            <span class="tabular-nums">{{ count($group['items']) }}</span>
+                            <span class="tabular-nums">{{ $running->count() }}</span>
                         </div>
-                        @foreach ($group['items'] as $item)
+                        @foreach ($running as $item)
                             @php
                                 $itemPct = $pct($item['progress'] ?? null);
                             @endphp
                             <a href="{{ $link($group['slug'], $item['id']) }}" wire:navigate wire:key="nav-{{ $group['slug'] }}-{{ $item['id'] }}"
                                @class(['gp-navlink', 'is-active' => $activeSlug === $group['slug'] && $activeId === (int) $item['id']])
                                @click="nav = false">
-                                {!! $ring(($item['state'] ?? '') === 'done' ? 100 : ($itemPct ?? 0), 15) !!}
+                                @if (($item['state'] ?? '') === 'paused')
+                                    @svg('heroicon-s-pause-circle', 'w-[15px] h-[15px] shrink-0 text-[color:var(--nx-warning)]')
+                                @else
+                                    {!! $ring($itemPct ?? 0, 15) !!}
+                                @endif
                                 <span class="min-w-0 truncate">{{ $item['title'] }}</span>
                                 @if ($itemPct !== null)<span class="gp-meta">{{ $itemPct }} %</span>@endif
                             </a>
                         @endforeach
+                        @if ($running->isEmpty())
+                            <div class="px-2 py-1 text-xs text-[color:var(--nx-faint)]">Gerade nichts laufend</div>
+                        @endif
+                        @if ($archived->isNotEmpty())
+                            <div x-data="{ open: @js($archiveOpen) }" class="mt-1">
+                                <button type="button" class="gp-navlink w-full" @click="open = ! open">
+                                    <span class="inline-flex w-[15px] justify-center transition-transform" :style="open && 'transform: rotate(90deg)'">@svg('heroicon-m-chevron-right', 'w-3.5 h-3.5 shrink-0')</span>
+                                    <span class="min-w-0 truncate text-left">Abgeschlossen</span>
+                                    <span class="gp-meta">{{ $archived->count() }}</span>
+                                </button>
+                                <div x-show="open" @if (! $archiveOpen) style="display: none" @endif>
+                                    @foreach ($archived as $item)
+                                        <a href="{{ $link($group['slug'], $item['id']) }}" wire:navigate wire:key="nav-a-{{ $group['slug'] }}-{{ $item['id'] }}"
+                                           @class(['gp-navlink', 'is-active' => $activeSlug === $group['slug'] && $activeId === (int) $item['id']])
+                                           @click="nav = false">
+                                            @svg('heroicon-s-check-circle', 'w-[15px] h-[15px] shrink-0 text-[color:var(--nx-success)]')
+                                            <span class="min-w-0 truncate">{{ $item['title'] }}</span>
+                                            @if (! empty($item['state_since']))<span class="gp-meta">{{ $de($item['state_since'], 'MMM YY') }}</span>@endif
+                                        </a>
+                                    @endforeach
+                                </div>
+                            </div>
+                        @endif
                     @endforeach
                 </nav>
 
@@ -181,7 +262,11 @@
                         @svg('heroicon-o-bars-3', 'w-5 h-5')
                     </button>
                     <nav class="flex min-w-0 flex-1 items-center gap-1.5 text-sm">
-                        @if ($activeSlug || $notFound)
+                        @if ($section && ! $notFound)
+                            <a href="{{ $link() }}" wire:navigate class="shrink-0 text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">Übersicht</a>
+                            @svg('heroicon-o-chevron-right', 'w-3.5 h-3.5 shrink-0 text-[color:var(--nx-faint)]')
+                            <span class="min-w-0 truncate font-medium">{{ \Platform\Organization\Livewire\Share\PublicShare::SECTIONS[$section] }}</span>
+                        @elseif ($activeSlug || $notFound)
                             <a href="{{ $link() }}" wire:navigate class="shrink-0 text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">Übersicht</a>
                             @if ($detail)
                                 @svg('heroicon-o-chevron-right', 'w-3.5 h-3.5 shrink-0 text-[color:var(--nx-faint)]')
@@ -210,6 +295,24 @@
                             <div class="mt-4 font-semibold">Nicht (mehr) Teil dieser Freigabe</div>
                             <p class="mt-1 text-sm text-[color:var(--nx-muted)]">Der Inhalt wurde entfernt oder ist hier nicht sichtbar.</p>
                             <a href="{{ $link() }}" wire:navigate class="mt-5 inline-flex rounded-[6px] border border-[color:var(--nx-line-strong)] px-3 py-1.5 text-sm hover:bg-[color:var(--nx-hover)]">Zur Übersicht</a>
+                        </div>
+                    @elseif ($section === 'leistung')
+                        <div class="mx-auto max-w-[1120px] px-4 py-8 sm:px-8 md:py-10">
+                            <h1 class="text-2xl font-bold tracking-tight">Leistung</h1>
+                            <p class="mt-1 text-sm text-[color:var(--nx-muted)]">Alle gebuchten Zeiten — wer wann woran gearbeitet hat.</p>
+                            @include('organization::livewire.share._work', ['work' => $data['work'], 'compact' => false])
+                        </div>
+                    @elseif ($section === 'rechnungen')
+                        <div class="mx-auto max-w-[1120px] px-4 py-8 sm:px-8 md:py-10">
+                            <h1 class="text-2xl font-bold tracking-tight">Rechnungen &amp; Zahlungen</h1>
+                            <p class="mt-1 text-sm text-[color:var(--nx-muted)]">Alle Rechnungen mit Beleg, ihr Bezahlstand und die eingegangenen Zahlungen.</p>
+                            @include('organization::livewire.share._finance', ['finance' => $data['finance'], 'compact' => false])
+                        </div>
+                    @elseif ($section === 'aktivitaet')
+                        <div class="mx-auto max-w-[1120px] px-4 py-8 sm:px-8 md:py-10">
+                            <h1 class="text-2xl font-bold tracking-tight">Aktivität</h1>
+                            <p class="mt-1 text-sm text-[color:var(--nx-muted)]">Was in den letzten 60 Tagen passiert ist — Arbeit, erledigte Schritte, Canvases, Zahlungen.</p>
+                            <div class="mt-6 max-w-3xl">@include('organization::livewire.share._activity', ['events' => $data['activity'], 'limit' => null])</div>
                         </div>
                     @elseif ($detail)
                         @include('organization::livewire.share._detail', ['detail' => $detail, 'detailLink' => fn (?string $sub = null) => $link($activeSlug, $activeId, $sub)])

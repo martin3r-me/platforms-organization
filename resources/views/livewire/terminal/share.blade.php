@@ -172,6 +172,19 @@
                     <input type="checkbox" wire:model.live="details" class="rounded border-[var(--t-border)]" @disabled(! $this->canWrite)>
                     <span>Einzelne Schritte zeigen <span class="text-[10px] text-[var(--t-text-muted)]">(zuletzt erledigt / als Nächstes)</span></span>
                 </label>
+                <label class="flex items-center gap-2 px-2 py-1 rounded text-[12px] cursor-pointer hover:bg-white/5">
+                    <input type="checkbox" wire:model.live="work" class="rounded border-[var(--t-border)]" @disabled(! $this->canWrite)>
+                    <span>Geleistete Zeiten zeigen <span class="text-[10px] text-[var(--t-text-muted)]">(wer, wann, wie lange, mit Notiz — ohne Beträge)</span></span>
+                </label>
+                @if($this->hasFinance)
+                    <label class="flex items-center gap-2 px-2 py-1 rounded text-[12px] cursor-pointer hover:bg-white/5">
+                        <input type="checkbox" wire:model.live="finance" class="rounded border-[var(--t-border)]" @disabled(! $this->canWrite)>
+                        <span>Rechnungen &amp; Zahlungen zeigen <span class="text-[10px] text-[var(--t-text-muted)]">(mit Belegen zum Herunterladen)</span></span>
+                    </label>
+                    @if($finance)
+                        <p class="px-2 text-[10px] leading-snug text-[var(--t-text-muted)]">Rechnungen erscheinen, wenn an diesem Knoten (oder darunter) die easybill-Kunden-ID als Fremd-ID „easybill" hinterlegt ist; Zahlungen auch über verknüpfte Transaktionen.</p>
+                    @endif
+                @endif
             </section>
 
             {{-- Auf der Seite --}}

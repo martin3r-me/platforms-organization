@@ -177,9 +177,9 @@ class EntityShareService
     // ── Seite ──────────────────────────────────────────────────
 
     /**
-     * Alles für die öffentliche Seite.
+     * Alles für die Übersicht der öffentlichen Seite.
      *
-     * @return array{featured: array, sections: array, areas: array, kpis: array}
+     * @return array{featured: array, sections: array, nav: array, recent: array, upcoming: array, kpis: array}
      */
     public function pageData(OrganizationEntityShare $share): array
     {
@@ -197,8 +197,9 @@ class EntityShareService
             if (! isset($allowed[$alias])) {
                 continue;
             }
-            $fqcn = Relation::getMorphedModel($alias) ?? (class_exists($alias) ? $alias : null);
-            if (! $fqcn || ! is_subclass_of($fqcn, Model::class)) {
+            $idToEntity = array_diff_key($idToEntity, array_flip($this->hiddenIds($share, $alias)));
+            $fqcn = $this->modelClass($alias);
+            if (! $idToEntity || ! $fqcn) {
                 continue;
             }
 
@@ -212,22 +213,25 @@ class EntityShareService
                 Log::warning('Freigabe: Typ nicht darstellbar', ['alias' => $alias, 'error' => $e->getMessage()]);
                 continue;
             }
-
-            // Herkunft im Baum, wenn nicht direkt am geteilten Knoten
-            foreach ($items as &$item) {
-                $entityId = $idToEntity[$item['id']] ?? null;
-                $item['area'] = ($entityId && $entityId !== $root->id) ? ($entities[$entityId]->name ?? null) : null;
-            }
-            unset($item);
-
             if (! $items) {
                 continue;
             }
 
+            $hasDetail = $view && method_exists($view, 'shareDetail');
+            foreach ($items as &$item) {
+                // Herkunft im Baum, wenn nicht direkt am geteilten Knoten
+                $entityId = $idToEntity[$item['id']] ?? null;
+                $item['area'] = ($entityId && $entityId !== $root->id) ? ($entities[$entityId]->name ?? null) : null;
+                $item['has_detail'] = $hasDetail;
+            }
+            unset($item);
+
             $group = [
                 'alias' => $alias,
+                'slug' => $this->slugFor($alias),
                 'label' => $shareTypes[$alias]['label'] ?? $config[$alias]['label'] ?? $alias,
                 'icon' => $this->icon($shareTypes[$alias]['icon'] ?? $config[$alias]['icon'] ?? null),
+                'has_detail' => $hasDetail,
                 'items' => $this->sortItems($items),
             ];
 
@@ -238,15 +242,103 @@ class EntityShareService
             }
         }
 
+        // Quer über alle Projekte: was zuletzt erledigt wurde und was als Nächstes ansteht
+        $steps = collect($featured)->flatMap(fn ($g) => collect($g['items'])->map(fn ($i) => $i + ['slug' => $g['slug']]));
+        $recent = $steps->flatMap(fn ($i) => collect($i['recent'] ?? [])->map(fn ($s) => $s + ['parent' => $i['title'], 'slug' => $i['slug'], 'parent_id' => $i['id'], 'linkable' => $i['has_detail']]))
+            ->sortByDesc(fn ($s) => optional($s['at'] ?? null)->timestamp ?? 0)->take(8)->values()->all();
+        $upcoming = $steps->flatMap(fn ($i) => collect($i['next'] ?? [])->map(fn ($s) => $s + ['parent' => $i['title'], 'slug' => $i['slug'], 'parent_id' => $i['id'], 'linkable' => $i['has_detail']]))
+            ->sortBy(fn ($s) => [empty($s['due']) ? 1 : 0, optional($s['due'] ?? null)->timestamp ?? 0])->take(8)->values()->all();
+
         return [
             'featured' => $featured,
             'sections' => $sections,
-            'areas' => $entities->except($root->id)->values()->map(fn ($e) => [
-                'name' => $e->name,
-                'type' => $e->type?->name,
-            ])->all(),
+            'nav' => array_values(array_filter(array_merge($featured, $sections), fn ($g) => $g['has_detail'])),
+            'recent' => $recent,
+            'upcoming' => $upcoming,
             'kpis' => $this->kpis($featured),
         ];
+    }
+
+    /**
+     * Ein Objekt der Freigabe über seinen URL-Teil — nur, wenn es im Ausschnitt liegt,
+     * sein Typ freigegeben und es nicht ausgeblendet ist und das Modul eine Detailseite hat.
+     *
+     * @return array{alias: string, model: Model, view: object}|null
+     */
+    public function findItem(OrganizationEntityShare $share, string $slug, int $id): ?array
+    {
+        $alias = collect($this->allowedTypes($share))->first(fn ($a) => $this->slugFor($a) === $slug);
+        $view = $alias ? $this->registry->shareView($alias) : null;
+        $fqcn = $alias ? $this->modelClass($alias) : null;
+        if (! $view || ! $fqcn || ! method_exists($view, 'shareDetail') || in_array($id, $this->hiddenIds($share, $alias), true)) {
+            return null;
+        }
+
+        $ids = $this->linkedIds($this->scopeEntities($share->entity, $share->depth)->keys()->all())[$alias] ?? [];
+        if (! in_array($id, array_map('intval', $ids), true)) {
+            return null;
+        }
+
+        $model = $fqcn::find($id);
+
+        return $model ? ['alias' => $alias, 'model' => $model, 'view' => $view] : null;
+    }
+
+    /** Detailseite eines gefundenen Objekts (siehe ProvidesShareView). */
+    public function detailData(OrganizationEntityShare $share, array $found, ?string $sub, callable $link): ?array
+    {
+        try {
+            return $found['view']->shareDetail($found['alias'], $found['model'], [
+                'details' => (bool) $share->setting('details', true),
+                'sub' => $sub,
+                'link' => $link,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Freigabe: Detail nicht darstellbar', ['alias' => $found['alias'], 'id' => $found['model']->getKey(), 'error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Objekte eines Typs mit Kundenansicht im Ausschnitt — für die Auswahl „sichtbar" im Panel.
+     *
+     * @return array<int, string> id => Titel
+     */
+    public function scopeItems(OrganizationEntity $root, ?int $depth, string $alias): array
+    {
+        $ids = $this->linkedIds($this->scopeEntities($root, $depth)->keys()->all())[$alias] ?? [];
+        $view = $this->registry->shareView($alias);
+        $fqcn = $this->modelClass($alias);
+        if (! $ids || ! $view || ! $fqcn) {
+            return [];
+        }
+
+        try {
+            $items = $view->shareItems($alias, $fqcn::whereIn('id', $ids)->get(), ['details' => false]);
+        } catch (\Throwable) {
+            return [];
+        }
+
+        return collect($this->sortItems($items))->mapWithKeys(fn ($i) => [$i['id'] => $i['title']])->all();
+    }
+
+    /** Ausgeblendete Objekte eines Typs (Einstellung der Freigabe). */
+    public function hiddenIds(OrganizationEntityShare $share, string $alias): array
+    {
+        return array_map('intval', (array) ($share->setting('hidden', [])[$alias] ?? []));
+    }
+
+    public function slugFor(string $alias): string
+    {
+        return $this->registry->allShareTypes()[$alias]['slug'] ?? $alias;
+    }
+
+    protected function modelClass(string $alias): ?string
+    {
+        $fqcn = Relation::getMorphedModel($alias) ?? (class_exists($alias) ? $alias : null);
+
+        return $fqcn && is_subclass_of($fqcn, Model::class) ? $fqcn : null;
     }
 
     /**

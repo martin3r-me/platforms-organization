@@ -19,9 +19,19 @@ class PublicShare extends Component
 
     public bool $requested = false;
 
-    public function mount(string $token): void
+    // Detailseite: /teilen/{token}/{type}/{id}/{sub?}
+    public ?string $type = null;
+
+    public ?int $itemId = null;
+
+    public ?string $sub = null;
+
+    public function mount(string $token, ?string $type = null, ?string $id = null, ?string $sub = null): void
     {
         $this->token = $token;
+        $this->type = $type;
+        $this->itemId = $id !== null ? (int) $id : null;
+        $this->sub = $sub;
 
         [$share, $recipient, $status] = app(EntityShareService::class)->resolve($token);
         if ($status === 'ok') {
@@ -53,6 +63,14 @@ class PublicShare extends Component
         $data = $status === 'ok' ? $service->pageData($share) : null;
         $title = $share?->displayTitle() ?? 'Freigabe';
 
+        // Detailseite eines Objekts — nur, was im Ausschnitt der Freigabe liegt
+        $detail = null;
+        $found = null;
+        if ($data && $this->type && $this->itemId) {
+            $found = $service->findItem($share, $this->type, $this->itemId);
+            $detail = $found ? $service->detailData($share, $found, $this->sub, fn (?string $sub = null) => $this->link($this->type, $this->itemId, $sub)) : null;
+        }
+
         return view('organization::livewire.share.public-share', [
             'share' => $share,
             'recipient' => $recipient,
@@ -62,6 +80,19 @@ class PublicShare extends Component
             'senderName' => $share?->createdBy?->name,
             'title' => $title,
             'data' => $data,
-        ])->layout('platform::layouts.guest', ['title' => $title]);
+            'detail' => $detail,
+            'notFound' => $data && $this->type && ! $detail,
+            'activeSlug' => $found ? $this->type : null,
+            'activeId' => $found ? $this->itemId : null,
+            'link' => fn (?string $type = null, ?int $id = null, ?string $sub = null) => $this->link($type, $id, $sub),
+        ])->layout('platform::layouts.guest', ['title' => $detail ? ($detail['page']['title'] ?? $detail['title']) . ' · ' . $title : $title]);
+    }
+
+    /** URL innerhalb der Freigabe — behält den Token, über den man gekommen ist. */
+    public function link(?string $type = null, ?int $id = null, ?string $sub = null): string
+    {
+        return $type && $id
+            ? route('organization.share.item', array_filter(['token' => $this->token, 'type' => $type, 'id' => $id, 'sub' => $sub]))
+            : route('organization.share.public', ['token' => $this->token]);
     }
 }

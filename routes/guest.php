@@ -12,3 +12,6 @@ Route::get('/org/{token}/pdf', [EntityStrategyPublicController::class, 'pdf'])->
 Route::get('/teilen/{token}', \Platform\Organization\Livewire\Share\PublicShare::class)
     ->where('token', '[a-f0-9]{48}')
     ->name('organization.share.public');
+Route::get('/teilen/{token}/{type}/{id}/{sub?}', \Platform\Organization\Livewire\Share\PublicShare::class)
+    ->where(['token' => '[a-f0-9]{48}', 'type' => '[a-z0-9_-]+', 'id' => '[0-9]+', 'sub' => '[a-z0-9_-]+'])
+    ->name('organization.share.item');

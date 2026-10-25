@@ -152,6 +152,22 @@
                 @else
                     <p class="text-[11px] text-[var(--t-text-muted)]">Hier hängt noch nichts – die Seite zeigt dann eine freundliche „Hier entsteht gerade etwas"-Ansicht.</p>
                 @endif
+                @foreach($this->shareableItems as $alias => $group)
+                    <div class="pt-1" wire:key="share-items-{{ $alias }}">
+                        <div class="flex items-center justify-between px-2 text-[10px] text-[var(--t-text-muted)]">
+                            <span>Sichtbare {{ $group['label'] }}</span>
+                            <span class="tabular-nums">{{ collect($visible)->filter(fn ($k) => str_starts_with($k, $alias . ':'))->count() }} / {{ count($group['items']) }}</span>
+                        </div>
+                        <div class="mt-0.5 max-h-48 overflow-y-auto space-y-0.5">
+                            @foreach($group['items'] as $id => $itemTitle)
+                                <label wire:key="share-i-{{ $alias }}-{{ $id }}" class="flex items-center gap-2 px-2 py-1 rounded text-[12px] cursor-pointer hover:bg-white/5">
+                                    <input type="checkbox" wire:model.live="visible" value="{{ $alias }}:{{ $id }}" class="rounded border-[var(--t-border)]" @disabled(! $this->canWrite)>
+                                    <span class="flex-1 min-w-0 truncate">{{ $itemTitle }}</span>
+                                </label>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
                 <label class="flex items-center gap-2 px-2 py-1 rounded text-[12px] cursor-pointer hover:bg-white/5">
                     <input type="checkbox" wire:model.live="details" class="rounded border-[var(--t-border)]" @disabled(! $this->canWrite)>
                     <span>Einzelne Schritte zeigen <span class="text-[10px] text-[var(--t-text-muted)]">(zuletzt erledigt / als Nächstes)</span></span>

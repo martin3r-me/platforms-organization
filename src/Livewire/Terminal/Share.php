@@ -29,6 +29,7 @@ class Share extends Component
     public string $depth = 'all';          // all | 0 | 1 | 2
     public array $types = [];              // gewählte Aliase
     public bool $details = true;
+    public array $visible = [];            // sichtbare Objekte als "alias:id" (Rest = ausgeblendet)
     public string $expires = '';           // Y-m-d oder leer
 
     public string $inviteEmails = '';
@@ -88,6 +89,32 @@ class Share extends Component
             : [];
     }
 
+    /**
+     * Einzelne Objekte der Typen mit Kundenansicht (z. B. Projekte) — zum Ein-/Ausblenden.
+     *
+     * @return array<string, array{label: string, items: array<int, string>}>
+     */
+    #[Computed]
+    public function shareableItems(): array
+    {
+        if (! $this->entity) {
+            return [];
+        }
+        $service = app(EntityShareService::class);
+        $out = [];
+        foreach ($this->availableTypes as $alias => $t) {
+            if (! $t['has_view'] || ! in_array($alias, $this->types, true)) {
+                continue;
+            }
+            $items = $service->scopeItems($this->entity, $this->depthValue(), $alias);
+            if ($items) {
+                $out[$alias] = ['label' => $t['label'], 'items' => $items];
+            }
+        }
+
+        return $out;
+    }
+
     protected function loadShare(): void
     {
         $share = $this->shareId ? $this->shares->firstWhere('id', $this->shareId) : $this->shares->first();
@@ -103,6 +130,39 @@ class Share extends Component
         $this->types = app(EntityShareService::class)->allowedTypes($share);
         $this->details = (bool) $share->setting('details', true);
         $this->expires = $share->expires_at?->format('Y-m-d') ?? '';
+        unset($this->shareableItems);
+        $this->visible = $this->visibleKeys($share);
+    }
+
+    /** Alle Objekte im Ausschnitt außer den ausgeblendeten. */
+    protected function visibleKeys(OrganizationEntityShare $share): array
+    {
+        $hidden = $share->setting('hidden', []);
+        $keys = [];
+        foreach ($this->shareableItems as $alias => $group) {
+            foreach (array_keys($group['items']) as $id) {
+                if (! in_array((int) $id, array_map('intval', (array) ($hidden[$alias] ?? [])), true)) {
+                    $keys[] = $alias . ':' . $id;
+                }
+            }
+        }
+
+        return $keys;
+    }
+
+    /** Ausgeblendet = im Ausschnitt, aber nicht angehakt. Neue Objekte sind automatisch sichtbar. */
+    protected function hiddenFromVisible(): array
+    {
+        $hidden = [];
+        foreach ($this->shareableItems as $alias => $group) {
+            foreach (array_keys($group['items']) as $id) {
+                if (! in_array($alias . ':' . $id, $this->visible, true)) {
+                    $hidden[$alias][] = (int) $id;
+                }
+            }
+        }
+
+        return $hidden;
     }
 
     public function create(): void
@@ -134,8 +194,8 @@ class Share extends Component
     /** Einstellungen sofort speichern. */
     public function updated(string $property): void
     {
-        if (! in_array($property, ['title', 'message', 'access', 'depth', 'types', 'details', 'expires'], true)
-            && ! str_starts_with($property, 'types.')) {
+        if (! in_array($property, ['title', 'message', 'access', 'depth', 'types', 'details', 'expires', 'visible'], true)
+            && ! str_starts_with($property, 'types.') && ! str_starts_with($property, 'visible.')) {
             return;
         }
         $share = $this->share;
@@ -143,9 +203,14 @@ class Share extends Component
             return;
         }
 
-        if ($property === 'depth') {
-            unset($this->availableTypes);
+        if ($property === 'depth' || $property === 'types' || str_starts_with($property, 'types.')) {
+            // Ausschnitt geändert: bisher Ausgeblendetes bleibt ausgeblendet, Neues wird sichtbar
+            unset($this->availableTypes, $this->shareableItems);
+            $this->visible = $this->visibleKeys($share);
         }
+        $hidden = $property === 'visible' || str_starts_with($property, 'visible.')
+            ? $this->hiddenFromVisible()
+            : ($share->setting('hidden', []) ?: []);
 
         $share->update([
             'title' => trim($this->title) !== '' ? mb_substr(trim($this->title), 0, 190) : null,
@@ -153,7 +218,7 @@ class Share extends Component
             'access' => $this->access === OrganizationEntityShare::ACCESS_INVITE ? OrganizationEntityShare::ACCESS_INVITE : OrganizationEntityShare::ACCESS_LINK,
             'depth' => $this->depthValue(),
             'types' => array_values(array_unique(array_filter($this->types, 'is_string'))),
-            'settings' => array_merge($share->settings ?? [], ['details' => $this->details]),
+            'settings' => array_merge($share->settings ?? [], ['details' => $this->details, 'hidden' => $hidden]),
             'expires_at' => $this->expires !== '' ? Carbon::parse($this->expires)->endOfDay() : null,
         ]);
 
@@ -237,7 +302,7 @@ class Share extends Component
 
     protected function refreshShares(): void
     {
-        unset($this->shares, $this->share, $this->availableTypes);
+        unset($this->shares, $this->share, $this->availableTypes, $this->shareableItems);
     }
 
     protected function changed(string $notice): void

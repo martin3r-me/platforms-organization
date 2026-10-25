@@ -185,15 +185,21 @@ class EntityShareService
      * @param \Carbon\CarbonInterface|null $since letzter Besuch (für „Seit Ihrem letzten Besuch")
      * @return array{featured: array, sections: array, nav: array, recent: array, upcoming: array, kpis: array, work: ?array, finance: ?array, activity: array, since: array}
      */
-    public function pageData(OrganizationEntityShare $share, ?\Carbon\CarbonInterface $since = null): array
+    public function pageData(OrganizationEntityShare $share, ?\Carbon\CarbonInterface $since = null, ?int $areaId = null): array
     {
         $root = $share->entity;
-        $entities = $this->scopeEntities($root, $share->depth);
+        $allEntities = $this->scopeEntities($root, $share->depth);
+        $areas = $this->areaOptions($root, $allEntities);
+        // Bereichsfilter: nur der Teilbaum eines Knotens (Pfade bleiben relativ zur Freigabe)
+        $entities = $areaId && $areaId !== $root->id && isset($areas[$areaId])
+            ? $allEntities->only($this->subtreeIds($areaId, $allEntities))
+            : $allEntities;
+        $areaId = $entities === $allEntities ? null : $areaId;
         $shareTypes = $this->registry->allShareTypes();
         $config = $this->registry->allLinkTypeConfig();
         $options = ['details' => (bool) $share->setting('details', true), 'since' => $since];
         $visible = $this->visibleObjects($share, $entities);
-        $tree = $this->treeOrder($root, $entities);
+        $tree = $this->treeOrder($root, $allEntities);
         $work = $share->setting('work', true) ? $this->workData($visible, $entities, $since) : null;
 
         $featured = [];
@@ -220,7 +226,10 @@ class EntityShareService
                 continue;
             }
 
-            $hasDetail = $view && method_exists($view, 'shareDetail');
+            $meta = $shareTypes[$alias] ?? [];
+            $navMode = $meta['nav'] ?? 'items';
+            $hasDetail = $view && $navMode === 'items' && ($meta['detail'] ?? true) && method_exists($view, 'shareDetail');
+            $hasSection = $view && $navMode === 'section' && method_exists($view, 'shareSection');
             $slug = $this->slugFor($alias);
             foreach ($items as &$item) {
                 // Herkunft im Baum, wenn nicht direkt am geteilten Knoten
@@ -255,16 +264,30 @@ class EntityShareService
                 }
             }
 
+            $summary = null;
+            if ($view && method_exists($view, 'shareSummary')) {
+                try {
+                    $summary = $view->shareSummary($alias, $models, $options);
+                } catch (\Throwable $e) {
+                    Log::warning('Freigabe: Kurzstatus nicht darstellbar', ['alias' => $alias, 'error' => $e->getMessage()]);
+                }
+            }
+
             $group = [
                 'alias' => $alias,
                 'slug' => $slug,
-                'label' => $shareTypes[$alias]['label'] ?? $config[$alias]['label'] ?? $alias,
-                'icon' => $this->icon($shareTypes[$alias]['icon'] ?? $config[$alias]['icon'] ?? null),
+                'label' => $meta['label'] ?? $config[$alias]['label'] ?? $alias,
+                'icon' => $this->icon($meta['icon'] ?? $config[$alias]['icon'] ?? null),
+                'group' => $meta['group'] ?? 'arbeit',
+                'order' => $meta['order'] ?? 50,
+                'nav_mode' => $navMode,
                 'has_detail' => $hasDetail,
+                'has_section' => $hasSection,
+                'summary' => $summary,
                 'items' => $this->sortItems($items),
             ];
 
-            if ($view && ($shareTypes[$alias]['featured'] ?? false)) {
+            if ($view && ($meta['featured'] ?? false)) {
                 $featured[] = $group;
             } else {
                 $sections[] = $group;
@@ -308,7 +331,13 @@ class EntityShareService
         return [
             'featured' => $featured,
             'sections' => $sections,
-            'nav' => array_values(array_filter(array_merge($featured, $sections), fn ($g) => $g['has_detail'])),
+            'nav' => collect(array_merge($featured, $sections))
+                ->filter(fn ($g) => $g['has_detail'] || $g['has_section'])
+                ->sortBy(fn ($g) => [array_search($g['group'], self::NAV_GROUPS, true), $g['order']])
+                ->groupBy('group')->all(),
+            'impact' => collect(array_merge($featured, $sections))->filter(fn ($g) => ! empty($g['summary']['kpis']))->values()->all(),
+            'areas' => $areas,
+            'area' => $areaId,
             'recent' => $recent,
             'upcoming' => $upcoming,
             'kpis' => $this->kpis($featured),
@@ -688,7 +717,9 @@ class EntityShareService
         $alias = collect($this->allowedTypes($share))->first(fn ($a) => $this->slugFor($a) === $slug);
         $view = $alias ? $this->registry->shareView($alias) : null;
         $fqcn = $alias ? $this->modelClass($alias) : null;
-        if (! $view || ! $fqcn || ! method_exists($view, 'shareDetail') || in_array($id, $this->hiddenIds($share, $alias), true)) {
+        $meta = $alias ? ($this->registry->allShareTypes()[$alias] ?? []) : [];
+        if (! $view || ! $fqcn || ! method_exists($view, 'shareDetail') || ($meta['nav'] ?? 'items') !== 'items' || ! ($meta['detail'] ?? true)
+            || in_array($id, $this->hiddenIds($share, $alias), true)) {
             return null;
         }
 
@@ -700,6 +731,80 @@ class EntityShareService
         $model = $fqcn::find($id);
 
         return $model ? ['alias' => $alias, 'model' => $model, 'view' => $view] : null;
+    }
+
+    /** Reihenfolge der Sidebar-Gruppen. */
+    public const NAV_GROUPS = ['arbeit', 'wirkung', 'service', 'konto'];
+
+    public const NAV_GROUP_LABELS = ['arbeit' => 'Arbeit', 'wirkung' => 'Wirkung', 'service' => 'Service', 'konto' => 'Konto'];
+
+    /**
+     * Bereichsseite eines Typs mit nav='section' (z. B. „Sichtbarkeit"): alle sichtbaren
+     * Objekte des Typs im Ausschnitt, gebaut vom Modul (shareSection, Format wie shareDetail).
+     */
+    public function sectionData(OrganizationEntityShare $share, string $slug, ?string $sub, callable $link, ?\Carbon\CarbonInterface $since = null): ?array
+    {
+        $types = $this->registry->allShareTypes();
+        $alias = collect($this->allowedTypes($share))->first(fn ($a) => $this->slugFor($a) === $slug && ($types[$a]['nav'] ?? 'items') === 'section');
+        $view = $alias ? $this->registry->shareView($alias) : null;
+        $fqcn = $alias ? $this->modelClass($alias) : null;
+        if (! $view || ! $fqcn || ! method_exists($view, 'shareSection')) {
+            return null;
+        }
+        $visible = $this->visibleObjects($share, $this->scopeEntities($share->entity, $share->depth))[$alias] ?? [];
+        if (! $visible) {
+            return null;
+        }
+
+        try {
+            return $view->shareSection($alias, $fqcn::whereIn('id', array_keys($visible))->get(), [
+                'details' => (bool) $share->setting('details', true),
+                'sub' => $sub,
+                'since' => $since,
+                'link' => $link,
+            ]);
+        } catch (\Throwable $e) {
+            Log::warning('Freigabe: Bereich nicht darstellbar', ['alias' => $alias, 'error' => $e->getMessage()]);
+
+            return null;
+        }
+    }
+
+    /**
+     * Knoten für den Bereichsfilter: nur solche, an denen (oder darunter) etwas hängt.
+     *
+     * @return array<int, array{id: int, name: string, depth: int}>
+     */
+    public function areaOptions(OrganizationEntity $root, Collection $entities): array
+    {
+        $withLinks = array_flip(array_merge(...array_values(array_map('array_values', $this->linkedIds($entities->keys()->all(), true)))) ?: []);
+        $tree = $this->treeOrder($root, $entities);
+        $out = [];
+        foreach ($tree as $id => $node) {
+            if ($node['depth'] === 0) {
+                continue;
+            }
+            $sub = $this->subtreeIds($id, $entities);
+            if (array_intersect_key(array_flip($sub), $withLinks)) {
+                $out[$id] = ['id' => $id, 'name' => $entities[$id]->name, 'depth' => $node['depth']];
+            }
+        }
+
+        return count($out) > 1 ? $out : [];
+    }
+
+    /** Knoten-ID samt aller Nachfahren im Ausschnitt. */
+    protected function subtreeIds(int $id, Collection $entities): array
+    {
+        $children = $entities->groupBy('parent_entity_id');
+        $ids = [$id];
+        for ($i = 0; $i < count($ids); $i++) {
+            foreach ($children->get($ids[$i], collect()) as $child) {
+                $ids[] = $child->id;
+            }
+        }
+
+        return $ids;
     }
 
     /** Detailseite eines gefundenen Objekts (siehe ProvidesShareView) — plus Tab „Arbeiten". */

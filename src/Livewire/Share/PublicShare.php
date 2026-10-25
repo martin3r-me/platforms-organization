@@ -35,6 +35,9 @@ class PublicShare extends Component
     /** Letzter Besuch vor diesem (persönlicher Link, sonst Cookie dieses Browsers) — ISO-Zeit. */
     public ?string $since = null;
 
+    /** Bereichsfilter (Teilbaum) — gemerkt je Freigabe in der Sitzung. */
+    public ?int $area = null;
+
     public function mount(string $token, ?string $type = null, ?string $id = null, ?string $sub = null, ?string $section = null): void
     {
         $this->token = $token;
@@ -55,9 +58,20 @@ class PublicShare extends Component
                 $this->since = $last?->toIso8601String();
                 session([$key => $this->since]);
             }
+            $this->area = session('gp_area_' . $share->id);
             Cookie::queue('gp_seen_' . $share->id, (string) now()->timestamp, 60 * 24 * 365);
             app(EntityShareService::class)->recordView($share, $recipient);
         }
+    }
+
+    public function setArea(?int $id = null): void
+    {
+        [$share, , $status] = app(EntityShareService::class)->resolve($this->token);
+        if ($status !== 'ok') {
+            return;
+        }
+        $this->area = $id ?: null;
+        session(['gp_area_' . $share->id => $this->area]);
     }
 
     public function requestAccess(): void
@@ -82,7 +96,13 @@ class PublicShare extends Component
         [$share, $recipient, $status] = $service->resolve($this->token);
 
         $since = $this->since ? Carbon::parse($this->since) : null;
-        $data = $status === 'ok' ? $service->pageData($share, $since) : null;
+        $data = $status === 'ok' ? $service->pageData($share, $since, $this->area) : null;
+
+        // Modul-Bereich (nav=section), z. B. /teilen/{token}/sichtbarkeit/{sub?}
+        $sectionPage = null;
+        if ($data && $this->section && ! isset(self::SECTIONS[$this->section])) {
+            $sectionPage = $service->sectionData($share, $this->section, $this->sub, fn (?string $sub = null) => $this->link($this->section, null, $sub), $since);
+        }
         $title = $share?->displayTitle() ?? 'Freigabe';
 
         // Detailseite eines Objekts — nur, was im Ausschnitt der Freigabe liegt
@@ -110,7 +130,8 @@ class PublicShare extends Component
             'title' => $title,
             'data' => $data,
             'detail' => $detail,
-            'notFound' => ($data && $this->type && ! $detail) || ($data && $this->section && ! $this->sectionAvailable($data)),
+            'notFound' => ($data && $this->type && ! $detail) || ($data && $this->section && ! $sectionPage && ! $this->sectionAvailable($data)),
+            'sectionPage' => $sectionPage,
             'section' => $this->type ? null : $this->section,
             'activeSlug' => $found ? $this->type : null,
             'activeId' => $found ? $this->itemId : null,
@@ -119,7 +140,7 @@ class PublicShare extends Component
             'document' => fn (string $ref) => route('organization.share.document', ['token' => $this->token, 'ref' => $ref]),
         ])->layout('platform::layouts.guest', ['title' => match (true) {
             (bool) $detail => ($detail['page']['title'] ?? $detail['title']) . ' · ' . $title,
-            (bool) $this->section => (self::SECTIONS[$this->section] ?? '') . ' · ' . $title,
+            (bool) $this->section => (self::SECTIONS[$this->section] ?? ($sectionPage['page']['title'] ?? $sectionPage['title'] ?? '')) . ' · ' . $title,
             default => $title,
         }]);
     }
@@ -129,9 +150,9 @@ class PublicShare extends Component
     protected function sectionAvailable(array $data): bool
     {
         return match ($this->section) {
-            'leistung' => ! empty($data['work']['entry_count']),
-            'rechnungen' => ! empty($data['finance']),
-            'aktivitaet' => true,
+            'leistung' => ! empty($data['work']['entry_count']) && ! $this->sub,
+            'rechnungen' => ! empty($data['finance']) && ! $this->sub,
+            'aktivitaet' => ! $this->sub,
             default => false,
         };
     }
@@ -141,7 +162,7 @@ class PublicShare extends Component
     {
         return match (true) {
             $type && $id => route('organization.share.item', array_filter(['token' => $this->token, 'type' => $type, 'id' => $id, 'sub' => $sub])),
-            $type && isset(self::SECTIONS[$type]) => route('organization.share.section', ['token' => $this->token, 'section' => $type]),
+            (bool) $type => route('organization.share.section', array_filter(['token' => $this->token, 'section' => $type, 'sub' => $sub])),
             default => route('organization.share.public', ['token' => $this->token]),
         };
     }

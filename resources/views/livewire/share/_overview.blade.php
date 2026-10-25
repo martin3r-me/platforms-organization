@@ -115,6 +115,42 @@
         </div>
     @endif
 
+    {{-- Wirkung: Kurzwerte der Module (Website, Sichtbarkeit, Social …) --}}
+    @if (! empty($data['impact']))
+        <section class="mt-10">
+            <h2 class="gp-h2 mb-3">Wirkung</h2>
+            <div class="space-y-3">
+                @foreach ($data['impact'] as $g)
+                    @php
+                        $gHref = $g['has_section'] ? $pageLink($g['slug']) : (($g['has_detail'] && count($g['items']) === 1) ? $pageLink($g['slug'], $g['items'][0]['id']) : null);
+                        $toneVar = ['success' => 'var(--nx-success)', 'warning' => 'var(--nx-warning)', 'danger' => 'var(--nx-danger)', 'info' => 'var(--nx-info)'];
+                    @endphp
+                    <div class="gp-card p-4">
+                        <div class="mb-3 flex items-center gap-2">
+                            @svg('heroicon-o-' . $g['icon'], 'w-4 h-4 text-[color:var(--nx-faint)]')
+                            <span class="text-sm font-medium">{{ $g['summary']['title'] ?? $g['label'] }}</span>
+                            @if (! empty($g['summary']['status']))
+                                <span class="text-xs" style="color: {{ $toneVar[$g['summary']['status']['tone'] ?? ''] ?? 'var(--nx-faint)' }}">{{ $g['summary']['status']['text'] }}</span>
+                            @endif
+                            @if ($gHref)
+                                <a href="{{ $gHref }}" wire:navigate class="ml-auto inline-flex items-center gap-1 text-sm text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">Details @svg('heroicon-o-arrow-right', 'w-3.5 h-3.5')</a>
+                            @endif
+                        </div>
+                        <div class="grid grid-cols-2 gap-x-6 gap-y-3 sm:grid-cols-3 lg:grid-cols-6">
+                            @foreach ($g['summary']['kpis'] as $kpi)
+                                <div class="min-w-0">
+                                    <div class="truncate text-xs text-[color:var(--nx-muted)]">{{ $kpi['label'] }}</div>
+                                    <div class="mt-0.5 truncate text-lg font-semibold tabular-nums tracking-tight" @if (! empty($kpi['tone'])) style="color: {{ $toneVar[$kpi['tone']] ?? 'inherit' }}" @endif>{{ $kpi['value'] }}</div>
+                                    @if (! empty($kpi['hint']))<div class="truncate text-[11px] text-[color:var(--nx-faint)]">{{ $kpi['hint'] }}</div>@endif
+                                </div>
+                            @endforeach
+                        </div>
+                    </div>
+                @endforeach
+            </div>
+        </section>
+    @endif
+
     {{-- Projekte: laufend/ruhend, darunter das Archiv --}}
     @foreach ($data['featured'] as $group)
         @php
@@ -311,7 +347,7 @@
     @endif
 
     {{-- Weitere Inhalte --}}
-    @foreach ($data['sections'] as $group)
+    @foreach (collect($data['sections'])->where('nav_mode', '!=', 'section')->where('group', 'arbeit') as $group)
         <section class="mt-10">
             <div class="mb-3 flex items-baseline gap-2">
                 <h2 class="text-[15px] font-semibold">{{ $group['label'] }}</h2>

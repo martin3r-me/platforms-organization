@@ -72,7 +72,6 @@
         };
     };
     $pageLink = $link; // Modul-Views bekommen ein eigenes $link (Unterseiten des Objekts)
-    $projectsAll = collect($data['nav'] ?? [])->flatMap(fn ($g) => collect($g['items'])->map(fn ($i) => $i + ['slug' => $g['slug']]));
 @endphp
 
 <div class="gp" x-data="{
@@ -117,6 +116,9 @@
         .gp-navtext { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
         .gp-navlink.is-multi { align-items: flex-start; }
         .gp-navlink.is-multi > svg, .gp-navlink.is-multi > .gp-ico { margin-top: 2px; }
+        .gp-navgroup { margin: 18px 8px 4px; font-size: 11px; font-weight: 600; letter-spacing: .04em; text-transform: uppercase; color: var(--nx-faint); }
+        .gp-navsub { display: flex; align-items: center; gap: 10px; margin-top: 6px; padding: 4px 8px; font-size: 13px; font-weight: 500; color: var(--nx-text); }
+        .gp-navsub span:last-child { font-size: 11px; font-weight: 400; color: var(--nx-faint); }
         .gp-navarea { display: flex; align-items: center; gap: 6px; padding: 8px 8px 2px; font-size: 11px; color: var(--nx-faint); }
         .gp-navarea span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .gp-navlink .gp-meta { margin-left: auto; flex-shrink: 0; white-space: nowrap; font-size: 11px; color: var(--nx-faint); font-variant-numeric: tabular-nums; }
@@ -186,31 +188,67 @@
                     </button>
                 </div>
 
+                @if (! empty($data['areas']))
+                    <div class="border-b border-[color:var(--nx-line)] px-3 py-2.5">
+                        <label class="relative flex items-center gap-2 rounded-[6px] border border-[color:var(--nx-line)] bg-[color:var(--nx-surface)] px-2.5 py-1.5 text-sm hover:border-[color:var(--nx-line-strong)]">
+                            @svg('heroicon-o-map-pin', 'w-4 h-4 shrink-0 text-[color:var(--nx-faint)]')
+                            <select class="min-w-0 flex-1 cursor-pointer appearance-none bg-transparent pr-5 outline-none" wire:change="setArea($event.target.value || null)" aria-label="Bereich">
+                                <option value="" @selected(! $data['area'])>Alle Bereiche</option>
+                                @foreach ($data['areas'] as $opt)
+                                    <option value="{{ $opt['id'] }}" @selected($data['area'] === $opt['id'])>{{ str_repeat('  ', max(0, $opt['depth'] - 1)) }}{{ $opt['name'] }}</option>
+                                @endforeach
+                            </select>
+                            @svg('heroicon-m-chevron-up-down', 'pointer-events-none absolute right-2 w-4 h-4 text-[color:var(--nx-faint)]')
+                        </label>
+                    </div>
+                @endif
+
                 <nav class="flex-1 overflow-y-auto px-2 py-3">
                     <a href="{{ $link() }}" wire:navigate @class(['gp-navlink', 'is-active' => ! $activeSlug && ! $section && ! $notFound])>
                         @svg('heroicon-o-squares-2x2', 'w-4 h-4 shrink-0')
                         <span class="truncate">Übersicht</span>
                     </a>
 
-                    @foreach (array_filter([
-                        ! empty($data['work']['entry_count']) ? ['leistung', 'Leistung', 'heroicon-o-clock', $data['work']['period_minutes']['30'] ? $hours($data['work']['period_minutes']['30']) . ' / 30 T.' : null] : null,
-                        ! empty($data['finance']) ? ['rechnungen', 'Rechnungen', 'heroicon-o-document-text', ($data['finance']['summary']['open'] ?? 0) > 0 ? $money($data['finance']['summary']['open'], $data['finance']['currency']) . ' offen' : null] : null,
-                        $data['activity'] ? ['aktivitaet', 'Aktivität', 'heroicon-o-bolt', null] : null,
-                    ]) as [$key, $label, $icon, $meta])
-                        <a href="{{ $link($key) }}" wire:navigate @class(['gp-navlink', 'is-active' => $section === $key && ! $notFound]) @click="nav = false">
-                            @svg($icon, 'w-4 h-4 shrink-0')
-                            <span class="min-w-0 truncate">{{ $label }}</span>
-                            @if ($meta)<span class="gp-meta">{{ $meta }}</span>@endif
+                    @if ($data['activity'])
+                        <a href="{{ $link('aktivitaet') }}" wire:navigate @class(['gp-navlink', 'is-active' => $section === 'aktivitaet' && ! $notFound]) @click="nav = false">
+                            @svg('heroicon-o-bolt', 'w-4 h-4 shrink-0')
+                            <span class="min-w-0 truncate">Aktivität</span>
                         </a>
-                    @endforeach
+                    @endif
 
-                    @foreach ($data['nav'] as $group)
+                    @php
+                        $konto = array_values(array_filter([
+                            ! empty($data['work']['entry_count']) ? ['leistung', 'Leistung', 'heroicon-o-clock', $data['work']['period_minutes']['30'] ? $hours($data['work']['period_minutes']['30']) . ' / 30 T.' : null, null] : null,
+                            ! empty($data['finance']) ? ['rechnungen', 'Rechnungen', 'heroicon-o-document-text', ($data['finance']['summary']['open'] ?? 0) > 0 ? $money($data['finance']['summary']['open'], $data['finance']['currency']) . ' offen' : 'alles bezahlt', ($data['finance']['summary']['overdue'] ?? 0) > 0 ? 'danger' : null] : null,
+                        ]));
+                        $toneColor = ['success' => 'var(--nx-success)', 'warning' => 'var(--nx-warning)', 'danger' => 'var(--nx-danger)', 'info' => 'var(--nx-info)'];
+                    @endphp
+                    @foreach (\Platform\Organization\Services\EntityShareService::NAV_GROUP_LABELS as $navGroup => $navGroupLabel)
+                        @php
+                            $groups = $data['nav'][$navGroup] ?? collect();
+                        @endphp
+                        @continue(collect($groups)->isEmpty() && ! ($navGroup === 'konto' && $konto))
+                        <div class="gp-navgroup">{{ $navGroupLabel }}</div>
+
+                        @foreach ($groups as $group)
+                            @if ($group['nav_mode'] === 'section')
+                                @php
+                                    $st = $group['summary']['status'] ?? null;
+                                @endphp
+                                <a href="{{ $link($group['slug']) }}" wire:navigate wire:key="nav-s-{{ $group['slug'] }}" @class(['gp-navlink', 'is-active' => $section === $group['slug'] && ! $notFound]) @click="nav = false">
+                                    @svg('heroicon-o-' . $group['icon'], 'w-4 h-4 shrink-0')
+                                    <span class="min-w-0 truncate">{{ $group['label'] }}</span>
+                                    @if ($st)<span class="gp-meta" style="color: {{ $toneColor[$st['tone'] ?? ''] ?? 'var(--nx-faint)' }}">{{ $st['text'] }}</span>@endif
+                                </a>
+                                @continue
+                            @endif
                         @php
                             [$archived, $running] = collect($group['items'])->partition(fn ($i) => ($i['state'] ?? '') === 'done');
                             $archiveOpen = $archived->contains(fn ($i) => $activeSlug === $group['slug'] && $activeId === (int) $i['id']);
                         @endphp
-                        <div class="mb-1 mt-5 flex items-center justify-between px-2 text-[11px] font-medium uppercase tracking-wide text-[color:var(--nx-faint)]">
-                            <span>{{ $group['label'] }}</span>
+                        <div class="gp-navsub">
+                            @svg('heroicon-o-' . $group['icon'], 'w-4 h-4 shrink-0')
+                            <span class="flex-1 truncate">{{ $group['label'] }}</span>
                             <span class="tabular-nums">{{ $running->count() }}</span>
                         </div>
                         @php
@@ -234,12 +272,16 @@
                                     <span class="gp-ico inline-flex shrink-0">
                                         @if (($item['state'] ?? '') === 'paused')
                                             @svg('heroicon-s-pause-circle', 'w-[15px] h-[15px] text-[color:var(--nx-warning)]')
+                                        @elseif ($itemPct === null && $group['alias'] !== 'project' && ! isset($item['progress']))
+                                            @svg('heroicon-o-' . $group['icon'], 'w-4 h-4 text-[color:var(--nx-faint)]')
                                         @else
                                             {!! $ring($itemPct ?? 0, 15) !!}
                                         @endif
                                     </span>
                                     <span class="gp-navtext">{{ $item['title'] }}</span>
-                                    @if ($itemPct !== null)<span class="gp-meta">{{ $itemPct }} %</span>@endif
+                                    @if (! empty($item['nav_status']))
+                                        <span class="gp-meta" style="color: {{ $toneColor[$item['nav_status']['tone'] ?? ''] ?? 'var(--nx-faint)' }}">{{ $item['nav_status']['text'] }}</span>
+                                    @elseif ($itemPct !== null)<span class="gp-meta">{{ $itemPct }} %</span>@endif
                                 </a>
                             @endforeach
                         @endforeach
@@ -265,6 +307,17 @@
                                     @endforeach
                                 </div>
                             </div>
+                        @endif
+                        @endforeach
+
+                        @if ($navGroup === 'konto')
+                            @foreach ($konto as [$key, $label, $icon, $meta, $tone])
+                                <a href="{{ $link($key) }}" wire:navigate @class(['gp-navlink', 'is-active' => $section === $key && ! $notFound]) @click="nav = false">
+                                    @svg($icon, 'w-4 h-4 shrink-0')
+                                    <span class="min-w-0 truncate">{{ $label }}</span>
+                                    @if ($meta)<span class="gp-meta" @if ($tone) style="color: {{ $toneColor[$tone] }}" @endif>{{ $meta }}</span>@endif
+                                </a>
+                            @endforeach
                         @endif
                     @endforeach
                 </nav>
@@ -300,7 +353,13 @@
                         @if ($section && ! $notFound)
                             <a href="{{ $link() }}" wire:navigate class="shrink-0 text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">Übersicht</a>
                             @svg('heroicon-o-chevron-right', 'w-3.5 h-3.5 shrink-0 text-[color:var(--nx-faint)]')
-                            <span class="min-w-0 truncate font-medium">{{ \Platform\Organization\Livewire\Share\PublicShare::SECTIONS[$section] }}</span>
+                            @if ($sectionPage && ! empty($sectionPage['page']))
+                                <a href="{{ $link($section) }}" wire:navigate class="min-w-0 truncate text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">{{ $sectionPage['title'] }}</a>
+                                @svg('heroicon-o-chevron-right', 'w-3.5 h-3.5 shrink-0 text-[color:var(--nx-faint)]')
+                                <span class="min-w-0 truncate font-medium">{{ $sectionPage['page']['title'] }}</span>
+                            @else
+                                <span class="min-w-0 truncate font-medium">{{ \Platform\Organization\Livewire\Share\PublicShare::SECTIONS[$section] ?? ($sectionPage['title'] ?? '') }}</span>
+                            @endif
                         @elseif ($activeSlug || $notFound)
                             <a href="{{ $link() }}" wire:navigate class="shrink-0 text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">Übersicht</a>
                             @if ($detail)
@@ -331,6 +390,8 @@
                             <p class="mt-1 text-sm text-[color:var(--nx-muted)]">Der Inhalt wurde entfernt oder ist hier nicht sichtbar.</p>
                             <a href="{{ $link() }}" wire:navigate class="mt-5 inline-flex rounded-[6px] border border-[color:var(--nx-line-strong)] px-3 py-1.5 text-sm hover:bg-[color:var(--nx-hover)]">Zur Übersicht</a>
                         </div>
+                    @elseif ($sectionPage)
+                        @include('organization::livewire.share._detail', ['detail' => $sectionPage, 'detailLink' => fn (?string $sub = null) => $link($section, null, $sub)])
                     @elseif ($section === 'leistung')
                         <div class="gp-wrap py-8 md:py-10">
                             <h1 class="text-2xl font-bold tracking-tight">Leistung</h1>

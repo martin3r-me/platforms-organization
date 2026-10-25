@@ -37,6 +37,17 @@ use Illuminate\Support\Collection;
  * liefert Ereignisse für den Aktivitätsstrom der Übersicht (neueste zuerst, höchstens
  * ~60 Tage): [['at' => Carbon, 'kind' => 'done'|'canvas'|'state'|…, 'title' => string,
  * 'text' => ?string, 'parent_id' => ?int (Objekt-ID des Typs, für den Link)]].
+ *
+ *   public function shareSummary(string $alias, Collection $models, array $options): ?array
+ *
+ * Kurzstatus für Sidebar und Übersicht: ['status' => ?['text' => '● online', 'tone' => 'success'|'warning'|'danger'|'info'|'neutral'],
+ * 'kpis' => [['label' => 'Besucher (30 T.)', 'value' => '1.240', 'hint' => ?'+12 %', 'tone' => ?string]]].
+ * kpis erscheinen in der Übersicht unter „Wirkung".
+ *
+ *   public function shareSection(string $alias, Collection $models, array $options): ?array
+ *
+ * Für Typen mit nav='section': EINE Seite für alle sichtbaren Objekte des Typs (Format wie
+ * shareDetail, $options['sub'] für Unterseiten, $options['link'](?sub) für URLs).
  * Views bekommen data + $link und sollten nur --nx-*-Tokens/x-nx-* nutzen; Inhalt in voller
  * Breite mit der Klasse `gp-wrap` (Seitenränder wie die Hülle), Randloses (Board) mit `gp-bleed`.
  */
@@ -44,9 +55,13 @@ interface ProvidesShareView
 {
     /**
      * Typen mit Kundenansicht.
-     * Format: [alias => ['label' => 'Projekte', 'singular' => 'Projekt', 'icon' => 'folder', 'featured' => bool, 'slug' => 'projekt']]
+     * Format: [alias => ['label' => 'Projekte', 'singular' => 'Projekt', 'icon' => 'folder', 'featured' => bool, 'slug' => 'projekt',
+     *                    'group' => 'arbeit'|'wirkung'|'service'|'konto', 'nav' => 'items'|'section', 'detail' => bool, 'order' => int]]
      * `featured` = eigene, große Sektion oben (z. B. Projekte mit Fortschritt).
      * `slug` = URL-Teil der Detailseite (sonst der Alias).
+     * `group` = Gruppe in der Sidebar (Standard arbeit). `nav` = items: jedes Objekt ein Eintrag mit
+     * Detailseite (shareDetail); section: ein Eintrag für alle (shareSection). `detail` = false:
+     * keine Detailseite (nur in Listen).
      */
     public function shareTypes(): array;
 

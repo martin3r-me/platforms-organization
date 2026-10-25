@@ -193,6 +193,7 @@ class EntityShareService
         $config = $this->registry->allLinkTypeConfig();
         $options = ['details' => (bool) $share->setting('details', true), 'since' => $since];
         $visible = $this->visibleObjects($share, $entities);
+        $tree = $this->treeOrder($root, $entities);
         $work = $share->setting('work', true) ? $this->workData($visible, $entities, $since) : null;
 
         $featured = [];
@@ -224,7 +225,12 @@ class EntityShareService
             foreach ($items as &$item) {
                 // Herkunft im Baum, wenn nicht direkt am geteilten Knoten
                 $entityId = $idToEntity[$item['id']] ?? null;
-                $item['area'] = ($entityId && $entityId !== $root->id) ? ($entities[$entityId]->name ?? null) : null;
+                $place = $tree[$entityId] ?? $tree[$root->id];
+                $item['area'] = $place['path'] ? implode(' › ', $place['path']) : null;
+                $item['area_id'] = $place['id'];
+                $item['area_path'] = $place['path'];
+                $item['area_pos'] = $place['pos'];
+                $item['area_type'] = $place['type'];
                 $item['has_detail'] = $hasDetail;
                 if ($work) {
                     $item['minutes'] = $work['by_item'][$alias][$item['id']] ?? 0;
@@ -319,6 +325,29 @@ class EntityShareService
                 'people' => $fresh->where('kind', 'work')->pluck('person')->unique()->values()->all(),
             ],
         ];
+    }
+
+    /**
+     * Verortung im Baum: Knoten in Baum-Reihenfolge (Tiefensuche, Wurzel zuerst) mit
+     * Pfad unterhalb der Wurzel — damit Projekte dort erscheinen, wo sie herkommen.
+     *
+     * @return array<int, array{id: int, pos: int, depth: int, path: string[], type: ?string}>
+     */
+    protected function treeOrder(OrganizationEntity $root, Collection $entities): array
+    {
+        $children = $entities->groupBy('parent_entity_id');
+        $out = [];
+        $walk = function (OrganizationEntity $node, array $path, int $depth) use (&$walk, &$out, $children) {
+            $out[$node->id] = ['id' => $node->id, 'pos' => count($out), 'depth' => $depth, 'path' => $path, 'type' => $node->type?->name];
+            foreach ($children->get($node->id, collect())->sortBy('name') as $child) {
+                if (! isset($out[$child->id])) {
+                    $walk($child, array_merge($path, [$child->name]), $depth + 1);
+                }
+            }
+        };
+        $walk($root, [], 0);
+
+        return $out;
     }
 
     // ── Leistung (gebuchte Zeiten) ─────────────────────────────

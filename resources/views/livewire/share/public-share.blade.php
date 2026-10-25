@@ -85,7 +85,7 @@
         .gp { min-height: 100vh; background: var(--nx-surface); color: var(--nx-text); -webkit-font-smoothing: antialiased;
               font-family: ui-sans-serif, -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Inter', Helvetica, Arial, sans-serif; }
         .gp-shell { display: flex; min-height: 100vh; }
-        .gp-nav { position: fixed; inset: 0 auto 0 0; z-index: 40; width: 300px; max-width: 86vw; display: flex; flex-direction: column;
+        .gp-nav { position: fixed; inset: 0 auto 0 0; z-index: 40; width: 336px; max-width: 88vw; display: flex; flex-direction: column;
                   background: var(--nx-bg); border-right: 1px solid var(--nx-line); transform: translateX(-100%); transition: transform .2s ease; }
         .gp-nav.is-open { transform: none; box-shadow: var(--nx-shadow-pop); }
         .gp-scrim { position: fixed; inset: 0; z-index: 30; background: rgba(15, 15, 15, .25); }
@@ -113,6 +113,12 @@
         .gp-navlink:hover { background: var(--nx-hover); color: var(--nx-text); }
         .gp-navlink.is-active { background: var(--nx-active); color: var(--nx-text); font-weight: 500; }
         .gp-navlink > .min-w-0 { flex: 1; }
+        /* Lange Namen umbrechen statt abschneiden (max. 2 Zeilen) */
+        .gp-navtext { flex: 1; min-width: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; line-height: 1.3; }
+        .gp-navlink.is-multi { align-items: flex-start; }
+        .gp-navlink.is-multi > svg, .gp-navlink.is-multi > .gp-ico { margin-top: 2px; }
+        .gp-navarea { display: flex; align-items: center; gap: 6px; padding: 8px 8px 2px; font-size: 11px; color: var(--nx-faint); }
+        .gp-navarea span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .gp-navlink .gp-meta { margin-left: auto; flex-shrink: 0; white-space: nowrap; font-size: 11px; color: var(--nx-faint); font-variant-numeric: tabular-nums; }
         .gp-tab { margin-bottom: -1px; display: inline-flex; flex-shrink: 0; align-items: center; gap: 6px; padding-bottom: 9px; border-bottom: 2px solid transparent;
                   color: var(--nx-muted); transition: color .12s, border-color .12s; }
@@ -207,21 +213,35 @@
                             <span>{{ $group['label'] }}</span>
                             <span class="tabular-nums">{{ $running->count() }}</span>
                         </div>
-                        @foreach ($running as $item)
-                            @php
-                                $itemPct = $pct($item['progress'] ?? null);
-                            @endphp
-                            <a href="{{ $link($group['slug'], $item['id']) }}" wire:navigate wire:key="nav-{{ $group['slug'] }}-{{ $item['id'] }}"
-                               @class(['gp-navlink', 'is-active' => $activeSlug === $group['slug'] && $activeId === (int) $item['id']])
-                               @click="nav = false">
-                                @if (($item['state'] ?? '') === 'paused')
-                                    @svg('heroicon-s-pause-circle', 'w-[15px] h-[15px] shrink-0 text-[color:var(--nx-warning)]')
-                                @else
-                                    {!! $ring($itemPct ?? 0, 15) !!}
-                                @endif
-                                <span class="min-w-0 truncate">{{ $item['title'] }}</span>
-                                @if ($itemPct !== null)<span class="gp-meta">{{ $itemPct }} %</span>@endif
-                            </a>
+                        @php
+                            $navAreas = $running->groupBy(fn ($i) => $i['area_id'] ?? 0)->sortBy(fn ($g) => $g->first()['area_pos'] ?? 0);
+                            $navShowAreas = $navAreas->count() > 1 || ($navAreas->keys()->first() ?? $entity->id) != $entity->id;
+                        @endphp
+                        @foreach ($navAreas as $areaItems)
+                            @if ($navShowAreas)
+                                <div class="gp-navarea" title="{{ $entity->name }}{{ ! empty($areaItems->first()['area_path']) ? ' › ' . implode(' › ', $areaItems->first()['area_path']) : '' }}">
+                                    @svg('heroicon-o-map-pin', 'w-3 h-3 shrink-0')
+                                    <span>{{ ! empty($areaItems->first()['area_path']) ? implode(' › ', $areaItems->first()['area_path']) : $entity->name }}</span>
+                                </div>
+                            @endif
+                            @foreach ($areaItems as $item)
+                                @php
+                                    $itemPct = $pct($item['progress'] ?? null);
+                                @endphp
+                                <a href="{{ $link($group['slug'], $item['id']) }}" wire:navigate wire:key="nav-{{ $group['slug'] }}-{{ $item['id'] }}"
+                                   @class(['gp-navlink is-multi', 'is-active' => $activeSlug === $group['slug'] && $activeId === (int) $item['id']])
+                                   @click="nav = false" title="{{ $item['title'] }}">
+                                    <span class="gp-ico inline-flex shrink-0">
+                                        @if (($item['state'] ?? '') === 'paused')
+                                            @svg('heroicon-s-pause-circle', 'w-[15px] h-[15px] text-[color:var(--nx-warning)]')
+                                        @else
+                                            {!! $ring($itemPct ?? 0, 15) !!}
+                                        @endif
+                                    </span>
+                                    <span class="gp-navtext">{{ $item['title'] }}</span>
+                                    @if ($itemPct !== null)<span class="gp-meta">{{ $itemPct }} %</span>@endif
+                                </a>
+                            @endforeach
                         @endforeach
                         @if ($running->isEmpty())
                             <div class="px-2 py-1 text-xs text-[color:var(--nx-faint)]">Gerade nichts laufend</div>
@@ -236,10 +256,10 @@
                                 <div x-show="open" @if (! $archiveOpen) style="display: none" @endif>
                                     @foreach ($archived as $item)
                                         <a href="{{ $link($group['slug'], $item['id']) }}" wire:navigate wire:key="nav-a-{{ $group['slug'] }}-{{ $item['id'] }}"
-                                           @class(['gp-navlink', 'is-active' => $activeSlug === $group['slug'] && $activeId === (int) $item['id']])
-                                           @click="nav = false">
+                                           @class(['gp-navlink is-multi', 'is-active' => $activeSlug === $group['slug'] && $activeId === (int) $item['id']])
+                                           @click="nav = false" title="{{ $item['title'] }}">
                                             @svg('heroicon-s-check-circle', 'w-[15px] h-[15px] shrink-0 text-[color:var(--nx-success)]')
-                                            <span class="min-w-0 truncate">{{ $item['title'] }}</span>
+                                            <span class="gp-navtext">{{ $item['title'] }}</span>
                                             @if (! empty($item['state_since']))<span class="gp-meta">{{ $de($item['state_since'], 'MMM YY') }}</span>@endif
                                         </a>
                                     @endforeach

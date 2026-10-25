@@ -125,9 +125,31 @@
                 <h2 class="gp-h2">{{ $group['label'] }}</h2>
                 <span class="text-sm text-[color:var(--nx-faint)]">{{ $running->count() }} laufend</span>
             </div>
-            @if ($running->isNotEmpty())
+            @php
+                // Verortung im Baum: je Knoten eine Gruppe, in Baum-Reihenfolge
+                $areas = $running->groupBy('area_id')->sortBy(fn ($g) => $g->first()['area_pos'] ?? 0);
+                $showAreas = $areas->count() > 1 || ($areas->keys()->first() ?? $entity->id) != $entity->id;
+            @endphp
+            @foreach ($areas as $areaItems)
+                @php
+                    $first = $areaItems->first();
+                @endphp
+                @if ($showAreas)
+                    <div @class(['mb-2 flex min-w-0 flex-wrap items-center gap-x-1.5 gap-y-0.5 text-xs', 'mt-5' => ! $loop->first])>
+                        @svg('heroicon-o-map-pin', 'w-3.5 h-3.5 shrink-0 text-[color:var(--nx-faint)]')
+                        <span @class(['text-[color:var(--nx-faint)]' => ! empty($first['area_path']), 'font-medium text-[color:var(--nx-text)]' => empty($first['area_path'])])>{{ $entity->name }}</span>
+                        @foreach ($first['area_path'] ?? [] as $seg)
+                            @svg('heroicon-m-chevron-right', 'w-3 h-3 shrink-0 text-[color:var(--nx-faint)]')
+                            <span @class(['font-medium text-[color:var(--nx-text)]' => $loop->last, 'text-[color:var(--nx-faint)]' => ! $loop->last])>{{ $seg }}</span>
+                        @endforeach
+                        @if (! empty($first['area_type']) && ! empty($first['area_path']))
+                            <span class="ml-1 rounded-full bg-[color:var(--nx-hover)] px-1.5 py-px text-[10px] text-[color:var(--nx-muted)]">{{ $first['area_type'] }}</span>
+                        @endif
+                        <span class="text-[color:var(--nx-faint)]">· {{ $areaItems->count() }}</span>
+                    </div>
+                @endif
                 <div class="gp-card overflow-hidden divide-y divide-[color:var(--nx-line)]">
-                    @foreach ($running as $item)
+                    @foreach ($areaItems as $item)
                         @php
                             $itemPct = $pct($item['progress'] ?? null);
                             $nextStep = ($item['next'] ?? [])[0] ?? null;
@@ -151,7 +173,7 @@
                                         <span class="truncate">{{ $nextStep['title'] }}</span>
                                         @if (! empty($nextStep['due']))<span class="shrink-0 text-[color:var(--nx-faint)]">· {{ $duePhrase($nextStep['due']) }}</span>@endif
                                     @else
-                                        <span class="truncate">{{ collect([$item['area'] ?? null, ! empty($item['updated_at']) ? 'Zuletzt bewegt ' . $ago($item['updated_at']) : null])->filter()->implode(' · ') }}</span>
+                                        <span class="truncate">{{ ! empty($item['updated_at']) ? 'Zuletzt bewegt ' . $ago($item['updated_at']) : '' }}</span>
                                     @endif
                                 </div>
                             </div>
@@ -178,7 +200,8 @@
                         </{{ $tag }}>
                     @endforeach
                 </div>
-            @else
+            @endforeach
+            @if ($running->isEmpty())
                 <div class="rounded-[12px] border border-dashed border-[color:var(--nx-line-strong)] px-4 py-6 text-center text-sm text-[color:var(--nx-faint)]">Gerade läuft nichts — abgeschlossene finden Sie im Archiv.</div>
             @endif
 
@@ -204,6 +227,7 @@
                                             ! empty($item['started_at']) && ! empty($item['state_since']) ? $de($item['started_at'], 'MMM YYYY') . ' – ' . $de($item['state_since'], 'MMM YYYY') : (! empty($item['state_since']) ? 'abgeschlossen ' . $de($item['state_since'], 'D. MMMM YYYY') : null),
                                             ! empty($item['progress']['total']) ? $item['progress']['done'] . ' Schritte' : null,
                                             ! empty($item['minutes']) ? $hours($item['minutes']) : null,
+                                            $item['area'] ?? null,
                                         ])->filter()->implode(' · ') }}
                                     </div>
                                 </div>

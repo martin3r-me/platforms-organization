@@ -396,7 +396,11 @@ class EntityShareService
         $nextDue = $items->flatMap(fn ($i) => $i['next'] ?? [])
             ->pluck('due')->filter()->filter(fn ($d) => $d->isFuture() || $d->isToday())->sort()->first();
 
+        $overdue = $items->flatMap(fn ($i) => $i['next'] ?? [])
+            ->pluck('due')->filter()->filter(fn ($d) => $d->isPast() && ! $d->isToday())->count();
+
         return [
+            'overdue' => $overdue,
             'active' => $items->where('state', 'active')->count(),
             'done' => $items->where('state', 'done')->count(),
             'progress' => $total > 0 ? (int) round($done / $total * 100) : null,

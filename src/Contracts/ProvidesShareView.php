@@ -29,7 +29,8 @@ use Illuminate\Support\Collection;
  *   ]
  * $options: details (bool), sub (?string), link (callable(?string $sub): string — URL zu
  * diesem Objekt bzw. einer Unterseite). null → 404 (z. B. unbekannte Unterseite).
- * Views bekommen data + $link und sollten nur --nx-*-Tokens/x-nx-* nutzen.
+ * Views bekommen data + $link und sollten nur --nx-*-Tokens/x-nx-* nutzen; Inhalt im Raster
+ * `mx-auto max-w-[1120px] px-4 sm:px-8`, randlos Breites (Board) mit der Klasse `gp-bleed`.
  */
 interface ProvidesShareView
 {

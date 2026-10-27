@@ -57,10 +57,11 @@ class DimensionLinksTerminalApp implements TerminalApp, HasBadge
             return false;
         }
 
-        // Kontext-Panel (liefert apps): nicht an organization-Modellen — dort ist der
-        // Datensatz selbst die Einheit. Terminal liefert keine apps → bisheriges Verhalten.
+        // Kontext-Panel (liefert apps): nur wenn die Seite Verknüpfungen anbietet (`links`,
+        // Standard an) und nicht an organization-Modellen — dort ist der Datensatz selbst
+        // die Einheit. Terminal liefert keine apps → bisheriges Verhalten.
         return $context->apps === []
-            || ! str_starts_with((string) $context->contextType, 'Platform\\Organization\\');
+            || ($context->offers('links') && ! str_starts_with((string) $context->contextType, 'Platform\\Organization\\'));
     }
 
     /**

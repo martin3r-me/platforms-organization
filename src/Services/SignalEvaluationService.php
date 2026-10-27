@@ -164,7 +164,11 @@ class SignalEvaluationService
         $triggered = [];
 
         foreach ($snapshots as $entityId => $snapshot) {
-            $value = $snapshot->metrics[$metric] ?? 0;
+            // Fehlende Kennzahl = Einheit hat dazu keine Daten (z. B. keine Projekte) → nicht als 0 werten
+            if (! isset($snapshot->metrics[$metric])) {
+                continue;
+            }
+            $value = $snapshot->metrics[$metric];
 
             $matches = match ($operator) {
                 '>' => $value > $threshold,

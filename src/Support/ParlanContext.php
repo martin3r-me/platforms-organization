@@ -149,15 +149,21 @@ class ParlanContext
     public static function card(string $alias, \Illuminate\Database\Eloquent\Model $model): array
     {
         $extra = app(EntityLinkRegistry::class)->contextCard($alias, $model) ?? [];
-        $label = (string) (ObjectTypeRegistry::label($alias, true) ?? $alias);
+        $isUnit = $model instanceof \Platform\Organization\Models\OrganizationEntity;
+        // Ein Org-Knoten selbst: Typ = sein Entity-Typ (Bereich, Initiative …), nicht der Alias.
+        $label = (string) ($isUnit ? ($model->type?->name ?? '') : '') ?: (string) (ObjectTypeRegistry::label($alias, true) ?? $alias);
+        $facts = [];
+        foreach ((array) ($extra['facts'] ?? []) as $f) {
+            $facts[] = ['label' => self::plain($f['label'] ?? ''), 'value' => self::plain($f['value'] ?? '')];
+        }
         $card = [
             'origin' => self::origin(),
-            'label' => $label,
-            'title' => (string) ($extra['title'] ?? self::titleOf($model) ?? $label . ' #' . $model->getKey()),
-            'status' => (string) ($extra['status'] ?? ''),
+            'label' => self::plain($label),
+            'title' => self::plain($extra['title'] ?? self::titleOf($model) ?? $label . ' #' . $model->getKey()),
+            'status' => self::plain($extra['status'] ?? ''),
             'url' => (string) ($extra['url'] ?? ''),
-            'summary' => (string) ($extra['summary'] ?? ''),
-            'facts' => array_values((array) ($extra['facts'] ?? [])),
+            'summary' => self::plain($extra['summary'] ?? ''),
+            'facts' => $facts,
             'path' => self::pathOf($alias, $model),
         ];
 
@@ -201,12 +207,16 @@ class ParlanContext
 
         $units = [];
         try {
-            $link = \Platform\Organization\Services\ObjectContextResolver::entityLinks($alias, (int) $model->getKey())['links']->first(static fn ($l) => $l->entity !== null);
-            $entity = $link?->entity;
+            if ($model instanceof \Platform\Organization\Models\OrganizationEntity) {
+                $entity = $model->parent; // ein Org-Knoten: darüber liegen seine Vorfahren
+            } else {
+                $link = \Platform\Organization\Services\ObjectContextResolver::entityLinks($alias, (int) $model->getKey())['links']->first(static fn ($l) => $l->entity !== null);
+                $entity = $link?->entity;
+            }
             for ($i = 0; $entity && $i < 8; $i++) {
                 array_unshift($units, array_filter([
-                    'label' => (string) ($entity->type?->name ?? ''),
-                    'title' => (string) $entity->name,
+                    'label' => self::plain($entity->type?->name ?? ''),
+                    'title' => self::plain($entity->name),
                 ]));
                 $entity = $entity->parent;
             }
@@ -217,12 +227,18 @@ class ParlanContext
         return array_values(array_filter([...$units, ...$objects], static fn ($n) => ($n['title'] ?? '') !== ''));
     }
 
+    /** Anzeige-Text: Namen liegen teils HTML-kodiert in der DB („&amp;“) — die Karte trägt Klartext. */
+    private static function plain(mixed $v): string
+    {
+        return trim(html_entity_decode(strip_tags((string) $v), ENT_QUOTES | ENT_HTML5, 'UTF-8'));
+    }
+
     private static function titleOf(\Illuminate\Database\Eloquent\Model $m): ?string
     {
         foreach (['title', 'name', 'subject', 'label'] as $f) {
             $v = $m->getAttribute($f);
             if (is_string($v) && trim($v) !== '') {
-                return mb_substr(trim($v), 0, 200);
+                return mb_substr(self::plain($v), 0, 200);
             }
         }
 

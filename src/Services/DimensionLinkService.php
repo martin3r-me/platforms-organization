@@ -254,7 +254,10 @@ class DimensionLinkService
      */
     public function unlink(string $dimension, string $contextType, int $contextId, int $dimensionValueId, ?int $perspectiveId = null): bool
     {
-        $contextType = self::resolveContextType($contextType);
+        // Exakt gespeicherter Typ zählt mit — sonst lassen sich verwaiste Links
+        // (Modul deinstalliert, Alias nicht mehr registriert) nicht mehr lösen,
+        // weil der Kurzname auf einen anderen Alias aufgelöst wird.
+        $contextTypes = array_values(array_unique([$contextType, self::resolveContextType($contextType)]));
 
         $def = OrganizationDimensionDefinition::findByKey($dimension);
         if (!$def) {
@@ -263,7 +266,7 @@ class DimensionLinkService
 
         return OrganizationDimensionLink::where('dimension_definition_id', $def->id)
             ->where('dimension_value_id', $dimensionValueId)
-            ->where('linkable_type', $contextType)
+            ->whereIn('linkable_type', $contextTypes)
             ->where('linkable_id', $contextId)
             ->delete() > 0;
     }

@@ -70,6 +70,7 @@ class ParlanPullCommand extends Command
         }
         $registry = app(EntityLinkRegistry::class);
         $states = [];
+        $cards = [];
         foreach ((array) ($res->json('refs') ?? []) as $ref) {
             $ref = (string) $ref;
             $alias = explode('/', $ref)[1] ?? '';
@@ -78,10 +79,18 @@ class ParlanPullCommand extends Command
             if ($done !== null) {
                 $states[$ref] = $done ? 'done' : 'open';
             }
+            if ($model !== null) {
+                try {
+                    // Kontext-Karte (rooms/0.4): Parlan schreibt sie nur, wenn sie sich geändert hat.
+                    $cards[$ref] = ParlanContext::card($alias, $model);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+            }
         }
         $changed = 0;
-        foreach (array_chunk($states, 500, true) as $chunk) {
-            $r = $http()->post($base . '/state', ['states' => $chunk]);
+        foreach (array_chunk($states, 200, true) as $chunk) {
+            $r = $http()->post($base . '/state', ['states' => $chunk, 'cards' => array_intersect_key($cards, $chunk)]);
             if (! $r->successful()) {
                 $this->warn('Erledigt-Abgleich: HTTP ' . $r->status());
 

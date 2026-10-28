@@ -174,6 +174,23 @@ class EntityLinkRegistry
     }
 
     /**
+     * Kontext-Karte laut Modul (Parlan, rooms/0.4): title/status/url/summary/facts[{label,value}]
+     * — erstes Modul mit einer Antwort gewinnt; null = kein Modul kennt das Objekt.
+     *
+     * @return array<string,mixed>|null
+     */
+    public function contextCard(string $morphAlias, \Illuminate\Database\Eloquent\Model $object): ?array
+    {
+        foreach ($this->providers as $p) {
+            if (method_exists($p, 'contextCard') && ($card = $p->contextCard($morphAlias, $object)) !== null) {
+                return (array) $card;
+            }
+        }
+
+        return null;
+    }
+
+    /**
      * Merged linkTypeConfig from all providers.
      * @return array<string, array{label: string, icon: string, route: string|null}>
      */

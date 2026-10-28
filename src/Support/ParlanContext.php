@@ -137,4 +137,95 @@ class ParlanContext
 
         return rtrim((string) config('organization.parlan.url'), '/') . '/ctx?' . http_build_query($q, '', '&', PHP_QUERY_RFC3986);
     }
+
+    /**
+     * Kontext-Karte (TRAAN rooms/0.4) für ein Objekt: woher der Raum kommt, worum es geht und
+     * welche Knoten darüber liegen — Org-Einheiten bis zur Wurzel, dann die Eltern-Objekte. Parlan
+     * schreibt sie als room.context in den Raum; sie lebt dann in der Fabric, auch ohne dieses ERP.
+     * Das Modul ergänzt Titel/Status/Fakten über contextCard() (per method_exists, lose).
+     *
+     * @return array<string,mixed>
+     */
+    public static function card(string $alias, \Illuminate\Database\Eloquent\Model $model): array
+    {
+        $extra = app(EntityLinkRegistry::class)->contextCard($alias, $model) ?? [];
+        $label = (string) (ObjectTypeRegistry::label($alias, true) ?? $alias);
+        $card = [
+            'origin' => self::origin(),
+            'label' => $label,
+            'title' => (string) ($extra['title'] ?? self::titleOf($model) ?? $label . ' #' . $model->getKey()),
+            'status' => (string) ($extra['status'] ?? ''),
+            'url' => (string) ($extra['url'] ?? ''),
+            'summary' => (string) ($extra['summary'] ?? ''),
+            'facts' => array_values((array) ($extra['facts'] ?? [])),
+            'path' => self::pathOf($alias, $model),
+        ];
+
+        return array_filter($card, static fn ($v) => $v !== '' && $v !== []);
+    }
+
+    /** Ref → Karte (oder null, wenn das Objekt nicht (mehr) existiert). */
+    public static function cardForRef(string $ref): ?array
+    {
+        $model = self::modelForRef($ref);
+
+        return $model ? self::card(explode('/', $ref)[1], $model) : null;
+    }
+
+    /**
+     * Übergeordnete Knoten, Wurzel zuerst: die Org-Einheit, an der das Objekt (oder sein Elter)
+     * hängt, mit ihren Vorfahren — dann die Eltern-Objekte (Aufgabe → Projekt).
+     *
+     * @return list<array{label?:string,title:string,ref?:string,url?:string}>
+     */
+    private static function pathOf(string $alias, \Illuminate\Database\Eloquent\Model $model): array
+    {
+        $registry = app(EntityLinkRegistry::class);
+        $objects = [];
+        $a = $alias;
+        $m = $model;
+        for ($hop = 0; $hop < 3; $hop++) {
+            $p = $registry->contextParent($a, $m);
+            $class = $p && ! empty($p[1]) ? ObjectTypeRegistry::modelClass((string) $p[0]) : null;
+            $pm = $class ? $class::find((int) $p[1]) : null;
+            if (! $pm) {
+                break;
+            }
+            [$a, $m] = [(string) $p[0], $pm];
+            array_unshift($objects, array_filter([
+                'label' => (string) (ObjectTypeRegistry::label($a, true) ?? $a),
+                'title' => self::titleOf($pm) ?? '#' . $pm->getKey(),
+                'ref' => self::ref($a, (int) $pm->getKey()),
+            ]));
+        }
+
+        $units = [];
+        try {
+            $link = \Platform\Organization\Services\ObjectContextResolver::entityLinks($alias, (int) $model->getKey())['links']->first(static fn ($l) => $l->entity !== null);
+            $entity = $link?->entity;
+            for ($i = 0; $entity && $i < 8; $i++) {
+                array_unshift($units, array_filter([
+                    'label' => (string) ($entity->type?->name ?? ''),
+                    'title' => (string) $entity->name,
+                ]));
+                $entity = $entity->parent;
+            }
+        } catch (\Throwable) {
+            // Verortung ist ein Hinweis — ohne geht es auch.
+        }
+
+        return array_values(array_filter([...$units, ...$objects], static fn ($n) => ($n['title'] ?? '') !== ''));
+    }
+
+    private static function titleOf(\Illuminate\Database\Eloquent\Model $m): ?string
+    {
+        foreach (['title', 'name', 'subject', 'label'] as $f) {
+            $v = $m->getAttribute($f);
+            if (is_string($v) && trim($v) !== '') {
+                return mb_substr(trim($v), 0, 200);
+            }
+        }
+
+        return null;
+    }
 }

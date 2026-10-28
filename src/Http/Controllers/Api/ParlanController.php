@@ -38,6 +38,21 @@ class ParlanController extends Controller
     }
 
     /**
+     * Kontext-Karte (rooms/0.4): Parlan holt sie beim Absprung, damit jeder im Raum — Mensch wie
+     * Agent — sieht, woher das Gespräch kommt und welche Knoten darüber liegen.
+     */
+    public function card(Request $request): JsonResponse
+    {
+        $secret = (string) config('organization.parlan.secret');
+        abort_unless($secret !== '' && hash_equals($secret, (string) $request->bearerToken()), 401);
+        $v = $request->validate(['ref' => ['required', 'string', 'max:300']]);
+        $card = ParlanContext::cardForRef($v['ref']);
+        abort_if($card === null, 404, 'Objekt nicht gefunden');
+
+        return response()->json(['ref' => $v['ref'], 'card' => $card]);
+    }
+
+    /**
      * Profilkarte in Parlan: wer ist das? Name, Rolle (aktive Stellenbeschreibung, sonst gültige
      * Org-Rolle), Einheit (Eltern-Entity der Person/des Agenten) und Bild. Parlan zeigt das nur an —
      * gepflegt wird es hier. Unbekannte E-Mails fehlen in der Antwort.

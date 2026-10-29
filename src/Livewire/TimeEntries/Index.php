@@ -81,6 +81,7 @@ class Index extends Component
 
         $query = OrganizationTimeEntry::query()
             ->whereIn('team_id', $teamIds)
+            ->resolvableContext()
             ->with(['user', 'team', 'context'])
             ->orderBy('work_date', 'desc')
             ->orderBy('created_at', 'desc');

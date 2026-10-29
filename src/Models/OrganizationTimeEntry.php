@@ -10,11 +10,12 @@ use Illuminate\Support\Facades\Auth;
 use Platform\ActivityLog\Traits\LogsActivity;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
+use Platform\Organization\Models\Concerns\ResolvesContextMorph;
 use Symfony\Component\Uid\UuidV7;
 
 class OrganizationTimeEntry extends Model
 {
-    use SoftDeletes, LogsActivity;
+    use SoftDeletes, LogsActivity, ResolvesContextMorph;
 
     public static function bootLogsActivity(): void
     {

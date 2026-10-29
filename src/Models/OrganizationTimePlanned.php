@@ -8,10 +8,13 @@ use Illuminate\Database\Eloquent\Relations\MorphTo;
 use Illuminate\Support\Facades\Auth;
 use Platform\Core\Models\Team;
 use Platform\Core\Models\User;
+use Platform\Organization\Models\Concerns\ResolvesContextMorph;
 use Symfony\Component\Uid\UuidV7;
 
 class OrganizationTimePlanned extends Model
 {
+    use ResolvesContextMorph;
+
     protected $table = 'organization_time_planned';
 
     protected $fillable = [

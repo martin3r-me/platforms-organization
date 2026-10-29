@@ -72,6 +72,7 @@ class Index extends Component
 
         $query = OrganizationTimePlanned::query()
             ->whereIn('team_id', $teamIds)
+            ->resolvableContext()
             ->with(['user', 'team', 'context'])
             ->orderBy('created_at', 'desc');
 

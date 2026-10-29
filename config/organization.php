@@ -152,5 +152,8 @@ return [
     'parlan' => [
         'url' => env('PARLAN_URL'),
         'secret' => env('PARLAN_CONTEXT_SECRET'),
+        // Huddle-Kalender-Spiegel (M365): leer = aus, "all" = alle Organisatoren,
+        // sonst kommagetrennte E-Mails (Pilot). Ohne Wert läuft der Zeitplan nicht los.
+        'huddle_mirror' => env('PARLAN_HUDDLE_MIRROR', ''),
     ],
 ];

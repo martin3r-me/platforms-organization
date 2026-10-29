@@ -50,6 +50,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 \Platform\Organization\Console\Commands\PurgeSignalsCommand::class,
                 \Platform\Organization\Console\Commands\DimensionLinkAuditCommand::class,
                 \Platform\Organization\Console\Commands\ParlanPullCommand::class,
+                \Platform\Organization\Console\Commands\ParlanHuddlesCommand::class,
             ]);
         }
 
@@ -250,6 +251,11 @@ class OrganizationServiceProvider extends ServiceProvider
         // Kontext-Kommunikation aus Parlan abholen (no-op ohne Parlan-Konfiguration)
         Schedule::command('organization:parlan-pull')
             ->everyFifteenMinutes()
+            ->withoutOverlapping();
+
+        // Geplante Parlan-Huddles in die M365-Kalender spiegeln (no-op ohne Parlan/user-connectors)
+        Schedule::command('organization:parlan-huddles')
+            ->everyFiveMinutes()
             ->withoutOverlapping();
 
         // Snapshots: 2x daily

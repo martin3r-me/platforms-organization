@@ -28,6 +28,8 @@ use Illuminate\Support\Collection;
  *     'page' => ?['title' => string, 'view' => string, 'data' => array],
  *   ]
  * $options: details (bool), sub (?string), since (?Carbon — letzter Besuch, für „neu"-Marken),
+ * hidden (alias => [id, …] — in der Freigabe Ausgeblendetes; die Modelle sind schon gefiltert, nützlich
+ * für Typen, die mehrere Items zu einem Objekt bündeln),
  * link (callable(?string $sub): string — URL zu diesem Objekt bzw. einer Unterseite).
  * null → 404 (z. B. unbekannte Unterseite). Tabs dürfen 'order' (int, Standard 50) tragen;
  * organization ergänzt selbst den Tab „Arbeiten" (order 20) mit den gebuchten Zeiten.
@@ -61,7 +63,8 @@ interface ProvidesShareView
      * `slug` = URL-Teil der Detailseite (sonst der Alias).
      * `group` = Gruppe in der Sidebar (Standard arbeit). `nav` = items: jedes Objekt ein Eintrag mit
      * Detailseite (shareDetail); section: ein Eintrag für alle (shareSection). `detail` = false:
-     * keine Detailseite (nur in Listen).
+     * keine Detailseite (nur in Listen). `opt_in` = true: erscheint nur in Freigaben, die den Typ
+     * ausdrücklich gewählt haben (nicht bei „alle Typen", z. B. Meetings).
      */
     public function shareTypes(): array;
 

@@ -22,6 +22,9 @@ use Platform\Core\Models\User;
  */
 class EntityShareService
 {
+    /** Share-Typen mit 'opt_in' werden respektiert (Module prüfen das vor dem Registrieren). */
+    public const SUPPORTS_OPT_IN = true;
+
     public function __construct(protected EntityLinkRegistry $registry)
     {
     }
@@ -169,12 +172,15 @@ class EntityShareService
         return $types;
     }
 
-    /** Erlaubte Typen einer Freigabe: ausdrücklich gewählte, sonst alle mit Kundenansicht. */
+    /**
+     * Erlaubte Typen einer Freigabe: ausdrücklich gewählte, sonst alle mit Kundenansicht —
+     * außer opt_in-Typen (z. B. Meetings), die nur erscheinen, wenn man sie anhakt.
+     */
     public function allowedTypes(OrganizationEntityShare $share): array
     {
         return $share->types !== null
             ? array_values($share->types)
-            : array_keys($this->registry->allShareTypes());
+            : array_keys(array_filter($this->registry->allShareTypes(), fn ($t) => empty($t['opt_in'])));
     }
 
     // ── Seite ──────────────────────────────────────────────────
@@ -197,7 +203,7 @@ class EntityShareService
         $areaId = $entities === $allEntities ? null : $areaId;
         $shareTypes = $this->registry->allShareTypes();
         $config = $this->registry->allLinkTypeConfig();
-        $options = ['details' => (bool) $share->setting('details', true), 'since' => $since];
+        $options = ['details' => (bool) $share->setting('details', true), 'since' => $since, 'hidden' => (array) $share->setting('hidden', [])];
         $visible = $this->visibleObjects($share, $entities);
         $tree = $this->treeOrder($root, $allEntities);
         $work = $share->setting('work', true) ? $this->workData($visible, $entities, $since) : null;
@@ -763,6 +769,7 @@ class EntityShareService
                 'sub' => $sub,
                 'since' => $since,
                 'link' => $link,
+                'hidden' => (array) $share->setting('hidden', []),
             ]);
         } catch (\Throwable $e) {
             Log::warning('Freigabe: Bereich nicht darstellbar', ['alias' => $alias, 'error' => $e->getMessage()]);

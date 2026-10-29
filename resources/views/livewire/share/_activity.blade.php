@@ -8,6 +8,7 @@
         'done' => ['heroicon-s-check-circle', 'var(--nx-success)'],
         'canvas' => ['heroicon-s-squares-2x2', 'var(--nx-info)'],
         'logbook' => ['heroicon-s-book-open', 'var(--nx-tone-indigo)'],
+        'meeting' => ['heroicon-s-calendar-days', 'var(--nx-tone-sky)'],
         'planned' => ['heroicon-s-plus-circle', 'var(--nx-faint)'],
         'state' => ['heroicon-s-flag', 'var(--nx-warning)'],
         'payment' => ['heroicon-s-banknotes', 'var(--nx-success)'],

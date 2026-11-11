@@ -14,17 +14,21 @@ use Platform\Core\Services\AnthropicProvider;
 class EntityStoryWriter
 {
     private const SYSTEM = <<<'TXT'
-Du schreibst die „Lage" eines Knotens in der Organisation BHG.DIGITAL: zwei bis vier kurze deutsche Sätze, höchstens 70 Wörter, reiner Text ohne Markdown, ohne Aufzählung, ohne Überschrift.
+Du schreibst die „Lage" einer Einheit der Organisation BHG.DIGITAL: höchstens drei kurze deutsche Sätze, höchstens 55 Wörter, reiner Text ohne Markdown, ohne Aufzählung, ohne Überschrift.
 
-Regeln:
-- Der erste Satz ist die Antwort auf „Was ist hier los?" — die wichtigste Bewegung, mit Namen und Zahl.
-- Namen statt Prozente: welches Projekt, welche Person, welcher Kindknoten.
-- Jede Zahl und jeder Name muss in den Fakten stehen. Nichts erfinden, keine Ursachen vermuten, keine Ratschläge.
-- Keine Zahl ohne Richtung, wo es einen Vergleich gibt (z. B. „4 h, halb so viel wie in der Vorwoche").
-- Stillstand nur als Tatsache („seit 12 Tagen keine Buchung"), nie als Wertung.
-- Ist coverage.expanded wahr, erwähne knapp, dass die Erfassung im Zeitraum erweitert wurde — Sprünge deshalb nicht als Arbeit erzählen.
-- Kein Geld. Keine Metrik-Schlüssel, keine Fachbegriffe wie „Snapshot", „Delta", „Dimension".
-- Stunden mit Komma (1,5 h), große Zahlen mit Punkt (1.688). Personennamen in normaler Schreibweise.
+Worauf es ankommt:
+- Der erste Satz ist die Nachricht: das, was sich am stärksten verändert hat. „gut", „schlecht" und „neutral" sind nach Gewicht sortiert, der jeweils erste Eintrag zählt am meisten. Die gebuchte Zeit ist Kontext und nur dann die Nachricht, wenn sie sich gegenüber der Vorperiode stark verändert hat.
+- Wähle die zwei, drei Fakten, die die Lage erklären. Nicht jede Zahl nennen.
+- Namen statt Prozente: welches Projekt, welche Person, welche Einheit darunter.
+- Trägt eine einzige Einheit darunter fast alles, sag das in einem Halbsatz statt ihre Details zu wiederholen.
+
+Strikt:
+- Jede Zahl und jeder Name steht in den Fakten. Nichts erfinden, keine Ursachen vermuten, keine Ratschläge, keine Bewertung von Stillstand.
+- Vergleiche nur mit der genannten Vorperiode und nenne sie so, wie sie in „vorperiode" heißt.
+- Bei Einträgen mit „im_zeitraum" zählt nur dieser Wert (z. B. „19 Aufgaben erledigt"), keine Gesamtzähler.
+- Ist „erfassung_erweitert" wahr, genügt ein kurzer Hinweis wie „die Erfassung ist im Zeitraum gewachsen".
+- Kein Geld. Keine Fachwörter wie Knoten, Kindknoten, Items, Snapshot, Delta, Dimension, Metrik.
+- Schreibweise: Namen in GROSSBUCHSTABEN normal schreiben (PLANUNG 2027 → Planung 2027). Projekt und Kunde stehen getrennt; den Kunden nur nennen, wenn es hilft. Stunden als „h" mit Komma (1,5 h), große Zahlen mit Punkt (1.688).
 TXT;
 
     public function __construct(protected AnthropicProvider $anthropic) {}
@@ -88,7 +92,7 @@ TXT;
             if ($e['agent_minutes'] > 0) {
                 $s .= ", davon {$this->hours($e['agent_minutes'])} von Agenten";
             }
-            $ctx = array_values(array_filter(array_map(fn ($c) => $this->cleanLabel($c['label']), array_slice($e['contexts'], 0, 2))));
+            $ctx = array_values(array_filter(array_map(fn ($c) => $this->name($this->context($c['label'])['was'] ?: null), array_slice($e['contexts'], 0, 2))));
             if ($ctx) {
                 $s .= ', vor allem auf ' . implode(' und ', $ctx);
             }
@@ -125,35 +129,39 @@ TXT;
     /** Was die KI sieht: nur das Erzählbare, keine internen Schlüssel. */
     protected function compact(array $f): array
     {
-        $metric = fn ($m) => array_filter([
-            'was' => $m['label'], 'jetzt' => $m['current'], 'veraenderung' => $m['delta'],
-            'im_zeitraum' => $m['flow'] ?? null,
-        ], fn ($v) => $v !== null);
+        $metric = fn ($m) => ($m['flow'] ?? null) !== null
+            ? ['was' => $this->plain($m['label']), 'im_zeitraum' => $m['flow']]
+            : ['was' => $this->plain($m['label']), 'jetzt' => $m['current'], 'veraenderung' => $m['delta']];
 
         $flows = [];
         foreach ($f['dimensions'] as $dim) {
             foreach ($dim['metrics'] as $m) {
-                if ($m['flow'] !== null) {
-                    $flows[] = ['was' => $m['label'], 'im_zeitraum' => $m['flow']];
+                if ($m['flow'] !== null && $m['flow'] != 0) {
+                    $flows[] = ['was' => $this->plain($m['label']), 'im_zeitraum' => $m['flow']];
                 }
             }
         }
 
         return [
-            'knoten' => $f['entity']['name'] . ($f['entity']['type'] ? ' (' . $f['entity']['type'] . ')' : ''),
+            'einheit' => $f['entity']['name'] . ($f['entity']['type'] ? ' (' . $f['entity']['type'] . ')' : ''),
             'zeitraum' => $f['period']['label'],
+            'vorperiode' => match ($f['period']['key']) {
+                'month' => 'die 30 Tage davor',
+                'quarter' => 'der gleich lange Zeitraum davor',
+                default => 'die Vorwoche',
+            },
             'gebucht' => [
                 'stunden' => round($f['energy']['minutes'] / 60, 1),
                 'davon_agenten' => round($f['energy']['agent_minutes'] / 60, 1),
                 'vorperiode_stunden' => round($f['energy']['previous_minutes'] / 60, 1),
                 'wer' => array_map(fn ($p) => ['name' => $this->name($p['name']), 'stunden' => round($p['minutes'] / 60, 1), 'agent' => $p['agent']], $f['energy']['people']),
-                'worauf' => array_map(fn ($c) => ['was' => $this->cleanLabel($c['label']), 'stunden' => round($c['minutes'] / 60, 1)], $f['energy']['contexts']),
+                'worauf' => array_map(fn ($c) => $this->context($c['label']) + ['stunden' => round($c['minutes'] / 60, 1)], $f['energy']['contexts']),
             ],
             'gut' => array_map($metric, $f['movers']['good']),
             'schlecht' => array_map($metric, $f['movers']['bad']),
             'neutral' => array_map($metric, $f['movers']['neutral']),
             'im_zeitraum' => $flows,
-            'coverage' => ['expanded' => $f['coverage']['expanded'] ?? false],
+            'erfassung_erweitert' => $f['coverage']['expanded'] ?? false,
             'signale_offen' => $f['signals']['open'],
             'signale' => array_map(fn ($s) => $s['message'], $f['signals']['top']),
             'letzte_buchung_vor_tagen' => $f['stillness']['days_since_last_booking'],
@@ -161,21 +169,45 @@ TXT;
                 'name' => $c['name'],
                 'stunden' => round($c['minutes'] / 60, 1),
                 'zustand' => $c['mute'] ? 'nichts angebunden' : ($c['quiet'] ? 'ruhig' : 'bewegt'),
-                'top' => $c['top'] ? $c['top']['label'] . ' ' . ($c['top']['delta'] > 0 ? '+' : '') . $c['top']['delta'] : null,
+                'staerkste_bewegung' => $c['top'] ? $this->plain($c['top']['label']) . ' ' . ($c['top']['delta'] > 0 ? '+' : '') . $c['top']['delta'] : null,
             ], fn ($v) => $v !== null), $f['children'] ?? []),
         ];
+    }
+
+    /** Metrik-Label in Alltagssprache: „Items (offen)" → „offene Aufgaben", ohne „(7 Tage)". */
+    protected function plain(string $label): string
+    {
+        $label = preg_replace('/\s*\(\d+ Tage\)/u', '', $label);
+
+        return strtr($label, [
+            'Items (offen)' => 'offene Aufgaben',
+            'Items (erledigt)' => 'erledigte Aufgaben',
+            'Items (gesamt)' => 'Aufgaben insgesamt',
+            'Verknuepfungen' => 'Verknüpfungen',
+        ]);
+    }
+
+    /** „PROJECT · PLANUNG 2027 - BHGBROICHCATERING" → Projekt „PLANUNG 2027", Kunde „BHGBROICHCATERING". */
+    protected function context(?string $label): array
+    {
+        $label = $this->cleanLabel($label) ?? '';
+        if (preg_match('/^(.+?)\s+-\s+([^-]+)$/u', $label, $m)) {
+            return ['was' => trim($m[1]), 'kunde' => trim($m[2])];
+        }
+
+        return ['was' => $label];
     }
 
     protected function move(array $m): string
     {
         if (($m['flow'] ?? null) !== null) {
             // Fenster-Metrik: der Wert im Zeitraum zählt, nicht die Differenz zur Vorperiode
-            return preg_replace('/\s*\(\d+ Tage\)/u', '', $m['label']) . ' ' . $this->num($m['flow']);
+            return $this->plain($m['label']) . ' ' . $this->num($m['flow']);
         }
         $d = $m['delta'];
         $sign = $d > 0 ? '+' : '−';
 
-        return $m['label'] . ' ' . $sign . $this->num(abs($d));
+        return $this->plain($m['label']) . ' ' . $sign . $this->num(abs($d));
     }
 
     protected function when(string $period): string

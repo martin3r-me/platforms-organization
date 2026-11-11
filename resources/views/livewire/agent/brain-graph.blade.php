@@ -318,10 +318,14 @@
         @endif
     </div>
 
-    @verbatim
-    <script type="module">
-        import * as THREE from 'https://esm.sh/three@0.179.0';
-        import ForceGraph3D from 'https://esm.sh/3d-force-graph@1.80.0?deps=three@0.179.0';
+    {{-- Livewire-Script-Block statt <script type="module">: der Reiter wird nachträglich eingesetzt, und
+         dabei startet ein eingefügtes <script> nie. Der Block läuft, sobald die Komponente initialisiert;
+         die Bibliotheken kommen per dynamischem import(). --}}
+    @script
+    <script>
+    (async () => {
+        const THREE = await import('https://esm.sh/three@0.179.0');
+        const ForceGraph3D = (await import('https://esm.sh/3d-force-graph@1.80.0?deps=three@0.179.0')).default;
 
         function trunc(s, n) { s = String(s || ''); return s.length > n ? s.slice(0, n - 1) + '…' : s; }
         function hueOf(s) { var h = 0; s = String(s || ''); for (var i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) >>> 0; return h % 360; }
@@ -463,8 +467,8 @@
                 io.observe(c);
             });
         }
-        document.addEventListener('livewire:navigated', scan);
-        if (document.readyState !== 'loading') scan(); else document.addEventListener('DOMContentLoaded', scan);
+        scan();
+    })();
     </script>
-    @endverbatim
+    @endscript
 </div>

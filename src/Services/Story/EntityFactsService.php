@@ -357,13 +357,21 @@ class EntityFactsService
 
     protected function childSummary(OrganizationEntity $child, string $period, ?Carbon $asOf): array
     {
-        $f = $this->forEntity($child, $period, $asOf, false);
+        return $this->summarize($this->forEntity($child, $period, $asOf, false));
+    }
+
+    /**
+     * Kurzfassung eines Knotens, wie sie beim Eltern-Knoten unter „Darunter" steht. Öffentlich, damit
+     * der tägliche Lauf die schon gerechneten Fakten der Kinder wiederverwendet statt neu zu rechnen.
+     */
+    public function summarize(array $f): array
+    {
         $top = $f['movers']['good'][0] ?? $f['movers']['bad'][0] ?? $f['movers']['neutral'][0] ?? null;
         $hasMetrics = collect($f['dimensions'])->contains(fn ($d) => $d['metrics'] !== []) || $f['excluded'] !== [];
 
         return [
-            'id' => $child->id,
-            'name' => $child->name,
+            'id' => $f['entity']['id'],
+            'name' => $f['entity']['name'],
             'minutes' => $f['energy']['minutes'],
             'good' => count($f['movers']['good']),
             'bad' => count($f['movers']['bad']),

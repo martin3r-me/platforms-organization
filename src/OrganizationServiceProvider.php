@@ -52,6 +52,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 \Platform\Organization\Console\Commands\ParlanPullCommand::class,
                 \Platform\Organization\Console\Commands\ParlanHuddlesCommand::class,
                 \Platform\Organization\Console\Commands\EntityFactsCommand::class,
+                \Platform\Organization\Console\Commands\EntityStoriesCommand::class,
             ]);
         }
 
@@ -275,6 +276,11 @@ class OrganizationServiceProvider extends ServiceProvider
 
         Schedule::command('organization:evaluate-signals')
             ->dailyAt('18:15')
+            ->withoutOverlapping();
+
+        // Lage-Erzählung je Knoten: nach Snapshot (08:00) und Signal-Bewertung (08:15)
+        Schedule::command('organization:entity-stories --period=auto')
+            ->dailyAt('08:20')
             ->withoutOverlapping();
 
         // Inference scheduling: daily poll, individual prompt intervals decide what's due

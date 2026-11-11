@@ -2,6 +2,7 @@
 
 use Illuminate\Support\Facades\Route;
 use Platform\Organization\Http\Controllers\Api\AgentChangeController;
+use Platform\Organization\Http\Controllers\Api\AgentContextRoomController;
 use Platform\Organization\Http\Controllers\Api\CoordinationController;
 use Platform\Organization\Http\Controllers\Api\AgentEnvironmentController;
 use Platform\Organization\Http\Controllers\Api\AgentMemoryController;
@@ -52,6 +53,8 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::get('/messages', [AgentMessagingController::class, 'inbox'])->name('organization.api.agent.messages');
     // ROSTER: die Kollegen-Agenten (Adresse + Rolle) für gezielte laterale 1:1-DMs.
     Route::get('/roster', [AgentMessagingController::class, 'roster'])->name('organization.api.agent.roster');
+    // KONTEXT-RAUM: den einen Parlan-Raum eines Org-Objekts öffnen/holen und den Agenten aufnehmen (statt freier Räume).
+    Route::post('/context-room', [AgentContextRoomController::class, 'open'])->name('organization.api.agent.context-room');
     // AUSRICHTUNG: Meilensteine in Sichtweite, eigene Objekte auf Meilensteine einzahlen lassen,
     // eigene Objekte (z. B. das persönliche OKR) an der eigenen Entity verorten.
     Route::get('/milestones', [AgentStrategyController::class, 'milestones'])->name('organization.api.agent.milestones');

@@ -139,6 +139,49 @@ class ParlanContext
     }
 
     /**
+     * Den Kontext-Raum eines Objekts serverseitig öffnen oder holen (Parlan: einer je Ref) und Mitglieder
+     * aufnehmen — für Agenten, die keinen Absprung-Link klicken. Mitglieder: die angegebenen E-Mails plus die
+     * Beteiligten des Objekts. Gibt Parlans Antwort zurück (room, url, members, unknown) oder null.
+     *
+     * @param  list<string>  $memberEmails
+     * @return array<string,mixed>|null
+     */
+    public static function openRoom(string $alias, \Illuminate\Database\Eloquent\Model $model, array $memberEmails): ?array
+    {
+        if (! self::enabled()) {
+            return null;
+        }
+        $parent = '';
+        try {
+            if (($p = app(EntityLinkRegistry::class)->contextParent($alias, $model)) && ! empty($p[1])) {
+                $parent = self::ref((string) $p[0], (int) $p[1]);
+            }
+        } catch (\Throwable) {
+            // Eltern-Kette ist ein Hinweis — ohne geht es auch.
+        }
+        $card = self::card($alias, $model);
+        $members = array_values(array_unique(array_map('strtolower', array_filter([
+            ...$memberEmails,
+            ...self::participantEmails($alias, $model),
+        ]))));
+        $res = \Illuminate\Support\Facades\Http::withToken((string) config('organization.parlan.secret'))
+            ->withHeaders(['X-Parlan-Origin' => self::origin()])->acceptJson()->timeout(20)
+            ->post(rtrim((string) config('organization.parlan.url'), '/') . '/api/context/rooms', array_filter([
+                'ref' => self::ref($alias, (int) $model->getKey()),
+                'title' => mb_substr((string) ($card['title'] ?? self::titleOf($model) ?? $alias . ' #' . $model->getKey()), 0, 200),
+                'url' => (string) ($card['url'] ?? ''),
+                'parent' => $parent,
+                'label' => mb_substr((string) ($card['label'] ?? ''), 0, 60),
+                'members' => array_slice($members, 0, 200),
+            ], static fn ($v) => $v !== '' && $v !== []));
+        if (! $res->successful()) {
+            return null;
+        }
+
+        return (array) $res->json() + ['ref' => self::ref($alias, (int) $model->getKey())];
+    }
+
+    /**
      * Kontext-Karte (TRAAN rooms/0.4) für ein Objekt: woher der Raum kommt, worum es geht und
      * welche Knoten darüber liegen — Org-Einheiten bis zur Wurzel, dann die Eltern-Objekte. Parlan
      * schreibt sie als room.context in den Raum; sie lebt dann in der Fabric, auch ohne dieses ERP.

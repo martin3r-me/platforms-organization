@@ -74,7 +74,7 @@
                         <div class="mb-1 text-[11px] font-medium uppercase tracking-wide text-[color:var(--nx-faint)]">{{ $group }}</div>
                         <ul class="m-0 list-none divide-y divide-[color:var(--nx-line)] rounded-[8px] border border-[color:var(--nx-line)] p-0">
                             @foreach ($items as $r)
-                                @php [$bv, $bl] = $ruleStatus[$r->status] ?? ['neutral', $r->status]; $open = $this->pendingForRule($r->rule_id); @endphp
+                                @php [$bv, $bl] = $ruleStatus[$r->status] ?? ['neutral', $r->status]; if ($r->status === 'active' && $r->confirmed === 0) { $bl = 'gilt'; } $open = $this->pendingForRule($r->rule_id); @endphp
                                 <li class="px-3 py-2 text-xs" wire:key="rule-{{ $r->rule_id }}">
                                     <div class="flex items-start gap-2">
                                         <span class="mt-0.5 shrink-0 font-mono text-[color:var(--nx-faint)]">r{{ $r->rule_id }}</span>

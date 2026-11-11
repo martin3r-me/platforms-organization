@@ -23,6 +23,29 @@
 
 <div class="max-w-3xl space-y-4">
 
+    {{-- Bezugsperson: aus der Organisationsstruktur, nicht aus der Container-Konfiguration --}}
+    <x-nx-panel title="Bezugsperson" subtitle="An wen das Engram berichtet, Rückfragen stellt und Freigaben vorlegt">
+        <div class="space-y-3 p-4">
+            @if ($supervisor)
+                <div class="text-sm text-[color:var(--nx-text)]">
+                    <span class="font-medium">{{ $supervisor['name'] }}</span>
+                    @if ($supervisor['email'])<span class="text-[color:var(--nx-muted)]"> · {{ $supervisor['email'] }}</span>@endif
+                </div>
+                <div class="text-xs text-[color:var(--nx-muted)]">aus: {{ $supervisor['source_label'] }}</div>
+            @else
+                <x-nx-callout variant="warning">Die Organisation kennt noch keine Bezugsperson für dieses Engram — es nutzt bis dahin den Eintrag aus seiner Konfiguration.</x-nx-callout>
+            @endif
+            <div class="flex flex-wrap items-end gap-2 border-t border-[color:var(--nx-line)] pt-3">
+                <div class="w-full sm:w-72">
+                    <x-nx-input-select name="reportsTo" label="Berichtet an" :options="$persons" nullable nullLabel="aus der Struktur ableiten" wire:model="reportsTo" />
+                </div>
+                <x-nx-button size="sm" wire:click="saveSupervisor">Übernehmen</x-nx-button>
+                @if ($supervisorMsg)<span class="text-xs text-[color:var(--nx-muted)]">{{ $supervisorMsg }}</span>@endif
+            </div>
+            <p class="m-0 text-xs text-[color:var(--nx-faint)]">Ohne Auswahl gilt die Leitung der übergeordneten Einheit, sonst die Berichtslinie aus dem Job-Profil. Wirkt ohne Neustart beim nächsten Profil-Abruf des Engrams.</p>
+        </div>
+    </x-nx-panel>
+
     {{-- Runtime-Konfiguration --}}
     <x-nx-panel title="Runtime-Konfiguration" subtitle="Was der Agent tut, kommt aus Job-Profil, Capabilities und Tokens — Rollen hier nur zur Info">
         <div class="space-y-4 p-4">

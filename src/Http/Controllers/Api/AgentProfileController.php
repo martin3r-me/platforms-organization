@@ -39,6 +39,12 @@ class AgentProfileController extends Controller
             ->filter();
 
         $stages = $roles->pluck('stage')->filter()->unique()->values()->all();
+        $jobProfile = $this->jobProfileForEntity((int) $profile->organization_entity_id);
+        // BEZUGSPERSON aus der Struktur (Berichtet an → Leitung der Einheit → Job-Profil). Der Daemon
+        // übernimmt sie statt SUPERVISOR aus seiner Env.
+        $supervisor = $profile->entity
+            ? app(\Platform\Organization\Services\AgentSupervisor::class)->resolve($profile->entity, $jobProfile['reporting']['reports_to'] ?? null)
+            : null;
 
         return response()->json(['data' => [
             'stages' => $stages,
@@ -55,7 +61,9 @@ class AgentProfileController extends Controller
             // Die Stellenbeschreibung als Org-Daten: purpose + responsibilities (= die Routinen der
             // Loop) + kpis + reporting. Weich referenziert (People baut auf Organization auf, nicht
             // umgekehrt) — fehlt das People-Modul oder das Profil, bleibt der Schlüssel null.
-            'job_profile' => $this->jobProfileForEntity((int) $profile->organization_entity_id),
+            'job_profile' => $jobProfile,
+            'supervisor' => $supervisor['text'] ?? null,
+            'supervisor_ref' => $supervisor,
             // ART-PRIOR (empirical Bayes, leave-one-out): wie kalibriert die ANDEREN Agent-Mitglieder
             // im Schnitt sind. Ein neues Mitglied erbt diesen Instinkt bei der Geburt, bis es eigene
             // Daten hat (VSM: die Organisation lernt über ihre Mitglieder und prägt die neuen).

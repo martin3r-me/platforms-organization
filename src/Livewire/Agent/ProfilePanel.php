@@ -8,6 +8,9 @@ use Illuminate\Support\Facades\Schema;
 use Livewire\Component;
 use Platform\Organization\Models\OrganizationAgentRunEvent;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityRelationType;
+use Platform\Organization\Models\OrganizationEntityRelationship;
+use Platform\Organization\Services\AgentSupervisor;
 use Platform\Organization\Models\OrganizationRoleAssignment;
 
 /**
@@ -29,6 +32,11 @@ class ProfilePanel extends Component
 
     public ?string $savedMsg = null;
 
+    /** Person-Entität, an die der Agent berichtet (Beziehung „Berichtet an“); null = aus der Struktur ableiten. */
+    public ?int $reportsTo = null;
+
+    public ?string $supervisorMsg = null;
+
     /** Frisch geminteter Token — NUR einmal sichtbar (danach nur der Hash in der DB). */
     public ?string $mintedToken = null;
 
@@ -44,6 +52,74 @@ class ProfilePanel extends Component
             $this->claim_unassigned = (bool) $p->claim_unassigned;
             $this->active = (bool) $p->active;
         }
+        $this->reportsTo = $this->explicitReportsTo()?->to_entity_id;
+    }
+
+    // ── Bezugsperson ──
+
+    private function reportsToTypeId(): ?int
+    {
+        return OrganizationEntityRelationType::query()->where('code', 'reports_to')->value('id');
+    }
+
+    /** Die ausdrückliche Beziehung „Berichtet an“ zu einer Person (nicht zu einer Einheit). */
+    private function explicitReportsTo(): ?OrganizationEntityRelationship
+    {
+        $type = $this->reportsToTypeId();
+        if (! $type) {
+            return null;
+        }
+
+        return OrganizationEntityRelationship::query()->active()
+            ->where('from_entity_id', $this->entity->id)->where('relation_type_id', $type)
+            ->whereHas('toEntity', fn ($q) => $q->persons())
+            ->latest('id')->first();
+    }
+
+    /** Personen der Organisation als Auswahl. */
+    public function personOptions(): array
+    {
+        return OrganizationEntity::query()->persons()
+            ->where('team_id', $this->entity->team_id)
+            ->where('is_active', true)
+            ->orderBy('name')->get(['id', 'name'])
+            ->map(fn ($p) => ['value' => $p->id, 'label' => $p->name])->all();
+    }
+
+    /** Setzt (oder entfernt) „Berichtet an“. Wirkt beim nächsten Profil-Abruf des Engrams — ohne Neustart. */
+    public function saveSupervisor(): void
+    {
+        $this->validate(['reportsTo' => 'nullable|integer']);
+        $type = $this->reportsToTypeId();
+        if (! $type) {
+            $this->supervisorMsg = 'Beziehungsart „Berichtet an“ fehlt in der Organisation.';
+
+            return;
+        }
+        $current = $this->explicitReportsTo();
+        if ($current && (int) $current->to_entity_id === (int) $this->reportsTo) {
+            $this->supervisorMsg = 'Unverändert.';
+
+            return;
+        }
+        if ($this->reportsTo) {
+            $person = OrganizationEntity::query()->persons()->where('team_id', $this->entity->team_id)->find($this->reportsTo);
+            if (! $person) {
+                $this->addError('reportsTo', 'Bitte eine Person der Organisation wählen.');
+
+                return;
+            }
+        }
+        $current?->delete();
+        if ($this->reportsTo) {
+            OrganizationEntityRelationship::create([
+                'from_entity_id' => $this->entity->id,
+                'to_entity_id' => $this->reportsTo,
+                'relation_type_id' => $type,
+                'team_id' => $this->entity->team_id,
+            ]);
+        }
+        $this->supervisorMsg = 'Gespeichert — das Engram übernimmt es beim nächsten Profil-Abruf.';
     }
 
     public function save(): void
@@ -197,6 +273,24 @@ class ProfilePanel extends Component
             'roles' => $this->agentRoles(),
             'events' => $this->recentEvents(),
             'nextTasks' => $this->nextTasks(),
+            'supervisor' => app(AgentSupervisor::class)->resolve($this->entity, $this->jobProfileReportsTo()),
+            'persons' => $this->personOptions(),
         ]);
+    }
+
+    /** Berichtslinie aus dem Job-Profil (Freitext), falls das People-Modul da ist. */
+    private function jobProfileReportsTo(): ?string
+    {
+        $class = \Platform\People\Models\JobProfile::class;
+        if (! class_exists($class)) {
+            return null;
+        }
+        try {
+            $jp = $class::query()->where('owner_entity_id', $this->entity->id)->where('status', 'active')->orderByDesc('id')->first();
+        } catch (\Throwable $e) {
+            return null;
+        }
+
+        return is_array($jp?->reporting) ? ($jp->reporting['reports_to'] ?? null) : null;
     }
 }

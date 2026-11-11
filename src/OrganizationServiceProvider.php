@@ -51,6 +51,7 @@ class OrganizationServiceProvider extends ServiceProvider
                 \Platform\Organization\Console\Commands\DimensionLinkAuditCommand::class,
                 \Platform\Organization\Console\Commands\ParlanPullCommand::class,
                 \Platform\Organization\Console\Commands\ParlanHuddlesCommand::class,
+                \Platform\Organization\Console\Commands\EntityFactsCommand::class,
             ]);
         }
 

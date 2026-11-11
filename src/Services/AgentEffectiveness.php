@@ -21,7 +21,7 @@ use Platform\Organization\Models\OrganizationEntity;
 class AgentEffectiveness
 {
     /** @return list<array<string,mixed>> eine Zeile je Agent */
-    public function period(Carbon $from, Carbon $to): array
+    public function period(Carbon $from, Carbon $to, bool $withCost = true): array
     {
         $agents = OrganizationEntity::query()->agents()->with(['linkedUser', 'agentProfile'])->orderBy('name')->get()
             ->filter(fn ($a) => $a->linked_user_id);
@@ -43,19 +43,27 @@ class AgentEffectiveness
             ->whereBetween('work_date', [$from->toDateString(), $to->toDateString()]));
 
         $coord = $this->coordination($userIds, $handles, $from, $to);
+        // Korrektur = ein Mensch ändert/streicht etwas am Gedächtnis; Freigaben (approve*) sind keine.
         $corrections = $this->countBy('organization_agent_curations', 'organization_entity_id', $agents->pluck('id')->all(), fn ($q) => $q
-            ->whereBetween('created_at', [$from, $to]));
+            ->whereIn('op', ['replace', 'retire', 'revise'])->whereBetween('created_at', [$from, $to]));
 
-        $isCurrent = $to->isFuture() || $to->isToday();
+        // Kosten je Ergebnis nur dort, wo Zeitraum und Token-Fenster übereinstimmen: das Gehirn meldet ein
+        // gleitendes 7-Tage-Fenster — also Ergebnisse derselben 7 Tage (eigener Lauf, nicht der gewählte Zeitraum).
+        $done7 = null;
+        if ($to->isFuture() || $to->isToday()) {
+            $done7 = $withCost ? collect($this->period(now()->subDays(7), now(), false))->pluck('done', 'entity_id')->all() : null;
+        }
         $rows = [];
         foreach ($agents as $a) {
             $uid = (int) $a->linked_user_id;
             $c = $coord[$uid] ?? [];
             $done = ($tasks[$uid] ?? 0) + ($issues[$uid] ?? 0) + ($tickets[$uid] ?? 0) + ($c['handoff_done'] ?? 0);
             $tokens = null;
-            if ($isCurrent) {
+            $done7a = null;
+            if ($withCost && ($to->isFuture() || $to->isToday())) {
                 $snap = $a->agentProfile?->brain_snapshot;
                 $tokens = is_array($snap) && isset($snap['budget']['tokens_7d']) ? (int) $snap['budget']['tokens_7d'] : null;
+                $done7a = $done7[(int) $a->id] ?? $done;
             }
             $rows[] = [
                 'entity_id' => (int) $a->id,
@@ -72,7 +80,8 @@ class AgentEffectiveness
                 'reaction_median_s' => $c['reaction_median_s'] ?? null,
                 'hours' => round(($minutes[$uid] ?? 0) / 60, 1),
                 'tokens_7d' => $tokens,
-                'tokens_per_result' => ($tokens !== null && $done > 0) ? (int) round($tokens / $done) : null,
+                'done_7d' => $done7a,
+                'tokens_per_result' => ($tokens !== null && $done7a > 0) ? (int) round($tokens / $done7a) : null,
             ];
         }
 
@@ -86,7 +95,7 @@ class AgentEffectiveness
         $start = now()->startOfWeek()->subWeeks($weeks - 1);
         for ($i = 0; $i < $weeks; $i++) {
             $from = $start->copy()->addWeeks($i);
-            foreach ($this->period($from, $from->copy()->endOfWeek()) as $r) {
+            foreach ($this->period($from, $from->copy()->endOfWeek(), false) as $r) {
                 $out[$r['entity_id']][$from->toDateString()] = $r['done'];
             }
         }

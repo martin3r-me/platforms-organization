@@ -73,7 +73,7 @@
                                 <th class="px-2 py-2 text-right font-medium" title="Kuratier-Aufträge am Gedächtnis">Korrekturen</th>
                                 <th class="px-2 py-2 text-right font-medium" title="Median der Reaktionszeit auf Vorgänge">Reaktion</th>
                                 <th class="px-2 py-2 text-right font-medium">Zeit</th>
-                                <th class="px-2 py-2 text-right font-medium" title="Token der letzten 7 Tage je Ergebnis (nur aktueller Zeitraum)">Token/Ergebnis</th>
+                                <th class="px-2 py-2 text-right font-medium" title="Token der letzten 7 Tage geteilt durch die Ergebnisse derselben 7 Tage">Token/Ergebnis (7 T.)</th>
                                 <th class="px-4 py-2 text-right font-medium" title="Ergebnisse je Woche, 8 Wochen">Verlauf</th>
                             </tr>
                         </thead>
@@ -113,7 +113,7 @@
             </x-nx-panel>
 
             <p class="m-0 max-w-[680px] text-xs text-[color:var(--nx-faint)]">
-                So gelesen: „Ergebnisse“ zählt nur Abgeschlossenes, nicht Aktivität. „Abgelehnt/verworfen“ und „Korrekturen“ zeigen, wo Menschen nachbessern mussten. Token/Ergebnis gibt es nur für den laufenden Zeitraum (das Gehirn meldet ein gleitendes 7-Tage-Fenster). Wie gesund die Gehirne selbst arbeiten, zeigt die Leitwarte.
+                So gelesen: „Ergebnisse“ zählt nur Abgeschlossenes, nicht Aktivität. „Abgelehnt/verworfen“ und „Korrekturen“ zeigen, wo Menschen nachbessern mussten. Token/Ergebnis bezieht sich immer auf die letzten 7 Tage (das Gehirn meldet ein gleitendes 7-Tage-Fenster) und fehlt bei abgeschlossenen Zeiträumen. Wie gesund die Gehirne selbst arbeiten, zeigt die Leitwarte.
             </p>
         </div>
     </x-ui-page-container>

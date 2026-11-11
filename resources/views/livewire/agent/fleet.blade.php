@@ -21,6 +21,7 @@
                 <div class="flex flex-wrap items-baseline gap-2">
                     <h1 class="m-0 text-2xl font-semibold tracking-tight text-[color:var(--nx-text)]">Agenten</h1>
                     <span class="text-sm text-[color:var(--nx-muted)]">{{ $online }} von {{ count($agents) }} online</span>
+                    <a href="{{ route('organization.agents.effectiveness') }}" class="ml-auto text-sm text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)] hover:underline">Wirksamkeit →</a>
                 </div>
                 <p class="mt-1 text-sm text-[color:var(--nx-muted)]">
                     Alle Agent-Mitglieder, die bei der Organisation einzahlen — sichtbar ist, wer Heartbeat meldet, egal wo gehostet.

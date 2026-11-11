@@ -21,6 +21,7 @@ use Platform\Organization\Livewire\TimeEntries\Index as TimeEntriesIndex;
 use Platform\Organization\Livewire\PlannedTimes\Index as PlannedTimesIndex;
 use Platform\Organization\Livewire\Role\Index as RoleIndex;
 use Platform\Organization\Livewire\Agent\Fleet as AgentFleet;
+use Platform\Organization\Livewire\Agent\Effectiveness as AgentEffectiveness;
 use Platform\Organization\Livewire\Settings\SignalDefinition\Index as SignalDefinitionIndex;
 use Platform\Organization\Livewire\Settings\SignalDefinition\Show as SignalDefinitionShow;
 use Platform\Organization\Livewire\Signal\Index as SignalIndex;
@@ -69,6 +70,8 @@ Route::get('/pulse', \Platform\Organization\Livewire\Pulse::class)->name('organi
 
 // Fleet: die Roster-Sicht über ALLE Agent-Mitglieder (host-agnostisch, gefüttert aus dem Heartbeat).
 Route::get('/agents', AgentFleet::class)->name('organization.agents.index');
+// Wirksamkeit: was die Agenten in der Organisation bewirken (Ergebnisse, Qualität, Tempo, Kosten).
+Route::get('/agents/effectiveness', AgentEffectiveness::class)->name('organization.agents.effectiveness');
 
 Route::get('/entities', EntityIndex::class)->name('organization.entities.index');
 Route::get('/entities/{entity}', EntityShow::class)->name('organization.entities.show');

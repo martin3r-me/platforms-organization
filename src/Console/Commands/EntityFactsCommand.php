@@ -71,6 +71,9 @@ class EntityFactsCommand extends Command
         }
         $this->table(['Dimension', 'Metrik', 'Basis', 'Stand', 'Vorher', 'Delta', 'Lesart'], $rows);
 
+        if ($facts['coverage']['expanded']) {
+            $this->warn('Erfassung im Zeitraum erweitert: ' . implode(', ', $facts['coverage']['new_keys']));
+        }
         if ($facts['excluded']) {
             $this->table(['Ausgeschlossen', 'Grund', 'Stand', 'Vorher'], array_map(
                 fn ($x) => [$x['label'], $x['reason'], $x['current'], $x['previous'] ?? '–'], $facts['excluded']));

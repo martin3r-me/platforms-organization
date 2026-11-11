@@ -24,6 +24,7 @@ use Platform\Organization\Services\TimeContextResolver;
  *  - Fehlt der Key im Vergleichs-Snapshot → „neu erfasst", keine Bewegung.
  *  - window_7d/30d nicht differenzieren: passt das Fenster zum Zeitraum, ist der Wert der Fluss.
  *  - modulator_factor → nur Stand. Prozent außerhalb 0–100 → unplausibel.
+ *  - Erfassung erweitert (Keys fehlen im Vergleich) + Stichtags-Sprung ab 0 bzw. ×3 → keine Bewegung.
  *  - Gleiche Zahl unter zwei Keys (Items offen ≙ Aufgaben offen) → einmal.
  *  - Geld (Kosten, Umsatz) bewusst noch nicht.
  */
@@ -38,6 +39,9 @@ class EntityFactsService
     private const SOURCE_FLOWS = ['time_total_minutes', 'time_billed_minutes', 'persons_time_total_minutes'];
 
     private const WINDOW_DAYS = ['window_7d' => 7, 'window_30d' => 30];
+
+    /** Ab diesem Faktor ist ein Stichtags-Sprung bei erweiterter Erfassung keine Bewegung. */
+    private const COVERAGE_JUMP = 3;
 
     /** Relative Änderung darunter gilt als Rauschen. */
     private const NOISE = 0.01;
@@ -75,6 +79,7 @@ class EntityFactsService
             'dimensions' => $metrics['dimensions'],
             'movers' => $this->movers($metrics['usable']),
             'excluded' => $metrics['excluded'],
+            'coverage' => $metrics['coverage'],
             'signals' => $this->signals($entity),
             'stillness' => $this->stillness($entity, $to),
             'quiet' => false,
@@ -132,6 +137,15 @@ class EntityFactsService
         $usable = [];
         $excluded = [];
         $seen = [];
+
+        // Erfassung erweitert: Keys, die heute gemessen werden, im Vergleichs-Snapshot aber fehlen
+        // (z. B. Planner-Metriken erst seit Mitte des Zeitraums). Dann sind Stichtags-Sprünge
+        // eher neue Erfassung als Arbeit.
+        $newKeys = $base === null ? [] : array_values(array_filter(
+            array_keys($defs),
+            fn ($k) => ($defs[$k]['dimension'] ?? null) && $this->value($current, $k, $defs[$k]) !== null && $this->value($base, $k, $defs[$k]) === null,
+        ));
+        $coverageExpanded = $newKeys !== [];
 
         foreach ($defs as $key => $def) {
             $dimension = $def['dimension'] ?? null;
@@ -202,6 +216,10 @@ class EntityFactsService
                         $excluded[] = $fact + ['reason' => 'no_baseline'];
                         continue 2;
                     }
+                    if ($coverageExpanded && $cur > $prev && ($prev == 0 || $cur / $prev >= self::COVERAGE_JUMP)) {
+                        $excluded[] = $fact + ['reason' => 'coverage_change'];
+                        continue 2;
+                    }
                     $fact['delta'] = $this->round($cur - $prev);
             }
 
@@ -235,7 +253,8 @@ class EntityFactsService
             $dimensions[$dim] = ['label' => $meta['label'], 'metrics' => $list];
         }
 
-        return ['dimensions' => $dimensions, 'usable' => $usable, 'excluded' => $excluded];
+        return ['dimensions' => $dimensions, 'usable' => $usable, 'excluded' => $excluded,
+            'coverage' => ['expanded' => $coverageExpanded, 'new_keys' => $newKeys]];
     }
 
     /** Teilbaum-Wert, wo die Metrik aufrollt; null = Key im Snapshot nicht vorhanden. */

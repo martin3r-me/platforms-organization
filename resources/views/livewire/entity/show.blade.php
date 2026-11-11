@@ -1271,6 +1271,7 @@
                             </x-nx-panel>
                         @endif
 
+                        @if ($this->reportingAvailable())
                         @php $feeds = $this->verbalizationFeeds; @endphp
                         <x-nx-panel flush title="Berichte" :subtitle="$includeDescendantsInReports ? 'für ' . $entity->name . ' und den ganzen Teilbaum' : 'nur direkt an ' . $entity->name">
                             <x-slot name="actions">
@@ -1351,6 +1352,7 @@
                                 <x-nx-empty icon="heroicon-o-document-text">Keine Berichte in diesem Umfang. Neue Feeds per <code class="text-xs">core.verbalization.feeds.POST</code>.</x-nx-empty>
                             @endforelse
                         </x-nx-panel>
+                        @endif
                     </div>
                 @endif
 

@@ -30,10 +30,10 @@ use Platform\Organization\Services\SnapshotMovementService;
 use Platform\Organization\Services\DimensionRadarService;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationSignal;
-use Platform\Core\Models\VerbalizationChannel;
-use Platform\Core\Models\VerbalizationFeed;
-use Platform\Core\Models\VerbalizationOutput;
-use Platform\Core\Models\VerbalizationRecipe;
+use Platform\Reporting\Models\VerbalizationChannel;
+use Platform\Reporting\Models\VerbalizationFeed;
+use Platform\Reporting\Models\VerbalizationOutput;
+use Platform\Reporting\Models\VerbalizationRecipe;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
 
@@ -1920,7 +1920,8 @@ class Show extends Component
             }
 
             $teamId = auth()->user()?->currentTeam?->id;
-            $recipeModel = VerbalizationRecipe::query()
+            // Recipe (pulse_full) kommt aus reporting — ohne Modul Ad-hoc-Puls.
+            $recipeModel = ! $this->reportingAvailable() ? null : VerbalizationRecipe::query()
                 ->where('key', 'pulse_full')
                 ->where(function ($q) use ($teamId) {
                     $q->whereNull('team_id');
@@ -2000,6 +2001,12 @@ class Show extends Component
      */
     public bool $includeDescendantsInReports = true;
 
+    /** Feeds/Recipes/Kanäle gehören dem reporting-Modul — optional installiert. */
+    public function reportingAvailable(): bool
+    {
+        return class_exists(VerbalizationFeed::class);
+    }
+
     public function toggleReportsScope(): void
     {
         $this->includeDescendantsInReports = ! $this->includeDescendantsInReports;
@@ -2018,6 +2025,9 @@ class Show extends Component
     #[Computed]
     public function verbalizationFeeds(): array
     {
+        if (! $this->reportingAvailable()) {
+            return [];
+        }
         $entityId = (int) $this->entity->id;
         $scope = $this->includeDescendantsInReports
             ? $this->collectEntityScopeForReports($entityId)
@@ -2135,7 +2145,7 @@ class Show extends Component
      */
     protected function hydrateRecipes(array $recipesMap, ?int $teamId): array
     {
-        if (empty($recipesMap)) {
+        if (empty($recipesMap) || ! $this->reportingAvailable()) {
             return [];
         }
         $keys = array_values($recipesMap);
@@ -2279,7 +2289,7 @@ class Show extends Component
             'webhook'  => ['label' => 'Webhook',  'icon' => 'link'],
         ];
         try {
-            $registry = app(\Platform\Core\Verbalization\Channel\ChannelRendererRegistry::class);
+            $registry = app(\Platform\Reporting\Verbalization\Channel\ChannelRendererRegistry::class);
             $registered = array_keys($registry->all());
             $out = [];
             foreach ($catalog as $type => $meta) {
@@ -2296,6 +2306,9 @@ class Show extends Component
      */
     public function verbalizationOutputsFor(int $feedId, int $limit = 5): array
     {
+        if (! $this->reportingAvailable()) {
+            return [];
+        }
         return VerbalizationOutput::query()
             ->where('feed_id', $feedId)
             ->orderByDesc('created_at')

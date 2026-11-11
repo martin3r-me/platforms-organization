@@ -61,7 +61,7 @@ class Memory extends Component
     {
         $this->entity = $entity;
         $this->view = OrganizationAgentRule::where('organization_entity_id', $entity->id)->exists() ? 'rules' : 'files';
-        if ($this->view === 'rules' && ! $this->rules->contains(fn ($r) => $r->isLive())) {
+        if ($this->view === 'rules' && ! $this->agentRules->contains(fn ($r) => $r->isLive())) {
             $this->ruleFilter = 'proposed';
         }
         $this->selected = $this->docs()->firstWhere('kind', 'routine')?->path ?? $this->docs()->first()?->path;
@@ -198,7 +198,7 @@ class Memory extends Component
     // ── Arbeitsweise (Regeln) ──
 
     #[Computed]
-    public function rules()
+    public function agentRules()
     {
         return OrganizationAgentRule::where('organization_entity_id', $this->entity->id)
             ->orderBy('ord')->orderBy('rule_id')->get();
@@ -224,7 +224,7 @@ class Memory extends Component
         };
         $q = mb_strtolower(trim($this->search));
         $groups = ['Ablauf' => [], 'Regeln' => [], 'Nach Anlass' => []];
-        foreach ($this->rules as $r) {
+        foreach ($this->agentRules as $r) {
             if (! in_array($r->status, $statuses, true)) {
                 continue;
             }
@@ -241,7 +241,7 @@ class Memory extends Component
     public function ruleCounts(): array
     {
         $c = ['live' => 0, 'proposed' => 0, 'history' => 0];
-        foreach ($this->rules as $r) {
+        foreach ($this->agentRules as $r) {
             $c[$r->isLive() ? 'live' : ($r->status === 'proposed' ? 'proposed' : 'history')]++;
         }
 
@@ -272,7 +272,7 @@ class Memory extends Component
 
     public function editRule(int $ruleId): void
     {
-        $r = $this->rules->firstWhere('rule_id', $ruleId);
+        $r = $this->agentRules->firstWhere('rule_id', $ruleId);
         if (! $r || $this->pendingForRule($ruleId)) {
             return;
         }
@@ -289,7 +289,7 @@ class Memory extends Component
 
     public function submitRule(): void
     {
-        $r = $this->editingRule ? $this->rules->firstWhere('rule_id', $this->editingRule) : null;
+        $r = $this->editingRule ? $this->agentRules->firstWhere('rule_id', $this->editingRule) : null;
         if (! $r || $this->pendingForRule($r->rule_id)) {
             return;
         }
@@ -306,7 +306,7 @@ class Memory extends Component
 
     public function retireRule(int $ruleId): void
     {
-        $r = $this->rules->firstWhere('rule_id', $ruleId);
+        $r = $this->agentRules->firstWhere('rule_id', $ruleId);
         if (! $r || $this->pendingForRule($ruleId) || ! in_array($r->status, ['active', 'probation', 'proposed'], true)) {
             return;
         }
@@ -323,7 +323,7 @@ class Memory extends Component
 
     public function approveRule(int $ruleId): void
     {
-        $r = $this->rules->firstWhere('rule_id', $ruleId);
+        $r = $this->agentRules->firstWhere('rule_id', $ruleId);
         if (! $r || $this->pendingForRule($ruleId) || $r->status !== 'probation') {
             return;
         }

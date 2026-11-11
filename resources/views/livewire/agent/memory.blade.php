@@ -124,7 +124,7 @@
                     </div>
                 @empty
                     <p class="m-0 py-4 text-center text-xs text-[color:var(--nx-muted)]">
-                        @if ($this->rules->isEmpty())
+                        @if ($this->agentRules->isEmpty())
                             Noch keine Regeln. Das Engram zerlegt seine routine.md beim nächsten Start einmal in Regeln — das Ergebnis erscheint hier als Vorschlag.
                         @else
                             Keine Regeln in dieser Ansicht.

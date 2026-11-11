@@ -477,6 +477,10 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\CommentSignalTool());
             $registry->register(new \Platform\Organization\Tools\SnoozeSignalTool());
 
+            // Agenten-Gedächtnis: Regeln lesen, Kuratier-Entwürfe anlegen (Freigabe im Reiter „Gedächtnis“)
+            $registry->register(new \Platform\Organization\Tools\ListAgentRulesTool());
+            $registry->register(new \Platform\Organization\Tools\CreateAgentCurationDraftTool());
+
             // Signal Inference (Semantic Layer)
             $registry->register(new \Platform\Organization\Tools\ListSignalInferencePromptsTool());
             $registry->register(new \Platform\Organization\Tools\CreateSignalInferencePromptTool());

@@ -30,7 +30,7 @@ class OrganizationAgentCuration extends Model
         'applied_at' => 'datetime',
     ];
 
-    public const OPS = ['replace', 'retire', 'revise', 'approve', 'approve_import', 'reject_import'];
+    public const OPS = ['replace', 'retire', 'revise', 'add', 'approve', 'approve_import', 'reject_import'];
 
     public const FINAL = ['applied', 'stale', 'rejected', 'cancelled'];
 

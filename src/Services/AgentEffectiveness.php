@@ -45,7 +45,7 @@ class AgentEffectiveness
         $coord = $this->coordination($userIds, $handles, $from, $to);
         // Korrektur = ein Mensch ändert/streicht etwas am Gedächtnis; Freigaben (approve*) sind keine.
         $corrections = $this->countBy('organization_agent_curations', 'organization_entity_id', $agents->pluck('id')->all(), fn ($q) => $q
-            ->whereIn('op', ['replace', 'retire', 'revise'])->whereBetween('created_at', [$from, $to]));
+            ->whereIn('op', ['replace', 'retire', 'revise'])->where('status', 'applied')->whereBetween('created_at', [$from, $to]));
 
         // Kosten je Ergebnis nur dort, wo Zeitraum und Token-Fenster übereinstimmen: das Gehirn meldet ein
         // gleitendes 7-Tage-Fenster — also Ergebnisse derselben 7 Tage (eigener Lauf, nicht der gewählte Zeitraum).

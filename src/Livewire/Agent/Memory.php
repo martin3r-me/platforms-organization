@@ -250,7 +250,39 @@ class Memory extends Component
 
     public function pendingForRule(int $ruleId): ?OrganizationAgentCuration
     {
-        return $this->pendingFor('rules/' . $ruleId);
+        return $this->pendingFor('rules/' . $ruleId)
+            ?? $this->curations->first(fn ($c) => $c->path === 'rules/' . $ruleId && $c->status === 'draft');
+    }
+
+    /** Entwürfe (von Menschen oder Agenten vorgeschlagen), die auf Freigabe warten — älteste zuerst. */
+    public function drafts()
+    {
+        return OrganizationAgentCuration::where('organization_entity_id', $this->entity->id)
+            ->where('status', 'draft')->orderBy('id')->get();
+    }
+
+    public function approveDraft(int $id): void
+    {
+        $n = OrganizationAgentCuration::where('organization_entity_id', $this->entity->id)
+            ->where('status', 'draft')->whereKey($id)->update(['status' => 'pending']);
+        unset($this->curations);
+        $this->flash = $n ? 'Freigegeben — das Engram übernimmt es in den nächsten Minuten.' : null;
+    }
+
+    public function approveAllDrafts(): void
+    {
+        $n = OrganizationAgentCuration::where('organization_entity_id', $this->entity->id)
+            ->where('status', 'draft')->update(['status' => 'pending']);
+        unset($this->curations);
+        $this->flash = "{$n} Entwürfe freigegeben — das Engram übernimmt sie in den nächsten Minuten.";
+    }
+
+    public function discardDraft(int $id): void
+    {
+        OrganizationAgentCuration::where('organization_entity_id', $this->entity->id)
+            ->where('status', 'draft')->whereKey($id)
+            ->update(['status' => 'cancelled', 'result' => 'Entwurf verworfen', 'applied_at' => now()]);
+        unset($this->curations);
     }
 
     public function hasPendingRuleOrders(): bool

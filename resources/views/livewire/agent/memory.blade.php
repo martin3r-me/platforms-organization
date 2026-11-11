@@ -1,5 +1,6 @@
 @php
     $statusBadge = [
+        'draft' => ['info', 'Entwurf'],
         'pending' => ['warning', 'offen'],
         'applied' => ['success', 'übernommen'],
         'stale' => ['info', 'veraltet'],
@@ -43,6 +44,49 @@
             </x-slot>
 
             <div class="space-y-3 p-4">
+                @php $drafts = $this->drafts(); @endphp
+                @if ($drafts->isNotEmpty())
+                    <div class="rounded-[8px] border border-[color:var(--nx-line)]">
+                        <div class="flex flex-wrap items-center justify-between gap-2 border-b border-[color:var(--nx-line)] px-3 py-2">
+                            <div>
+                                <div class="text-sm font-semibold text-[color:var(--nx-text)]">Entwürfe zur Freigabe · {{ $drafts->count() }}</div>
+                                <div class="text-xs text-[color:var(--nx-muted)]">Vorgeschlagene Änderungen an der Arbeitsweise. Erst nach Freigabe gehen sie an das Engram.</div>
+                            </div>
+                            <x-nx-button variant="primary" wire:click="approveAllDrafts">Alle freigeben</x-nx-button>
+                        </div>
+                        <ul class="m-0 list-none divide-y divide-[color:var(--nx-line)] p-0">
+                            @foreach ($drafts as $d)
+                                @php
+                                    $rid = str_starts_with($d->path, 'rules/') ? (int) substr($d->path, 6) : null;
+                                    $old = $rid ? $this->agentRules->firstWhere('rule_id', $rid) : null;
+                                    $add = $d->op === 'add' ? (json_decode((string) $d->content, true) ?: []) : null;
+                                @endphp
+                                <li class="px-3 py-2 text-xs" wire:key="draft-{{ $d->id }}">
+                                    <div class="flex items-start gap-2">
+                                        <x-nx-badge :variant="['retire' => 'danger', 'add' => 'success'][$d->op] ?? 'info'">{{ ['revise' => 'ändern', 'retire' => 'stilllegen', 'add' => 'neu'][$d->op] ?? $d->op }}</x-nx-badge>
+                                        <div class="min-w-0 flex-1 space-y-1">
+                                            @if ($old)
+                                                <div class="{{ $d->op === 'retire' ? 'line-through' : '' }} text-[color:var(--nx-muted)]"><span class="font-mono text-[color:var(--nx-faint)]">r{{ $rid }}</span> {{ $old->text }}</div>
+                                            @endif
+                                            @if ($d->op === 'revise')
+                                                <div class="text-[color:var(--nx-text)]">→ {{ $d->content }}</div>
+                                            @elseif ($add)
+                                                <div class="text-[color:var(--nx-text)]">@if (($add['kind'] ?? '') === 'avoid')<span class="font-medium text-[color:var(--nx-danger)]">Nicht: </span>@endif{{ $add['text'] ?? '' }}</div>
+                                                <div class="text-[color:var(--nx-muted)]">{{ ['step' => 'Schritt im Ablauf', 'rule' => 'Regel', 'avoid' => 'Verbot'][$add['kind'] ?? 'rule'] ?? '' }}@if (! empty($add['trigger'])) · wenn {{ $add['trigger'] }}@else · Kern @endif</div>
+                                            @endif
+                                            <div class="text-[color:var(--nx-faint)]">Warum: {{ $d->note }}</div>
+                                        </div>
+                                        <div class="flex shrink-0 gap-1">
+                                            <x-nx-button variant="ghost" wire:click="approveDraft({{ $d->id }})">Freigeben</x-nx-button>
+                                            <x-nx-button variant="ghost" wire:click="discardDraft({{ $d->id }})">Verwerfen</x-nx-button>
+                                        </div>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                    </div>
+                @endif
+
                 @if ($counts['proposed'] > 0 && ($meta['mode'] ?? 'routine') !== 'rules')
                     <x-nx-callout variant="warning" title="Umzug-Vorschlag: {{ $counts['proposed'] }} Regeln aus routine.md">
                         <p class="m-0">Das Engram hat seine gewachsene routine.md in einzelne Regeln zerlegt. Prüfe den Vorschlag — einzelne Regeln kannst du ändern oder streichen. Erst mit „Übernehmen“ führen die Regeln; bis dahin gilt die bisherige Datei.</p>
@@ -244,7 +288,7 @@
                     @php [$v, $l] = $statusBadge[$c->status] ?? ['neutral', $c->status]; @endphp
                     <li class="flex flex-wrap items-center gap-x-3 gap-y-1 px-4 py-2 text-xs">
                         <x-nx-badge :variant="$v">{{ $l }}</x-nx-badge>
-                        <span class="font-medium text-[color:var(--nx-text)]">{{ ['retire' => 'stilllegen', 'replace' => 'ändern', 'revise' => 'korrigieren', 'approve' => 'freigeben', 'approve_import' => 'Umzug übernehmen', 'reject_import' => 'Umzug verwerfen'][$c->op] ?? $c->op }}</span>
+                        <span class="font-medium text-[color:var(--nx-text)]">{{ ['retire' => 'stilllegen', 'replace' => 'ändern', 'revise' => 'korrigieren', 'add' => 'Regel ergänzen', 'approve' => 'freigeben', 'approve_import' => 'Umzug übernehmen', 'reject_import' => 'Umzug verwerfen'][$c->op] ?? $c->op }}</span>
                         <span class="text-[color:var(--nx-muted)]">{{ str_starts_with($c->path, 'rules/') ? 'r' . substr($c->path, 6) : ($c->path === 'rules' ? 'Arbeitsweise' : $c->path) }}</span>
                         @if ($c->note)<span class="text-[color:var(--nx-muted)]">— {{ $c->note }}</span>@endif
                         <span class="ml-auto text-[color:var(--nx-faint)]">{{ $c->created_at->diffForHumans() }}</span>

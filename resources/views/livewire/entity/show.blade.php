@@ -1274,8 +1274,15 @@
                         @if ($this->reportingAvailable())
                         @php $feeds = $this->verbalizationFeeds; @endphp
                         <x-nx-panel flush title="Berichte" :subtitle="$includeDescendantsInReports ? 'für ' . $entity->name . ' und den ganzen Teilbaum' : 'nur direkt an ' . $entity->name">
+                            @php $builderAvailable = \Illuminate\Support\Facades\Route::has('reporting.reports.create'); @endphp
                             <x-slot name="actions">
                                 <x-nx-button size="sm" variant="ghost" wire:click="toggleReportsScope">{{ $includeDescendantsInReports ? 'Nur diese Einheit' : 'Mit Teilbaum' }}</x-nx-button>
+                                @if ($builderAvailable)
+                                    <x-nx-button size="sm" variant="secondary" :href="route('reporting.reports.create', ['entity' => $entity->id])" wire:navigate>
+                                        @svg('heroicon-o-plus', 'w-4 h-4')
+                                        <span>Bericht bauen</span>
+                                    </x-nx-button>
+                                @endif
                             </x-slot>
 
                             @forelse ($feeds as $feed)
@@ -1292,6 +1299,10 @@
                                             @endif
                                         </div>
                                         <div class="flex shrink-0 items-center gap-1">
+                                            @if ($builderAvailable)
+                                                <a href="{{ route('reporting.reports.edit', ['feed' => $feed['id']]) }}" wire:navigate
+                                                   class="rounded-[6px] px-2 py-1 text-xs text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)] hover:text-[color:var(--nx-text)]">Öffnen</a>
+                                            @endif
                                             <button type="button" x-on:click="setup = !setup" class="rounded-[6px] px-2 py-1 text-xs text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)]" x-text="setup ? 'Konfiguration ausblenden' : 'Konfiguration'"></button>
                                             <a href="{{ $feed['feed_url'] }}" target="_blank" rel="noopener noreferrer" title="{{ $feed['feed_url'] }}"
                                                class="inline-flex items-center gap-1 rounded-[6px] px-2 py-1 text-xs text-[color:var(--nx-muted)] hover:bg-[color:var(--nx-hover)] hover:text-[color:var(--nx-text)]">
@@ -1349,7 +1360,7 @@
                                     </div>
                                 </div>
                             @empty
-                                <x-nx-empty icon="heroicon-o-document-text">Keine Berichte in diesem Umfang. Neue Feeds per <code class="text-xs">core.verbalization.feeds.POST</code>.</x-nx-empty>
+                                <x-nx-empty icon="heroicon-o-document-text">Keine Berichte in diesem Umfang.@unless ($builderAvailable) Neue Feeds per <code class="text-xs">core.verbalization.feeds.POST</code>.@endunless</x-nx-empty>
                             @endforelse
                         </x-nx-panel>
                         @endif

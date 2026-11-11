@@ -67,7 +67,7 @@ class Sidebar extends Component
                 'note' => '→ reporting',
                 'muted' => true,
                 'items' => [
-                    ['route' => 'reporting.factory', 'label' => 'Baukasten', 'icon' => 'wrench-screwdriver', 'match' => '^/reporting/factory'],
+                    ['route' => 'reporting.dashboard', 'label' => 'Berichte', 'icon' => 'document-chart-bar', 'match' => '^/reporting(/reports.*)?$'],
                     ['route' => 'organization.synthesis-reports.index', 'label' => 'Synthese-Berichte', 'icon' => 'document-text', 'match' => '^/organization/synthesis-reports'],
                 ],
             ],

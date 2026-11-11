@@ -8,6 +8,7 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Carbon;
 use Platform\Organization\Models\OrganizationAgentCuration;
 use Platform\Organization\Models\OrganizationAgentMemoryDoc;
+use Platform\Organization\Models\OrganizationAgentRule;
 use Platform\Organization\Models\OrganizationEntity;
 
 /**
@@ -60,6 +61,82 @@ class AgentMemoryController extends Controller
         }
 
         return response()->json(['data' => ['ok' => true, 'docs' => count($seen), 'removed' => count($gone)]]);
+    }
+
+    /** POST /api/org/agent/rules — vollständiger Spiegel der Regeln (inkl. abgelöster) + Stand des Umzugs. */
+    public function rules(Request $request): JsonResponse
+    {
+        $agent = $this->agentFor($request);
+        if (! $agent) {
+            return response()->json(['message' => 'No agent for this token'], 404);
+        }
+
+        $data = $request->validate([
+            'rules' => 'present|array|max:3000',
+            'rules.*.id' => 'required|integer|min:1',
+            'rules.*.ord' => 'nullable|integer',
+            'rules.*.kind' => 'required|string|in:step,rule,avoid',
+            'rules.*.trigger' => 'nullable|string|max:500',
+            'rules.*.text' => 'required|string|max:4000',
+            'rules.*.why' => 'nullable|string|max:2000',
+            'rules.*.source' => 'nullable|string|max:16',
+            'rules.*.status' => 'required|string|in:proposed,probation,active,superseded,retired',
+            'rules.*.supersedes' => 'nullable|integer|min:0',
+            'rules.*.confirmed' => 'nullable|integer|min:0',
+            'rules.*.refuted' => 'nullable|integer|min:0',
+            'rules.*.sha' => 'required|string|size:64',
+            'rules.*.created_at' => 'nullable|string|max:40',
+            'rules.*.updated_at' => 'nullable|string|max:40',
+            'rules.*.last_used_at' => 'nullable|string|max:40',
+            'proposed_sha' => 'nullable|string|size:64',
+            'mode' => 'nullable|string|in:rules,routine',
+        ]);
+
+        $entityId = (int) $agent->id;
+        $existing = OrganizationAgentRule::where('organization_entity_id', $entityId)->get()->keyBy('rule_id');
+        $seen = [];
+        foreach ($data['rules'] as $r) {
+            $seen[(int) $r['id']] = true;
+            $row = $existing[(int) $r['id']] ?? new OrganizationAgentRule(['organization_entity_id' => $entityId, 'rule_id' => (int) $r['id']]);
+            $fields = [
+                'ord' => (int) ($r['ord'] ?? 0),
+                'kind' => $r['kind'],
+                'trigger' => (string) ($r['trigger'] ?? ''),
+                'text' => $r['text'],
+                'why' => $r['why'] ?? null,
+                'source' => $r['source'] ?? 'learned',
+                'status' => $r['status'],
+                'supersedes' => (int) ($r['supersedes'] ?? 0),
+                'confirmed' => (int) ($r['confirmed'] ?? 0),
+                'refuted' => (int) ($r['refuted'] ?? 0),
+                'sha' => $r['sha'],
+                'rule_created_at' => $r['created_at'] ?? null,
+                'rule_updated_at' => $r['updated_at'] ?? null,
+                'last_used_at' => $r['last_used_at'] ?? null,
+            ];
+            $row->fill($fields);
+            if (! $row->exists || $row->isDirty()) {
+                $row->save();
+            }
+        }
+        $gone = $existing->keys()->reject(fn ($id) => isset($seen[$id]))->all();
+        if ($gone) {
+            OrganizationAgentRule::where('organization_entity_id', $entityId)->whereIn('rule_id', $gone)->delete();
+        }
+
+        $profile = $agent->agentProfile;
+        if ($profile) {
+            $settings = is_array($profile->settings) ? $profile->settings : [];
+            $settings['rules'] = [
+                'mode' => $data['mode'] ?? 'routine',
+                'proposed_sha' => $data['proposed_sha'] ?? null,
+                'pushed_at' => now()->toIso8601String(),
+            ];
+            $profile->settings = $settings;
+            $profile->save();
+        }
+
+        return response()->json(['data' => ['ok' => true, 'rules' => count($seen), 'removed' => count($gone)]]);
     }
 
     /** GET /api/org/agent/curations — offene Aufträge, älteste zuerst. */

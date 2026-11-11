@@ -28,6 +28,7 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::post('/brain', [AgentProfileController::class, 'brain'])->name('organization.api.agent.brain');
     // GEDÄCHTNIS: steuernde Vault-Dateien spiegeln + Kuratier-Aufträge abholen/quittieren (Org schreibt nie direkt).
     Route::post('/memory', [AgentMemoryController::class, 'push'])->name('organization.api.agent.memory');
+    Route::post('/rules', [AgentMemoryController::class, 'rules'])->name('organization.api.agent.rules');
     Route::get('/curations', [AgentMemoryController::class, 'pending'])->name('organization.api.agent.curations');
     Route::post('/curations/{id}', [AgentMemoryController::class, 'ack'])->whereNumber('id')->name('organization.api.agent.curations.ack');
     // Dashboard-Kennzahlen: getrackte Zeit (24h / Monat).

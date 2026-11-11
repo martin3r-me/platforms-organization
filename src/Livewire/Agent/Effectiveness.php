@@ -70,6 +70,6 @@ class Effectiveness extends Component
                 'hours' => round(array_sum(array_map(fn ($r) => (float) $r['hours'], $rows)), 1),
             ],
             'isCurrent' => $to->isToday() || $to->isFuture(),
-        ]);
+        ])->layout('platform::layouts.app');
     }
 }

@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use Platform\Organization\Http\Controllers\Api\AgentChangeController;
 use Platform\Organization\Http\Controllers\Api\CoordinationController;
 use Platform\Organization\Http\Controllers\Api\AgentEnvironmentController;
+use Platform\Organization\Http\Controllers\Api\AgentMemoryController;
 use Platform\Organization\Http\Controllers\Api\AgentMessagingController;
 use Platform\Organization\Http\Controllers\Api\AgentOkrController;
 use Platform\Organization\Http\Controllers\Api\AgentPortfolioController;
@@ -25,6 +26,10 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::post('/log', [AgentProfileController::class, 'log'])->name('organization.api.agent.log');
     // Client-Daemon: einen gebündelten Gehirn-Snapshot pushen → Org-Einzel-Gehirn-Ansicht (host-agnostisch).
     Route::post('/brain', [AgentProfileController::class, 'brain'])->name('organization.api.agent.brain');
+    // GEDÄCHTNIS: steuernde Vault-Dateien spiegeln + Kuratier-Aufträge abholen/quittieren (Org schreibt nie direkt).
+    Route::post('/memory', [AgentMemoryController::class, 'push'])->name('organization.api.agent.memory');
+    Route::get('/curations', [AgentMemoryController::class, 'pending'])->name('organization.api.agent.curations');
+    Route::post('/curations/{id}', [AgentMemoryController::class, 'ack'])->whereNumber('id')->name('organization.api.agent.curations.ack');
     // Dashboard-Kennzahlen: getrackte Zeit (24h / Monat).
     Route::get('/stats', [AgentProfileController::class, 'stats'])->name('organization.api.agent.stats');
     // Observability: jüngste Run-Events lesen (z. B. ?kind=fail für Ablehnungsgründe).

@@ -42,6 +42,7 @@
     if ($this->isAgentEntity) {
         $tabs[] = ['key' => 'agent', 'label' => 'Agent', 'icon' => 'heroicon-o-sparkles'];
         $tabs[] = ['key' => 'braingraph', 'label' => 'Gehirn', 'icon' => 'heroicon-o-cpu-chip'];
+        $tabs[] = ['key' => 'memory', 'label' => 'Gedächtnis', 'icon' => 'heroicon-o-book-open'];
     } elseif ($this->isSystemAgent) {
         $unhealthyCount = $this->agentPrompts->filter(fn ($p) => in_array($p->health_status, ['stale', 'error']))->count();
         $tabs[] = ['key' => 'agent', 'label' => 'Agent', 'icon' => 'heroicon-o-cpu-chip', 'badge' => $unhealthyCount ?: null, 'badgeVariant' => 'danger'];
@@ -683,6 +684,9 @@
                     @endif
                     @if ($activeTab === 'braingraph')
                         @livewire(\Platform\Organization\Livewire\Agent\BrainGraph::class, ['entity' => $entity], key('agent-braingraph-'.$entity->id))
+                    @endif
+                    @if ($activeTab === 'memory')
+                        @livewire(\Platform\Organization\Livewire\Agent\Memory::class, ['entity' => $entity], key('agent-memory-'.$entity->id))
                     @endif
                 @endif
 

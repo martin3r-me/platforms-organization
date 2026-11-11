@@ -67,7 +67,7 @@ class Sidebar extends Component
                 'note' => '→ reporting',
                 'muted' => true,
                 'items' => [
-                    ['route' => 'core.verbalization.factory', 'label' => 'Baukasten', 'icon' => 'wrench-screwdriver', 'match' => '/verbalization/factory'],
+                    ['route' => 'reporting.factory', 'label' => 'Baukasten', 'icon' => 'wrench-screwdriver', 'match' => '^/reporting/factory'],
                     ['route' => 'organization.synthesis-reports.index', 'label' => 'Synthese-Berichte', 'icon' => 'document-text', 'match' => '^/organization/synthesis-reports'],
                 ],
             ],
@@ -86,12 +86,19 @@ class Sidebar extends Component
     {
         $path = '/' . ltrim(request()->path(), '/');
         foreach ($sections as &$section) {
+            // Links in lose gekoppelte Module (z. B. reporting) nur, wenn die Route existiert.
+            $section['items'] = array_values(array_filter(
+                $section['items'],
+                fn ($item) => \Illuminate\Support\Facades\Route::has($item['route']),
+            ));
             foreach ($section['items'] as &$item) {
                 $item['active'] = (bool) preg_match('#' . $item['match'] . '#', $path);
             }
+            unset($item);
         }
+        unset($section);
 
-        return $sections;
+        return array_values(array_filter($sections, fn ($section) => $section['items'] !== []));
     }
 
     public function render()

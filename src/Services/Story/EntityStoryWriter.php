@@ -20,13 +20,14 @@ Worauf es ankommt:
 - Der erste Satz ist die Nachricht: das, was sich am stärksten verändert hat. „gut", „schlecht" und „neutral" sind nach Gewicht sortiert, der jeweils erste Eintrag zählt am meisten. Die gebuchte Zeit ist Kontext und nur dann die Nachricht, wenn sie sich gegenüber der Vorperiode stark verändert hat.
 - Wähle die zwei, drei Fakten, die die Lage erklären. Nicht jede Zahl nennen.
 - Namen statt Prozente: welches Projekt, welche Person, welche Einheit darunter.
-- Trägt eine einzige Einheit darunter fast alles, sag das in einem Halbsatz statt ihre Details zu wiederholen.
+- Hat eine Einheit in „darunter" einen „anteil_stunden" von 80 oder mehr, sag das in einem Halbsatz („fast alles in Kunden-Engagements") und wiederhole ihre Details nicht. Erzähl dann, was nur hier sichtbar ist.
 
 Strikt:
 - Jede Zahl und jeder Name steht in den Fakten. Nichts erfinden, keine Ursachen vermuten, keine Ratschläge, keine Bewertung von Stillstand.
 - Vergleiche nur mit der genannten Vorperiode und nenne sie so, wie sie in „vorperiode" heißt.
 - Bei Einträgen mit „im_zeitraum" zählt nur dieser Wert (z. B. „19 Aufgaben erledigt"), keine Gesamtzähler.
 - Ist „erfassung_erweitert" wahr, genügt ein kurzer Hinweis wie „die Erfassung ist im Zeitraum gewachsen".
+- Keine wertenden Füllwörter (immerhin, leider, erfreulich, nur, deutlich).
 - Kein Geld. Keine Fachwörter wie Knoten, Kindknoten, Items, Snapshot, Delta, Dimension, Metrik.
 - Schreibweise: Namen in GROSSBUCHSTABEN normal schreiben (PLANUNG 2027 → Planung 2027). Projekt und Kunde stehen getrennt; den Kunden nur nennen, wenn es hilft. Stunden als „h" mit Komma (1,5 h), große Zahlen mit Punkt (1.688).
 TXT;
@@ -155,7 +156,7 @@ TXT;
                 'davon_agenten' => round($f['energy']['agent_minutes'] / 60, 1),
                 'vorperiode_stunden' => round($f['energy']['previous_minutes'] / 60, 1),
                 'wer' => array_map(fn ($p) => ['name' => $this->name($p['name']), 'stunden' => round($p['minutes'] / 60, 1), 'agent' => $p['agent']], $f['energy']['people']),
-                'worauf' => array_map(fn ($c) => $this->context($c['label']) + ['stunden' => round($c['minutes'] / 60, 1)], $f['energy']['contexts']),
+                'worauf' => array_map(fn ($c) => ['was' => $this->name($this->context($c['label'])['was'])] + $this->context($c['label']) + ['stunden' => round($c['minutes'] / 60, 1)], $f['energy']['contexts']),
             ],
             'gut' => array_map($metric, $f['movers']['good']),
             'schlecht' => array_map($metric, $f['movers']['bad']),
@@ -168,6 +169,7 @@ TXT;
             'darunter' => array_map(fn ($c) => array_filter([
                 'name' => $c['name'],
                 'stunden' => round($c['minutes'] / 60, 1),
+                'anteil_stunden' => $f['energy']['minutes'] > 0 ? (int) round(100 * $c['minutes'] / $f['energy']['minutes']) : null,
                 'zustand' => $c['mute'] ? 'nichts angebunden' : ($c['quiet'] ? 'ruhig' : 'bewegt'),
                 'staerkste_bewegung' => $c['top'] ? $this->plain($c['top']['label']) . ' ' . ($c['top']['delta'] > 0 ? '+' : '') . $c['top']['delta'] : null,
             ], fn ($v) => $v !== null), $f['children'] ?? []),

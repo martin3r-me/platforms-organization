@@ -186,6 +186,9 @@ TXT;
             'Items (erledigt)' => 'erledigte Aufgaben',
             'Items (gesamt)' => 'Aufgaben insgesamt',
             'Verknuepfungen' => 'Verknüpfungen',
+            'Referring Domains' => 'verlinkende Domains',
+            'AI Search Volume' => 'Suchvolumen in KI-Suchen',
+            'Backlink-Spam-Score' => 'Spam-Wert der Backlinks',
         ]);
     }
 

@@ -320,10 +320,10 @@ class AgentMessagingController extends Controller
                 continue;
             }
             $role = null;
-            $jpClass = \Platform\People\Models\JobProfile::class;
+            $jpClass = \Platform\People\Support\HeldJobProfile::class;
             if (class_exists($jpClass)) {
                 try {
-                    $role = $jpClass::query()->where('owner_entity_id', $e->id)->value('name');
+                    $role = $jpClass::forEntity((int) $e->id)?->name;
                 } catch (\Throwable $ex) {
                     $role = null;
                 }
@@ -386,10 +386,10 @@ class AgentMessagingController extends Controller
         $entity = OrganizationEntity::query()->agents()->where('linked_user_id', $userId)->first();
         $name = $entity?->name ?: $fallbackName;
         $role = null;
-        $jpClass = \Platform\People\Models\JobProfile::class;
+        $jpClass = \Platform\People\Support\HeldJobProfile::class;
         if ($entity && class_exists($jpClass)) {
             try {
-                $role = $jpClass::query()->where('owner_entity_id', $entity->id)->value('name');
+                $role = $jpClass::forEntity((int) $entity->id)?->name;
             } catch (\Throwable $e) {
                 $role = null;
             }

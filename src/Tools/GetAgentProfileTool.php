@@ -12,7 +12,7 @@ use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
 
 /**
  * Das Agent-Profil LESEN — genau das, was der Daemon über GET /api/org/agent/profile bekommt:
- * Job-Profil (aufgelöst über owner_entity_id), Bezugsperson aus der Struktur, Stufen, Governor,
+ * Job-Profil (Stelle des Mitarbeiters in People), Bezugsperson aus der Struktur, Stufen, Governor,
  * Einstellungen. So lässt sich per MCP prüfen, womit ein Agent tatsächlich arbeitet.
  */
 class GetAgentProfileTool implements ToolContract, ToolMetadataContract
@@ -26,7 +26,7 @@ class GetAgentProfileTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/agent-profile - Zeigt das Profil eines Agenten so, wie der Agent es zieht: job_profile (Stellenbeschreibung aus People, über owner_entity_id; mit vsm_level, Verantwortlichkeiten, KPIs), supervisor (Bezugsperson aus der Org-Struktur — schlägt reporting.reports_to im Job-Profil), stages, governor, settings. Ändern: organization.agent_profile.PUT bzw. people.job_profiles.PATCH.';
+        return 'GET /organization/agent-profile - Zeigt das Profil eines Agenten so, wie der Agent es zieht: job_profile (Stelle des Agenten als Mitarbeiter in People — people.employee_job_profiles; mit vsm_level, Verantwortlichkeiten, KPIs), supervisor (Bezugsperson aus der Org-Struktur — schlägt reporting.reports_to im Job-Profil), stages, governor, settings. Ändern: organization.agent_profile.PUT bzw. people.job_profiles.PATCH.';
     }
 
     public function getSchema(): array

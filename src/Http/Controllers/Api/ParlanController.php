@@ -87,10 +87,10 @@ class ParlanController extends Controller
     /** Rollen-Titel: aktive Stellenbeschreibung (People, weich gekoppelt), sonst gültige Org-Rolle. */
     private function roleOf(int $entityId): ?string
     {
-        $jp = \Platform\People\Models\JobProfile::class;
+        $jp = \Platform\People\Support\HeldJobProfile::class;
         if (class_exists($jp)) {
             try {
-                $name = $jp::query()->where('owner_entity_id', $entityId)->where('status', 'active')->orderByDesc('id')->value('name');
+                $name = $jp::forEntity($entityId)?->name;
                 if ($name) {
                     return (string) $name;
                 }

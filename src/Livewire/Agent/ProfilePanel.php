@@ -281,12 +281,12 @@ class ProfilePanel extends Component
     /** Berichtslinie aus dem Job-Profil (Freitext), falls das People-Modul da ist. */
     private function jobProfileReportsTo(): ?string
     {
-        $class = \Platform\People\Models\JobProfile::class;
+        $class = \Platform\People\Support\HeldJobProfile::class;
         if (! class_exists($class)) {
             return null;
         }
         try {
-            $jp = $class::query()->where('owner_entity_id', $this->entity->id)->where('status', 'active')->orderByDesc('id')->first();
+            $jp = $class::forEntity((int) $this->entity->id);
         } catch (\Throwable $e) {
             return null;
         }

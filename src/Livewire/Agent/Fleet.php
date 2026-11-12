@@ -26,18 +26,15 @@ class Fleet extends Component
             ->orderBy('name')
             ->get();
 
-        // Das WAS des Agenten = der JOB-PROFIL-Name (weich über owner_entity_id, wie im Profil-Endpoint).
+        // Das WAS des Agenten = der Name seiner Stelle (People: Stelle hängt am Mitarbeiter, wie im Profil-Endpoint).
         // Die „Domäne" als Label ist abgeschafft. class_exists-Gate: kein harter Cross-Modul-Zwang auf People.
         $jobNames = [];
-        if (class_exists(\Platform\People\Models\JobProfile::class)) {
-            $jobNames = \Platform\People\Models\JobProfile::query()
-                ->whereIn('owner_entity_id', $entities->pluck('id'))
-                ->where('status', 'active')
-                ->orderByDesc('id')
-                ->get(['owner_entity_id', 'name'])
-                ->groupBy('owner_entity_id')
-                ->map(fn ($g) => $g->first()->name)
-                ->all();
+        if (class_exists(\Platform\People\Support\HeldJobProfile::class)) {
+            try {
+                $jobNames = array_map(fn ($jp) => $jp->name, \Platform\People\Support\HeldJobProfile::forEntities($entities->pluck('id')->all()));
+            } catch (\Throwable $e) {
+                $jobNames = [];
+            }
         }
 
         return $entities->map(function ($e) use ($jobNames) {

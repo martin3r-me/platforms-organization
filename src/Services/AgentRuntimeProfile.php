@@ -88,8 +88,8 @@ class AgentRuntimeProfile
     }
 
     /**
-     * Weiche Auflösung der Stellenbeschreibung eines Agenten über die Org-Entity-Kante
-     * (people_job_profiles.owner_entity_id = organization_entities.id). Tolerant: fehlende
+     * Weiche Auflösung der Stellenbeschreibung eines Agenten: die Stelle hängt am Mitarbeiter
+     * (People HeldJobProfile: Knoten → Mitarbeiter → Zuweisung → Profil). Tolerant: fehlende
      * People-Klasse oder kein aktives Profil → null (kein harter Abbruch, kein Cross-Modul-Zwang).
      */
     private function jobProfileForEntity(int $entityId): ?array
@@ -97,17 +97,13 @@ class AgentRuntimeProfile
         if ($entityId < 1) {
             return null;
         }
-        $class = \Platform\People\Models\JobProfile::class;
+        $class = \Platform\People\Support\HeldJobProfile::class;
         if (! class_exists($class)) {
             return null;
         }
         try {
             /** @var \Platform\People\Models\JobProfile|null $jp */
-            $jp = $class::query()
-                ->where('owner_entity_id', $entityId)
-                ->where('status', 'active')
-                ->orderByDesc('id')
-                ->first();
+            $jp = $class::forEntity($entityId);
         } catch (\Throwable $e) {
             return null;
         }

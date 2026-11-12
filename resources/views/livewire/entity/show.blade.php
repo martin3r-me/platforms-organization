@@ -26,6 +26,7 @@
 
     // Tabs: Inhalt zuerst, Konfiguration („Einstellungen") zuletzt.
     $tabs = [];
+    $tabs[] = ['key' => 'lage', 'label' => 'Lage', 'icon' => 'heroicon-o-newspaper'];
     $tabs[] = ['key' => 'hierarchy', 'label' => 'Struktur', 'icon' => 'heroicon-o-rectangle-group', 'badge' => $descendantCount ?: null];
     $tabs[] = ['key' => 'links', 'label' => 'Verknüpft', 'icon' => 'heroicon-o-link', 'badge' => $linkCount ?: null];
     $tabs[] = ['key' => 'analyse', 'label' => 'Analyse', 'icon' => 'heroicon-o-chart-bar-square', 'click' => '$wire.loadAnalyseData()'];
@@ -230,6 +231,11 @@
                     </nav>
                     <div wire:loading.delay wire:target="activeTab" class="py-2 text-xs text-[color:var(--nx-faint)]">Lädt…</div>
                 </div>
+
+                {{-- ═══ Lage: was sich bewegt und wo die Einheit steht ═══ --}}
+                @if ($activeTab === 'lage')
+                    @include('organization::livewire.entity.partials.lage', ['lage' => $this->lage])
+                @endif
 
                 {{-- ═══ Struktur: Untereinheiten ═══ --}}
                 @if ($activeTab === 'hierarchy')

@@ -177,7 +177,7 @@ TXT;
     }
 
     /** Metrik-Label in Alltagssprache: „Items (offen)" → „offene Aufgaben", ohne „(7 Tage)". */
-    protected function plain(string $label): string
+    public function plain(string $label): string
     {
         $label = preg_replace('/\s*\(\d+ Tage\)/u', '', $label);
 
@@ -193,7 +193,7 @@ TXT;
     }
 
     /** „PROJECT · PLANUNG 2027 - BHGBROICHCATERING" → Projekt „PLANUNG 2027", Kunde „BHGBROICHCATERING". */
-    protected function context(?string $label): array
+    public function context(?string $label): array
     {
         $label = $this->cleanLabel($label) ?? '';
         if (preg_match('/^(.+?)\s+-\s+([^-]+)$/u', $label, $m)) {
@@ -243,7 +243,7 @@ TXT;
     }
 
     /** „MARTIN ERREN" → „Martin Erren" */
-    protected function name(?string $name): ?string
+    public function name(?string $name): ?string
     {
         if ($name === null) {
             return null;

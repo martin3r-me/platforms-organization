@@ -30,6 +30,9 @@ use Platform\Organization\Services\SnapshotMovementService;
 use Platform\Organization\Services\DimensionRadarService;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationSignal;
+use Platform\Organization\Models\OrganizationEntityStory;
+use Platform\Organization\Services\Story\EntityFactsService;
+use Platform\Organization\Services\Story\EntityStoryWriter;
 use Platform\Reporting\Models\VerbalizationChannel;
 use Platform\Reporting\Models\VerbalizationFeed;
 use Platform\Reporting\Models\VerbalizationOutput;
@@ -43,7 +46,8 @@ class Show extends Component
 
     public OrganizationEntity $entity;
     public array $form = [];
-    public string $activeTab = 'hierarchy';
+    public string $activeTab = 'lage';
+    public string $lagePeriod = 'week';
     public bool $showCreateTeamModal = false;
     public array $newTeam = [
         'name' => '',
@@ -549,11 +553,56 @@ class Show extends Component
             'linkedUser',
         ]);
         $this->loadForm();
+    }
 
-        // Ohne Untereinheiten ist „Struktur" leer — dann direkt das Verknüpfte zeigen.
-        if ($this->entity->children->isEmpty()) {
-            $this->activeTab = 'links';
+    public function setLagePeriod(string $period): void
+    {
+        if (in_array($period, EntityFactsService::PERIODS, true)) {
+            $this->lagePeriod = $period;
+            unset($this->lage);
         }
+    }
+
+    /**
+     * Lage des Knotens: gespeicherte Erzählung des täglichen Laufs (organization:entity-stories),
+     * sonst live gerechnete Fakten mit festem Satz. Dazu die Sätze der direkten Untereinheiten.
+     */
+    #[Computed]
+    public function lage(): array
+    {
+        $story = OrganizationEntityStory::latestFor($this->entity->id, $this->lagePeriod);
+
+        if ($story) {
+            $facts = $story->facts;
+            $text = $story->story;
+            $source = $story->source;
+            $asOf = $story->as_of?->toDateString();
+        } else {
+            try {
+                $facts = resolve(EntityFactsService::class)->forEntity($this->entity, $this->lagePeriod);
+            } catch (\Throwable $e) {
+                report($e);
+
+                return ['error' => true];
+            }
+            $text = resolve(EntityStoryWriter::class)->template($facts);
+            $source = 'live';
+            $asOf = now()->toDateString();
+        }
+
+        $childIds = collect($facts['children'] ?? [])->pluck('id')->all();
+        $childStories = $childIds === [] ? collect() : OrganizationEntityStory::whereIn('entity_id', $childIds)
+            ->where('period', $this->lagePeriod)->orderByDesc('as_of')->get(['entity_id', 'story', 'as_of'])
+            ->unique('entity_id')->keyBy('entity_id');
+
+        return [
+            'error' => false,
+            'facts' => $facts,
+            'story' => $text,
+            'source' => $source,
+            'as_of' => $asOf,
+            'child_stories' => $childStories->map(fn ($s) => $s->story)->all(),
+        ];
     }
 
     /** Offene Signale für den Tab-Zähler (läuft bei jedem Request, daher nur ein COUNT). */

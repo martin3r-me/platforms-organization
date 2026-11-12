@@ -1,12 +1,11 @@
 @php
-    $insights = $this->insightStatements;
+    $lage = $this->orgLage;
     $summary = $this->teamSnapshotSummary;
     $health = $this->entityHealthOverview;
     $time = $this->teamTimeAnalytics;
     $velocity = $this->completionVelocity;
     $trend = $this->teamSnapshotTrend;
     $linkDist = $this->linkTypeDistribution;
-    $topEntities = $this->topEntitiesByActivity;
     $personOverview = $this->personOverview;
     $signalOverview = $this->signalOverview;
     $focusedSignals = $this->focusedSignals;
@@ -70,6 +69,9 @@
                 <span class="text-sm text-[color:var(--nx-muted)]">{{ now()->locale('de')->isoFormat('dddd, D. MMMM') }}</span>
             </div>
 
+            {{-- Lage zuerst: was sich bewegt und wo die Organisation steht --}}
+            @include('organization::livewire.dashboard.lage', ['lage' => $lage])
+
             {{-- Kennzahlen --}}
             <x-nx-stat-grid cols="4">
                 <x-nx-stat label="Aktive Einheiten" :value="$this->activeEntities" :hint="$this->totalEntities . ' gesamt'"
@@ -83,20 +85,6 @@
                 <x-nx-stat label="Offene Signale" :value="$signalOverview['total_open']" :hint="$signalHint"
                     icon="heroicon-o-bell-alert" :accent="$signalAccent" :href="route('organization.signals.index')" wire:navigate />
             </x-nx-stat-grid>
-
-            @if (count($insights) > 0)
-                <x-nx-callout variant="neutral" icon="heroicon-o-light-bulb">
-                    <div class="flex flex-col gap-1">
-                        @foreach ($insights as $insight)
-                            <span @class([
-                                'text-[color:var(--nx-success)]' => $insight['type'] === 'success',
-                                'text-[color:var(--nx-warning)]' => $insight['type'] === 'warning',
-                                'text-[color:var(--nx-text)]' => ! in_array($insight['type'], ['success', 'warning']),
-                            ])>{{ $insight['text'] }}</span>
-                        @endforeach
-                    </div>
-                </x-nx-callout>
-            @endif
 
             <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
                 {{-- Hauptspalte --}}
@@ -190,28 +178,6 @@
                                     </div>
                                 @endforeach
                             @endif
-                        </x-nx-panel>
-                    @endif
-
-                    @if (count($topEntities) > 0)
-                        <x-nx-panel flush title="Aktive Einheiten" subtitle="letzte 7 Tage">
-                            @foreach ($topEntities as $top)
-                                <a href="{{ route('organization.entities.show', $top['id']) }}" wire:navigate
-                                   class="flex items-center gap-3 border-b border-[color:var(--nx-line)] px-4 py-2 text-sm transition-colors last:border-0 hover:bg-[color:var(--nx-hover)]">
-                                    <div class="min-w-0 flex-1">
-                                        <div class="truncate font-medium text-[color:var(--nx-text)]">{{ $top['name'] }}</div>
-                                        <div class="text-xs text-[color:var(--nx-faint)]">{{ $top['type_name'] }}</div>
-                                    </div>
-                                    <div class="shrink-0 text-right text-xs tabular-nums">
-                                        @if ($top['items_completed_7d'] > 0)
-                                            <div class="text-[color:var(--nx-success)]">{{ $top['items_completed_7d'] }} erledigt</div>
-                                        @endif
-                                        @if ($top['hours_7d'] > 0)
-                                            <div class="text-[color:var(--nx-muted)]">{{ $top['hours_7d'] }} h</div>
-                                        @endif
-                                    </div>
-                                </a>
-                            @endforeach
                         </x-nx-panel>
                     @endif
 

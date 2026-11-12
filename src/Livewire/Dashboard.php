@@ -15,6 +15,9 @@ use Platform\Organization\Services\PersonActivityRegistry;
 use Platform\Organization\Services\SnapshotMovementService;
 use Platform\Organization\Services\EnvironmentMovementService;
 use Platform\Organization\Models\OrganizationEnvironmentSource;
+use Platform\Organization\Models\OrganizationEntityStory;
+use Platform\Organization\Services\PerspectiveService;
+use Platform\Organization\Services\Story\EntityFactsService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Carbon\Carbon;
@@ -22,6 +25,7 @@ use Carbon\Carbon;
 class Dashboard extends Component
 {
     public ?string $dashboardStream = null;
+    public string $lagePeriod = 'week';
 
     #[On('perspective-switched')]
     public function onPerspectiveSwitched(): void
@@ -40,7 +44,81 @@ class Dashboard extends Component
             $this->signalOverview,
             $this->focusedSignals,
             $this->environmentRadar,
+            $this->orgLage,
         );
+    }
+
+    public function setLagePeriod(string $period): void
+    {
+        if (in_array($period, EntityFactsService::PERIODS, true)) {
+            $this->lagePeriod = $period;
+            unset($this->orgLage);
+        }
+    }
+
+    /**
+     * Lage der Organisation aus Sicht der aktiven Perspektive: ihr Satz (täglicher Lauf
+     * organization:entity-stories), die Einheiten direkt darunter nach Art gruppiert mit ihren
+     * Sätzen, und die stärksten Bewegungen quer über diese Einheiten. Nur Gespeichertes —
+     * live über 60+ Untereinheiten zu rechnen wäre für eine Startseite zu teuer.
+     */
+    #[Computed]
+    public function orgLage(): array
+    {
+        $teamId = $this->getTeamId();
+        $root = $teamId ? PerspectiveService::getActiveEntity($teamId) : null;
+        if (! $root) {
+            return ['root' => null];
+        }
+
+        $story = OrganizationEntityStory::latestFor($root->id, $this->lagePeriod);
+        if (! $story) {
+            return ['root' => $root, 'story' => null];
+        }
+
+        $children = collect($story->facts['children'] ?? []);
+        $entities = OrganizationEntity::with('type:id,name')->whereIn('id', $children->pluck('id'))
+            ->get(['id', 'entity_type_id'])->keyBy('id');
+        $childStories = OrganizationEntityStory::whereIn('entity_id', $children->pluck('id'))
+            ->where('period', $this->lagePeriod)->orderByDesc('as_of')->get(['entity_id', 'story', 'facts', 'as_of'])
+            ->unique('entity_id')->keyBy('entity_id');
+
+        // Einheiten nach Art; Arten mit Bewegung zuerst, Stilles nur gezählt
+        $groups = $children
+            ->map(fn ($c) => $c + ['type' => $entities[$c['id']]->type->name ?? 'Sonstige', 'story' => $childStories[$c['id']]->story ?? null])
+            ->groupBy('type')
+            ->map(fn ($items, $type) => [
+                'type' => $type,
+                'active' => $items->reject(fn ($c) => $c['quiet'] || $c['mute'])->sortByDesc('weight')->values()->all(),
+                'quiet' => $items->filter(fn ($c) => $c['quiet'] && ! $c['mute'])->count(),
+                'mute' => $items->filter(fn ($c) => $c['mute'])->count(),
+                'weight' => $items->sum('weight'),
+            ])
+            ->sortByDesc('weight')->values()->all();
+
+        // Bewegungen quer über die Einheiten darunter, mit Herkunft
+        $moves = ['good' => [], 'bad' => []];
+        foreach ($childStories as $id => $cs) {
+            $name = $children->firstWhere('id', $id)['name'] ?? '';
+            foreach (['good', 'bad'] as $g) {
+                foreach ($cs->facts['movers'][$g] ?? [] as $m) {
+                    $moves[$g][] = $m + ['entity_id' => $id, 'entity' => $name];
+                }
+            }
+        }
+        foreach ($moves as $g => $list) {
+            $moves[$g] = collect($list)->sortByDesc('score')->take(5)->values()->all();
+        }
+
+        return [
+            'root' => $root,
+            'story' => $story->story,
+            'source' => $story->source,
+            'as_of' => $story->as_of?->toDateString(),
+            'facts' => $story->facts,
+            'groups' => $groups,
+            'moves' => $moves,
+        ];
     }
 
     /** Live-Kacheln (Zeiten, Links, Insights): 10 min je Team/Stream. */

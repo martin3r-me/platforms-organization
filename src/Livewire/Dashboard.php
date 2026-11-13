@@ -110,7 +110,12 @@ class Dashboard extends Component
         // Bewegungen quer über die Einheiten darunter, mit Herkunft
         $moves = ['good' => [], 'bad' => []];
         foreach ($childStories as $id => $cs) {
-            $name = $children->firstWhere('id', $id)['name'] ?? '';
+            $child = $children->firstWhere('id', $id);
+            // Menschen und Agenten nicht einzeln bewerten — sie stehen bei „Wer trägt"
+            if (in_array($child['class'] ?? null, ['actor', 'observed'], true)) {
+                continue;
+            }
+            $name = $child['name'] ?? '';
             foreach (['good', 'bad'] as $g) {
                 foreach ($cs->facts['movers'][$g] ?? [] as $m) {
                     $moves[$g][] = $m + ['entity_id' => $id, 'entity' => $name];
@@ -186,12 +191,14 @@ class Dashboard extends Component
                 return;
             }
             $seen[$signal->id] = true;
+            // Regel-Signale tragen Rohformeln („items_done/items_total = 0% (< 30%)") — lesbar ist der Name der Regel
+            $rule = $signal->definition?->name;
             $items[] = [
                 'kind' => 'signal',
                 'severity' => $signal->severity,
-                'title' => \Illuminate\Support\Str::limit((string) $signal->message, 120),
-                'why' => $why,
-                'entity' => $signal->entity?->name,
+                'title' => $rule ? ($signal->entity?->name ?? $rule) : \Illuminate\Support\Str::limit((string) $signal->message, 120),
+                'why' => $rule ? $rule . ' · ' . $why : $why,
+                'entity' => $rule ? null : $signal->entity?->name,
                 'href' => route('organization.signals.show', $signal),
                 'focused' => $why === 'von dir markiert',
                 'signal_id' => $signal->id,
@@ -199,7 +206,7 @@ class Dashboard extends Component
         };
 
         if ($userId) {
-            $open()->focusedBy($userId)->with('entity:id,name')
+            $open()->focusedBy($userId)->with(['entity:id,name', 'definition:id,name'])
                 ->orderByRaw("FIELD(severity, 'algedonic', 'critical', 'warning', 'info')")->latest()->limit(5)->get()
                 ->each(fn ($s) => $push($s, 'von dir markiert'));
         }
@@ -208,7 +215,7 @@ class Dashboard extends Component
         $fresh = now()->subDays(self::ATTENTION_FRESH_DAYS);
         $since = fn ($s) => 'gemeldet ' . $s->created_at->locale('de')->diffForHumans();
 
-        $open()->whereIn('severity', ['algedonic', 'critical'])->where('created_at', '>=', $fresh)->with('entity:id,name')
+        $open()->whereIn('severity', ['algedonic', 'critical'])->where('created_at', '>=', $fresh)->with(['entity:id,name', 'definition:id,name'])
             ->orderByRaw("FIELD(severity, 'algedonic', 'critical')")->latest()->limit(5)->get()
             ->each(fn ($s) => $push($s, $since($s)));
 
@@ -232,9 +239,33 @@ class Dashboard extends Component
             }
         }
 
+        // Frische Warnungen: dieselbe Regel an mehreren Einheiten wird eine Zeile, nicht fünf
         if (count($items) < 5) {
-            $open()->where('severity', 'warning')->where('created_at', '>=', $fresh)->with('entity:id,name')->latest()->limit(5 - count($items))->get()
-                ->each(fn ($s) => $push($s, 'Warnung, ' . $since($s)));
+            $open()->where('severity', 'warning')->where('created_at', '>=', $fresh)->with(['entity:id,name', 'definition:id,name'])->latest()->limit(50)->get()
+                ->reject(fn ($s) => isset($seen[$s->id]))
+                ->groupBy(fn ($s) => $s->signal_definition_id ? 'd' . $s->signal_definition_id : 's' . $s->id)
+                ->each(function ($group) use (&$items, $push, $since) {
+                    if (count($items) >= 5) {
+                        return false;
+                    }
+                    $first = $group->first();
+                    if ($group->count() === 1 || ! $first->definition) {
+                        $push($first, $since($first));
+
+                        return;
+                    }
+                    $names = $group->map(fn ($s) => $s->entity?->name)->filter()->unique()->values();
+                    $items[] = [
+                        'kind' => 'rule',
+                        'severity' => 'warning',
+                        'title' => $first->definition->name . ' · ' . $names->count() . ' Einheiten',
+                        'why' => $names->take(3)->implode(', ') . ($names->count() > 3 ? ' und ' . ($names->count() - 3) . ' weitere' : '') . ' · zuletzt ' . $since($first),
+                        'entity' => null,
+                        'href' => route('organization.signals.index'),
+                        'focused' => false,
+                        'signal_id' => null,
+                    ];
+                });
         }
 
         return [

@@ -320,13 +320,16 @@ class EntityFactsService
         $inRange = fn (CarbonImmutable $a, CarbonImmutable $b) => $query()->whereBetween('work_date', [$a->toDateString(), $b->toDateString()]);
 
         $minutes = (int) $inRange($from, $to)->sum('minutes');
-        $agent = (int) $inRange($from, $to)->where('metadata->source', 'agent')->sum('minutes');
+        // Agent = KI-User (users.type) oder ausdrücklich als Agentenzeit gebucht
+        $aiUsers = \Platform\Core\Models\User::where('type', 'ai_user')->pluck('id')->all();
+        $isAgent = fn ($q) => $q->where(fn ($w) => $w->where('metadata->source', 'agent')->orWhereIn('user_id', $aiUsers ?: [0]));
+        $agent = (int) $isAgent($inRange($from, $to))->sum('minutes');
         $previous = (int) $inRange($from->subDays($days), $from->subDay())->sum('minutes');
 
         $people = $inRange($from, $to)
             ->select('user_id', DB::raw('SUM(minutes) as m'), DB::raw("MAX(CASE WHEN JSON_UNQUOTE(JSON_EXTRACT(metadata, '$.source')) = 'agent' THEN 1 ELSE 0 END) as agent"))
             ->groupBy('user_id')->orderByDesc('m')->limit(5)->with('user:id,name')->get()
-            ->map(fn ($r) => ['name' => $r->user?->name, 'minutes' => (int) $r->m, 'agent' => (bool) $r->agent])->all();
+            ->map(fn ($r) => ['name' => $r->user?->name, 'minutes' => (int) $r->m, 'agent' => (bool) $r->agent || in_array((int) $r->user_id, $aiUsers)])->all();
 
         $contexts = $inRange($from, $to)
             ->whereNotNull('context_type')

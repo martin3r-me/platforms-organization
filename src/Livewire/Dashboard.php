@@ -17,6 +17,7 @@ use Platform\Organization\Services\EnvironmentMovementService;
 use Platform\Organization\Models\OrganizationEnvironmentSource;
 use Platform\Organization\Models\OrganizationEntityStory;
 use Platform\Organization\Services\PerspectiveService;
+use Platform\Organization\Services\EntityHierarchyService;
 use Platform\Organization\Services\Story\EntityFactsService;
 use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
@@ -45,6 +46,7 @@ class Dashboard extends Component
             $this->focusedSignals,
             $this->environmentRadar,
             $this->orgLage,
+            $this->attention,
         );
     }
 
@@ -52,7 +54,7 @@ class Dashboard extends Component
     {
         if (in_array($period, EntityFactsService::PERIODS, true)) {
             $this->lagePeriod = $period;
-            unset($this->orgLage);
+            unset($this->orgLage, $this->attention);
         }
     }
 
@@ -77,23 +79,31 @@ class Dashboard extends Component
         }
 
         $children = collect($story->facts['children'] ?? []);
-        $entities = OrganizationEntity::with('type:id,name')->whereIn('id', $children->pluck('id'))
+        $entities = OrganizationEntity::with('type:id,name,vsm_class')->whereIn('id', $children->pluck('id'))
             ->get(['id', 'entity_type_id'])->keyBy('id');
         $childStories = OrganizationEntityStory::whereIn('entity_id', $children->pluck('id'))
             ->where('period', $this->lagePeriod)->orderByDesc('as_of')->get(['entity_id', 'story', 'facts', 'as_of'])
             ->unique('entity_id')->keyBy('entity_id');
 
-        // Einheiten nach Art; Arten mit Bewegung zuerst, Stilles nur gezählt
-        $groups = $children
-            ->map(fn ($c) => $c + ['type' => $entities[$c['id']]->type->name ?? 'Sonstige', 'story' => $childStories[$c['id']]->story ?? null])
+        $children = $children->map(fn ($c) => $c + [
+            'type' => $entities[$c['id']]->type->name ?? 'Sonstige',
+            'class' => $entities[$c['id']]->type->vsm_class ?? null,
+            'story' => $childStories[$c['id']]->story ?? null,
+        ]);
+
+        // Karte: die Struktur (alles außer Akteuren und Umwelt) nach Art. Menschen und Agenten
+        // stehen bei „Wer trägt die Woche", Externe und Software zählen nur als Umwelt.
+        $map = $children->reject(fn ($c) => in_array($c['class'], ['actor', 'observed'], true))
             ->groupBy('type')
             ->map(fn ($items, $type) => [
                 'type' => $type,
                 'active' => $items->reject(fn ($c) => $c['quiet'] || $c['mute'])->sortByDesc('weight')->values()->all(),
-                'quiet' => $items->filter(fn ($c) => $c['quiet'] && ! $c['mute'])->count(),
+                'quiet' => $items->filter(fn ($c) => $c['quiet'] && ! $c['mute'])->pluck('name')->all(),
                 'mute' => $items->filter(fn ($c) => $c['mute'])->count(),
+                'minutes' => $items->sum('minutes'),
                 'weight' => $items->sum('weight'),
             ])
+            ->filter(fn ($g) => $g['active'] !== [] || $g['quiet'] !== [])
             ->sortByDesc('weight')->values()->all();
 
         // Bewegungen quer über die Einheiten darunter, mit Herkunft
@@ -116,9 +126,85 @@ class Dashboard extends Component
             'source' => $story->source,
             'as_of' => $story->as_of?->toDateString(),
             'facts' => $story->facts,
-            'groups' => $groups,
+            'map' => $map,
+            'observed' => $children->where('class', 'observed')->count(),
             'moves' => $moves,
         ];
+    }
+
+    /**
+     * „Braucht Aufmerksamkeit": was heute angefasst werden muss, im Teilbaum der Perspektive.
+     * Reihenfolge: eigene Fokus-Markierungen, algedonische und kritische Signale, Einheiten mit
+     * überwiegend kritischer Bewegung (aus der Lage), dann Warnungen. Höchstens fünf.
+     */
+    #[Computed]
+    public function attention(): array
+    {
+        $teamId = $this->getTeamId();
+        $root = $teamId ? PerspectiveService::getActiveEntity($teamId) : null;
+        if (! $root) {
+            return ['items' => [], 'open_total' => 0];
+        }
+
+        $ids = array_merge([$root->id], resolve(EntityHierarchyService::class)->getAllDescendantMap([$root->id])[$root->id] ?? []);
+        $open = fn () => OrganizationSignal::whereIn('entity_id', $ids)->actionable();
+        $userId = auth()->id();
+
+        $items = [];
+        $seen = [];
+        $push = function ($signal, string $why) use (&$items, &$seen) {
+            if (isset($seen[$signal->id])) {
+                return;
+            }
+            $seen[$signal->id] = true;
+            $items[] = [
+                'kind' => 'signal',
+                'severity' => $signal->severity,
+                'title' => \Illuminate\Support\Str::limit((string) $signal->message, 120),
+                'why' => $why,
+                'entity' => $signal->entity?->name,
+                'href' => route('organization.signals.show', $signal),
+                'focused' => $why === 'von dir markiert',
+                'signal_id' => $signal->id,
+            ];
+        };
+
+        if ($userId) {
+            $open()->focusedBy($userId)->with('entity:id,name')
+                ->orderByRaw("FIELD(severity, 'algedonic', 'critical', 'warning', 'info')")->latest()->limit(5)->get()
+                ->each(fn ($s) => $push($s, 'von dir markiert'));
+        }
+
+        $open()->whereIn('severity', ['algedonic', 'critical'])->with('entity:id,name')
+            ->orderByRaw("FIELD(severity, 'algedonic', 'critical')")->latest()->limit(5)->get()
+            ->each(fn ($s) => $push($s, 'offen seit ' . $s->created_at->locale('de')->diffForHumans(null, true)));
+
+        // Einheiten, in denen Kritisches überwiegt — aus den Fakten der Lage, nicht neu gerechnet
+        $lage = $this->orgLage;
+        foreach ($lage['map'] ?? [] as $g) {
+            foreach ($g['active'] as $c) {
+                if ($c['bad'] >= 2 && $c['bad'] > $c['good'] && count($items) < 5) {
+                    $top = $c['top'] ?? null;
+                    $items[] = [
+                        'kind' => 'unit',
+                        'severity' => 'warning',
+                        'title' => $c['name'] . ': ' . $c['bad'] . ' kritische Bewegungen',
+                        'why' => $top ? resolve(\Platform\Organization\Services\Story\EntityStoryWriter::class)->plain($top['label']) . ' ' . (($top['delta'] ?? 0) > 0 ? '+' : '') . ($top['delta'] ?? '') : null,
+                        'entity' => $g['type'],
+                        'href' => route('organization.entities.show', $c['id']),
+                        'focused' => false,
+                        'signal_id' => null,
+                    ];
+                }
+            }
+        }
+
+        if (count($items) < 5) {
+            $open()->where('severity', 'warning')->with('entity:id,name')->latest()->limit(5 - count($items))->get()
+                ->each(fn ($s) => $push($s, 'Warnung, offen seit ' . $s->created_at->locale('de')->diffForHumans(null, true)));
+        }
+
+        return ['items' => array_slice($items, 0, 5), 'open_total' => $open()->count()];
     }
 
     /** Live-Kacheln (Zeiten, Links, Insights): 10 min je Team/Stream. */
@@ -839,7 +925,7 @@ class Dashboard extends Component
             ->where('user_id', $userId)
             ->delete();
 
-        unset($this->focusedSignals);
+        unset($this->focusedSignals, $this->attention);
     }
 
     #[Computed]

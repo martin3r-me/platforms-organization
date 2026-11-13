@@ -1,24 +1,26 @@
 {{--
-    Lage der Organisation — oberster Block der Übersicht. Erwartet $lage (Dashboard::orgLage), $lagePeriod.
-    Satz der Perspektive, darunter die Einheiten nach Art mit ihren Sätzen, daneben die stärksten Bewegungen.
+    Lage + Karte der Organisation — oberster Teil der Übersicht. Erwartet $lage (Dashboard::orgLage), $lagePeriod.
+    Satz der Perspektive, darunter die Einheiten als Karte: Fläche = gebuchte Zeit, Farbe = Wärme, Rand = Richtung.
 --}}
 @php
-    $writer = resolve(\Platform\Organization\Services\Story\EntityStoryWriter::class);
     $h = function ($min) {
         $v = round($min / 60, 1);
         return str_replace('.', ',', (string) ($v == (int) $v ? (int) $v : $v)) . ' h';
     };
-    $num = fn ($v, $unit) => $unit === 'minutes' ? $h($v) : (is_float($v) && $v != (int) $v ? number_format($v, 1, ',', '.') : number_format((int) $v, 0, ',', '.'));
     $periods = ['week' => 'Woche', 'month' => 'Monat', 'quarter' => 'Quartal'];
     $root = $lage['root'] ?? null;
     $f = $lage['facts'] ?? null;
-    $maxMin = max(1, collect($lage['groups'] ?? [])->flatMap(fn ($g) => $g['active'])->max('minutes') ?? 1);
+    $map = $lage['map'] ?? [];
+    $maxMin = max(1, collect($map)->flatMap(fn ($g) => $g['active'])->max('minutes') ?? 1);
+    // Wärme 0..1 → Hintergrund aus dem Warn-Ton; still = neutrale Fläche
+    $heat = fn ($min) => $min <= 0 ? 'background: var(--nx-accent-soft)' : 'background: color-mix(in oklab, var(--nx-warning) ' . (18 + (int) round(62 * min(1, $min / $maxMin))) . '%, transparent)';
+    $edge = fn ($c) => $c['bad'] > $c['good'] ? 'box-shadow: inset 0 -3px 0 var(--nx-danger)' : ($c['good'] > $c['bad'] ? 'box-shadow: inset 0 -3px 0 var(--nx-success)' : '');
 @endphp
 
 @if ($root)
-    <section class="space-y-5">
+    <section class="space-y-4">
         <div class="flex flex-wrap items-start justify-between gap-3">
-            <div class="max-w-3xl flex-1">
+            <div class="min-w-0 max-w-3xl flex-1">
                 <div class="mb-1 text-xs font-medium uppercase tracking-wide text-[color:var(--nx-faint)]">Lage · {{ $root->name }}</div>
                 @if ($lage['story'] ?? null)
                     <p class="m-0 text-xl leading-relaxed text-[color:var(--nx-text)]">{{ $lage['story'] }}</p>
@@ -40,82 +42,45 @@
         </div>
         <div wire:loading.delay wire:target="setLagePeriod" class="text-xs text-[color:var(--nx-faint)]">Lädt…</div>
 
-        @if ($f)
-            <div class="grid grid-cols-1 gap-5 lg:grid-cols-3">
-                {{-- Einheiten nach Art --}}
-                <div class="min-w-0 space-y-4 lg:col-span-2">
-                    @foreach ($lage['groups'] as $g)
-                        @continue(empty($g['active']) && ! $g['quiet'])
-                        <div>
-                            <div class="mb-2 flex items-baseline gap-2 text-xs">
-                                <span class="font-medium text-[color:var(--nx-muted)]">{{ $g['type'] }}</span>
-                                @if ($g['quiet'] || $g['mute'])
-                                    <span class="text-[color:var(--nx-faint)]">
-                                        {{ collect([$g['quiet'] ? $g['quiet'] . ' ruhig' : null, $g['mute'] ? $g['mute'] . ' ohne Daten' : null])->filter()->implode(' · ') }}
+        @if ($map !== [])
+            <div>
+                <div class="flex flex-col gap-1.5 sm:h-64 sm:flex-row">
+                    @foreach ($map as $g)
+                        @php $gFlex = 1 + $g['minutes'] / 60 / 2; @endphp
+                        <div class="flex min-w-0 flex-wrap gap-1 sm:flex-col sm:flex-nowrap" style="flex: {{ round($gFlex, 2) }} 1 0">
+                            <div class="w-full truncate text-[10px] font-medium uppercase tracking-wide text-[color:var(--nx-muted)] sm:w-auto" title="{{ $g['type'] }}">{{ $g['type'] }}</div>
+                            @foreach ($g['active'] as $c)
+                                <a href="{{ route('organization.entities.show', $c['id']) }}" wire:navigate
+                                   title="{{ $c['story'] ?? $c['name'] }}"
+                                   class="flex min-h-[44px] min-w-[30%] flex-1 flex-col justify-between overflow-hidden rounded-[6px] px-2 py-1.5 text-[color:var(--nx-text)] transition-opacity hover:opacity-80 sm:min-h-0 sm:min-w-0"
+                                   style="flex-grow: {{ round(max(0.7, $c['minutes'] / 60), 2) }}; {{ $heat($c['minutes']) }}; {{ $edge($c) }}">
+                                    <span class="truncate text-xs font-semibold leading-tight">{{ $c['name'] }}</span>
+                                    <span class="truncate text-[11px] tabular-nums opacity-80">
+                                        {{ $c['minutes'] > 0 ? $h($c['minutes']) : 'keine Zeit' }}
+                                        @if ($c['good']) ▲{{ $c['good'] }} @endif
+                                        @if ($c['bad']) ▼{{ $c['bad'] }} @endif
                                     </span>
-                                @endif
-                            </div>
-                            @if (! empty($g['active']))
-                                <div class="grid grid-cols-1 gap-2 sm:grid-cols-2">
-                                    @foreach ($g['active'] as $c)
-                                        <a href="{{ route('organization.entities.show', $c['id']) }}" wire:navigate
-                                           class="block rounded-[8px] border border-[color:var(--nx-line)] p-3 transition-colors hover:bg-[color:var(--nx-hover)]">
-                                            <div class="flex items-baseline justify-between gap-2">
-                                                <span class="truncate text-sm font-medium text-[color:var(--nx-text)]">{{ $c['name'] }}</span>
-                                                <span class="shrink-0 text-xs tabular-nums text-[color:var(--nx-muted)]">
-                                                    @if ($c['minutes'] > 0) {{ $h($c['minutes']) }} @endif
-                                                    @if ($c['good']) <span style="color: var(--nx-success)">▲{{ $c['good'] }}</span> @endif
-                                                    @if ($c['bad']) <span style="color: var(--nx-danger)">▼{{ $c['bad'] }}</span> @endif
-                                                </span>
-                                            </div>
-                                            {{-- Wärme: gebuchte Zeit relativ zur aktivsten Einheit --}}
-                                            <div class="mt-1.5 h-1 overflow-hidden rounded-full bg-[color:var(--nx-accent-soft)]">
-                                                <div class="h-full rounded-full" style="width: {{ max(2, round(100 * $c['minutes'] / $maxMin)) }}%; background: var(--nx-warning)"></div>
-                                            </div>
-                                            @if ($c['story'])
-                                                <p class="mb-0 mt-2 text-xs leading-relaxed text-[color:var(--nx-muted)] line-clamp-3">{{ $c['story'] }}</p>
-                                            @endif
-                                        </a>
-                                    @endforeach
+                                </a>
+                            @endforeach
+                            @if ($g['quiet'] !== [])
+                                <div class="flex min-h-[44px] min-w-[30%] flex-1 flex-col justify-between overflow-hidden rounded-[6px] px-2 py-1.5 text-[color:var(--nx-muted)] sm:min-h-0 sm:min-w-0"
+                                     style="flex-grow: 0.7; background: var(--nx-accent-soft)" title="{{ implode(', ', $g['quiet']) }}">
+                                    <span class="truncate text-xs font-semibold leading-tight">{{ count($g['quiet']) }} ruhig</span>
+                                    <span class="truncate text-[11px]">{{ implode(', ', array_slice($g['quiet'], 0, 3)) }}{{ count($g['quiet']) > 3 ? ' …' : '' }}</span>
                                 </div>
                             @endif
                         </div>
                     @endforeach
                 </div>
-
-                {{-- Bewegungen quer über die Einheiten --}}
-                <div class="min-w-0">
-                    <x-nx-panel title="Was sich bewegt" subtitle="stärkste Veränderungen darunter">
-                        @php $anyMove = ! empty($lage['moves']['good']) || ! empty($lage['moves']['bad']); @endphp
-                        @if ($anyMove)
-                            <div class="space-y-4">
-                                @foreach (['good' => ['Gut bewegt', 'var(--nx-success)'], 'bad' => ['Zu beobachten', 'var(--nx-danger)']] as $key => [$label, $color])
-                                    @continue(empty($lage['moves'][$key]))
-                                    <div>
-                                        <div class="mb-1 text-xs font-medium" style="color: {{ $color }}">{{ $label }}</div>
-                                        @foreach ($lage['moves'][$key] as $m)
-                                            <a href="{{ route('organization.entities.show', $m['entity_id']) }}" wire:navigate class="flex items-baseline justify-between gap-3 rounded-[4px] py-1 text-sm hover:bg-[color:var(--nx-hover)]">
-                                                <span class="min-w-0">
-                                                    <span class="text-[color:var(--nx-text)]">{{ $writer->plain($m['label']) }}</span>
-                                                    <span class="block truncate text-xs text-[color:var(--nx-faint)]">{{ $m['entity'] }}</span>
-                                                </span>
-                                                <span class="shrink-0 tabular-nums text-xs">
-                                                    @if (($m['flow'] ?? null) !== null)
-                                                        <span class="font-semibold text-[color:var(--nx-text)]">{{ $num($m['flow'], $m['unit']) }}</span>
-                                                    @else
-                                                        <span class="font-semibold text-[color:var(--nx-text)]">{{ $num($m['current'], $m['unit']) }}</span>
-                                                        <span style="color: {{ $color }}">{{ ($m['delta'] > 0 ? '+' : '−') . $num(abs($m['delta']), $m['unit']) }}</span>
-                                                    @endif
-                                                </span>
-                                            </a>
-                                        @endforeach
-                                    </div>
-                                @endforeach
-                            </div>
-                        @else
-                            <p class="m-0 text-sm text-[color:var(--nx-muted)]">Keine Bewegung im Zeitraum.</p>
-                        @endif
-                    </x-nx-panel>
+                <div class="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-[11px] text-[color:var(--nx-muted)]">
+                    <span>Fläche = gebuchte Zeit</span>
+                    <span><span class="mr-1 inline-block h-2 w-2 rounded-[2px]" style="background: color-mix(in oklab, var(--nx-warning) 70%, transparent)"></span>warm</span>
+                    <span><span class="mr-1 inline-block h-2 w-2 rounded-[2px] bg-[color:var(--nx-accent-soft)]"></span>still</span>
+                    <span><span class="mr-1 inline-block h-2 w-2 rounded-[2px]" style="background: var(--nx-danger)"></span>mehr Kritisches als Gutes</span>
+                    <span><span class="mr-1 inline-block h-2 w-2 rounded-[2px]" style="background: var(--nx-success)"></span>mehr Gutes</span>
+                    @if (($lage['observed'] ?? 0) > 0)
+                        <span class="sm:ml-auto">dazu {{ $lage['observed'] }} Externe und Software</span>
+                    @endif
                 </div>
             </div>
         @endif

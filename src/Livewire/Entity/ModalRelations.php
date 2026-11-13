@@ -146,19 +146,8 @@ class ModalRelations extends Component
             'validTo.after_or_equal' => 'Das Enddatum muss nach dem Startdatum liegen.',
         ]);
 
-        // Prüfe ob Relation bereits existiert
-        $exists = OrganizationEntityRelationship::where('from_entity_id', $this->entityId)
-            ->where('to_entity_id', $this->selectedToEntityId)
-            ->where('relation_type_id', $this->selectedRelationTypeId)
-            ->exists();
-
-        if ($exists) {
-            $this->addError('selectedToEntityId', 'Diese Relation existiert bereits.');
-            return;
-        }
-
         try {
-            OrganizationEntityRelationship::create([
+            [, $status] = OrganizationEntityRelationship::createOrRestore([
                 'from_entity_id' => $this->entityId,
                 'to_entity_id' => $this->selectedToEntityId,
                 'relation_type_id' => $this->selectedRelationTypeId,
@@ -167,10 +156,15 @@ class ModalRelations extends Component
                 'team_id' => Auth::user()?->currentTeamRelation?->id,
             ]);
 
+            if ($status === 'duplicate') {
+                $this->addError('selectedToEntityId', 'Diese Relation existiert bereits.');
+                return;
+            }
+
             $this->loadRelations();
             $this->resetForm();
             
-            session()->flash('message', 'Relation erfolgreich erstellt.');
+            session()->flash('message', $status === 'restored' ? 'Gelöschte Relation wiederhergestellt.' : 'Relation erfolgreich erstellt.');
         } catch (\Exception $e) {
             $this->addError('general', 'Fehler beim Erstellen: ' . $e->getMessage());
         }

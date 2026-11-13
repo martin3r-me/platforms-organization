@@ -932,17 +932,7 @@ class Show extends Component
             'relationForm.valid_to' => 'nullable|date|after_or_equal:relationForm.valid_from',
         ]);
 
-        $exists = OrganizationEntityRelationship::where('from_entity_id', $this->entity->id)
-            ->where('to_entity_id', (int) $this->relationForm['to_entity_id'])
-            ->where('relation_type_id', (int) $this->relationForm['relation_type_id'])
-            ->exists();
-
-        if ($exists) {
-            $this->addError('relationForm.to_entity_id', 'Diese Beziehung existiert bereits.');
-            return;
-        }
-
-        OrganizationEntityRelationship::create([
+        [, $status] = OrganizationEntityRelationship::createOrRestore([
             'from_entity_id' => $this->entity->id,
             'to_entity_id' => (int) $this->relationForm['to_entity_id'],
             'relation_type_id' => (int) $this->relationForm['relation_type_id'],
@@ -950,10 +940,15 @@ class Show extends Component
             'valid_to' => $this->relationForm['valid_to'] !== '' ? $this->relationForm['valid_to'] : null,
         ]);
 
+        if ($status === 'duplicate') {
+            $this->addError('relationForm.to_entity_id', 'Diese Beziehung existiert bereits.');
+            return;
+        }
+
         $this->relationForm = ['to_entity_id' => '', 'relation_type_id' => '', 'valid_from' => '', 'valid_to' => ''];
         $this->relationFormShow = false;
         unset($this->relationsFrom, $this->relationsTo);
-        $this->dispatch('toast', message: 'Beziehung erstellt');
+        $this->dispatch('toast', message: $status === 'restored' ? 'Beziehung wiederhergestellt' : 'Beziehung erstellt');
     }
 
     public function deleteRelation(int $id): void

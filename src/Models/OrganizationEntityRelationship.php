@@ -57,6 +57,38 @@ class OrganizationEntityRelationship extends Model
     }
 
     /**
+     * Legt die Beziehung an oder stellt eine soft-gelöschte wieder her.
+     *
+     * Der Unique-Key (from, to, type) zählt soft-gelöschte Zeilen mit, die Prüfung
+     * braucht daher withTrashed(). Eine wiederhergestellte Zeile behält id/uuid
+     * (daran hängende Interlinks bleiben erhalten).
+     *
+     * @return array{0: self, 1: string} [Model, 'created'|'restored'|'duplicate']
+     */
+    public static function createOrRestore(array $attributes): array
+    {
+        $existing = static::withTrashed()
+            ->where('from_entity_id', $attributes['from_entity_id'])
+            ->where('to_entity_id', $attributes['to_entity_id'])
+            ->where('relation_type_id', $attributes['relation_type_id'])
+            ->first();
+
+        if (! $existing) {
+            return [static::create($attributes), 'created'];
+        }
+
+        if (! $existing->trashed()) {
+            return [$existing, 'duplicate'];
+        }
+
+        $existing->fill($attributes);
+        $existing->restore();
+        $existing->save();
+
+        return [$existing->fresh(), 'restored'];
+    }
+
+    /**
      * Von-Wem geht die Beziehung aus
      */
     public function fromEntity(): BelongsTo

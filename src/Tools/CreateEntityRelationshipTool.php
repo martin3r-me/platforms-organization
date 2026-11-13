@@ -123,16 +123,6 @@ class CreateEntityRelationshipTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', "Relation Type '{$relationType->name}' ist inaktiv.");
             }
 
-            // Check for duplicate
-            $exists = OrganizationEntityRelationship::query()
-                ->where('from_entity_id', $fromEntityId)
-                ->where('to_entity_id', $toEntityId)
-                ->where('relation_type_id', $relationTypeId)
-                ->exists();
-            if ($exists) {
-                return ToolResult::error('VALIDATION_ERROR', 'Diese Relation existiert bereits.');
-            }
-
             // Validate dates
             $validFrom = isset($arguments['valid_from']) && $arguments['valid_from'] !== '' ? $arguments['valid_from'] : null;
             $validTo = isset($arguments['valid_to']) && $arguments['valid_to'] !== '' ? $arguments['valid_to'] : null;
@@ -141,7 +131,7 @@ class CreateEntityRelationshipTool implements ToolContract, ToolMetadataContract
                 return ToolResult::error('VALIDATION_ERROR', 'valid_to muss nach valid_from liegen.');
             }
 
-            $relationship = OrganizationEntityRelationship::create([
+            [$relationship, $status] = OrganizationEntityRelationship::createOrRestore([
                 'from_entity_id' => $fromEntityId,
                 'to_entity_id' => $toEntityId,
                 'relation_type_id' => $relationTypeId,
@@ -151,6 +141,10 @@ class CreateEntityRelationshipTool implements ToolContract, ToolMetadataContract
                 'user_id' => $context->user?->id,
                 'metadata' => (isset($arguments['metadata']) && is_array($arguments['metadata'])) ? $arguments['metadata'] : null,
             ]);
+
+            if ($status === 'duplicate') {
+                return ToolResult::error('VALIDATION_ERROR', 'Diese Relation existiert bereits.');
+            }
 
             $relationship->load(['fromEntity', 'toEntity', 'relationType']);
 
@@ -167,7 +161,10 @@ class CreateEntityRelationshipTool implements ToolContract, ToolMetadataContract
                 'valid_to' => $relationship->valid_to?->toDateString(),
                 'metadata' => $relationship->metadata,
                 'summary' => $relationship->summary,
-                'message' => 'Entity Relationship erfolgreich erstellt.',
+                'status' => $status,
+                'message' => $status === 'restored'
+                    ? 'Gelöschte Entity Relationship wiederhergestellt (gleiche id/uuid).'
+                    : 'Entity Relationship erfolgreich erstellt.',
             ]);
         } catch (\Throwable $e) {
             return ToolResult::error('EXECUTION_ERROR', 'Fehler beim Erstellen des Entity Relationships: ' . $e->getMessage());

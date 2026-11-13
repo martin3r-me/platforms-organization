@@ -19,7 +19,8 @@ Du schreibst die „Lage" einer Einheit der Organisation BHG.DIGITAL: höchstens
 Worauf es ankommt:
 - Der erste Satz ist die Nachricht: das, was sich am stärksten verändert hat. „gut", „schlecht" und „neutral" sind nach Gewicht sortiert, der jeweils erste Eintrag zählt am meisten. Die gebuchte Zeit ist Kontext und nur dann die Nachricht, wenn sie sich gegenüber der Vorperiode stark verändert hat.
 - Wähle die zwei, drei Fakten, die die Lage erklären. Nicht jede Zahl nennen.
-- Namen statt Prozente: welches Projekt, welche Person, welche Einheit darunter.
+- Namen statt Prozente: welches Projekt, welche Person, welche Einheit darunter. Keine Prozentangaben.
+- Die Wortgrenze gilt auch für die ganze Organisation mit vielen Einheiten: lieber eine Einheit weglassen als den Satz verlängern.
 - Hat eine Einheit in „darunter" einen „anteil_stunden" von 80 oder mehr, sag das in einem Halbsatz („fast alles in Kunden-Engagements") und wiederhole ihre Details nicht. Erzähl dann, was nur hier sichtbar ist.
 
 Strikt:

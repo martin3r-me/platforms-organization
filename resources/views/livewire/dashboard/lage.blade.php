@@ -44,31 +44,50 @@
 
         @if ($map !== [])
             <div>
-                <div class="flex flex-col gap-1.5 sm:h-64 sm:flex-row">
+                {{-- Treemap: Arten als Flächen, darin die Einheiten (Rechtecke in Prozent, siehe Dashboard::mapLayout) --}}
+                <div class="relative h-72 w-full">
                     @foreach ($map as $g)
-                        @php $gFlex = 1 + $g['minutes'] / 60 / 2; @endphp
-                        <div class="flex min-w-0 flex-wrap gap-1 sm:flex-col sm:flex-nowrap" style="flex: {{ round($gFlex, 2) }} 1 0">
-                            <div class="w-full truncate text-[10px] font-medium uppercase tracking-wide text-[color:var(--nx-muted)] sm:w-auto" title="{{ $g['type'] }}">{{ $g['type'] }}</div>
-                            @foreach ($g['active'] as $c)
-                                <a href="{{ route('organization.entities.show', $c['id']) }}" wire:navigate
-                                   title="{{ $c['story'] ?? $c['name'] }}"
-                                   class="flex min-h-[44px] min-w-[30%] flex-1 flex-col justify-between overflow-hidden rounded-[6px] px-2 py-1.5 text-[color:var(--nx-text)] transition-opacity hover:opacity-80 sm:min-h-0 sm:min-w-0"
-                                   style="flex-grow: {{ round(max(0.7, $c['minutes'] / 60), 2) }}; {{ $heat($c['minutes']) }}; {{ $edge($c) }}">
-                                    <span class="truncate text-xs font-semibold leading-tight">{{ $c['name'] }}</span>
-                                    <span class="truncate text-[11px] tabular-nums opacity-80">
-                                        {{ $c['minutes'] > 0 ? $h($c['minutes']) : 'keine Zeit' }}
-                                        @if ($c['good']) ▲{{ $c['good'] }} @endif
-                                        @if ($c['bad']) ▼{{ $c['bad'] }} @endif
-                                    </span>
-                                </a>
-                            @endforeach
-                            @if ($g['quiet'] !== [])
-                                <div class="flex min-h-[44px] min-w-[30%] flex-1 flex-col justify-between overflow-hidden rounded-[6px] px-2 py-1.5 text-[color:var(--nx-muted)] sm:min-h-0 sm:min-w-0"
-                                     style="flex-grow: 0.7; background: var(--nx-accent-soft)" title="{{ implode(', ', $g['quiet']) }}">
-                                    <span class="truncate text-xs font-semibold leading-tight">{{ count($g['quiet']) }} ruhig</span>
-                                    <span class="truncate text-[11px]">{{ implode(', ', array_slice($g['quiet'], 0, 3)) }}{{ count($g['quiet']) > 3 ? ' …' : '' }}</span>
-                                </div>
-                            @endif
+                        @php [$gx, $gy, $gw, $gh] = $g['rect']; @endphp
+                        <div class="absolute flex flex-col p-0.5" style="left: {{ $gx }}%; top: {{ $gy }}%; width: {{ $gw }}%; height: {{ $gh }}%">
+                            <div class="truncate px-0.5 pb-0.5 text-[10px] font-medium uppercase tracking-wide text-[color:var(--nx-muted)]" title="{{ $g['type'] }}">{{ $g['type'] }}</div>
+                            <div class="relative min-h-0 flex-1">
+                                @foreach ($g['cells'] as $cell)
+                                    @php
+                                        [$cx, $cy, $cw, $ch] = $cell['rect'];
+                                        $big = $gw * $cw / 100 > 7 && $gh * $ch / 100 > 16;
+                                        $pos = "left: {$cx}%; top: {$cy}%; width: {$cw}%; height: {$ch}%";
+                                    @endphp
+                                    @if ($cell['kind'] === 'unit')
+                                        @php $c = $cell['unit']; @endphp
+                                        <a href="{{ route('organization.entities.show', $c['id']) }}" wire:navigate
+                                           title="{{ $c['name'] }}{{ $c['story'] ? ': ' . $c['story'] : '' }}"
+                                           class="absolute p-0.5" style="{{ $pos }}">
+                                            <span class="flex h-full w-full flex-col justify-between overflow-hidden rounded-[6px] px-2 py-1.5 text-[color:var(--nx-text)] transition-opacity hover:opacity-80"
+                                                  style="{{ $heat($c['minutes']) }}; {{ $edge($c) }}">
+                                                @if ($big)
+                                                    <span class="truncate text-xs font-semibold leading-tight">{{ $c['name'] }}</span>
+                                                    <span class="truncate text-[11px] tabular-nums opacity-80">
+                                                        {{ $c['minutes'] > 0 ? $h($c['minutes']) : 'keine Zeit' }}
+                                                        @if ($c['good']) ▲{{ $c['good'] }} @endif
+                                                        @if ($c['bad']) ▼{{ $c['bad'] }} @endif
+                                                    </span>
+                                                @else
+                                                    <span class="truncate text-[10px] font-semibold leading-tight">{{ $c['name'] }}</span>
+                                                @endif
+                                            </span>
+                                        </a>
+                                    @else
+                                        <div class="absolute p-0.5" style="{{ $pos }}" title="{{ implode(', ', $cell['names']) }}">
+                                            <div class="flex h-full w-full flex-col justify-between overflow-hidden rounded-[6px] px-2 py-1.5 text-[color:var(--nx-muted)]" style="background: var(--nx-accent-soft)">
+                                                <span class="truncate text-[11px] font-semibold leading-tight">{{ count($cell['names']) }} ruhig</span>
+                                                @if ($big)
+                                                    <span class="truncate text-[11px]">{{ implode(', ', array_slice($cell['names'], 0, 3)) }}{{ count($cell['names']) > 3 ? ' …' : '' }}</span>
+                                                @endif
+                                            </div>
+                                        </div>
+                                    @endif
+                                @endforeach
+                            </div>
                         </div>
                     @endforeach
                 </div>

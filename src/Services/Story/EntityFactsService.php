@@ -243,6 +243,17 @@ class EntityFactsService
             $usable[$key] = $fact;
         }
 
+        // Zeigt ein Fenster-Wert (z. B. „Aufgaben erledigt (7 Tage)") die Periode direkt, ist er ehrlicher
+        // als die Differenz eines Zählers seit Beginn derselben Dimension — die enthält auch neu
+        // Angebundenes. Dann nur das Fenster, sonst steht „39 erledigt" neben „62 erledigt".
+        $windowDims = array_flip(array_map(fn ($f) => $f['dimension'], array_filter($usable, fn ($f) => str_starts_with((string) $f['basis'], 'window_'))));
+        foreach ($usable as $key => $f) {
+            if ($f['basis'] === 'cumulative_since_start' && isset($windowDims[$f['dimension']])) {
+                $excluded[] = $f + ['reason' => 'window_preferred'];
+                unset($usable[$key]);
+            }
+        }
+
         $dimensions = [];
         foreach ($dimensionLabels as $dim => $meta) {
             if (in_array($dim, self::EXCLUDED_DIMENSIONS, true)) {
@@ -284,10 +295,14 @@ class EntityFactsService
             if ($relative < self::NOISE) {
                 continue; // z. B. Sichtbarkeit −0,04 % — Rauschen, keine Bewegung
             }
-            $score = min($relative, 3) * ($f['primary'] ? 1.5 : 1);
+            if ($f['unit'] !== 'minutes' && abs($f['delta']) < 2) {
+                continue; // eine Aufgabe mehr oder weniger ist keine Nachricht
+            }
+            // relativ UND absolut: „0 → 1" ist relativ riesig, aber klein; „154 → 185" zählt mehr
+            $score = min($relative, 3) * (1 + log10(1 + abs($f['delta']))) * ($f['primary'] ? 1.5 : 1);
             $bucket = match ($f['sentiment']) { 'positive' => 'good', 'negative' => 'bad', default => 'neutral' };
             $out[$bucket][] = ['key' => $f['key'], 'label' => $f['label'], 'dimension' => $f['dimension'], 'unit' => $f['unit'],
-                'current' => $f['current'], 'delta' => $f['delta'], 'flow' => $f['flow'], 'score' => round($score, 3)];
+                'current' => $f['current'], 'previous' => $f['previous'], 'delta' => $f['delta'], 'flow' => $f['flow'], 'score' => round($score, 3)];
         }
         foreach ($out as &$list) {
             usort($list, fn ($a, $b) => $b['score'] <=> $a['score']);

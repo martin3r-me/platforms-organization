@@ -59,7 +59,7 @@
 
             <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
                 {{-- 3: Braucht Aufmerksamkeit — immer der Stand von jetzt --}}
-                <x-nx-panel flush title="Braucht Aufmerksamkeit" :subtitle="$attention['open_total'] > 0 ? $attention['open_total'] . ' offene Signale im Bereich' : 'jetzt'">
+                <x-nx-panel flush title="Braucht Aufmerksamkeit" :subtitle="'neu in den letzten 14 Tagen' . ($attention['older'] > 0 ? ' · ' . $attention['older'] . ' ältere offen' : '')">
                     @if ($attention['open_total'] > count($attention['items']))
                         <x-slot name="actions">
                             <a href="{{ route('organization.signals.index') }}" wire:navigate class="text-xs font-medium text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">Alle Signale</a>
@@ -80,7 +80,7 @@
                             </a>
                         </div>
                     @empty
-                        <p class="m-0 px-4 py-3 text-sm text-[color:var(--nx-muted)]">Nichts, das heute drängt.</p>
+                        <p class="m-0 px-4 py-3 text-sm text-[color:var(--nx-muted)]">Nichts Neues, das drängt.@if ($attention['older'] > 0) <a href="{{ route('organization.signals.index') }}" wire:navigate class="hover:underline">{{ $attention['older'] }} ältere Signale sind noch offen.</a>@endif</p>
                     @endforelse
                 </x-nx-panel>
 
@@ -102,7 +102,7 @@
                                                 <span class="shrink-0 text-xs tabular-nums">
                                                     @if (($m['flow'] ?? null) !== null)
                                                         <span class="font-semibold text-[color:var(--nx-text)]">{{ $num($m['flow'], $m['unit']) }}</span>
-                                                        <span class="text-[color:var(--nx-faint)]">im Zeitraum</span>
+                                                        <span class="text-[color:var(--nx-faint)]">{{ ($m['previous'] ?? null) !== null ? 'davor ' . $num($m['previous'], $m['unit']) : 'im Zeitraum' }}</span>
                                                     @else
                                                         <span class="font-semibold text-[color:var(--nx-text)]">{{ $num($m['current'], $m['unit']) }}</span>
                                                         <span style="color: {{ $color }}">{{ ($m['delta'] > 0 ? '+' : '−') . $num(abs($m['delta']), $m['unit']) }}</span>

@@ -105,6 +105,7 @@ class Dashboard extends Component
             ])
             ->filter(fn ($g) => $g['active'] !== [] || $g['quiet'] !== [])
             ->sortByDesc('weight')->values()->all();
+        $map = $this->mapLayout($map);
 
         // Bewegungen quer über die Einheiten darunter, mit Herkunft
         $moves = ['good' => [], 'bad' => []];
@@ -133,6 +134,34 @@ class Dashboard extends Component
     }
 
     /**
+     * Flächen für die Karte: erst die Arten, darin die Einheiten (Squarified Treemap).
+     * Fläche = gebuchte Zeit; Stilles und Kleines bekommen eine Mindestfläche, damit es sichtbar bleibt.
+     */
+    protected function mapLayout(array $groups): array
+    {
+        $total = collect($groups)->sum('minutes');
+        $floor = max(30, $total * 0.03);
+
+        foreach ($groups as &$g) {
+            $cells = array_map(fn ($c) => ['value' => max($floor, $c['minutes']), 'kind' => 'unit', 'unit' => $c], $g['active']);
+            if ($g['quiet'] !== []) {
+                $cells[] = ['value' => $floor, 'kind' => 'quiet', 'names' => $g['quiet']];
+            }
+            $g['cells'] = $cells;
+            $g['value'] = array_sum(array_column($cells, 'value'));
+        }
+        unset($g);
+
+        $aspect = 3.2; // Karte ist etwa dreimal so breit wie hoch
+        return array_map(function ($g) use ($aspect) {
+            [, , $gw, $gh] = $g['rect'];
+            $g['cells'] = \Platform\Organization\Services\Story\Treemap::layout($g['cells'], max(0.2, $aspect * $gw / max($gh, 1)));
+
+            return $g;
+        }, \Platform\Organization\Services\Story\Treemap::layout($groups, $aspect));
+    }
+
+    /**
      * „Braucht Aufmerksamkeit": was heute angefasst werden muss, im Teilbaum der Perspektive.
      * Reihenfolge: eigene Fokus-Markierungen, algedonische und kritische Signale, Einheiten mit
      * überwiegend kritischer Bewegung (aus der Lage), dann Warnungen. Höchstens fünf.
@@ -143,7 +172,7 @@ class Dashboard extends Component
         $teamId = $this->getTeamId();
         $root = $teamId ? PerspectiveService::getActiveEntity($teamId) : null;
         if (! $root) {
-            return ['items' => [], 'open_total' => 0];
+            return ['items' => [], 'open_total' => 0, 'older' => 0];
         }
 
         $ids = array_merge([$root->id], resolve(EntityHierarchyService::class)->getAllDescendantMap([$root->id])[$root->id] ?? []);
@@ -175,9 +204,13 @@ class Dashboard extends Component
                 ->each(fn ($s) => $push($s, 'von dir markiert'));
         }
 
-        $open()->whereIn('severity', ['algedonic', 'critical'])->with('entity:id,name')
+        // Nur Frisches drängt; was seit Wochen offen liegt, wird gezählt statt gezeigt
+        $fresh = now()->subDays(self::ATTENTION_FRESH_DAYS);
+        $since = fn ($s) => 'gemeldet ' . $s->created_at->locale('de')->diffForHumans();
+
+        $open()->whereIn('severity', ['algedonic', 'critical'])->where('created_at', '>=', $fresh)->with('entity:id,name')
             ->orderByRaw("FIELD(severity, 'algedonic', 'critical')")->latest()->limit(5)->get()
-            ->each(fn ($s) => $push($s, 'offen seit ' . $s->created_at->locale('de')->diffForHumans(null, true)));
+            ->each(fn ($s) => $push($s, $since($s)));
 
         // Einheiten, in denen Kritisches überwiegt — aus den Fakten der Lage, nicht neu gerechnet
         $lage = $this->orgLage;
@@ -200,15 +233,22 @@ class Dashboard extends Component
         }
 
         if (count($items) < 5) {
-            $open()->where('severity', 'warning')->with('entity:id,name')->latest()->limit(5 - count($items))->get()
-                ->each(fn ($s) => $push($s, 'Warnung, offen seit ' . $s->created_at->locale('de')->diffForHumans(null, true)));
+            $open()->where('severity', 'warning')->where('created_at', '>=', $fresh)->with('entity:id,name')->latest()->limit(5 - count($items))->get()
+                ->each(fn ($s) => $push($s, 'Warnung, ' . $since($s)));
         }
 
-        return ['items' => array_slice($items, 0, 5), 'open_total' => $open()->count()];
+        return [
+            'items' => array_slice($items, 0, 5),
+            'open_total' => $open()->count(),
+            'older' => $open()->where('created_at', '<', $fresh)->count(),
+        ];
     }
 
     /** Live-Kacheln (Zeiten, Links, Insights): 10 min je Team/Stream. */
     private const PANEL_CACHE_TTL = 600;
+
+    /** „Braucht Aufmerksamkeit" zeigt nur Signale aus diesem Zeitraum; ältere werden gezählt. */
+    private const ATTENTION_FRESH_DAYS = 14;
 
     /**
      * Rein snapshot-basierte Kacheln: gültig bis zum nächsten Snapshot-Lauf —

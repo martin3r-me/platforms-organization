@@ -692,7 +692,21 @@
                         @livewire(\Platform\Organization\Livewire\Agent\BrainGraph::class, ['entity' => $entity], key('agent-braingraph-'.$entity->id))
                     @endif
                     @if ($activeTab === 'memory')
-                        @livewire(\Platform\Organization\Livewire\Agent\Memory::class, ['entity' => $entity], key('agent-memory-'.$entity->id))
+                        @php
+                            $memoryUrl = app()->bound(\Platform\Organization\Contracts\AgentMemoryStore::class)
+                                ? app(\Platform\Organization\Contracts\AgentMemoryStore::class)->memoryUrl((int) $entity->id)
+                                : null;
+                        @endphp
+                        <x-nx-callout variant="info" icon="heroicon-o-book-open" title="Das Gedächtnis liegt jetzt in People">
+                            Arbeitsweise, Notizen und Kuratier-Aufträge gehören zur Entwicklung des Mitarbeiters und werden dort gepflegt.
+                            @if ($memoryUrl)
+                                <x-slot name="action">
+                                    <x-nx-button size="sm" variant="primary" :href="$memoryUrl">Gedächtnis öffnen</x-nx-button>
+                                </x-slot>
+                            @else
+                                Für diesen Agenten gibt es noch keinen Mitarbeiter-Satz — in People unter „Mitarbeiter“ übernehmen.
+                            @endif
+                        </x-nx-callout>
                     @endif
                 @endif
 

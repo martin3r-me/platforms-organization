@@ -181,7 +181,7 @@
                     @endif
                 </div>
 
-                @if (! empty($analysis))
+                @if (! empty($analysis) && $analysis['items_total'] > 0)
                     @php
                         [$hLabel, $hColor] = $healthMeta[$analysis['health_status']] ?? $healthMeta['progressing'];
                         $pct = (int) $analysis['completion_rate'];

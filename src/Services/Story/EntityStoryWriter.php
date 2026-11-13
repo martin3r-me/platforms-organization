@@ -54,7 +54,7 @@ TXT;
             );
             $text = trim((string) ($result['content'] ?? ''));
             if ($text !== '') {
-                return ['story' => $text, 'source' => 'llm', 'model' => $result['model'] ?? null];
+                return ['story' => $this->limitWords($text), 'source' => 'llm', 'model' => $result['model'] ?? null];
             }
         } catch (\Throwable $e) {
             Log::warning('EntityStoryWriter: KI-Satz fehlgeschlagen, fester Satz', ['entity' => $facts['entity']['id'] ?? null, 'error' => $e->getMessage()]);
@@ -243,13 +243,39 @@ TXT;
         return $label === null ? null : trim(preg_replace('/^[A-Z]+ · /u', '', $label));
     }
 
-    /** „MARTIN ERREN" → „Martin Erren" */
+    /** „MARTIN ERREN" → „Martin Erren", „PLANUNG 2027" → „Planung 2027"; Kürzel wie EFP, CRM bleiben. */
     public function name(?string $name): ?string
     {
-        if ($name === null) {
-            return null;
+        if ($name === null || mb_strtoupper($name) !== $name) {
+            return $name;
+        }
+        $small = ['UND', 'DER', 'DIE', 'DAS', 'FÜR', 'MIT', 'VON', 'AUF', 'IM', 'IN', 'AM', 'AN', 'ZU', 'BEI', 'AUS'];
+
+        return preg_replace_callback('/\p{Lu}[\p{Lu}\p{N}]*/u', function ($m) use ($small) {
+            $w = $m[0];
+            if (mb_strlen($w) <= 3 && ! in_array($w, $small, true)) {
+                return $w; // Kürzel
+            }
+
+            return in_array($w, $small, true) ? mb_strtolower($w) : mb_substr($w, 0, 1) . mb_strtolower(mb_substr($w, 1));
+        }, $name);
+    }
+
+    /** Schneidet nach ganzen Sätzen, sobald die Wortgrenze überschritten wäre — die KI hält sie nicht immer. */
+    protected function limitWords(string $text, int $max = 60): string
+    {
+        $sentences = preg_split('/(?<=[.!?])\s+/u', trim($text));
+        $out = [];
+        $words = 0;
+        foreach ($sentences as $sentence) {
+            $n = count(preg_split('/\s+/u', $sentence));
+            if ($out !== [] && $words + $n > $max) {
+                break;
+            }
+            $out[] = $sentence;
+            $words += $n;
         }
 
-        return mb_strtoupper($name) === $name ? mb_convert_case(mb_strtolower($name), MB_CASE_TITLE) : $name;
+        return implode(' ', $out);
     }
 }

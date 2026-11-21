@@ -544,39 +544,8 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\ListEnvironmentSnapshotsTool());
             $registry->register(new \Platform\Organization\Tools\RateEnvironmentSourceTool());
 
-            // Strategy Layer (Aggregat, Mission/Vision, Forecasts, FocusAreas, VisionImages, Obstacles, Milestones)
-            $registry->register(new \Platform\Organization\Tools\ListStrategiesTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateStrategyTool());
-            $registry->register(new \Platform\Organization\Tools\ListStrategicDocumentsTool());
-            $registry->register(new \Platform\Organization\Tools\CreateStrategicDocumentTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateStrategicDocumentTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteStrategicDocumentTool());
-            $registry->register(new \Platform\Organization\Tools\ListForecastsTool());
-            $registry->register(new \Platform\Organization\Tools\CreateForecastTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateForecastTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteForecastTool());
-            $registry->register(new \Platform\Organization\Tools\CreateForecastVersionTool());
-            $registry->register(new \Platform\Organization\Tools\ListFocusAreasTool());
-            $registry->register(new \Platform\Organization\Tools\CreateFocusAreaTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateFocusAreaTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteFocusAreaTool());
-            $registry->register(new \Platform\Organization\Tools\ListVisionImagesTool());
-            $registry->register(new \Platform\Organization\Tools\CreateVisionImageTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateVisionImageTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteVisionImageTool());
-            $registry->register(new \Platform\Organization\Tools\ListObstaclesTool());
-            $registry->register(new \Platform\Organization\Tools\CreateObstacleTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateObstacleTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteObstacleTool());
-            $registry->register(new \Platform\Organization\Tools\ListMilestonesTool());
-            $registry->register(new \Platform\Organization\Tools\CreateMilestoneTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateMilestoneTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteMilestoneTool());
-            // Ausrichtung: Objectives / Key Results zahlen auf Meilensteine ein.
-            $registry->register(new \Platform\Organization\Tools\ListMilestoneContributionsTool());
-            $registry->register(new \Platform\Organization\Tools\CreateMilestoneContributionTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteMilestoneContributionTool());
-            $registry->register(new \Platform\Organization\Tools\GetEntityStrategyTool());
+            // Strategie (Mission/Vision, Regnose, Fokusräume, Meilensteine, Ausrichtung) lebt im Management Book
+            // (management-book.*); die Organisation liest sie nur über Strategy\StrategySources.
 
         } catch (\Throwable $e) {
             \Log::warning('Organization: Tool-Registrierung fehlgeschlagen', ['error' => $e->getMessage()]);

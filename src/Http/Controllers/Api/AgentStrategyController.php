@@ -8,10 +8,9 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Carbon;
 use Platform\Core\Authz\AuthzResolver;
 use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationMilestone;
-use Platform\Organization\Models\OrganizationMilestoneContribution;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Services\ObjectTypeRegistry;
+use Platform\Organization\Strategy\StrategySources;
 
 /**
  * Agent-API für die Ausrichtung auf die Strategie (/api/org/agent/…):
@@ -45,29 +44,10 @@ class AgentStrategyController extends Controller
             $d = $d->copy()->addQuarter();
         }
 
-        $rows = OrganizationMilestone::query()
-            ->where('team_id', $agent->team_id)
-            ->where(function ($q) use ($slots) {
-                foreach ($slots as [$y, $qu]) {
-                    $q->orWhere(fn ($w) => $w->where('target_year', $y)->where('target_quarter', $qu));
-                }
-            })
-            ->with(['entity:id,name', 'focusArea:id,title'])
-            ->orderBy('target_year')->orderBy('target_quarter')->orderBy('entity_id')->orderBy('order')
-            ->get();
-
+        // Quelle: Meilensteine der Management Books des Teams (StrategySources); ohne Quelle leer.
         return response()->json(['data' => [
             'quarters' => array_map(fn ($s) => $s[0] . '-Q' . $s[1], $slots),
-            'milestones' => $rows->map(fn (OrganizationMilestone $m) => [
-                'id' => $m->id,
-                'title' => $m->title,
-                'central_question' => $m->central_question,
-                'entity_id' => $m->entity_id,
-                'entity' => $m->entity?->name,
-                'focus_area' => $m->focusArea?->title,
-                'target_year' => $m->target_year,
-                'target_quarter' => $m->target_quarter,
-            ])->values()->all(),
+            'milestones' => array_values(StrategySources::milestonesForTeam((int) $agent->team_id, $slots)),
         ]]);
     }
 
@@ -92,32 +72,26 @@ class AgentStrategyController extends Controller
         if ($own) {
             return $own;
         }
-        $milestone = OrganizationMilestone::query()->where('team_id', $agent->team_id)->find($data['milestone_id']);
-        if (!$milestone) {
-            return response()->json(['message' => "Meilenstein #{$data['milestone_id']} nicht gefunden."], 404);
-        }
-
         try {
-            $c = OrganizationMilestoneContribution::firstOrNew([
-                'milestone_id' => $milestone->id,
-                'linkable_type' => $alias,
-                'linkable_id' => (int) $data['linkable_id'],
-            ]);
-            $created = !$c->exists;
-            if (array_key_exists('weight', $data)) {
-                $c->weight = $data['weight'];
-            }
-            if ($created) {
-                $c->team_id = $milestone->team_id;
-                $c->created_by_user_id = $user->id;
-            }
-            $c->save();
+            $result = StrategySources::contribute(
+                (int) $agent->team_id,
+                (int) $data['milestone_id'],
+                $alias,
+                (int) $data['linkable_id'],
+                array_key_exists('weight', $data) ? $data['weight'] : null,
+                (int) $user->id,
+            );
         } catch (\InvalidArgumentException $e) {
             return response()->json(['message' => $e->getMessage()], 422);
         }
-        $c->load('milestone.focusArea', 'milestone.entity');
+        if ($result === null) {
+            return response()->json(['message' => "Meilenstein #{$data['milestone_id']} nicht gefunden."], 404);
+        }
 
-        return response()->json(['data' => array_merge($c->toAlignmentArray(), ['created' => $created])], $created ? 201 : 200);
+        return response()->json(
+            ['data' => array_merge($result['alignment'], ['created' => $result['created']])],
+            $result['created'] ? 201 : 200
+        );
     }
 
     /**

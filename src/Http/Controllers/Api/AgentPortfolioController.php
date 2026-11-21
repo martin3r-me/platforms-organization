@@ -7,7 +7,7 @@ use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
-use Platform\Organization\Services\EntityStrategyPresenter;
+use Platform\Organization\Strategy\StrategySources;
 
 /**
  * DAS VERINNERLICHTE WELTBILD als Wahrnehmungs-Quelle: der Daemon ZIEHT das Venture-Portfolio
@@ -67,7 +67,7 @@ class AgentPortfolioController extends Controller
     private function briefFor(OrganizationEntity $carrier): string
     {
         try {
-            $s = EntityStrategyPresenter::forEntity($carrier);
+            $s = StrategySources::forEntity($carrier);
         } catch (\Throwable $e) {
             return '';
         }

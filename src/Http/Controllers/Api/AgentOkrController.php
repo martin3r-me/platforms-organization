@@ -6,7 +6,7 @@ use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Routing\Controller;
 use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationMilestoneContribution;
+use Platform\Organization\Strategy\StrategySources;
 use Platform\Organization\Services\EntityDimensionBridge;
 
 /**
@@ -233,20 +233,14 @@ class AgentOkrController extends Controller
         if (empty($ids)) {
             return;
         }
-        try {
-            $rows = OrganizationMilestoneContribution::query()
-                ->with(['milestone.focusArea', 'milestone.entity'])
-                ->where(function ($w) use ($ids) {
-                    foreach ($ids as $alias => $list) {
-                        $w->orWhere(fn ($x) => $x->where('linkable_type', $alias)->whereIn('linkable_id', array_values(array_unique($list))));
-                    }
-                })
-                ->get();
-            foreach ($rows as $c) {
-                $this->alignments[$c->linkable_type][(int) $c->linkable_id][] = $c->toAlignmentArray();
+        // Ausrichtung auf Meilensteine des Management Books (StrategySources) — ein Zusatz, ohne Quelle leer.
+        $ids = array_map(fn ($list) => array_values(array_unique($list)), $ids);
+        foreach (StrategySources::alignmentsFor($ids) as $alias => $byId) {
+            foreach ($byId as $id => $rows) {
+                foreach ($rows as $row) {
+                    $this->alignments[$alias][(int) $id][] = $row;
+                }
             }
-        } catch (\Throwable $e) {
-            // Ausrichtung ist ein Zusatz — ohne sie weiter.
         }
     }
 

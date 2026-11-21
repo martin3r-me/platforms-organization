@@ -63,6 +63,17 @@ class OrganizationServiceProvider extends ServiceProvider
 
     public function boot(): void
     {
+        // ImpactSource registrieren (Wirkung im people-Modul, loose Kopplung): Transparenz aus der Koordination.
+        // CoordinationImpactSource erbt von einer people-Klasse → nur instanziieren, wenn people da ist.
+        try {
+            if (class_exists(\Platform\People\Support\ImpactSourceBase::class)) {
+                resolve(\Platform\People\Services\ImpactSourceRegistry::class)
+                    ->register(new \Platform\Organization\People\CoordinationImpactSource());
+            }
+        } catch (\Throwable $e) {
+            // people-Modul nicht geladen
+        }
+
         // Morph-Map-Aliase für Role- und Process-Modelle
         Relation::morphMap([
             'organization_role'               => \Platform\Organization\Models\OrganizationRole::class,

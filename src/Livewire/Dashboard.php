@@ -215,9 +215,36 @@ class Dashboard extends Component
         $fresh = now()->subDays(self::ATTENTION_FRESH_DAYS);
         $since = fn ($s) => 'gemeldet ' . $s->created_at->locale('de')->diffForHumans();
 
-        $open()->whereIn('severity', ['algedonic', 'critical'])->where('created_at', '>=', $fresh)->with(['entity:id,name', 'definition:id,name'])
-            ->orderByRaw("FIELD(severity, 'algedonic', 'critical')")->latest()->limit(5)->get()
-            ->each(fn ($s) => $push($s, $since($s)));
+        // Dieselbe Regel an mehreren Einheiten wird eine Zeile, nicht fünf
+        $addGrouped = function ($signals) use (&$items, &$seen, $push, $since) {
+            $signals->reject(fn ($s) => isset($seen[$s->id]))
+                ->groupBy(fn ($s) => $s->signal_definition_id ? 'd' . $s->signal_definition_id : 's' . $s->id)
+                ->each(function ($group) use (&$items, $push, $since) {
+                    if (count($items) >= 5) {
+                        return false;
+                    }
+                    $first = $group->first();
+                    $names = $group->map(fn ($s) => $s->entity?->name)->filter()->unique()->values();
+                    if ($names->count() < 2 || ! $first->definition) {
+                        $push($first, $since($first));
+
+                        return;
+                    }
+                    $items[] = [
+                        'kind' => 'rule',
+                        'severity' => $first->severity,
+                        'title' => $first->definition->name . ' · ' . $names->count() . ' Einheiten',
+                        'why' => $names->take(3)->implode(', ') . ($names->count() > 3 ? ' und ' . ($names->count() - 3) . ' weitere' : '') . ' · zuletzt ' . $since($first),
+                        'entity' => null,
+                        'href' => route('organization.signals.index'),
+                        'focused' => false,
+                        'signal_id' => null,
+                    ];
+                });
+        };
+
+        $addGrouped($open()->whereIn('severity', ['algedonic', 'critical'])->where('created_at', '>=', $fresh)->with(['entity:id,name', 'definition:id,name'])
+            ->orderByRaw("FIELD(severity, 'algedonic', 'critical')")->latest()->limit(50)->get());
 
         // Einheiten, in denen Kritisches überwiegt — aus den Fakten der Lage, nicht neu gerechnet
         $lage = $this->orgLage;
@@ -239,33 +266,8 @@ class Dashboard extends Component
             }
         }
 
-        // Frische Warnungen: dieselbe Regel an mehreren Einheiten wird eine Zeile, nicht fünf
         if (count($items) < 5) {
-            $open()->where('severity', 'warning')->where('created_at', '>=', $fresh)->with(['entity:id,name', 'definition:id,name'])->latest()->limit(50)->get()
-                ->reject(fn ($s) => isset($seen[$s->id]))
-                ->groupBy(fn ($s) => $s->signal_definition_id ? 'd' . $s->signal_definition_id : 's' . $s->id)
-                ->each(function ($group) use (&$items, $push, $since) {
-                    if (count($items) >= 5) {
-                        return false;
-                    }
-                    $first = $group->first();
-                    if ($group->count() === 1 || ! $first->definition) {
-                        $push($first, $since($first));
-
-                        return;
-                    }
-                    $names = $group->map(fn ($s) => $s->entity?->name)->filter()->unique()->values();
-                    $items[] = [
-                        'kind' => 'rule',
-                        'severity' => 'warning',
-                        'title' => $first->definition->name . ' · ' . $names->count() . ' Einheiten',
-                        'why' => $names->take(3)->implode(', ') . ($names->count() > 3 ? ' und ' . ($names->count() - 3) . ' weitere' : '') . ' · zuletzt ' . $since($first),
-                        'entity' => null,
-                        'href' => route('organization.signals.index'),
-                        'focused' => false,
-                        'signal_id' => null,
-                    ];
-                });
+            $addGrouped($open()->where('severity', 'warning')->where('created_at', '>=', $fresh)->with(['entity:id,name', 'definition:id,name'])->latest()->limit(50)->get());
         }
 
         return [

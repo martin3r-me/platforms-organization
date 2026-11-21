@@ -254,6 +254,17 @@ class EntityFactsService
             }
         }
 
+        // Verzehnfacht sich ein Stand binnen einer Periode (Sichtbarkeit 9 → 4.474), ist das fast immer
+        // neue Erfassung (mehr Keywords, neue Quelle), keine Entwicklung — nicht erzählen.
+        foreach ($usable as $key => $f) {
+            $prev = abs((float) ($f['previous'] ?? 0));
+            if (! str_starts_with((string) $f['basis'], 'window_') && $prev >= 5 && $f['current'] !== null
+                && (abs((float) $f['current']) >= 10 * $prev || abs((float) $f['current']) * 10 <= $prev)) {
+                $excluded[] = $f + ['reason' => 'jump'];
+                unset($usable[$key]);
+            }
+        }
+
         $dimensions = [];
         foreach ($dimensionLabels as $dim => $meta) {
             if (in_array($dim, self::EXCLUDED_DIMENSIONS, true)) {

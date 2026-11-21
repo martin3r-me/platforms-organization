@@ -8,8 +8,8 @@ use Platform\Organization\Services\EntityHierarchyService;
 
 /**
  * Ziel = ein Org-Knoten (OrganizationEntity: Einheit/Position/Person).
- * Löst zu den konkreten Usern auf, die als Personen-Knoten unter dem Knoten
- * hängen (per linked_user_id), standardmäßig inklusive aller Nachfahren.
+ * Löst zu den konkreten Usern auf, die als Personen- oder Agenten-Knoten unter dem
+ * Knoten hängen (per linked_user_id), standardmäßig inklusive aller Nachfahren.
  *
  * Wird vom Organisation-Modul in der Core-AudienceResolverRegistry registriert —
  * Academy kennt weder dieses Modul noch diese Klasse.
@@ -39,7 +39,8 @@ class OrgEntityAudienceResolver implements AudienceResolverInterface
         return OrganizationEntity::query()
             ->whereIn('id', $ids)
             ->when($teamId, fn ($q) => $q->where('team_id', $teamId))
-            ->persons()
+            // Menschen UND Agenten: Pflichten der Einheit gelten für alle ihre Mitglieder (gleiche Brille).
+            ->whereHas('type', fn ($q) => $q->whereIn('code', ['person', 'agent']))
             ->whereNotNull('linked_user_id')
             ->pluck('linked_user_id')
             ->map(fn ($id) => (int) $id)

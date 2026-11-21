@@ -11,11 +11,10 @@ use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Authz\DimensionLinkAuthorizer;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityRelationship;
-use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationRoleAssignment;
 use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\EntityDimensionBridge;
-use Platform\Organization\Services\EntityStrategyPresenter;
+use Platform\Organization\Strategy\StrategySources;
 use Platform\Organization\Services\ObjectContextResolver;
 use Platform\Organization\Services\ObjectTypeRegistry;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
@@ -49,7 +48,7 @@ class GetBriefTool implements ToolContract, ToolMetadataContract
     {
         return 'GET /organization/brief - EINSTIEG für Aufgaben: Orientierung zu einem Objekt (Projekt, Task, Ticket, Issue, Kontakt, …) '
             . 'oder einer Entity in einem Call. Liefert: zugehörige Organisationseinheit(en) mit Pfad im Baum, Zuständige (Rollen/Personen), '
-            . 'Beziehungen inkl. Schnittstellen, offene Signale, Strategie des nächsten Carriers (Mission/Vision/Fokusräume) und Link-Übersicht. '
+            . 'Beziehungen inkl. Schnittstellen, offene Signale, Strategie des nächsten Knotens mit aktivem Management Book (Mission/Vision/Fokusräume) und Link-Übersicht. '
             . 'Nutze dies ZUERST, bevor du mit Modul-Tools arbeitest. Entweder object_type+object_id ODER entity_id angeben.';
     }
 
@@ -145,7 +144,7 @@ class GetBriefTool implements ToolContract, ToolMetadataContract
             $response['next'] = [
                 'organization.neighbors.GET' => 'Umfeld im Org-Graphen: Eltern, Kinder, Beziehungen, verknüpfte Objekte',
                 'organization.entity.detail.GET' => 'Alle verknüpften Objekte einer Entity',
-                'organization.strategy.GET' => 'Vollständige Strategie eines Carriers',
+                'management-book.strategy.GET' => 'Vollständige Strategie eines Knotens (Management Book)',
                 'organization.signals.GET' => 'Signale filtern/bearbeiten',
                 'tool_registry.SEARCH' => 'Modul-Tools für CRUD finden',
             ];
@@ -264,15 +263,16 @@ class GetBriefTool implements ToolContract, ToolMetadataContract
     }
 
     /**
-     * Strategie des nächsten Carriers (Entity selbst oder Vorfahr) — kompakt.
+     * Strategie des nächsten Knotens mit Strategie (Entity selbst oder Vorfahr) — kompakt.
+     * Quelle ist das aktive Management Book des Knotens (StrategySources); ohne Quelle null.
      */
     private function strategy(array $lineage): ?array
     {
+        if (! StrategySources::has()) {
+            return null;
+        }
         foreach (array_reverse($lineage) as $node) {
-            if ($node->type?->vsm_class !== OrganizationEntityType::VSM_CLASS_CARRIER) {
-                continue;
-            }
-            $s = EntityStrategyPresenter::forEntity($node);
+            $s = StrategySources::forEntity($node);
             if (! $s) {
                 continue;
             }
@@ -280,9 +280,11 @@ class GetBriefTool implements ToolContract, ToolMetadataContract
             return array_filter([
                 'carrier' => $node->name,
                 'carrier_entity_id' => $node->id,
+                'source' => 'management-book',
                 'mission' => isset($s['mission']['content']) ? mb_strimwidth(strip_tags((string) $s['mission']['content']), 0, 400, '…') : null,
                 'vision' => isset($s['vision']['content']) ? mb_strimwidth(strip_tags((string) $s['vision']['content']), 0, 400, '…') : null,
                 'focus_areas' => collect($s['focus_areas'] ?? [])->take(self::MAX_FOCUS_AREAS)->pluck('title')->all() ?: null,
+                'management_book_id' => $s['source']['id'] ?? null,
             ], fn ($v) => $v !== null);
         }
 

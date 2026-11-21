@@ -161,78 +161,23 @@ class Show extends Component
         return $this->entity->type?->code === 'agent';
     }
 
-    // ── Strategy Tab ──────────────────────────────────────────
+    // ── Strategie (aus dem Management Book) ───────────────────
 
     /**
-     * Strategy artifacts attached to this carrier-entity for the Strategie-Tab.
-     *
-     * Shape (Modell-Shift: Fokusräume entity-nativ, Regnose optional):
-     * [
-     *   'mission'            => ['title','content','version','valid_from'] | null,
-     *   'vision'             => ['title','content','version','valid_from'] | null,
-     *   'focus_areas'        => [ ...per FA, entity-native, flat ],
-     *   'transformation_map' => [
-     *      'years' => [int, ...],  // sorted union of years across all focus-area milestones
-     *      'grid'  => [focus_area_id => [year => [milestone,...]]],
-     *      'no_year' => [focus_area_id => [milestone,...]],  // milestones without year
-     *   ],
-     *   'forecasts'       => [ ...per Regnose: id, title, target_date, content, current_version ],
-     *   'strategy_meta'   => ['status','version','published_at','owner_name'] | null,  // Strategy-Aggregat
-     *   'milestone_total' => int,
-     *   'has_any'         => bool,
-     * ]
-     *
-     * A focus_area has:
-     *   id, title, description, order,
-     *   vision_images => [{id,title}], obstacles => [{id,title}],
-     *   milestones => [{id,title,target_year,target_quarter,order}]
+     * Strategie dieses Knotens aus der registrierten Strategie-Quelle (Management Book).
+     * Shape siehe Platform\Organization\Contracts\StrategySource::forEntity(); null ohne Strategie/Quelle.
      */
     #[Computed]
     public function strategy(): ?array
     {
-        if (! $this->isCarrierEntity) {
-            return null;
-        }
-
-        return \Platform\Organization\Services\EntityStrategyPresenter::forEntity($this->entity);
+        return \Platform\Organization\Strategy\StrategySources::forEntity($this->entity);
     }
 
-    /** Vollständigkeit der Strategie gegen das Blueprint (percent, Kapitel, Issues). */
+    /** Ist ein Strategie-Modul (Management Book) angebunden? */
     #[Computed]
-    public function strategyCompleteness(): ?array
+    public function hasStrategySource(): bool
     {
-        if (! $this->isCarrierEntity) {
-            return null;
-        }
-
-        // Eine Quelle: derselbe reiche Read wie das Panel (memoisiert via $this->strategy),
-        // auf die Blueprint-Eval-Form projiziert. Ersetzt den separaten StrategyReader.
-        return (new \Platform\Organization\Strategy\StrategyCompleteness())->evaluate(
-            \Platform\Organization\Strategy\StrategyBlueprintMapper::fromStrategyArray($this->strategy)
-        );
-    }
-
-    /** Öffentlich teilbare URL der Strategie-Ansicht (null, wenn kein gültiger Link). */
-    #[Computed]
-    public function publicStrategyUrl(): ?string
-    {
-        return $this->entity->isPublicAccessible() ? $this->entity->getPublicUrl() : null;
-    }
-
-    /** Erzeugt (oder erneuert) den öffentlichen Strategie-Link. */
-    public function generatePublicLink(): void
-    {
-        $this->entity->generatePublicToken();
-        unset($this->publicStrategyUrl);
-        $this->dispatch('toast', message: 'Öffentlicher Strategie-Link erstellt');
-    }
-
-    /** Widerruft den öffentlichen Strategie-Link. */
-    public function revokePublicLink(): void
-    {
-        $this->entity->revokePublicToken();
-        unset($this->publicStrategyUrl);
-        $this->dispatch('toast', message: 'Öffentlicher Link widerrufen');
+        return \Platform\Organization\Strategy\StrategySources::has();
     }
 
     // ── Perspective ↔ Team Mapping ────────────────────────────

@@ -35,9 +35,11 @@
     if ($this->hasLinkedUser) {
         $tabs[] = ['key' => 'person', 'label' => 'Person', 'icon' => 'heroicon-o-user'];
     }
+    if ($this->hasStrategySource && ($this->isCarrierEntity || $this->strategy)) {
+        $tabs[] = ['key' => 'strategy', 'label' => 'Strategie', 'icon' => 'heroicon-o-flag'];
+    }
     if ($this->isCarrierEntity) {
         $vacancyCount = collect($this->vsmMatrix)->where('is_vacant', true)->count();
-        $tabs[] = ['key' => 'strategy', 'label' => 'Strategie', 'icon' => 'heroicon-o-flag'];
         $tabs[] = ['key' => 'vsm', 'label' => 'VSM', 'icon' => 'heroicon-o-squares-2x2', 'badge' => $vacancyCount ?: null, 'badgeVariant' => 'warning', 'title' => $vacancyCount ? $vacancyCount . ' unbesetzte Zellen' : null];
     }
     if ($this->isAgentEntity) {
@@ -825,442 +827,71 @@
                     </x-nx-panel>
                 @endif
 
-                {{-- ═══ Strategie: Mission, Vision, Fokusräume, Transformation Map, Regnosen ═══ --}}
-                @if ($this->isCarrierEntity && $activeTab === 'strategy')
-                    <div>
-                        @php $strategy = $this->strategy; @endphp
-                        @if($strategy === null)
-                            <x-nx-card>
-                                <div class="py-10 text-center">
-                                    <div class="mx-auto w-12 h-12 rounded-full border border-[color:var(--nx-line)] flex items-center justify-center mb-4">
-                                        @svg('heroicon-o-map', 'w-6 h-6 text-[color:var(--nx-faint)]')
-                                    </div>
-                                    <h3 class="text-sm font-semibold text-[color:var(--nx-text)]">Noch kein strategisches Zukunftsbild</h3>
-                                    <p class="text-xs text-[color:var(--nx-muted)] mt-1 max-w-md mx-auto">
-                                        Diese Carrier-Entity hat noch keine Mission, Vision oder Regnose. Lege sie an, um Zielbilder, Hindernisse und Meilensteine zu strukturieren.
-                                    </p>
-                                    <div class="mt-4 flex items-center justify-center gap-1.5 flex-wrap text-[10px] text-[color:var(--nx-faint)]">
-                                        <span>MCP-Tools:</span>
-                                        <code class="bg-[color:var(--nx-bg)] border border-[color:var(--nx-line)] px-1.5 py-0.5 rounded">organization.strategic_documents.POST</code>
-                                        <code class="bg-[color:var(--nx-bg)] border border-[color:var(--nx-line)] px-1.5 py-0.5 rounded">organization.forecasts.POST</code>
-                                        <code class="bg-[color:var(--nx-bg)] border border-[color:var(--nx-line)] px-1.5 py-0.5 rounded">organization.focus_areas.POST</code>
-                                        <code class="bg-[color:var(--nx-bg)] border border-[color:var(--nx-line)] px-1.5 py-0.5 rounded">organization.milestones.POST</code>
-                                    </div>
-                                </div>
-                            </x-nx-card>
-                        @else
-                            @php
-                                $totalFA = count($strategy['focus_areas']); $totalVI = 0; $totalOb = 0; $totalMS = 0;
-                                foreach ($strategy['focus_areas'] as $__fa) {
-                                    $totalVI += count($__fa['vision_images']);
-                                    $totalOb += count($__fa['obstacles']);
-                                    $totalMS += count($__fa['milestones']);
-                                }
-                            @endphp
-
-                            {{-- Kennzahlen: nur was nicht ohnehin unten als Abschnitt steht --}}
-                            <div class="mb-8">
-                                <x-nx-stat-grid :cols="4">
-                                    <x-nx-stat label="Fokusräume" :value="$totalFA" icon="heroicon-o-squares-2x2" />
-                                    <x-nx-stat label="Zielbilder" :value="$totalVI" icon="heroicon-o-photo" />
-                                    <x-nx-stat label="Hindernisse" :value="$totalOb" icon="heroicon-o-exclamation-triangle" />
-                                    <x-nx-stat label="Meilensteine" :value="$totalMS" icon="heroicon-o-flag" />
-                                </x-nx-stat-grid>
-                            </div>
-
-                            {{-- Vollständigkeit gegen das Strategie-Blueprint --}}
-                            @php $sc = $this->strategyCompleteness; @endphp
-                            @if($sc)
-                                <div class="mb-8">
-                                    <x-nx-card>
-                                        <div class="flex items-center justify-between gap-3 mb-3">
-                                            <div class="flex items-center gap-2">
-                                                <div class="text-sm font-medium text-[color:var(--nx-text)]">Vollständigkeit</div>
-                                                @php $sm = $strategy['strategy_meta'] ?? null; @endphp
-                                                @if($sm)
-                                                    <x-nx-badge :variant="$sm['status'] === 'active' ? 'success' : ($sm['status'] === 'archived' ? 'neutral' : 'warning')">
-                                                        {{ ['draft' => 'Entwurf', 'active' => 'Aktiv', 'archived' => 'Archiviert'][$sm['status']] ?? $sm['status'] }} · v{{ $sm['version'] }}
-                                                    </x-nx-badge>
-                                                @endif
-                                            </div>
-                                            <div class="text-sm font-semibold tabular-nums text-[color:var(--nx-text)]">{{ $sc['percent'] }}%</div>
-                                        </div>
-                                        <div class="h-1.5 w-full overflow-hidden rounded-full bg-[color:var(--nx-line)] mb-4">
-                                            <div class="h-full rounded-full transition-all"
-                                                 style="width: {{ $sc['percent'] }}%; background: {{ $sc['complete'] ? 'var(--nx-success)' : 'var(--nx-accent)' }}"></div>
-                                        </div>
-                                        <div class="flex flex-wrap gap-1.5">
-                                            @foreach($sc['chapters'] as $ch)
-                                                <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-xs {{ $ch['ok'] ? 'text-[color:var(--nx-success)] bg-[rgba(47,158,68,.10)]' : ($ch['required'] ? 'text-[color:var(--nx-warning)] bg-[rgba(232,89,12,.10)]' : 'text-[color:var(--nx-faint)] bg-[color:var(--nx-accent-soft)]') }}"
-                                                      @if($ch['reason']) title="{{ $ch['reason'] }}" @endif>
-                                                    {{ $ch['order'] }}. {{ $ch['label'] }}
-                                                    @if($ch['ok'])<span aria-hidden="true">✓</span>@elseif($ch['required'])<span aria-hidden="true">!</span>@endif
-                                                </span>
-                                            @endforeach
-                                        </div>
-                                        @if(!empty($sc['issues']))
-                                            <div class="mt-4 space-y-2">
-                                                @foreach($sc['issues'] as $issue)
-                                                    <x-nx-callout :variant="$issue['severity'] === 'error' ? 'warning' : 'info'">{{ $issue['message'] }}</x-nx-callout>
-                                                @endforeach
-                                            </div>
-                                        @endif
-                                    </x-nx-card>
-                                </div>
-                            @endif
-
-                            {{-- Öffentlich teilen --}}
-                            @php $publicUrl = $this->publicStrategyUrl; @endphp
-                            <div class="mb-8">
-                                <x-nx-card>
-                                    @if($publicUrl)
-                                        <div class="flex items-center justify-between gap-3 flex-wrap">
-                                            <div class="min-w-0 flex items-center gap-2">
-                                                <x-nx-badge variant="success" dot>öffentlich</x-nx-badge>
-                                                <div x-data="{ copied: false }" class="flex items-center gap-1.5 min-w-0">
-                                                    <input type="text" readonly value="{{ $publicUrl }}"
-                                                           x-ref="publicLink"
-                                                           class="text-xs text-[color:var(--nx-text)] bg-[color:var(--nx-bg)] border border-[color:var(--nx-line)] rounded-md px-2 py-1 w-[280px] max-w-full font-mono truncate">
-                                                    <x-nx-button variant="ghost" size="sm"
-                                                            x-on:click="navigator.clipboard.writeText($refs.publicLink.value); copied = true; setTimeout(() => copied = false, 1500)">
-                                                        <span x-show="!copied">Kopieren</span>
-                                                        <span x-show="copied" class="text-[color:var(--nx-success)]">✓ Kopiert</span>
-                                                    </x-nx-button>
-                                                </div>
-                                            </div>
-                                            <div class="flex items-center gap-2">
-                                                <x-nx-button variant="secondary" size="sm" :href="$publicUrl.'/pdf'" target="_blank">
-                                                    @svg('heroicon-o-arrow-down-tray', 'w-3.5 h-3.5') PDF
-                                                </x-nx-button>
-                                                <x-nx-button variant="danger" size="sm" wire:click="revokePublicLink"
-                                                        wire:confirm="Öffentlichen Link wirklich widerrufen? Bestehende Links werden ungültig.">
-                                                    Widerrufen
-                                                </x-nx-button>
-                                            </div>
-                                        </div>
-                                    @else
-                                        <div class="flex items-center justify-between gap-3 flex-wrap">
-                                            <div class="flex items-center gap-2 text-xs text-[color:var(--nx-muted)]">
-                                                @svg('heroicon-o-share', 'w-4 h-4 text-[color:var(--nx-faint)]')
-                                                <span>Strategie extern teilen — als Link ohne Login oder als PDF.</span>
-                                            </div>
-                                            <x-nx-button variant="primary" size="sm" wire:click="generatePublicLink">
-                                                @svg('heroicon-o-globe-alt', 'w-3.5 h-3.5') Öffentlichen Link erstellen
-                                            </x-nx-button>
-                                        </div>
+                {{-- ═══ Strategie: lebt im Management Book (Organisation hält keinen eigenen Strategie-Layer) ═══ --}}
+                @if ($activeTab === 'strategy')
+                    @php
+                        $strategy = $this->strategy;
+                        $bookUrl = $strategy['source']['url'] ?? null;
+                        $mbDashboard = \Illuminate\Support\Facades\Route::has('management-book.dashboard') ? route('management-book.dashboard') : null;
+                        $msOpen = 0;
+                        foreach (($strategy['focus_areas'] ?? []) as $__fa) {
+                            foreach (($__fa['milestones'] ?? []) as $__m) {
+                                if (! in_array($__m['status'] ?? 'planned', ['reached', 'cancelled'], true)) { $msOpen++; }
+                            }
+                        }
+                    @endphp
+                    <x-nx-card>
+                        @if ($strategy)
+                            <div class="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+                                <div class="min-w-0 max-w-2xl">
+                                    <div class="text-[11px] font-semibold uppercase tracking-[0.08em] text-[color:var(--nx-faint)]">Strategie im Management Book</div>
+                                    @if (! empty($strategy['vision']))
+                                        <p class="mt-2 mb-0 text-lg font-semibold leading-snug text-[color:var(--nx-text)]">{{ $strategy['vision']['title'] ?: \Illuminate\Support\Str::limit(strip_tags(\Illuminate\Support\Str::markdown((string) $strategy['vision']['content'])), 160) }}</p>
                                     @endif
-                                </x-nx-card>
-                            </div>
-
-                            {{-- 1. Mission — volle Breite --}}
-                            @if(!empty($strategy['mission']))
-                                <div class="mb-8">
-                                    <x-nx-section icon="heroicon-o-flag" title="Mission"
-                                        hint="v{{ $strategy['mission']['version'] }} · gültig ab {{ $strategy['mission']['valid_from'] }}">
-                                        <x-nx-card>
-                                            <div class="text-sm font-semibold text-[color:var(--nx-text)] mb-2">{{ $strategy['mission']['title'] }}</div>
-                                            @if(!empty($strategy['mission']['content']))
-                                                <div class="nx-prose">
-                                                    {!! \Illuminate\Support\Str::markdown($strategy['mission']['content']) !!}
-                                                </div>
-                                            @else
-                                                <p class="text-xs text-[color:var(--nx-muted)] italic">Kein Inhalt gepflegt.</p>
-                                            @endif
-                                        </x-nx-card>
-                                    </x-nx-section>
-                                </div>
-                            @endif
-
-                            {{-- 2. Vision — volle Breite, klar von Mission getrennt --}}
-                            @if(!empty($strategy['vision']))
-                                <div class="mb-8">
-                                    <x-nx-section icon="heroicon-o-sparkles" title="Vision"
-                                        hint="v{{ $strategy['vision']['version'] }} · gültig ab {{ $strategy['vision']['valid_from'] }}">
-                                        <x-nx-card>
-                                            <div class="text-sm font-semibold text-[color:var(--nx-text)] mb-2">{{ $strategy['vision']['title'] }}</div>
-                                            @if(!empty($strategy['vision']['content']))
-                                                <div class="nx-prose">
-                                                    {!! \Illuminate\Support\Str::markdown($strategy['vision']['content']) !!}
-                                                </div>
-                                            @else
-                                                <p class="text-xs text-[color:var(--nx-muted)] italic">Kein Inhalt gepflegt.</p>
-                                            @endif
-                                        </x-nx-card>
-                                    </x-nx-section>
-                                </div>
-                            @endif
-
-                            {{-- 3. Fokusräume — entity-nativ (Modell-Shift), unabhängig von einer Regnose --}}
-                            @if(!empty($strategy['focus_areas']))
-                                <div class="mb-8">
-                                    <x-nx-section icon="heroicon-o-squares-2x2" title="Fokusräume" hint="Strategische Handlungsfelder der Entity">
-                                        <div class="space-y-3">
-                                            @foreach($strategy['focus_areas'] as $fa)
-                                                @php
-                                                    $viCount = count($fa['vision_images']);
-                                                    $obCount = count($fa['obstacles']);
-                                                    $msCount = count($fa['milestones']);
-                                                    $emptyFA = ($viCount + $obCount + $msCount) === 0;
-                                                @endphp
-                                                <x-nx-card flush>
-                                                    <div class="px-4 py-3 border-b border-[color:var(--nx-line)]">
-                                                        <div class="flex items-start gap-3">
-                                                            <div class="w-7 h-7 bg-[color:var(--nx-bg)] text-[color:var(--nx-muted)] rounded-md flex items-center justify-center flex-shrink-0 border border-[color:var(--nx-line)] mt-0.5">
-                                                                <span class="text-xs font-semibold">{{ $loop->iteration }}</span>
-                                                            </div>
-                                                            <div class="flex-1 min-w-0">
-                                                                <h3 class="text-sm font-semibold text-[color:var(--nx-text)]">{{ $fa['title'] }}</h3>
-                                                                @if(!empty($fa['description']))
-                                                                    <p class="text-xs text-[color:var(--nx-muted)] mt-1 leading-relaxed">{{ $fa['description'] }}</p>
-                                                                @endif
-                                                            </div>
-                                                            <div class="flex items-center gap-1 flex-shrink-0">
-                                                                @if($viCount > 0)<x-nx-badge variant="neutral">@svg('heroicon-o-photo', 'w-3 h-3') {{ $viCount }}</x-nx-badge>@endif
-                                                                @if($obCount > 0)<x-nx-badge variant="warning">@svg('heroicon-o-exclamation-triangle', 'w-3 h-3') {{ $obCount }}</x-nx-badge>@endif
-                                                                @if($msCount > 0)<x-nx-badge variant="neutral">@svg('heroicon-o-flag', 'w-3 h-3') {{ $msCount }}</x-nx-badge>@endif
-                                                            </div>
-                                                        </div>
-                                                    </div>
-
-                                                    @if($emptyFA)
-                                                        <div class="px-4 py-4 text-center">
-                                                            <p class="text-xs text-[color:var(--nx-muted)] italic">Noch keine Zielbilder, Hindernisse oder Meilensteine gepflegt.</p>
-                                                        </div>
-                                                    @else
-                                                        <div class="grid grid-cols-1 md:grid-cols-3 divide-y md:divide-y-0 md:divide-x divide-[color:var(--nx-line)]">
-                                                            {{-- Zielbilder --}}
-                                                            <div class="p-4">
-                                                                <div class="flex items-center gap-1.5 mb-2">
-                                                                    @svg('heroicon-o-photo', 'w-3.5 h-3.5 text-[color:var(--nx-faint)]')
-                                                                    <span class="text-[10px] uppercase tracking-wider text-[color:var(--nx-muted)] font-semibold">Zielbilder</span>
-                                                                    @if($viCount > 0)<span class="text-[10px] text-[color:var(--nx-faint)]">{{ $viCount }}</span>@endif
-                                                                </div>
-                                                                @if(!empty($fa['central_question_vision_images']))
-                                                                    <p class="text-[11px] text-[color:var(--nx-faint)] italic mb-2 leading-snug">{{ $fa['central_question_vision_images'] }}</p>
-                                                                @endif
-                                                                @if($viCount === 0)
-                                                                    <p class="text-[11px] text-[color:var(--nx-faint)] italic">noch offen</p>
-                                                                @else
-                                                                    <ul class="space-y-2">
-                                                                        @foreach($fa['vision_images'] as $vi)
-                                                                            <li class="flex items-start gap-1.5 text-xs text-[color:var(--nx-text)]">
-                                                                                <span class="w-1 h-1 rounded-full bg-[color:var(--nx-tone-sky)] mt-1.5 flex-shrink-0"></span>
-                                                                                <div class="min-w-0 flex-1">
-                                                                                    <span class="leading-snug">{{ $vi['title'] }}</span>
-                                                                                    @if(!empty($vi['description']))
-                                                                                        <p class="text-[11px] text-[color:var(--nx-muted)] mt-0.5 leading-snug">{{ $vi['description'] }}</p>
-                                                                                    @endif
-                                                                                    @if(!empty($vi['central_question']))
-                                                                                        <p class="text-[11px] text-[color:var(--nx-faint)] italic mt-0.5 leading-snug">{{ $vi['central_question'] }}</p>
-                                                                                    @endif
-                                                                                </div>
-                                                                            </li>
-                                                                        @endforeach
-                                                                    </ul>
-                                                                @endif
-                                                            </div>
-                                                            {{-- Hindernisse --}}
-                                                            <div class="p-4">
-                                                                <div class="flex items-center gap-1.5 mb-2">
-                                                                    @svg('heroicon-o-exclamation-triangle', 'w-3.5 h-3.5 text-[color:var(--nx-warning)]')
-                                                                    <span class="text-[10px] uppercase tracking-wider text-[color:var(--nx-muted)] font-semibold">Hindernisse</span>
-                                                                    @if($obCount > 0)<span class="text-[10px] text-[color:var(--nx-faint)]">{{ $obCount }}</span>@endif
-                                                                </div>
-                                                                @if(!empty($fa['central_question_obstacles']))
-                                                                    <p class="text-[11px] text-[color:var(--nx-faint)] italic mb-2 leading-snug">{{ $fa['central_question_obstacles'] }}</p>
-                                                                @endif
-                                                                @if($obCount === 0)
-                                                                    <p class="text-[11px] text-[color:var(--nx-faint)] italic">noch offen</p>
-                                                                @else
-                                                                    <ul class="space-y-2">
-                                                                        @foreach($fa['obstacles'] as $ob)
-                                                                            <li class="flex items-start gap-1.5 text-xs text-[color:var(--nx-text)]">
-                                                                                <span class="w-1 h-1 rounded-full bg-[color:var(--nx-warning)] mt-1.5 flex-shrink-0"></span>
-                                                                                <div class="min-w-0 flex-1">
-                                                                                    <span class="leading-snug">{{ $ob['title'] }}</span>
-                                                                                    @if(!empty($ob['description']))
-                                                                                        <p class="text-[11px] text-[color:var(--nx-muted)] mt-0.5 leading-snug">{{ $ob['description'] }}</p>
-                                                                                    @endif
-                                                                                    @if(!empty($ob['central_question']))
-                                                                                        <p class="text-[11px] text-[color:var(--nx-faint)] italic mt-0.5 leading-snug">{{ $ob['central_question'] }}</p>
-                                                                                    @endif
-                                                                                </div>
-                                                                            </li>
-                                                                        @endforeach
-                                                                    </ul>
-                                                                @endif
-                                                            </div>
-                                                            {{-- Meilensteine --}}
-                                                            <div class="p-4">
-                                                                <div class="flex items-center gap-1.5 mb-2">
-                                                                    @svg('heroicon-o-flag', 'w-3.5 h-3.5 text-[color:var(--nx-faint)]')
-                                                                    <span class="text-[10px] uppercase tracking-wider text-[color:var(--nx-muted)] font-semibold">Meilensteine</span>
-                                                                    @if($msCount > 0)<span class="text-[10px] text-[color:var(--nx-faint)]">{{ $msCount }}</span>@endif
-                                                                </div>
-                                                                @if(!empty($fa['central_question_milestones']))
-                                                                    <p class="text-[11px] text-[color:var(--nx-faint)] italic mb-2 leading-snug">{{ $fa['central_question_milestones'] }}</p>
-                                                                @endif
-                                                                @if($msCount === 0)
-                                                                    <p class="text-[11px] text-[color:var(--nx-faint)] italic">noch offen</p>
-                                                                @else
-                                                                    <ul class="space-y-2">
-                                                                        @foreach($fa['milestones'] as $m)
-                                                                            <li class="flex items-start gap-1.5 text-xs text-[color:var(--nx-text)]">
-                                                                                <span class="w-1 h-1 rounded-full bg-[color:var(--nx-tone-emerald)] mt-1.5 flex-shrink-0"></span>
-                                                                                <div class="min-w-0 flex-1">
-                                                                                    <div class="flex items-start gap-1.5">
-                                                                                        <span class="leading-snug flex-1">{{ $m['title'] }}</span>
-                                                                                        @if($m['target_year'] || $m['target_quarter'])
-                                                                                            <span class="text-[9px] font-semibold text-[color:var(--nx-muted)] bg-[color:var(--nx-bg)] border border-[color:var(--nx-line)] rounded px-1 flex-shrink-0 whitespace-nowrap leading-4">
-                                                                                                @if($m['target_year'] && $m['target_quarter']){{ $m['target_year'] }}·Q{{ $m['target_quarter'] }}
-                                                                                                @elseif($m['target_year']){{ $m['target_year'] }}
-                                                                                                @else Q{{ $m['target_quarter'] }}
-                                                                                                @endif
-                                                                                            </span>
-                                                                                        @endif
-                                                                                    </div>
-                                                                                    @if(!empty($m['description']))
-                                                                                        <p class="text-[11px] text-[color:var(--nx-muted)] mt-0.5 leading-snug">{{ $m['description'] }}</p>
-                                                                                    @endif
-                                                                                    @if(!empty($m['central_question']))
-                                                                                        <p class="text-[11px] text-[color:var(--nx-faint)] italic mt-0.5 leading-snug">{{ $m['central_question'] }}</p>
-                                                                                    @endif
-                                                                                </div>
-                                                                            </li>
-                                                                        @endforeach
-                                                                    </ul>
-                                                                @endif
-                                                            </div>
-                                                        </div>
-                                                    @endif
-                                                </x-nx-card>
+                                    @if (! empty($strategy['mission']))
+                                        <p class="mt-1 mb-0 text-sm text-[color:var(--nx-muted)]">{{ \Illuminate\Support\Str::limit(strip_tags(\Illuminate\Support\Str::markdown((string) $strategy['mission']['content'])), 200) }}</p>
+                                    @endif
+                                    <div class="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm text-[color:var(--nx-muted)]">
+                                        <span><span class="font-semibold text-[color:var(--nx-text)] tabular-nums">{{ count($strategy['focus_areas'] ?? []) }}</span> Fokusräume</span>
+                                        <span><span class="font-semibold text-[color:var(--nx-text)] tabular-nums">{{ $strategy['milestone_total'] ?? 0 }}</span> Meilensteine</span>
+                                        <span><span class="font-semibold text-[color:var(--nx-text)] tabular-nums">{{ $msOpen }}</span> offen</span>
+                                        <span><span class="font-semibold text-[color:var(--nx-text)] tabular-nums">{{ count($strategy['forecasts'] ?? []) }}</span> Regnosen</span>
+                                    </div>
+                                    @if (! empty($strategy['focus_areas']))
+                                        <ul class="mt-4 mb-0 grid list-none gap-1.5 p-0 sm:grid-cols-2">
+                                            @foreach (array_slice($strategy['focus_areas'], 0, 8) as $fa)
+                                                <li class="flex items-center gap-2 text-sm text-[color:var(--nx-text)]">
+                                                    @svg('heroicon-o-viewfinder-circle', 'w-4 h-4 shrink-0 text-[color:var(--nx-faint)]')
+                                                    <span class="truncate">{{ $fa['title'] }}</span>
+                                                </li>
                                             @endforeach
-                                        </div>
-                                    </x-nx-section>
+                                        </ul>
+                                    @endif
                                 </div>
-                            @endif
-
-                            {{-- 4. Transformation Map — Meilensteine über alle Fokusräume × Jahr --}}
-                            @php $tmap = $strategy['transformation_map']; @endphp
-                            @if(!empty($strategy['focus_areas']) && (count($tmap['years']) > 0 || !empty($tmap['no_year'])))
-                                <div class="mb-8">
-                                    <x-nx-section icon="heroicon-o-arrows-right-left" title="Transformation Map" hint="Meilensteine · Fokusraum × Jahr">
-                                        <div class="overflow-x-auto rounded-lg border border-[color:var(--nx-line)]">
-                                            <table class="w-full border-collapse">
-                                                <thead>
-                                                    <tr class="bg-[color:var(--nx-bg)]">
-                                                        <th class="p-2.5 text-left text-[10px] uppercase tracking-wider font-semibold text-[color:var(--nx-muted)] sticky left-0 bg-[color:var(--nx-bg)] z-10 min-w-[160px] border-b border-[color:var(--nx-line)]">Fokusraum</th>
-                                                        @foreach($tmap['years'] as $year)
-                                                            <th class="p-2.5 text-center text-[10px] uppercase tracking-wider font-semibold text-[color:var(--nx-text)] min-w-[150px] border-b border-[color:var(--nx-line)]">{{ $year }}</th>
-                                                        @endforeach
-                                                        @if(!empty($tmap['no_year']))
-                                                            <th class="p-2.5 text-center text-[10px] uppercase tracking-wider font-semibold text-[color:var(--nx-faint)] min-w-[150px] border-b border-[color:var(--nx-line)]" title="Meilensteine ohne Jahresangabe">ohne Jahr</th>
-                                                        @endif
-                                                    </tr>
-                                                </thead>
-                                                <tbody class="divide-y divide-[color:var(--nx-line)]">
-                                                    @foreach($strategy['focus_areas'] as $fa)
-                                                        <tr class="hover:bg-[color:var(--nx-hover)]">
-                                                            <td class="p-2.5 bg-[color:var(--nx-surface)] sticky left-0 z-10 border-r border-[color:var(--nx-line)]">
-                                                                <span class="text-xs font-medium text-[color:var(--nx-text)]">{{ $fa['title'] }}</span>
-                                                            </td>
-                                                            @foreach($tmap['years'] as $year)
-                                                                <td class="p-2 bg-[color:var(--nx-surface)] align-top border-r border-[color:var(--nx-line)] last:border-r-0">
-                                                                    @php $cell = $tmap['grid'][$fa['id']][$year] ?? []; @endphp
-                                                                    @if(count($cell) > 0)
-                                                                        <div class="flex flex-col gap-1">
-                                                                            @foreach($cell as $m)
-                                                                                <div class="flex items-start gap-1 bg-[color:var(--nx-bg)] rounded px-1.5 py-1 border border-[color:var(--nx-line)]" title="Meilenstein #{{ $m['id'] }}">
-                                                                                    <span class="text-[11px] text-[color:var(--nx-text)] leading-tight flex-1">{{ $m['title'] }}</span>
-                                                                                    @if($m['target_quarter'])
-                                                                                        <sup class="text-[9px] font-semibold text-[color:var(--nx-muted)] flex-shrink-0">Q{{ $m['target_quarter'] }}</sup>
-                                                                                    @endif
-                                                                                </div>
-                                                                            @endforeach
-                                                                        </div>
-                                                                    @else
-                                                                        <div class="text-[10px] text-[color:var(--nx-faint)] text-center">·</div>
-                                                                    @endif
-                                                                </td>
-                                                            @endforeach
-                                                            @if(!empty($tmap['no_year']))
-                                                                <td class="p-2 bg-[color:var(--nx-surface)] align-top">
-                                                                    @php $cell = $tmap['no_year'][$fa['id']] ?? []; @endphp
-                                                                    @if(count($cell) > 0)
-                                                                        <div class="flex flex-col gap-1">
-                                                                            @foreach($cell as $m)
-                                                                                <div class="bg-[color:var(--nx-bg)] rounded px-1.5 py-1 border border-[color:var(--nx-line)]" title="Meilenstein #{{ $m['id'] }}">
-                                                                                    <span class="text-[11px] text-[color:var(--nx-text)] leading-tight">{{ $m['title'] }}</span>
-                                                                                </div>
-                                                                            @endforeach
-                                                                        </div>
-                                                                    @else
-                                                                        <div class="text-[10px] text-[color:var(--nx-faint)] text-center">·</div>
-                                                                    @endif
-                                                                </td>
-                                                            @endif
-                                                        </tr>
-                                                    @endforeach
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </x-nx-section>
+                                @if ($bookUrl)
+                                    <x-nx-button variant="primary" :href="$bookUrl" wire:navigate>
+                                        @svg('heroicon-o-book-open', 'w-4 h-4') {{ $strategy['source']['title'] ?? 'Management Book' }} öffnen
+                                    </x-nx-button>
+                                @endif
+                            </div>
+                        @else
+                            <div class="py-8 text-center">
+                                <div class="mx-auto mb-4 flex h-12 w-12 items-center justify-center rounded-full border border-[color:var(--nx-line)]">
+                                    @svg('heroicon-o-book-open', 'w-6 h-6 text-[color:var(--nx-faint)]')
                                 </div>
-                            @endif
-
-                            {{-- 5. Regnosen (Rückblicke aus der Zukunft) — optionale Erzähl-Blöcke --}}
-                            @foreach($strategy['forecasts'] as $forecast)
-                                @php
-                                    $daysToTarget = null;
-                                    $targetPassed = false;
-                                    if ($forecast['target_date']) {
-                                        try {
-                                            $targetDt = \Carbon\Carbon::parse($forecast['target_date'])->startOfDay();
-                                            $today = now()->startOfDay();
-                                            $daysToTarget = $today->diffInDays($targetDt, false);
-                                            $targetPassed = $daysToTarget < 0;
-                                        } catch (\Throwable $e) {}
-                                    }
-                                @endphp
-                                <div class="mb-8">
-                                    <x-nx-section icon="heroicon-o-map" title="Regnose — {{ $forecast['title'] }}" hint="Rückblick aus der Zukunft">
-                                        <x-slot name="action">
-                                            <div class="flex items-center gap-2 flex-wrap">
-                                                @if($forecast['target_date'])
-                                                    <x-nx-badge variant="neutral">
-                                                        @svg('heroicon-o-calendar', 'w-3.5 h-3.5') {{ $forecast['target_date'] }}
-                                                    </x-nx-badge>
-                                                    @if($daysToTarget !== null)
-                                                        <x-nx-badge :variant="$targetPassed ? 'neutral' : 'success'">
-                                                            @svg('heroicon-o-clock', 'w-3.5 h-3.5')
-                                                            @if($targetPassed) Ziel überschritten
-                                                            @else noch {{ (int) $daysToTarget }} {{ (int) $daysToTarget === 1 ? 'Tag' : 'Tage' }}
-                                                            @endif
-                                                        </x-nx-badge>
-                                                    @endif
-                                                @endif
-                                                @if($forecast['current_version'])
-                                                    <x-nx-badge variant="neutral">v{{ $forecast['current_version'] }}</x-nx-badge>
-                                                @endif
-                                            </div>
-                                        </x-slot>
-
-                                        @if(!empty($forecast['content']))
-                                            <div class="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-[color:var(--nx-faint)] font-semibold mb-2 pl-1">
-                                                @svg('heroicon-o-book-open', 'w-3.5 h-3.5')
-                                                <span>Regnose-Rückblick — Erzählung aus der Zieljahres-Perspektive</span>
-                                            </div>
-                                            <div class="nx-prose">
-                                                {!! \Illuminate\Support\Str::markdown($forecast['content']) !!}
-                                            </div>
-                                        @else
-                                            <p class="text-xs text-[color:var(--nx-muted)] italic">Noch keine Regnose-Erzählung hinterlegt.</p>
-                                        @endif
-                                    </x-nx-section>
-                                </div>
-                            @endforeach
+                                <h3 class="m-0 text-sm font-semibold text-[color:var(--nx-text)]">Keine Strategie für diesen Knoten</h3>
+                                <p class="mx-auto mt-1 mb-0 max-w-md text-xs text-[color:var(--nx-muted)]">
+                                    Mission, Vision, Regnose, Fokusräume und Meilensteine werden im Management Book gepflegt.
+                                    Ein aktives Book an diesem Knoten erscheint hier automatisch.
+                                </p>
+                                @if ($mbDashboard)
+                                    <div class="mt-4">
+                                        <x-nx-button variant="secondary" :href="$mbDashboard" wire:navigate>@svg('heroicon-o-book-open', 'w-4 h-4') Zu den Management Books</x-nx-button>
+                                    </div>
+                                @endif
+                            </div>
                         @endif
-                    </div>
+                    </x-nx-card>
                 @endif
 
                 {{-- ═══ Berichte ═══ --}}

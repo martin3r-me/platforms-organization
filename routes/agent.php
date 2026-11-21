@@ -5,6 +5,7 @@ use Platform\Organization\Http\Controllers\Api\AgentChangeController;
 use Platform\Organization\Http\Controllers\Api\AgentContextRoomController;
 use Platform\Organization\Http\Controllers\Api\CoordinationController;
 use Platform\Organization\Http\Controllers\Api\AgentEnvironmentController;
+use Platform\Organization\Http\Controllers\Api\AgentImpactController;
 use Platform\Organization\Http\Controllers\Api\AgentMemoryController;
 use Platform\Organization\Http\Controllers\Api\AgentMessagingController;
 use Platform\Organization\Http\Controllers\Api\AgentOkrController;
@@ -38,6 +39,8 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::get('/events', [AgentProfileController::class, 'events'])->name('organization.api.agent.events');
     // FOKUS & ZIELE: die eigenen OKRs des aktuellen Zyklus ziehen (Firmware lädt sie als DNA-Achse).
     Route::get('/okrs', [AgentOkrController::class, 'okrs'])->name('organization.api.agent.okrs');
+    // WIRKUNG: den eigenen Wirkungs-Score lesen (people rechnet, dieselbe Zahl wie für Menschen).
+    Route::get('/impact', [AgentImpactController::class, 'impact'])->name('organization.api.agent.impact');
     // WELTBILD: das Venture-Portfolio (Strategie-Briefs) ziehen → der Schlaf verinnerlicht es.
     Route::get('/portfolio', [AgentPortfolioController::class, 'portfolio'])->name('organization.api.agent.portfolio');
     // RICHTUNG: die aktiven Transformationen (Change-Vorhaben) ziehen → verinnerlichen + als Vektor im Primer.

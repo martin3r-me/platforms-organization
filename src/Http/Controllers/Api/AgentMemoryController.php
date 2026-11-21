@@ -76,6 +76,8 @@ class AgentMemoryController extends Controller
             'rules.*.created_at' => 'nullable|string|max:40',
             'rules.*.updated_at' => 'nullable|string|max:40',
             'rules.*.last_used_at' => 'nullable|string|max:40',
+            'rules.*.impact_credited' => 'nullable|numeric',
+            'rules.*.impact_rounds' => 'nullable|integer|min:0',
             'proposed_sha' => 'nullable|string|size:64',
             'mode' => 'nullable|string|in:rules,routine',
         ]);

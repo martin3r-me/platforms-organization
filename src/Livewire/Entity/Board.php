@@ -14,7 +14,6 @@ use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntityVsmAssignment;
-use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
 
@@ -399,29 +398,6 @@ class Board extends Component
             ];
         }
 
-        // 14. Algedonic Alerts (from persisted signals)
-        $algedonicAlerts = [];
-        $openSignals = OrganizationSignal::forTeam($teamId)
-            ->open()
-            ->whereIn('entity_id', $entityIds)
-            ->with('entity')
-            ->orderByDesc('severity')
-            ->orderByDesc('created_at')
-            ->limit(5)
-            ->get();
-
-        foreach ($openSignals as $signal) {
-            $signalEntityId = $signal->entity_id;
-            $fromBand = $entityBandMap[$signalEntityId] ?? 'S1';
-            $algedonicAlerts[] = [
-                'from' => $fromBand,
-                'to' => 'S5',
-                'message' => $signal->message,
-                'severity' => $signal->severity,
-                'timestamp' => $signal->created_at->format('H:i'),
-            ];
-        }
-
         // 15. Recursive entities (entities with children)
         $recursiveEntityIds = OrganizationEntityRelationship::query()
             ->whereIn('from_entity_id', $entityIds)
@@ -453,41 +429,6 @@ class Board extends Component
             }
         }
 
-        // 16. Ticker (from persisted signals, last 24h)
-        $ticker = [];
-        $recentSignals = OrganizationSignal::forTeam($teamId)
-            ->recent(24)
-            ->whereIn('entity_id', $entityIds)
-            ->with(['entity', 'definition'])
-            ->orderByDesc('created_at')
-            ->limit(10)
-            ->get();
-
-        $tickerIcons = [
-            'critical' => 'exclamation-triangle',
-            'warning' => 'shield-exclamation',
-            'info' => 'information-circle',
-        ];
-        $tickerTypes = [
-            'threshold' => 'alert',
-            'trend' => 'regulation',
-            'cross_dimension' => 'emergence',
-            'ratio' => 'intervention',
-        ];
-
-        foreach ($recentSignals as $sig) {
-            $patternType = $sig->definition?->pattern_type ?? 'threshold';
-            $sigBand = $entityBandMap[$sig->entity_id] ?? 'S1';
-            $ticker[] = [
-                'type' => $tickerTypes[$patternType] ?? 'alert',
-                'level' => $sigBand,
-                'icon' => $tickerIcons[$sig->severity] ?? 'information-circle',
-                'message' => Str::limit($sig->message, 60),
-                'detail' => $sig->message,
-                'timestamp' => $sig->created_at->format('H:i'),
-            ];
-        }
-
         // 17. Regulation Loops
         $regulationLoops = [
             ['from' => 'S5', 'to' => 'S3', 'label' => 'Policy → Control', 'color' => $vsmColors['S5']],
@@ -505,12 +446,10 @@ class Board extends Component
             'unassigned' => $unassigned,
             'balance' => $balance,
             'diagnosis' => $diagnosis,
-            'ticker' => $ticker,
             'regulationLoops' => $regulationLoops,
             'vsmColors' => $vsmColors,
             'flowColors' => $flowColors,
             'varietyMetrics' => $varietyMetrics,
-            'algedonicAlerts' => $algedonicAlerts,
             'recursiveEntityIds' => $recursiveEntityIds,
             'systemLoad' => $systemLoad,
             'regulationHealth' => $regulationHealth,

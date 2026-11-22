@@ -12,7 +12,6 @@ use Platform\Organization\Authz\DimensionLinkAuthorizer;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Models\OrganizationRoleAssignment;
-use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Strategy\StrategySources;
 use Platform\Organization\Services\ObjectContextResolver;
@@ -35,7 +34,6 @@ class GetBriefTool implements ToolContract, ToolMetadataContract
     private const MAX_ENTITIES = 5;
     private const MAX_PEOPLE = 10;
     private const MAX_RELATIONS = 10;
-    private const MAX_SIGNALS = 3;
     private const MAX_FOCUS_AREAS = 5;
     private const MAX_DEPTH = 25;
 
@@ -48,7 +46,8 @@ class GetBriefTool implements ToolContract, ToolMetadataContract
     {
         return 'GET /organization/brief - EINSTIEG für Aufgaben: Orientierung zu einem Objekt (Projekt, Task, Ticket, Issue, Kontakt, …) '
             . 'oder einer Entity in einem Call. Liefert: zugehörige Organisationseinheit(en) mit Pfad im Baum, Zuständige (Rollen/Personen), '
-            . 'Beziehungen inkl. Schnittstellen, offene Signale, Strategie des nächsten Knotens mit aktivem Management Book (Mission/Vision/Fokusräume) und Link-Übersicht. '
+            . 'Beziehungen inkl. Schnittstellen, Strategie des nächsten Knotens mit aktivem Management Book (Mission/Vision/Fokusräume) und Link-Übersicht. '
+            . 'Offene Signale liefert dieses Tool nicht mehr — die liest du über das Tool signals.signals.GET. '
             . 'Nutze dies ZUERST, bevor du mit Modul-Tools arbeitest. Entweder object_type+object_id ODER entity_id angeben.';
     }
 
@@ -145,7 +144,7 @@ class GetBriefTool implements ToolContract, ToolMetadataContract
                 'organization.neighbors.GET' => 'Umfeld im Org-Graphen: Eltern, Kinder, Beziehungen, verknüpfte Objekte',
                 'organization.entity.detail.GET' => 'Alle verknüpften Objekte einer Entity',
                 'management-book.strategy.GET' => 'Vollständige Strategie eines Knotens (Management Book)',
-                'organization.signals.GET' => 'Signale filtern/bearbeiten',
+                'signals.signals.GET' => 'Offene Signale lesen (Signals-Modul)',
                 'tool_registry.SEARCH' => 'Modul-Tools für CRUD finden',
             ];
 
@@ -167,7 +166,6 @@ class GetBriefTool implements ToolContract, ToolMetadataContract
             'path' => implode(' → ', array_map(fn ($n) => $n->name, $lineage)),
             'responsible' => $this->responsible($lineage),
             'relationships' => $this->relationships($entity->id, $readable),
-            'signals' => $this->signals($entity->id),
             'strategy' => $this->strategy($lineage),
             'links' => EntityDimensionBridge::linkCountsByEntityAndType([$entity->id])[$entity->id] ?? [],
         ];
@@ -236,30 +234,6 @@ class GetBriefTool implements ToolContract, ToolMetadataContract
             ->take(self::MAX_RELATIONS)
             ->values()
             ->all();
-    }
-
-    private function signals(int $entityId): array
-    {
-        $base = OrganizationSignal::where('entity_id', $entityId)->actionable();
-        $total = (clone $base)->count();
-        if ($total === 0) {
-            return ['open' => 0];
-        }
-
-        $top = (clone $base)
-            ->orderByRaw("FIELD(severity, 'algedonic', 'critical', 'warning', 'info')")
-            ->latest()
-            ->limit(self::MAX_SIGNALS)
-            ->get(['id', 'severity', 'message', 'created_at']);
-
-        return [
-            'open' => $total,
-            'top' => $top->map(fn ($s) => [
-                'id' => $s->id,
-                'severity' => $s->severity,
-                'message' => mb_strimwidth((string) $s->message, 0, 200, '…'),
-            ])->all(),
-        ];
     }
 
     /**

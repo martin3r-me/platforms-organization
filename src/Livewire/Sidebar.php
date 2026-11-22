@@ -15,7 +15,7 @@ class Sidebar extends Component
 
     /**
      * Navigation der Organisation. Gruppen: Übersicht · Organisation · Zeit ·
-     * Maschinenraum (org-intern) · Reporting (wandert ins reporting-Modul) ·
+     * Reporting (wandert ins reporting-Modul) ·
      * Einstellungen (ein Eintrag, Kategorien in der Einstellungs-Sidebar). Abgesetzte Gruppen sind 'muted' und tragen eine 'note'.
      *
      * Item: route, label, icon, match (Regex auf den Pfad fürs Aktiv-Highlight),
@@ -28,10 +28,7 @@ class Sidebar extends Component
                 'label' => 'Übersicht',
                 'items' => [
                     ['route' => 'organization.dashboard', 'label' => 'Dashboard', 'icon' => 'home', 'match' => '^/organization/?$'],
-                    ['route' => 'organization.signals.index', 'label' => 'Signale', 'icon' => 'bell-alert', 'match' => '^/organization/signals'],
-                    ['route' => 'organization.ops-room', 'label' => 'Ops-Room', 'icon' => 'squares-2x2', 'match' => '^/organization/ops-room'],
                     ['route' => 'organization.pulse', 'label' => 'Pulse', 'icon' => 'signal', 'match' => '^/organization/pulse'],
-                    ['route' => 'organization.my-inquiries.index', 'label' => 'Meine Rückfragen', 'icon' => 'inbox', 'match' => '^/organization/my-inquiries', 'migrates' => 'home'],
                 ],
             ],
             [
@@ -51,22 +48,11 @@ class Sidebar extends Component
                 ],
             ],
             [
-                'label' => 'Maschinenraum',
-                'note' => 'org-intern',
-                'muted' => true,
-                'items' => [
-                    ['route' => 'organization.inference-runs.index', 'label' => 'Inference-Läufe', 'icon' => 'play', 'match' => '^/organization/inference-runs'],
-                    ['route' => 'organization.memory.index', 'label' => 'Memory', 'icon' => 'circle-stack', 'match' => '^/organization/memory'],
-                    ['route' => 'organization.inquiries.index', 'label' => 'Rückfragen (Admin)', 'icon' => 'question-mark-circle', 'match' => '^/organization/inquiries'],
-                ],
-            ],
-            [
                 'label' => 'Reporting',
                 'note' => '→ reporting',
                 'muted' => true,
                 'items' => [
                     ['route' => 'reporting.dashboard', 'label' => 'Berichte', 'icon' => 'document-chart-bar', 'match' => '^/reporting(/reports.*)?$'],
-                    ['route' => 'organization.synthesis-reports.index', 'label' => 'Synthese-Berichte', 'icon' => 'document-text', 'match' => '^/organization/synthesis-reports'],
                 ],
             ],
             [

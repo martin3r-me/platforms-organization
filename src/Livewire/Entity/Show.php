@@ -12,8 +12,6 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityVsmAssignment;
 use Platform\Organization\Models\OrganizationPerspectiveTeam;
 use Platform\Organization\Services\PerspectiveService;
-use Platform\Organization\Models\OrganizationInferenceRun;
-use Platform\Organization\Models\OrganizationSignalInferencePrompt;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Models\OrganizationEntityType;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -29,7 +27,6 @@ use Platform\Organization\Services\EntityHierarchyService;
 use Platform\Organization\Services\SnapshotMovementService;
 use Platform\Organization\Services\DimensionRadarService;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
-use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Models\OrganizationEntityStory;
 use Platform\Organization\Services\Story\EntityFactsService;
 use Platform\Organization\Services\Story\EntityStoryWriter;
@@ -56,9 +53,6 @@ class Show extends Component
 
     public ?string $movementStream = null;
     public bool $analyseLoaded = false;
-
-    // Signals tab
-    public string $signalStatusFilter = '';
 
     // VSM tab
     public bool $vsmAssignmentModalShow = false;
@@ -119,7 +113,6 @@ class Show extends Component
             $this->treeNodes,
             $this->totalDescendantCount,
             $this->totalLinkCount,
-            $this->entitySignals,
             $this->vsmMatrix,
         );
     }
@@ -423,54 +416,6 @@ class Show extends Component
         }
     }
 
-    // ── System-Agent Tab ──────────────────────────────────────
-
-    #[Computed]
-    public function isSystemAgent(): bool
-    {
-        return $this->entity->type?->code === 'system_agent';
-    }
-
-    #[Computed]
-    public function agentPrompts()
-    {
-        if (!$this->isSystemAgent) {
-            return collect();
-        }
-        return OrganizationSignalInferencePrompt::query()
-            ->where('agent_entity_id', $this->entity->id)
-            ->orderBy('name')
-            ->get();
-    }
-
-    #[Computed]
-    public function agentRecentRuns()
-    {
-        if (!$this->isSystemAgent) {
-            return collect();
-        }
-        $promptIds = $this->agentPrompts->pluck('id');
-        if ($promptIds->isEmpty()) {
-            return collect();
-        }
-
-        return OrganizationInferenceRun::query()
-            ->whereHas('steps', fn ($q) => $q->whereIn('inference_prompt_id', $promptIds))
-            ->latest()
-            ->limit(15)
-            ->get();
-    }
-
-    public function toggleEntityActive(): void
-    {
-        $this->entity->update(['is_active' => !$this->entity->is_active]);
-        $this->entity->refresh();
-        unset($this->agentPrompts, $this->agentRecentRuns);
-        session()->flash('message', $this->entity->is_active
-            ? 'Entity aktiviert.'
-            : 'Entity deaktiviert.');
-    }
-
     public function removeVsmAssignment(int $assignmentId): void
     {
         $assignment = OrganizationEntityVsmAssignment::query()
@@ -548,13 +493,6 @@ class Show extends Component
             'as_of' => $asOf,
             'child_stories' => $childStories->map(fn ($s) => $s->story)->all(),
         ];
-    }
-
-    /** Offene Signale für den Tab-Zähler (läuft bei jedem Request, daher nur ein COUNT). */
-    #[Computed]
-    public function openSignalCount(): int
-    {
-        return OrganizationSignal::where('entity_id', $this->entity->id)->where('status', 'open')->count();
     }
 
     /** Fremd-ID-Editor: Zeilen [['system','value','label'], ...]. */
@@ -1821,79 +1759,6 @@ class Show extends Component
         }
 
         return $result;
-    }
-
-    // ── Signals Tab ────────────────────────────────────────────
-
-    #[Computed]
-    public function entitySignals(): \Illuminate\Support\Collection
-    {
-        $teamId = auth()->user()->currentTeam->id;
-        $activeEntity = \Platform\Organization\Services\PerspectiveService::getActiveEntity($teamId, auth()->id());
-
-        $query = OrganizationSignal::query()
-            ->where('entity_id', $this->entity->id)
-            ->with([
-                'definition:id,name,pattern_type',
-                'resolvedByUser:id,name',
-                'perspectiveEntity:id,name',
-                'currentOwner:id,name',
-                'createdByAgent:id,name',
-            ])
-            ->orderByRaw("FIELD(status, 'open', 'acknowledged', 'resolved', 'dismissed')")
-            ->orderByDesc('created_at');
-
-        // Perspektive-sensitive Anzeige: nur Signale aus aktiver Sicht (oder NULL = legacy / global).
-        if ($activeEntity) {
-            $query->forPerspective($activeEntity->id);
-        }
-
-        if ($this->signalStatusFilter) {
-            $query->where('status', $this->signalStatusFilter);
-        }
-
-        return $query->get();
-    }
-
-    public function acknowledgeSignal(int $signalId): void
-    {
-        $signal = OrganizationSignal::where('id', $signalId)
-            ->where('entity_id', $this->entity->id)
-            ->firstOrFail();
-        $signal->update([
-            'status' => 'acknowledged',
-            'acknowledged_at' => $signal->acknowledged_at ?? now(),
-        ]);
-        unset($this->entitySignals);
-        session()->flash('message', 'Signal bestaetigt.');
-    }
-
-    public function resolveSignal(int $signalId): void
-    {
-        $signal = OrganizationSignal::where('id', $signalId)
-            ->where('entity_id', $this->entity->id)
-            ->firstOrFail();
-        $signal->update([
-            'status' => 'resolved',
-            'resolved_at' => now(),
-            'resolved_by' => auth()->id(),
-            'acknowledged_at' => $signal->acknowledged_at ?? now(),
-        ]);
-        unset($this->entitySignals);
-        session()->flash('message', 'Signal geloest.');
-    }
-
-    public function dismissSignal(int $signalId): void
-    {
-        $signal = OrganizationSignal::where('id', $signalId)
-            ->where('entity_id', $this->entity->id)
-            ->firstOrFail();
-        $signal->update([
-            'status' => 'dismissed',
-            'acknowledged_at' => $signal->acknowledged_at ?? now(),
-        ]);
-        unset($this->entitySignals);
-        session()->flash('message', 'Signal verworfen.');
     }
 
     /**

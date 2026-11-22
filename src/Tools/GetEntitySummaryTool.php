@@ -7,7 +7,6 @@ use Platform\Core\Contracts\ToolContext;
 use Platform\Core\Contracts\ToolMetadataContract;
 use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Services\EntityLinkRegistry;
 use Platform\Organization\Services\PersonActivityRegistry;
@@ -24,7 +23,7 @@ class GetEntitySummaryTool implements ToolContract, ToolMetadataContract
 
     public function getDescription(): string
     {
-        return 'GET /organization/entity/summary - Aggregierter Status einer Entity in einem Call: Link-Counts nach Typ, Signal-Counts, Provider-Metriken. Ideal als Einstieg um zu sehen was bei einer Entity los ist, bevor man tiefer geht.';
+        return 'GET /organization/entity/summary - Aggregierter Status einer Entity in einem Call: Link-Counts nach Typ, Provider-Metriken. Ideal als Einstieg um zu sehen was bei einer Entity los ist, bevor man tiefer geht. Offene Signale liest du über das Tool signals.signals.GET.';
     }
 
     public function getSchema(): array
@@ -83,21 +82,6 @@ class GetEntitySummaryTool implements ToolContract, ToolMetadataContract
             }
             $linksTotal = array_sum($mergedCounts);
 
-            // Signal counts — use status='open' to match ListSignalsTool behavior
-            $signals = OrganizationSignal::whereIn('entity_id', $entityIds)
-                ->where('status', 'open')
-                ->selectRaw('severity, count(*) as cnt')
-                ->groupBy('severity')
-                ->pluck('cnt', 'severity')
-                ->toArray();
-
-            $signalSummary = [
-                'open_total' => array_sum($signals),
-                'critical' => $signals['critical'] ?? 0,
-                'warning' => $signals['warning'] ?? 0,
-                'info' => $signals['info'] ?? 0,
-            ];
-
             // Provider metrics
             $links = EntityDimensionBridge::linksForEntities($entityIds);
             $linksByEntityAndType = [];
@@ -142,7 +126,6 @@ class GetEntitySummaryTool implements ToolContract, ToolMetadataContract
                 'entity_name' => $entity->name,
                 'includes_children' => $includeChildren,
                 'entity_count' => count($entityIds),
-                'signals' => $signalSummary,
                 'links_by_type' => $mergedCounts,
                 'links_total' => $linksTotal,
                 'metrics' => $mergedMetrics,

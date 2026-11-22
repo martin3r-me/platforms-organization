@@ -7,7 +7,6 @@ use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\DB;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
-use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\EntityLinkRegistry;
 use Platform\Organization\Services\EntityTimeResolver;
 use Platform\Organization\Services\TimeContextResolver;
@@ -80,7 +79,6 @@ class EntityFactsService
             'movers' => $this->movers($metrics['usable']),
             'excluded' => $metrics['excluded'],
             'coverage' => $metrics['coverage'],
-            'signals' => $this->signals($entity),
             'stillness' => $this->stillness($entity, $to),
             'quiet' => false,
         ];
@@ -358,20 +356,7 @@ class EntityFactsService
         ];
     }
 
-    // ── Signale, Stillstand, Kinder ────────────────────────────
-
-    protected function signals(OrganizationEntity $entity): array
-    {
-        $open = OrganizationSignal::where('entity_id', $entity->id)->actionable();
-
-        return [
-            'open' => (clone $open)->count(),
-            'critical' => (clone $open)->whereIn('severity', ['critical', 'algedonic'])->count(),
-            'top' => (clone $open)->orderByRaw("CASE severity WHEN 'algedonic' THEN 0 WHEN 'critical' THEN 1 ELSE 2 END")
-                ->latest()->limit(3)->get(['message', 'severity', 'created_at'])
-                ->map(fn ($s) => ['message' => mb_strimwidth((string) $s->message, 0, 160, '…'), 'severity' => $s->severity, 'since' => $s->created_at?->toDateString()])->all(),
-        ];
-    }
+    // ── Stillstand, Kinder ────────────────────────────
 
     /** Stillstand vorerst nur als Tatsache: letzte Buchung im Teilbaum, ohne Wertung. */
     protected function stillness(OrganizationEntity $entity, CarbonImmutable $to): array
@@ -407,7 +392,6 @@ class EntityFactsService
             'top' => $top,
             'quiet' => $f['quiet'],
             'mute' => ! $hasMetrics && $f['energy']['minutes'] === 0,
-            'signals_open' => $f['signals']['open'],
             'days_since_last_booking' => $f['stillness']['days_since_last_booking'],
             'weight' => $f['energy']['minutes'] + 60 * (count($f['movers']['good']) + count($f['movers']['bad'])),
         ];

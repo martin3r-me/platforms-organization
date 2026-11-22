@@ -14,9 +14,8 @@ use Platform\Core\Models\Team;
  * Pulse — operative cross-modul Live-Sicht.
  *
  * Aggregiert juengste Snapshots aus allen Modulen, die das Health-Snapshot-Pattern
- * implementieren (Planner Projects, Helpdesk Boards, Dev Packages). Bewusst eine
- * andere Buehne als der OpsRoom (VSM-Steuerung) — hier zaehlt Live-Lage, nicht
- * Verantwortlichkeitsmodell.
+ * implementieren (Planner Projects, Helpdesk Boards, Dev Packages). Hier zaehlt
+ * Live-Lage, nicht Verantwortlichkeitsmodell.
  *
  * Scope: Root-Team + alle Child-Teams (organization-Standard).
  *

@@ -80,7 +80,7 @@ class EntityFactsCommand extends Command
         }
 
         $s = $facts['stillness'];
-        $this->line("Signale offen: {$facts['signals']['open']} (kritisch {$facts['signals']['critical']}) · letzte Buchung: " . ($s['last_booking'] ?? '–')
+        $this->line('Letzte Buchung: ' . ($s['last_booking'] ?? '–')
             . ($s['days_since_last_booking'] !== null ? " (vor {$s['days_since_last_booking']} Tagen)" : '') . ($facts['quiet'] ? ' · ruhig' : ''));
 
         if (! empty($facts['children'])) {

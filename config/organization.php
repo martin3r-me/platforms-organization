@@ -46,11 +46,6 @@ return [
                     'route' => 'organization.dashboard',
                     'icon' => 'heroicon-o-home',
                 ],
-                'ops-room' => [
-                    'title' => 'Ops-Room',
-                    'route' => 'organization.ops-room',
-                    'icon' => 'heroicon-o-command-line',
-                ],
                 'settings' => [
                     'title' => 'Einstellungen',
                     'icon' => 'heroicon-o-cog-6-tooth',
@@ -80,23 +75,11 @@ return [
                             'route' => 'organization.settings.interlink-types.index',
                             'icon' => 'heroicon-o-link',
                         ],
-                        'signal-definitions' => [
-                            'title' => 'Signaldefinitionen',
-                            'route' => 'organization.settings.signal-definitions.index',
-                            'icon' => 'heroicon-o-bell-alert',
-                        ],
                     ],
                 ],
             ],
         ],
     ],
-    'inference' => [
-        'max_inquiry_depth' => 3,
-        'escalation_user_id' => null,
-        'inquiry_check_interval_hours' => 6,
-        'default_interval_hours' => 72,
-    ],
-
     // Wie wird der Score einer Dimension berechnet?
     //   'sum'     = Summe aller Metriken der Dimension (Legacy, mischt potenziell Einheiten)
     //   'primary' = nur die als is_dimension_primary markierte Metrik (vergleichbarer Score)
@@ -124,27 +107,6 @@ return [
             'priority' => 100,
             'active' => true,
         ],
-    ],
-
-    /*
-    |--------------------------------------------------------------------------
-    | Signal-Deadlines pro VSM-Ebene (in Stunden)
-    |--------------------------------------------------------------------------
-    |
-    | Wie lange darf ein Signal auf einer Ebene "offen" liegen, bevor der
-    | Eskalations-Cron es eine Stufe hoch zieht. Algedonic ist ein Sonderfall:
-    | extrem kurze Deadline, weil das Signal per Beer-Konvention sofort vom
-    | Top-Level wahrgenommen werden muss.
-    */
-    'signal_deadlines' => [
-        'default' => 168, // 7 Tage
-        's1' => 24,
-        's2' => 48,
-        's3' => 72,
-        's3_star' => 72,
-        's4' => 168,
-        's5' => 336, // 14 Tage — strategisch, langsamer Takt
-        'algedonic' => 1, // 1h — Schmerz-Kanal nach Beer
     ],
 
     // Kommunikation im Kontext läuft in Parlan (TRAAN rooms/0.2): das ERP chattet nicht, es löst

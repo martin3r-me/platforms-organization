@@ -1,5 +1,5 @@
 {{-- Eine Zeile der Einheiten-Liste, rekursiv für Kinder derselben Gruppe.
-     Erwartet: $entity, $depth, $childrenByParent, $entityMovements, $vsmSystemMap, $signalCounts.
+     Erwartet: $entity, $depth, $childrenByParent, $entityMovements, $vsmSystemMap.
      Bewusst schlichtes Markup: die Liste hat schnell mehrere hundert Zeilen. --}}
 @php
     $children = $childrenByParent[$entity->id] ?? collect();
@@ -9,13 +9,8 @@
     $relFrom = $entity->relations_from_count ?? 0;
     $relTo = $entity->relations_to_count ?? 0;
     $vsmValues = $vsmSystemMap[$entity->id] ?? [];
-    $sc = $signalCounts[$entity->id] ?? null;
     $mv = $entityMovements[$entity->id] ?? null;
 
-    $signalDot = ! $sc ? null : (
-        (($sc['algedonic_count'] ?? 0) > 0 || ($sc['critical_count'] ?? 0) > 0) ? 'var(--nx-danger)'
-        : ((($sc['warning_count'] ?? 0) > 0) ? 'var(--nx-warning)' : 'var(--nx-info)')
-    );
     $moveDot = ! ($mv && $mv['delta_count'] > 0) ? null : (
         $mv['positive'] > $mv['negative'] ? 'var(--nx-success)'
         : ($mv['negative'] > $mv['positive'] ? 'var(--nx-danger)' : 'var(--nx-warning)')
@@ -75,16 +70,6 @@
             <span class="text-[color:var(--nx-faint)]">–</span>
         @endif
     </td>
-    <td class="whitespace-nowrap px-3 py-1.5">
-        @if ($sc)
-            <a href="{{ route('organization.entities.show', $entity) }}?tab=signals" wire:navigate class="inline-flex items-center gap-1.5 text-xs tabular-nums text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">
-                <span class="h-2 w-2 shrink-0 rounded-full" style="background: {{ $signalDot }}"></span>
-                {{ $sc['total'] }}
-            </a>
-        @else
-            <span class="text-[color:var(--nx-faint)]">–</span>
-        @endif
-    </td>
     <td class="px-4 py-1.5">
         @if ($moveDot)
             <div class="flex items-center gap-1.5">
@@ -104,6 +89,5 @@
         'childrenByParent' => $childrenByParent,
         'entityMovements' => $entityMovements,
         'vsmSystemMap' => $vsmSystemMap,
-        'signalCounts' => $signalCounts,
     ])
 @endforeach

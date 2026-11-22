@@ -12,7 +12,6 @@
         'childrenByParent' => $childrenByParent,
         'entityMovements' => $this->entityMovements,
         'vsmSystemMap' => $this->vsmSystemMap,
-        'signalCounts' => $this->signalCounts,
     ];
 @endphp
 
@@ -30,7 +29,6 @@
                     :options="$typeOptions" nullable nullLabel="Alle" />
                 <div class="flex flex-col items-start gap-2 border-t border-[color:var(--nx-line)] pt-3">
                     <x-nx-input-checkbox label="Inaktive anzeigen" wire:model.live="showInactive" />
-                    <x-nx-input-checkbox label="Nur mit Signalen" wire:model.live="onlyWithSignals" />
                 </div>
 
                 <div class="border-t border-[color:var(--nx-line)] pt-3">
@@ -40,7 +38,7 @@
                             <span class="inline-flex h-4 w-4 items-center justify-center rounded-[4px] bg-[rgba(47,158,68,.12)] text-[10px] font-semibold text-[color:var(--nx-success)]">C</span>
                             Carrier · Perspektive möglich
                         </div>
-                        <div class="flex items-center gap-2" title="Füllt VSM-Funktionen aus, empfängt Signale">
+                        <div class="flex items-center gap-2" title="Füllt VSM-Funktionen aus">
                             <span class="inline-flex h-4 w-4 items-center justify-center rounded-[4px] bg-[color:var(--nx-accent-soft)] text-[10px] font-semibold text-[color:var(--nx-muted)]">A</span>
                             Actor · füllt Funktion aus
                         </div>
@@ -106,7 +104,6 @@
                                         <th class="border-b border-[color:var(--nx-line)] px-3 py-2 text-left font-medium">Typ</th>
                                         <th class="border-b border-[color:var(--nx-line)] px-3 py-2 text-left font-medium">Beziehungen</th>
                                         <th class="border-b border-[color:var(--nx-line)] px-3 py-2 text-left font-medium">VSM</th>
-                                        <th class="border-b border-[color:var(--nx-line)] px-3 py-2 text-left font-medium">Signale</th>
                                         <th class="border-b border-[color:var(--nx-line)] px-4 py-2 text-left font-medium">Bewegung</th>
                                     </tr>
                                 </thead>

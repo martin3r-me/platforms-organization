@@ -4,7 +4,7 @@
     $vsmClass = $entity->type->vsm_class;
     $vsmChip = match ($vsmClass) {
         'carrier' => ['Carrier', 'Lebensfähiges System (VSM) — kann eigene Perspektive sein'],
-        'actor' => ['Actor', 'Füllt VSM-Funktionen aus, empfängt Signale'],
+        'actor' => ['Actor', 'Füllt VSM-Funktionen aus'],
         'observed' => ['Observed', 'Umwelt — wird von S4 beobachtet'],
         default => null,
     };
@@ -31,7 +31,6 @@
     $tabs[] = ['key' => 'links', 'label' => 'Verknüpft', 'icon' => 'heroicon-o-link', 'badge' => $linkCount ?: null];
     $tabs[] = ['key' => 'analyse', 'label' => 'Analyse', 'icon' => 'heroicon-o-chart-bar-square', 'click' => '$wire.loadAnalyseData()'];
     $tabs[] = ['key' => 'relations', 'label' => 'Beziehungen', 'icon' => 'heroicon-o-arrows-right-left'];
-    $tabs[] = ['key' => 'signals', 'label' => 'Signale', 'icon' => 'heroicon-o-bell-alert', 'badge' => $this->openSignalCount ?: null, 'badgeVariant' => 'danger'];
     if ($this->hasLinkedUser) {
         $tabs[] = ['key' => 'person', 'label' => 'Person', 'icon' => 'heroicon-o-user'];
     }
@@ -46,32 +45,10 @@
         $tabs[] = ['key' => 'agent', 'label' => 'Agent', 'icon' => 'heroicon-o-sparkles'];
         $tabs[] = ['key' => 'braingraph', 'label' => 'Gehirn', 'icon' => 'heroicon-o-cpu-chip'];
         $tabs[] = ['key' => 'memory', 'label' => 'Gedächtnis', 'icon' => 'heroicon-o-book-open'];
-    } elseif ($this->isSystemAgent) {
-        $unhealthyCount = $this->agentPrompts->filter(fn ($p) => in_array($p->health_status, ['stale', 'error']))->count();
-        $tabs[] = ['key' => 'agent', 'label' => 'Agent', 'icon' => 'heroicon-o-cpu-chip', 'badge' => $unhealthyCount ?: null, 'badgeVariant' => 'danger'];
     }
     $tabs[] = ['key' => 'reports', 'label' => 'Berichte', 'icon' => 'heroicon-o-document-text'];
     $tabs[] = ['key' => 'activity', 'label' => 'Aktivität', 'icon' => 'heroicon-o-clock'];
     $tabs[] = ['key' => 'data', 'label' => 'Einstellungen', 'icon' => 'heroicon-o-cog-6-tooth'];
-
-    $sevVariant = fn ($s) => match ($s) {
-        'critical', 'algedonic' => 'danger',
-        'warning' => 'warning',
-        default => 'info',
-    };
-    $sevLabel = fn ($s) => match ($s) {
-        'critical' => 'Kritisch',
-        'algedonic' => 'Algedonisch',
-        'warning' => 'Warnung',
-        default => 'Info',
-    };
-    $statusBadge = fn ($s) => match ($s) {
-        'open' => ['warning', 'Offen'],
-        'acknowledged' => ['info', 'Bestätigt'],
-        'resolved' => ['success', 'Gelöst'],
-        'dismissed' => ['neutral', 'Verworfen'],
-        default => ['neutral', ucfirst((string) $s)],
-    };
 
     $crumbs = [['label' => 'Organisation', 'href' => route('organization.dashboard'), 'icon' => 'building-office'],
                ['label' => 'Einheiten', 'href' => route('organization.entities.index')]];
@@ -598,88 +575,6 @@
                     </div>
                 @endif
 
-                {{-- ═══ Signale ═══ --}}
-                @if ($activeTab === 'signals')
-                    <x-nx-panel flush title="Signale">
-                        <x-slot name="actions">
-                            <div class="w-40">
-                                <x-nx-input-select name="signalStatusFilter" size="sm" wire:model.live="signalStatusFilter" nullable nullLabel="Alle"
-                                    :options="[['value' => 'open', 'label' => 'Offen'], ['value' => 'acknowledged', 'label' => 'Bestätigt'], ['value' => 'resolved', 'label' => 'Gelöst'], ['value' => 'dismissed', 'label' => 'Verworfen']]" />
-                            </div>
-                        </x-slot>
-
-                        @if ($this->entitySignals->isEmpty())
-                            <x-nx-empty icon="heroicon-o-bell-slash">Keine Signale{{ $signalStatusFilter ? ' mit diesem Status' : '' }}.</x-nx-empty>
-                        @else
-                            @foreach ($this->entitySignals as $signal)
-                                @php
-                                    [$stV, $stL] = $statusBadge($signal->status);
-                                    $isOverdue = $signal->deadline_at && $signal->status === 'open' && $signal->deadline_at->isPast();
-                                    $pattern = match ($signal->definition?->pattern_type) {
-                                        'threshold' => 'Schwellenwert',
-                                        'trend' => 'Trend',
-                                        'cross_dimension' => 'Kreuz-Dimension',
-                                        'ratio' => 'Verhältnis',
-                                        default => $signal->definition?->pattern_type,
-                                    };
-                                @endphp
-                                <div wire:key="signal-{{ $signal->id }}" class="flex items-start gap-4 border-b border-[color:var(--nx-line)] px-4 py-3 last:border-0">
-                                    <div class="min-w-0 flex-1">
-                                        <div class="flex flex-wrap items-center gap-1.5">
-                                            <x-nx-badge :variant="$sevVariant($signal->severity)">{{ $sevLabel($signal->severity) }}</x-nx-badge>
-                                            <a href="{{ route('organization.signals.show', $signal) }}" wire:navigate class="text-sm font-medium text-[color:var(--nx-text)] hover:underline">{{ $signal->definition?->name ?? 'Signal' }}</a>
-                                            @if ($pattern)<span class="text-xs text-[color:var(--nx-faint)]">{{ $pattern }}</span>@endif
-                                        </div>
-                                        <p class="mb-0 mt-1 text-sm text-[color:var(--nx-muted)]">{{ $signal->message }}</p>
-
-                                        <div class="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-[color:var(--nx-faint)]">
-                                            @if ($signal->vsm_level)<span title="VSM-Ebene">{{ strtoupper(str_replace('_', '', $signal->vsm_level)) }}</span>@endif
-                                            @if ($signal->current_owner_entity_id)
-                                                <span title="Owner">{{ $signal->currentOwner?->name ?? '#' . $signal->current_owner_entity_id }}</span>
-                                            @elseif ($signal->status === 'open')
-                                                <span class="text-[color:var(--nx-warning)]">ohne Owner</span>
-                                            @endif
-                                            @if ($signal->deadline_at)
-                                                <span class="{{ $isOverdue ? 'text-[color:var(--nx-danger)]' : '' }}" title="{{ $signal->deadline_at->format('d.m.Y H:i') }}">{{ $isOverdue ? 'überfällig' : 'fällig' }} {{ $signal->deadline_at->diffForHumans() }}</span>
-                                            @endif
-                                            @if ($signal->escalated_at)<span class="text-[color:var(--nx-warning)]">eskaliert</span>@endif
-                                            @if ($signal->source_type === 'aggregation')<span>aggregiert</span>@endif
-                                            @if ($signal->createdByAgent)<span>von {{ $signal->createdByAgent->name }}</span>@endif
-                                            @if ($signal->trigger_metrics)
-                                                <span x-data="{ open: false }">
-                                                    <button type="button" x-on:click="open = !open" class="hover:text-[color:var(--nx-text)] hover:underline" x-text="open ? 'Werte ausblenden' : 'Auslösende Werte'"></button>
-                                                    <div x-show="open" x-cloak class="mt-1.5 rounded-[6px] bg-[color:var(--nx-bg)] p-2 font-mono text-[11px] text-[color:var(--nx-muted)]">
-                                                        @foreach ($signal->trigger_metrics as $key => $value)
-                                                            <div>{{ $key }}: {{ is_array($value) ? json_encode($value) : $value }}</div>
-                                                        @endforeach
-                                                    </div>
-                                                </span>
-                                            @endif
-                                        </div>
-                                    </div>
-                                    <div class="flex shrink-0 flex-col items-end gap-1.5">
-                                        <x-nx-badge :variant="$stV" dot>{{ $stL }}</x-nx-badge>
-                                        <span class="text-xs tabular-nums text-[color:var(--nx-faint)]">{{ $signal->created_at->format('d.m.Y') }}</span>
-                                        @if ($signal->status === 'resolved' && $signal->resolvedByUser)
-                                            <span class="text-xs text-[color:var(--nx-faint)]">von {{ $signal->resolvedByUser->name }}</span>
-                                        @endif
-                                        @if (in_array($signal->status, ['open', 'acknowledged']))
-                                            <div class="mt-0.5 flex gap-1">
-                                                @if ($signal->status === 'open')
-                                                    <x-nx-button size="sm" wire:click="acknowledgeSignal({{ $signal->id }})">Bestätigen</x-nx-button>
-                                                @else
-                                                    <x-nx-button size="sm" wire:click="resolveSignal({{ $signal->id }})">Lösen</x-nx-button>
-                                                @endif
-                                                <x-nx-button size="sm" variant="ghost" wire:click="dismissSignal({{ $signal->id }})">Verwerfen</x-nx-button>
-                                            </div>
-                                        @endif
-                                    </div>
-                                </div>
-                            @endforeach
-                        @endif
-                    </x-nx-panel>
-                @endif
-
                 {{-- ═══ Person ═══ --}}
                 @if ($this->hasLinkedUser && $activeTab === 'person')
                     <livewire:organization.entity.person-activity :entity="$entity" :key="'person-activity-'.$entity->id" />
@@ -710,77 +605,6 @@
                             @endif
                         </x-nx-callout>
                     @endif
-                @endif
-
-                {{-- ═══ System-Agent ═══ --}}
-                @if ($this->isSystemAgent && ! $this->isAgentEntity && $activeTab === 'agent')
-                    <div class="space-y-5">
-                        <x-nx-callout :variant="$entity->is_active ? 'success' : 'danger'" :title="$entity->is_active ? 'Agent aktiv' : 'Agent inaktiv'">
-                            {{ $entity->is_active ? 'Die Inference-Prompts laufen nach ihrem Zeitplan.' : 'Der Worker überspringt die Prompts, auch wenn sie selbst aktiv sind.' }}
-                            <x-slot name="action">
-                                <x-nx-button size="sm" :variant="$entity->is_active ? 'danger' : 'primary'" wire:click="toggleEntityActive"
-                                    wire:confirm="{{ $entity->is_active ? 'Agent wirklich deaktivieren? Seine Prompts laufen dann nicht mehr.' : 'Agent wieder aktivieren?' }}">
-                                    {{ $entity->is_active ? 'Deaktivieren' : 'Aktivieren' }}
-                                </x-nx-button>
-                            </x-slot>
-                        </x-nx-callout>
-
-                        <x-nx-panel flush title="Inference-Prompts" :subtitle="$this->agentPrompts->count() . ' zugewiesen'">
-                            @forelse ($this->agentPrompts as $prompt)
-                                @php
-                                    $hv = match ($prompt->health_status) { 'healthy' => 'success', 'stale' => 'warning', 'error' => 'danger', default => 'neutral' };
-                                @endphp
-                                <div class="border-b border-[color:var(--nx-line)] px-4 py-3 last:border-0">
-                                    <div class="flex flex-wrap items-center gap-2">
-                                        <x-nx-badge>{{ strtoupper(str_replace('_star', '*', $prompt->vsm_system)) }}</x-nx-badge>
-                                        <a href="{{ route('organization.settings.inference-prompts.show', $prompt) }}" wire:navigate class="truncate text-sm font-medium text-[color:var(--nx-text)] hover:underline">{{ $prompt->name }}</a>
-                                        <x-nx-badge :variant="$hv" dot>{{ $prompt->health_status }}</x-nx-badge>
-                                    </div>
-                                    <div class="mt-1 flex flex-wrap gap-x-3 text-xs text-[color:var(--nx-faint)]">
-                                        <span>alle {{ $prompt->schedule_interval_hours ?? 72 }} h</span>
-                                        @if ($prompt->last_evaluated_at)
-                                            <span title="{{ $prompt->last_evaluated_at->format('d.m.Y H:i:s') }}">zuletzt {{ $prompt->last_evaluated_at->diffForHumans() }}</span>
-                                        @else
-                                            <span class="text-[color:var(--nx-warning)]">noch nie gelaufen</span>
-                                        @endif
-                                        <span>{{ $prompt->run_count ?? 0 }} Läufe</span>
-                                        <span>Schwere {{ $prompt->default_severity }}</span>
-                                    </div>
-                                    @if ($prompt->description)
-                                        <p class="mb-0 mt-1.5 line-clamp-2 text-xs text-[color:var(--nx-muted)]">{{ $prompt->description }}</p>
-                                    @endif
-                                    @if ($prompt->last_error)
-                                        <pre class="mb-0 mt-2 whitespace-pre-wrap break-words rounded-[6px] bg-[rgba(224,49,49,.08)] p-2 font-mono text-[11px] text-[color:var(--nx-danger)]">{{ $prompt->last_error }}</pre>
-                                    @endif
-                                </div>
-                            @empty
-                                <x-nx-empty icon="heroicon-o-cpu-chip">Noch kein Prompt zugewiesen — per <code class="text-xs">organization.signal_inference_prompts.PUT</code> mit <code class="text-xs">agent_entity_id={{ $entity->id }}</code>.</x-nx-empty>
-                            @endforelse
-                        </x-nx-panel>
-
-                        <x-nx-panel flush title="Letzte Läufe">
-                            <x-slot name="actions">
-                                <a href="{{ route('organization.inference-runs.index') }}" wire:navigate class="text-xs font-medium text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">Alle</a>
-                            </x-slot>
-                            @forelse ($this->agentRecentRuns as $run)
-                                @php
-                                    $rv = match ($run->status) { 'completed' => 'success', 'failed' => 'danger', 'running' => 'warning', default => 'neutral' };
-                                @endphp
-                                <a href="{{ route('organization.inference-runs.show', $run) }}" wire:navigate class="flex items-center gap-3 border-b border-[color:var(--nx-line)] px-4 py-2 text-sm last:border-0 hover:bg-[color:var(--nx-hover)]">
-                                    <span class="w-12 font-mono text-xs tabular-nums text-[color:var(--nx-faint)]">#{{ $run->id }}</span>
-                                    <x-nx-badge :variant="$rv" dot>{{ $run->status }}</x-nx-badge>
-                                    <span class="text-xs text-[color:var(--nx-muted)]" title="{{ $run->created_at->format('d.m.Y H:i:s') }}">{{ $run->created_at->diffForHumans() }}</span>
-                                    <span class="ml-auto flex gap-3 text-xs tabular-nums text-[color:var(--nx-faint)]">
-                                        <span>{{ $run->signals_created ?? 0 }} Signale</span>
-                                        <span>{{ $run->entities_analyzed ?? 0 }} Einheiten</span>
-                                        @if ($run->duration_ms > 0)<span>{{ $run->duration_ms < 1000 ? $run->duration_ms . ' ms' : number_format($run->duration_ms / 1000, 1, ',', '') . ' s' }}</span>@endif
-                                    </span>
-                                </a>
-                            @empty
-                                <x-nx-empty icon="heroicon-o-play">Noch keine Läufe.</x-nx-empty>
-                            @endforelse
-                        </x-nx-panel>
-                    </div>
                 @endif
 
                 {{-- ═══ VSM-Besetzung ═══ --}}
@@ -1107,7 +931,7 @@
                                 $perspectiveTeams = $this->perspectiveTeamAssignments;
                                 $availableTeams = $this->perspectiveAvailableTeams;
                             @endphp
-                            <x-nx-panel flush title="Perspektive für Plattform-Teams" :subtitle="'Mitglieder dieser Teams können ' . $entity->name . ' als VSM-Sicht nutzen. „Standard“ ist die Sicht für alle, die nie selbst eine gewählt haben — wichtig fürs Signal-Routing.'">
+                            <x-nx-panel flush title="Perspektive für Plattform-Teams" :subtitle="'Mitglieder dieser Teams können ' . $entity->name . ' als VSM-Sicht nutzen. „Standard“ ist die Sicht für alle, die nie selbst eine gewählt haben.'">
                                 @forelse ($perspectiveTeams as $pt)
                                     <div class="flex items-center gap-3 border-b border-[color:var(--nx-line)] px-4 py-2">
                                         <div class="min-w-0 flex-1">

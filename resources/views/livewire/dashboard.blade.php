@@ -16,7 +16,7 @@
     };
     $num = fn ($v, $unit) => $unit === 'minutes' ? $h($v) : (is_float($v) && $v != (int) $v ? number_format($v, 1, ',', '.') : number_format((int) $v, 0, ',', '.'));
     $sevColor = fn ($s) => match ($s) {
-        'algedonic', 'critical' => 'var(--nx-danger)',
+        'critical' => 'var(--nx-danger)',
         'warning' => 'var(--nx-warning)',
         default => 'var(--nx-info)',
     };
@@ -56,29 +56,18 @@
             @include('organization::livewire.dashboard.lage', ['lage' => $lage])
 
             <div class="grid grid-cols-1 gap-5 lg:grid-cols-2">
-                {{-- 3: Braucht Aufmerksamkeit — immer der Stand von jetzt --}}
-                <x-nx-panel flush title="Braucht Aufmerksamkeit" :subtitle="'neu in den letzten 14 Tagen' . ($attention['older'] > 0 ? ' · ' . $attention['older'] . ' ältere offen' : '')">
-                    @if ($attention['open_total'] > count($attention['items']))
-                        <x-slot name="actions">
-                            <a href="{{ route('organization.signals.index') }}" wire:navigate class="text-xs font-medium text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">Alle Signale</a>
-                        </x-slot>
-                    @endif
+                {{-- 3: Braucht Aufmerksamkeit — Einheiten mit überwiegend kritischer Bewegung --}}
+                <x-nx-panel flush title="Braucht Aufmerksamkeit" subtitle="Einheiten mit überwiegend kritischer Bewegung">
                     @forelse ($attention['items'] as $item)
                         <div class="flex items-start gap-3 border-b border-[color:var(--nx-line)] px-4 py-2.5 last:border-0">
-                            @if ($item['focused'])
-                                <button type="button" wire:click="unfocusSignal({{ $item['signal_id'] }})" title="Aus Fokus entfernen" class="mt-0.5 shrink-0 text-[color:var(--nx-warning)] hover:opacity-70">
-                                    @svg('heroicon-s-star', 'w-4 h-4')
-                                </button>
-                            @else
-                                <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full" style="background: {{ $sevColor($item['severity']) }}"></span>
-                            @endif
+                            <span class="mt-1.5 h-2 w-2 shrink-0 rounded-full" style="background: {{ $sevColor($item['severity']) }}"></span>
                             <a href="{{ $item['href'] }}" wire:navigate class="min-w-0 flex-1">
                                 <span class="block text-sm text-[color:var(--nx-text)] hover:underline">{{ $item['title'] }}</span>
                                 <span class="block text-xs text-[color:var(--nx-faint)]">{{ collect([$item['why'], $item['entity']])->filter()->implode(' · ') }}</span>
                             </a>
                         </div>
                     @empty
-                        <p class="m-0 px-4 py-3 text-sm text-[color:var(--nx-muted)]">Nichts Neues, das drängt.@if ($attention['older'] > 0) <a href="{{ route('organization.signals.index') }}" wire:navigate class="hover:underline">{{ $attention['older'] }} ältere Signale sind noch offen.</a>@endif</p>
+                        <p class="m-0 px-4 py-3 text-sm text-[color:var(--nx-muted)]">Nichts, das drängt.</p>
                     @endforelse
                 </x-nx-panel>
 

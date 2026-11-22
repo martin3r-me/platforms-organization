@@ -164,8 +164,6 @@ TXT;
             'neutral' => array_map($metric, $f['movers']['neutral']),
             'im_zeitraum' => $flows,
             'erfassung_erweitert' => $f['coverage']['expanded'] ?? false,
-            'signale_offen' => $f['signals']['open'],
-            'signale' => array_map(fn ($s) => $s['message'], $f['signals']['top']),
             'letzte_buchung_vor_tagen' => $f['stillness']['days_since_last_booking'],
             'darunter' => array_map(fn ($c) => array_filter([
                 'name' => $c['name'],

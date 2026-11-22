@@ -16,11 +16,6 @@
             ['key' => 'interlink-categories', 'label' => 'Kategorien',           'icon' => 'heroicon-o-tag',                    'route' => 'organization.settings.interlink-categories.index'],
             ['key' => 'interlink-types',      'label' => 'Typen',                'icon' => 'heroicon-o-arrows-right-left',      'route' => 'organization.settings.interlink-types.index'],
         ],
-        'Steuerung' => [
-            ['key' => 'signal-definitions', 'label' => 'Signal-Definitionen',    'icon' => 'heroicon-o-adjustments-horizontal', 'route' => 'organization.settings.signal-definitions.index'],
-            ['key' => 'inference-prompts',  'label' => 'Inference-Prompts',      'icon' => 'heroicon-o-sparkles',               'route' => 'organization.settings.inference-prompts.index'],
-            ['key' => 'synthesis-prompts',  'label' => 'Synthese-Prompts',       'icon' => 'heroicon-o-chat-bubble-left-right', 'route' => 'organization.settings.synthesis-prompts.index'],
-        ],
     ];
 
     $klassen = fn (bool $ist) => 'flex w-full items-center gap-3 rounded-md p-2 text-left text-sm font-medium transition-colors '

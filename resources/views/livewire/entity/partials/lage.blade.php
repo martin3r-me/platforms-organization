@@ -1,6 +1,6 @@
 {{--
     Lage — Startansicht am Knoten: ein Satz (täglicher Lauf organization:entity-stories),
-    darunter was ihn trägt: Bewegung, gebuchte Zeit, Untereinheiten, offene Signale.
+    darunter was ihn trägt: Bewegung, gebuchte Zeit, Untereinheiten.
     Erwartet $lage (Show::lage) und $lagePeriod.
 --}}
 @php
@@ -138,23 +138,6 @@
                                 <p class="mb-0 mt-1 text-xs leading-relaxed text-[color:var(--nx-muted)] line-clamp-2">{{ $lage['child_stories'][$c['id']] }}</p>
                             @endif
                         </a>
-                    @endforeach
-                </div>
-            </x-nx-panel>
-        @endif
-
-        {{-- Signale --}}
-        @if ($f['signals']['open'] > 0)
-            <x-nx-panel title="Offene Signale" :subtitle="$f['signals']['open'] . ' offen' . ($f['signals']['critical'] ? ', ' . $f['signals']['critical'] . ' kritisch' : '')">
-                <x-slot name="actions">
-                    <button type="button" x-on:click="tab = 'signals'" class="text-xs font-medium text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">Alle Signale</button>
-                </x-slot>
-                <div class="space-y-1.5">
-                    @foreach ($f['signals']['top'] as $s)
-                        <div class="flex items-baseline gap-2 text-sm">
-                            <x-nx-badge :variant="$sevVariant($s['severity'])">{{ $sevLabel($s['severity']) }}</x-nx-badge>
-                            <span class="text-[color:var(--nx-text)]">{{ $s['message'] }}</span>
-                        </div>
                     @endforeach
                 </div>
             </x-nx-panel>

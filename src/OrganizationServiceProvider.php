@@ -7,13 +7,8 @@ use Illuminate\Support\ServiceProvider;
 use Illuminate\Support\Facades\Schedule;
 use Illuminate\Support\Str;
 use Livewire\Livewire;
-use Platform\Organization\Console\Commands\CleanupInferenceRunsCommand;
 use Platform\Organization\Console\Commands\DimensionCoverageCommand;
 use Platform\Organization\Console\Commands\DimensionScoreDiffCommand;
-use Platform\Organization\Console\Commands\EvaluateSignalsCommand;
-use Platform\Organization\Console\Commands\ProcessInferenceTriggersCommand;
-use Platform\Organization\Console\Commands\ScheduleInferenceCommand;
-use Platform\Organization\Console\Commands\ScheduleSynthesisCommand;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
 use Platform\Organization\Console\Commands\SnapshotEntitiesCommand;
 use Platform\Organization\Console\Commands\SyncEntityTypeCatalogCommand;
@@ -31,17 +26,10 @@ class OrganizationServiceProvider extends ServiceProvider
             $this->commands([
                 SeedOrganizationData::class,
                 SnapshotEntitiesCommand::class,
-                EvaluateSignalsCommand::class,
-                ProcessInferenceTriggersCommand::class,
-                ScheduleInferenceCommand::class,
-                ScheduleSynthesisCommand::class,
-                CleanupInferenceRunsCommand::class,
                 DimensionCoverageCommand::class,
                 DimensionScoreDiffCommand::class,
-                \Platform\Organization\Console\Commands\EscalateSignalsCommand::class,
                 SyncEntityTypeCatalogCommand::class,
                 \Platform\Organization\Console\Commands\AuthzMaterializeCommand::class,
-                \Platform\Organization\Console\Commands\PurgeSignalsCommand::class,
                 \Platform\Organization\Console\Commands\DimensionLinkAuditCommand::class,
                 \Platform\Organization\Console\Commands\ParlanPullCommand::class,
                 \Platform\Organization\Console\Commands\ParlanHuddlesCommand::class,
@@ -52,7 +40,6 @@ class OrganizationServiceProvider extends ServiceProvider
 
         $this->app->singleton(\Platform\Organization\Services\EntityLinkRegistry::class);
         $this->app->singleton(\Platform\Organization\Services\PersonActivityRegistry::class);
-        $this->app->singleton(\Platform\Organization\Services\InferencePromptService::class);
     }
 
     public function boot(): void
@@ -189,29 +176,10 @@ class OrganizationServiceProvider extends ServiceProvider
         // Tools registrieren (loose gekoppelt - für AI/Chat)
         $this->registerTools();
 
-        // Algedonic-Kanal (Beer): Core dispatched, Organization erzeugt Signal
-        if (class_exists(\Platform\Core\Events\AlgedonicTriggered::class)) {
-            \Illuminate\Support\Facades\Event::listen(
-                \Platform\Core\Events\AlgedonicTriggered::class,
-                \Platform\Organization\Listeners\HandleAlgedonicTriggered::class,
-            );
-        }
-
         // Error Reporter Registration
         try {
             resolve(\Platform\Core\Services\ErrorReporterRegistry::class)
                 ->register('organization', 'Platform\\Organization');
-        } catch (\Throwable $e) {}
-
-        // Verbalization-Template + Subject-Collector fuer Signal-Feeds (VSM)
-        try {
-            resolve(\Platform\Core\Verbalization\Template\TemplateRegistry::class)
-                ->register(new \Platform\Organization\Verbalization\OrganizationSignalsTemplate());
-        } catch (\Throwable $e) {}
-
-        try {
-            resolve(\Platform\Core\Verbalization\SubjectCollector\SubjectCollectorRegistry::class)
-                ->register(new \Platform\Organization\Verbalization\OrganizationSignalsSubjectCollector());
         } catch (\Throwable $e) {}
 
         // Scheduler registrieren
@@ -274,44 +242,9 @@ class OrganizationServiceProvider extends ServiceProvider
             ->dailyAt('18:00')
             ->withoutOverlapping();
 
-        // Rule-based signal evaluation: 2x daily
-        Schedule::command('organization:evaluate-signals')
-            ->dailyAt('08:15')
-            ->withoutOverlapping();
-
-        Schedule::command('organization:evaluate-signals')
-            ->dailyAt('18:15')
-            ->withoutOverlapping();
-
-        // Lage-Erzählung je Knoten: nach Snapshot (08:00) und Signal-Bewertung (08:15)
+        // Lage-Erzählung je Knoten: nach Snapshot (08:00)
         Schedule::command('organization:entity-stories --period=auto')
             ->dailyAt('08:20')
-            ->withoutOverlapping();
-
-        // Inference scheduling: daily poll, individual prompt intervals decide what's due
-        Schedule::command('organization:schedule-inference')
-            ->dailyAt('08:05')
-            ->withoutOverlapping();
-
-        // Signal-Eskalation: stuendlich pruefen ob Deadlines ueberschritten sind
-        // und ggf. VSM-Ebene hochsetzen oder in aeussere Perspektive aggregieren.
-        Schedule::command('organization:escalate-signals')
-            ->hourly()
-            ->withoutOverlapping();
-
-        // Process inference triggers: every minute (cheap polling)
-        Schedule::command('organization:process-inference-triggers')
-            ->everyMinute()
-            ->withoutOverlapping();
-
-        // Weekly synthesis report: Friday 16:00
-        Schedule::command('organization:schedule-synthesis --type=weekly')
-            ->weeklyOn(5, '16:00')
-            ->withoutOverlapping();
-
-        // Monthly synthesis report: 1st of month 08:00
-        Schedule::command('organization:schedule-synthesis --type=monthly')
-            ->monthlyOn(1, '08:00')
             ->withoutOverlapping();
 
         // Autorisierungs-Index frisch halten: Closure + resource_links + Rollen-Grants
@@ -469,57 +402,7 @@ class OrganizationServiceProvider extends ServiceProvider
             // Person ↔ Skill Zuordnung: nach People migriert (Phase 2a).
             // Bestand lebt jetzt in people_employee_skills (people.employee_skills.*).
 
-            // Signal (Algedonic) Tools
-            $registry->register(new \Platform\Organization\Tools\ListSignalDefinitionsTool());
-            $registry->register(new \Platform\Organization\Tools\CreateSignalDefinitionTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateSignalDefinitionTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteSignalDefinitionTool());
-            $registry->register(new \Platform\Organization\Tools\ListSignalsTool());
-            $registry->register(new \Platform\Organization\Tools\AcknowledgeSignalTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateSignalTool());
-            $registry->register(new \Platform\Organization\Tools\CommentSignalTool());
-            $registry->register(new \Platform\Organization\Tools\SnoozeSignalTool());
-
             // Agenten-Gedächtnis: Regeln lesen, Kuratier-Entwürfe anlegen (Freigabe im Reiter „Gedächtnis“)
-
-            // Signal Inference (Semantic Layer)
-            $registry->register(new \Platform\Organization\Tools\ListSignalInferencePromptsTool());
-            $registry->register(new \Platform\Organization\Tools\CreateSignalInferencePromptTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateSignalInferencePromptTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteSignalInferencePromptTool());
-            $registry->register(new \Platform\Organization\Tools\EvaluateSignalInferenceTool());
-            $registry->register(new \Platform\Organization\Tools\CreateInferenceSignalTool());
-            $registry->register(new \Platform\Organization\Tools\DoNothingInferenceTool());
-
-            // Organizational Memory (Layer 3)
-            $registry->register(new \Platform\Organization\Tools\ListMemoryEntriesTool());
-            $registry->register(new \Platform\Organization\Tools\CreateMemoryEntryTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateMemoryEntryTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteMemoryEntryTool());
-
-            // Inquiry System (Formular-Engine)
-            $registry->register(new \Platform\Organization\Tools\ListInquiriesTool());
-            $registry->register(new \Platform\Organization\Tools\CreateInquiryTool());
-            $registry->register(new \Platform\Organization\Tools\RespondInquiryTool());
-            $registry->register(new \Platform\Organization\Tools\CancelInquiryTool());
-            $registry->register(new \Platform\Organization\Tools\RemindInquiryTool());
-            $registry->register(new \Platform\Organization\Tools\InquiryComplianceTool());
-
-            // Inference Runs
-            $registry->register(new \Platform\Organization\Tools\ListInferenceRunsTool());
-            $registry->register(new \Platform\Organization\Tools\ExecuteInferenceRunTool());
-
-            // Synthesis Reports
-            $registry->register(new \Platform\Organization\Tools\ListSynthesisReportsTool());
-            $registry->register(new \Platform\Organization\Tools\GenerateSynthesisReportTool());
-
-            // Prompt Precision Stats
-            $registry->register(new \Platform\Organization\Tools\ListPromptStatsTool());
-
-            // Inference Debug Tools
-            $registry->register(new \Platform\Organization\Tools\InferenceHealthCheckTool());
-            $registry->register(new \Platform\Organization\Tools\InferenceLogsTool());
-
 
             // Strategie (Mission/Vision, Regnose, Fokusräume, Meilensteine, Ausrichtung) lebt im Management Book
             // (management-book.*); die Organisation liest sie nur über Strategy\StrategySources.

@@ -9,7 +9,6 @@ use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityType;
 use Platform\Organization\Models\OrganizationEntityTypeGroup;
 use Platform\Organization\Models\OrganizationEntityVsmAssignment;
-use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\PerspectiveService;
 use Platform\Organization\Services\SnapshotMovementService;
 
@@ -19,7 +18,6 @@ class Index extends Component
     public $selectedType = '';
     public $selectedGroup = '';
     public $showInactive = false;
-    public $onlyWithSignals = false;
     public $modalShow = false;
     public $newEntity = [
         'name' => '',
@@ -35,7 +33,6 @@ class Index extends Component
         'selectedType' => ['except' => ''],
         'selectedGroup' => ['except' => ''],
         'showInactive' => ['except' => false],
-        'onlyWithSignals' => ['except' => false],
     ];
 
     public function updatingSearch()
@@ -61,7 +58,7 @@ class Index extends Component
     #[On('perspective-switched')]
     public function onPerspectiveSwitched(): void
     {
-        unset($this->entities, $this->stats, $this->parentEntities, $this->entityMovements, $this->vsmSystemMap, $this->signalCounts);
+        unset($this->entities, $this->stats, $this->parentEntities, $this->entityMovements, $this->vsmSystemMap);
     }
 
     #[Computed]
@@ -98,11 +95,6 @@ class Index extends Component
         // Active/Inactive Filter
         if (!$this->showInactive) {
             $query->active();
-        }
-
-        // Only with signals filter
-        if ($this->onlyWithSignals) {
-            $query->whereHas('signals', fn($q) => $q->whereIn('status', ['open', 'acknowledged']));
         }
 
         $entities = $query->orderBy('name')->get();
@@ -231,31 +223,6 @@ class Index extends Component
                     ->values()
                     ->toArray();
             })
-            ->toArray();
-    }
-
-    #[Computed]
-    public function signalCounts(): array
-    {
-        $teamId = auth()->user()->currentTeam->id;
-        $activeEntity = PerspectiveService::getActiveEntity($teamId, auth()->id());
-
-        $query = OrganizationSignal::where('team_id', $teamId)
-            ->whereIn('status', ['open', 'acknowledged']);
-
-        // Perspektive-sensitive Anzeige: nur Signale aus aktiver Sicht (oder NULL = legacy / global).
-        if ($activeEntity) {
-            $query->forPerspective($activeEntity->id);
-        }
-
-        return $query
-            ->selectRaw('entity_id, COUNT(*) as total,
-                SUM(CASE WHEN severity = "critical" THEN 1 ELSE 0 END) as critical_count,
-                SUM(CASE WHEN severity = "algedonic" THEN 1 ELSE 0 END) as algedonic_count,
-                SUM(CASE WHEN severity = "warning" THEN 1 ELSE 0 END) as warning_count')
-            ->groupBy('entity_id')
-            ->get()
-            ->keyBy('entity_id')
             ->toArray();
     }
 

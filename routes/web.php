@@ -22,21 +22,6 @@ use Platform\Organization\Livewire\PlannedTimes\Index as PlannedTimesIndex;
 use Platform\Organization\Livewire\Role\Index as RoleIndex;
 use Platform\Organization\Livewire\Agent\Fleet as AgentFleet;
 use Platform\Organization\Livewire\Agent\Effectiveness as AgentEffectiveness;
-use Platform\Organization\Livewire\Settings\SignalDefinition\Index as SignalDefinitionIndex;
-use Platform\Organization\Livewire\Settings\SignalDefinition\Show as SignalDefinitionShow;
-use Platform\Organization\Livewire\Signal\Index as SignalIndex;
-use Platform\Organization\Livewire\Signal\Show as SignalShow;
-use Platform\Organization\Livewire\Settings\InferencePrompt\Index as InferencePromptIndex;
-use Platform\Organization\Livewire\Settings\SynthesisPrompt\Index as SynthesisPromptIndex;
-use Platform\Organization\Livewire\Settings\SynthesisPrompt\Show as SynthesisPromptShow;
-use Platform\Organization\Livewire\Inference\RunIndex as InferenceRunIndex;
-use Platform\Organization\Livewire\Inference\RunShow as InferenceRunShow;
-use Platform\Organization\Livewire\Memory\Index as MemoryIndex;
-use Platform\Organization\Livewire\Inquiry\Index as InquiryIndex;
-use Platform\Organization\Livewire\Inquiry\MyInquiries;
-use Platform\Organization\Livewire\Inquiry\Respond as InquiryRespond;
-use Platform\Organization\Livewire\Synthesis\Index as SynthesisIndex;
-use Platform\Organization\Livewire\Synthesis\Show as SynthesisShow;
 
 Route::get('/', Platform\Organization\Livewire\Dashboard::class)->name('organization.dashboard');
 
@@ -56,12 +41,6 @@ Route::get('/parlan/jump', function (\Illuminate\Http\Request $request) {
     return redirect()->away($url);
 })->name('organization.parlan.jump');
 
-// Operations Room — Hommage an Stafford Beer, Santiago 1972 (VSM-Steuerung)
-Route::get('/ops-room', \Platform\Organization\Livewire\OpsRoom::class)->name('organization.ops-room');
-Route::get('/ops-room/perspective/{perspective}', \Platform\Organization\Livewire\OpsRoom::class)->name('organization.ops-room.perspective');
-Route::get('/ops-room/perspective/{perspective}/level/{vsm}', \Platform\Organization\Livewire\OpsRoomLevel::class)->name('organization.ops-room.level');
-Route::get('/ops-room/signal/{signal}', \Platform\Organization\Livewire\OpsRoomSignal::class)->name('organization.ops-room.signal');
-
 // Pulse — operative cross-modul Live-Lage (Health-Snapshots aller Module)
 Route::get('/pulse', \Platform\Organization\Livewire\Pulse::class)->name('organization.pulse');
 
@@ -74,24 +53,6 @@ Route::get('/entities', EntityIndex::class)->name('organization.entities.index')
 Route::get('/entities/{entity}', EntityShow::class)->name('organization.entities.show');
 Route::get('/entities/{entity}/mindmap', EntityMindmap::class)->name('organization.entities.mindmap');
 Route::get('/entities/{entity}/board', EntityBoard::class)->name('organization.entities.board');
-
-// Signals
-Route::get('/signals', SignalIndex::class)->name('organization.signals.index');
-Route::get('/signals/{signal}', SignalShow::class)->name('organization.signals.show');
-
-// Inference
-Route::get('/settings/inference-prompts', InferencePromptIndex::class)->name('organization.settings.inference-prompts.index');
-Route::get('/settings/inference-prompts/{prompt}', \Platform\Organization\Livewire\Settings\InferencePrompt\Show::class)->name('organization.settings.inference-prompts.show');
-Route::get('/settings/synthesis-prompts', SynthesisPromptIndex::class)->name('organization.settings.synthesis-prompts.index');
-Route::get('/settings/synthesis-prompts/{definition}', SynthesisPromptShow::class)->name('organization.settings.synthesis-prompts.show');
-Route::get('/inference-runs', InferenceRunIndex::class)->name('organization.inference-runs.index');
-Route::get('/inference-runs/{run}', InferenceRunShow::class)->name('organization.inference-runs.show');
-Route::get('/memory', MemoryIndex::class)->name('organization.memory.index');
-Route::get('/inquiries', InquiryIndex::class)->name('organization.inquiries.index');
-Route::get('/my-inquiries', MyInquiries::class)->name('organization.my-inquiries.index');
-Route::get('/my-inquiries/{recipient}', InquiryRespond::class)->name('organization.my-inquiries.respond');
-Route::get('/synthesis-reports', SynthesisIndex::class)->name('organization.synthesis-reports.index');
-Route::get('/synthesis-reports/{report}', SynthesisShow::class)->name('organization.synthesis-reports.show');
 
 // Settings: Entity Types
 Route::get('/settings/entity-types', EntityTypeIndex::class)->name('organization.settings.entity-types.index');
@@ -112,10 +73,6 @@ Route::get('/settings/interlink-categories/{interlinkCategory}', InterlinkCatego
 // Settings: Interlink-Typen
 Route::get('/settings/interlink-types', InterlinkTypeIndex::class)->name('organization.settings.interlink-types.index');
 Route::get('/settings/interlink-types/{interlinkType}', InterlinkTypeShow::class)->name('organization.settings.interlink-types.show');
-
-// Settings: Signal-Definitionen
-Route::get('/settings/signal-definitions', SignalDefinitionIndex::class)->name('organization.settings.signal-definitions.index');
-Route::get('/settings/signal-definitions/{signalDefinition}', SignalDefinitionShow::class)->name('organization.settings.signal-definitions.show');
 
 // Interlinks
 Route::get('/interlinks', InterlinkIndex::class)->name('organization.interlinks.index');

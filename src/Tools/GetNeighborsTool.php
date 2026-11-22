@@ -11,7 +11,6 @@ use Platform\Core\Contracts\ToolResult;
 use Platform\Organization\Authz\DimensionLinkAuthorizer;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntityRelationship;
-use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Services\ObjectTypeRegistry;
 use Platform\Organization\Tools\Concerns\ResolvesOrganizationTeam;
@@ -44,7 +43,7 @@ class GetNeighborsTool implements ToolContract, ToolMetadataContract
     {
         return 'GET /organization/neighbors - Nachbarschaft einer Entity im Org-Graphen: Eltern, Kinder, Beziehungen (Typ, Beer-Kanal, Schnittstellen) '
             . 'bis depth=2 sowie verknüpfte Objekte (Projekte, Tickets, …) der Entity selbst. Antwort als nodes + edges, '
-            . 'jeder Knoten mit Link-Zählern und offenen Signalen. Für ein Objekt erst organization.brief.GET (liefert entity_id).';
+            . 'jeder Knoten mit Link-Zählern. Für ein Objekt erst organization.brief.GET (liefert entity_id). Offene Signale liest du über das Tool signals.signals.GET.';
     }
 
     public function getSchema(): array
@@ -238,8 +237,6 @@ class GetNeighborsTool implements ToolContract, ToolMetadataContract
 
             $nodeIds = array_keys($nodes);
             $linkCounts = EntityDimensionBridge::linkCountsByEntityAndType($nodeIds);
-            $signalCounts = OrganizationSignal::whereIn('entity_id', $nodeIds)->actionable()
-                ->selectRaw('entity_id, count(*) as c')->groupBy('entity_id')->pluck('c', 'entity_id');
             $childCounts = OrganizationEntity::where('team_id', $rootTeamId)
                 ->when(! $includeInactive, fn ($q) => $q->where('is_active', true))
                 ->whereIn('parent_entity_id', $nodeIds)
@@ -255,7 +252,6 @@ class GetNeighborsTool implements ToolContract, ToolMetadataContract
                     'depth' => $n['depth'],
                     'is_active' => $n['entity']->is_active ? null : false,
                     'children' => (int) ($childCounts[$id] ?? 0) ?: null,
-                    'open_signals' => (int) ($signalCounts[$id] ?? 0) ?: null,
                     'links' => $linkCounts[$id] ?? null,
                 ], fn ($v) => $v !== null))->values()->all(),
                 'edges' => $edges,
@@ -272,7 +268,7 @@ class GetNeighborsTool implements ToolContract, ToolMetadataContract
             }
             $response['next'] = [
                 'organization.neighbors.GET' => 'Mit entity_id eines Knotens weiterwandern',
-                'organization.brief.GET' => 'Zuständige, Strategie, Signale einer Entity',
+                'organization.brief.GET' => 'Zuständige, Strategie einer Entity',
                 'organization.entity.detail.GET' => 'Alle verknüpften Objekte einer Entity',
             ];
 

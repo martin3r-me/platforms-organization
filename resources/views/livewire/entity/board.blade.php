@@ -42,22 +42,7 @@
 
             {{-- Top Bar (replaces floating controls) --}}
             <div class="shrink-0 h-12 flex items-center justify-between px-4 border-b border-gray-700/40 bg-gray-900/60 backdrop-blur-md">
-                {{-- Left: Algedonic Alert --}}
-                <div class="flex-1 min-w-0 max-w-md">
-                    @if(!empty($this->boardData['algedonicAlerts']))
-                        @php $alert = $this->boardData['algedonicAlerts'][0]; @endphp
-                        <div class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-red-900/60 border border-red-500/40 text-red-200 text-xs truncate animate-pulse" style="animation-duration:2s">
-                            <span class="text-sm shrink-0">&#9889;</span>
-                            <span class="truncate"><strong>Algedonic:</strong> {{ $alert['message'] }}</span>
-                            <span class="text-[9px] text-red-400 tabular-nums shrink-0 ml-1">{{ $alert['timestamp'] }}</span>
-                        </div>
-                    @else
-                        <div class="flex items-center gap-2 px-3 py-1.5 text-xs text-gray-500">
-                            @svg('heroicon-o-check-circle', 'w-4 h-4 text-emerald-500')
-                            <span>Keine Alarme</span>
-                        </div>
-                    @endif
-                </div>
+                <div class="flex-1 min-w-0"></div>
 
                 {{-- Right: Timeline + Fullscreen --}}
                 <div class="flex items-center gap-3 shrink-0">
@@ -302,49 +287,6 @@
                     </div>
                 </div>
 
-                {{-- Right Ticker --}}
-                <div id="board-ticker" class="w-72 shrink-0 p-3 overflow-hidden">
-                    <div class="bg-gray-900/50 backdrop-blur-md border border-gray-700/40 rounded-xl text-xs overflow-hidden h-full flex flex-col">
-                        <div class="px-3 py-2 border-b border-gray-700/40 font-bold text-gray-300 text-sm flex items-center gap-2 shrink-0">
-                            @svg('heroicon-o-signal', 'w-4 h-4 text-cyan-400')
-                            <span>Live Feed</span>
-                            <span class="px-1.5 py-0.5 rounded text-[8px] font-bold uppercase bg-amber-500/20 text-amber-400 tracking-wider">Demo</span>
-                            <span class="ml-auto flex items-center gap-1">
-                                <span class="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-pulse"></span>
-                                <span class="text-[9px] text-emerald-400 uppercase tracking-wider">Live</span>
-                            </span>
-                        </div>
-                        <div id="ticker-list" class="flex-1 overflow-y-auto p-2 space-y-1.5">
-                            @foreach($this->boardData['ticker'] as $event)
-                                @php
-                                    $typeColors = [
-                                        'regulation' => 'border-blue-500/30 text-blue-400',
-                                        'intervention' => 'border-amber-500/30 text-amber-400',
-                                        'emergence' => 'border-emerald-500/30 text-emerald-400',
-                                        'alert' => 'border-red-500/30 text-red-400',
-                                    ];
-                                    $badgeBg = [
-                                        'regulation' => 'bg-blue-500/15 text-blue-400',
-                                        'intervention' => 'bg-amber-500/15 text-amber-400',
-                                        'emergence' => 'bg-emerald-500/15 text-emerald-400',
-                                        'alert' => 'bg-red-500/15 text-red-400',
-                                    ];
-                                    $tc = $typeColors[$event['type']] ?? 'border-gray-500/30 text-gray-400';
-                                    $bg = $badgeBg[$event['type']] ?? 'bg-gray-500/15 text-gray-400';
-                                @endphp
-                                <div class="ticker-event rounded-lg border {{ $tc }} p-2 bg-gray-900/60 transition-all duration-300" style="animation:tickerSlideIn 0.4s ease-out">
-                                    <div class="flex items-center gap-1.5 mb-1">
-                                        <span class="text-[9px] text-gray-500 tabular-nums">{{ $event['timestamp'] }}</span>
-                                        <span class="px-1 py-0.5 rounded text-[8px] font-bold uppercase {{ $bg }}">{{ $event['level'] }}</span>
-                                    </div>
-                                    <div class="font-medium text-[11px] text-gray-200 mb-0.5">{{ $event['message'] }}</div>
-                                    <div class="text-[10px] text-gray-500 leading-snug">{{ $event['detail'] }}</div>
-                                </div>
-                            @endforeach
-                        </div>
-                    </div>
-                </div>
-
             </div>
             </div>
         </div>
@@ -361,10 +303,6 @@
     @endif
 
     <style>
-        @keyframes tickerSlideIn {
-            from { opacity: 0; transform: translateY(-8px); }
-            to { opacity: 1; transform: translateY(0); }
-        }
         @keyframes movementPulse {
             0%, 100% { box-shadow: none; }
             50% { box-shadow: 0 0 8px 2px var(--pulse-color); }
@@ -722,39 +660,6 @@
             document.querySelectorAll('.board-card.selected').forEach(c => c.classList.remove('selected'));
             document.getElementById('board-info-panel').classList.add('hidden');
         }
-
-        // ---- Ticker auto-cycling ----
-        const tickerList = document.getElementById('ticker-list');
-        let tickerPaused = false;
-
-        tickerList?.addEventListener('mouseenter', () => { tickerPaused = true; });
-        tickerList?.addEventListener('mouseleave', () => { tickerPaused = false; });
-
-        function cycleTickerEvent() {
-            if (tickerPaused || !tickerList) return;
-            const events = tickerList.querySelectorAll('.ticker-event');
-            if (events.length === 0) return;
-
-            // Move last to first with animation
-            const last = events[events.length - 1];
-            const clone = last.cloneNode(true);
-            clone.style.animation = 'tickerSlideIn 0.4s ease-out';
-            tickerList.insertBefore(clone, tickerList.firstChild);
-
-            // Update timestamp to now
-            const timeEl = clone.querySelector('.tabular-nums');
-            if (timeEl) {
-                const now = new Date();
-                timeEl.textContent = now.getHours().toString().padStart(2, '0') + ':' + now.getMinutes().toString().padStart(2, '0');
-            }
-
-            // Remove last if too many
-            if (tickerList.children.length > 15) {
-                tickerList.removeChild(tickerList.lastChild);
-            }
-        }
-
-        setInterval(cycleTickerEvent, 8000 + Math.random() * 7000);
 
         // ---- Livewire integration ----
         Livewire.on('board-data-updated', function(event) {

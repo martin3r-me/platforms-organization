@@ -320,14 +320,6 @@ class OrganizationEntity extends Model
     }
 
     /**
-     * Signals (algedonic/inference signals for this entity)
-     */
-    public function signals(): HasMany
-    {
-        return $this->hasMany(OrganizationSignal::class, 'entity_id');
-    }
-
-    /**
      * Dimension links (generic dimensions framework)
      */
     public function dimensionLinks()

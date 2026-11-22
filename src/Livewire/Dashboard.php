@@ -8,7 +8,6 @@ use Livewire\Attributes\On;
 use Platform\Organization\Models\OrganizationEntity;
 use Platform\Organization\Models\OrganizationEntitySnapshot;
 use Platform\Organization\Services\EntityDimensionBridge;
-use Platform\Organization\Models\OrganizationSignal;
 use Platform\Organization\Models\OrganizationTimeEntry;
 use Platform\Organization\Services\EntityLinkRegistry;
 use Platform\Organization\Services\PersonActivityRegistry;
@@ -40,8 +39,6 @@ class Dashboard extends Component
             $this->topEntitiesByActivity,
             $this->personOverview,
             $this->insightStatements,
-            $this->signalOverview,
-            $this->focusedSignals,
             $this->orgLage,
             $this->attention,
         );
@@ -164,88 +161,15 @@ class Dashboard extends Component
     }
 
     /**
-     * „Braucht Aufmerksamkeit": was heute angefasst werden muss, im Teilbaum der Perspektive.
-     * Reihenfolge: eigene Fokus-Markierungen, algedonische und kritische Signale, Einheiten mit
-     * überwiegend kritischer Bewegung (aus der Lage), dann Warnungen. Höchstens fünf.
+     * „Braucht Aufmerksamkeit": Einheiten im Teilbaum der Perspektive, in denen kritische
+     * Bewegung überwiegt — aus den Fakten der Lage, nicht neu gerechnet. Höchstens fünf.
+     * Signale liegen im Signals-Modul.
      */
     #[Computed]
     public function attention(): array
     {
-        $teamId = $this->getTeamId();
-        $root = $teamId ? PerspectiveService::getActiveEntity($teamId) : null;
-        if (! $root) {
-            return ['items' => [], 'open_total' => 0, 'older' => 0];
-        }
-
-        $ids = array_merge([$root->id], resolve(EntityHierarchyService::class)->getAllDescendantMap([$root->id])[$root->id] ?? []);
-        $open = fn () => OrganizationSignal::whereIn('entity_id', $ids)->actionable();
-        $userId = auth()->id();
-
         $items = [];
-        $seen = [];
-        $push = function ($signal, string $why) use (&$items, &$seen) {
-            if (isset($seen[$signal->id])) {
-                return;
-            }
-            $seen[$signal->id] = true;
-            // Regel-Signale tragen Rohformeln („items_done/items_total = 0% (< 30%)") — lesbar ist der Name der Regel
-            $rule = $signal->definition?->name;
-            $items[] = [
-                'kind' => 'signal',
-                'severity' => $signal->severity,
-                'title' => $rule ? ($signal->entity?->name ?? $rule) : \Illuminate\Support\Str::limit((string) $signal->message, 120),
-                'why' => $rule ? $rule . ' · ' . $why : $why,
-                'entity' => $rule ? null : $signal->entity?->name,
-                'href' => route('organization.signals.show', $signal),
-                'focused' => $why === 'von dir markiert',
-                'signal_id' => $signal->id,
-            ];
-        };
-
-        if ($userId) {
-            $open()->focusedBy($userId)->with(['entity:id,name', 'definition:id,name'])
-                ->orderByRaw("FIELD(severity, 'algedonic', 'critical', 'warning', 'info')")->latest()->limit(5)->get()
-                ->each(fn ($s) => $push($s, 'von dir markiert'));
-        }
-
-        // Nur Frisches drängt; was seit Wochen offen liegt, wird gezählt statt gezeigt
-        $fresh = now()->subDays(self::ATTENTION_FRESH_DAYS);
-        $since = fn ($s) => 'gemeldet ' . $s->created_at->locale('de')->diffForHumans();
-
-        // Dieselbe Regel an mehreren Einheiten wird eine Zeile, nicht fünf
-        $addGrouped = function ($signals) use (&$items, &$seen, $push, $since) {
-            $signals->reject(fn ($s) => isset($seen[$s->id]))
-                ->groupBy(fn ($s) => $s->signal_definition_id ? 'd' . $s->signal_definition_id : 's' . $s->id)
-                ->each(function ($group) use (&$items, $push, $since) {
-                    if (count($items) >= 5) {
-                        return false;
-                    }
-                    $first = $group->first();
-                    $names = $group->map(fn ($s) => $s->entity?->name)->filter()->unique()->values();
-                    if ($names->count() < 2 || ! $first->definition) {
-                        $push($first, $since($first));
-
-                        return;
-                    }
-                    $items[] = [
-                        'kind' => 'rule',
-                        'severity' => $first->severity,
-                        'title' => $first->definition->name . ' · ' . $names->count() . ' Einheiten',
-                        'why' => $names->take(3)->implode(', ') . ($names->count() > 3 ? ' und ' . ($names->count() - 3) . ' weitere' : '') . ' · zuletzt ' . $since($first),
-                        'entity' => null,
-                        'href' => route('organization.signals.index'),
-                        'focused' => false,
-                        'signal_id' => null,
-                    ];
-                });
-        };
-
-        $addGrouped($open()->whereIn('severity', ['algedonic', 'critical'])->where('created_at', '>=', $fresh)->with(['entity:id,name', 'definition:id,name'])
-            ->orderByRaw("FIELD(severity, 'algedonic', 'critical')")->latest()->limit(50)->get());
-
-        // Einheiten, in denen Kritisches überwiegt — aus den Fakten der Lage, nicht neu gerechnet
-        $lage = $this->orgLage;
-        foreach ($lage['map'] ?? [] as $g) {
+        foreach ($this->orgLage['map'] ?? [] as $g) {
             foreach ($g['active'] as $c) {
                 if ($c['bad'] >= 2 && $c['bad'] > $c['good'] && count($items) < 5) {
                     $top = $c['top'] ?? null;
@@ -256,29 +180,16 @@ class Dashboard extends Component
                         'why' => $top ? resolve(\Platform\Organization\Services\Story\EntityStoryWriter::class)->plain($top['label']) . ' ' . (($top['delta'] ?? 0) > 0 ? '+' : '') . ($top['delta'] ?? '') : null,
                         'entity' => $g['type'],
                         'href' => route('organization.entities.show', $c['id']),
-                        'focused' => false,
-                        'signal_id' => null,
                     ];
                 }
             }
         }
 
-        if (count($items) < 5) {
-            $addGrouped($open()->where('severity', 'warning')->where('created_at', '>=', $fresh)->with(['entity:id,name', 'definition:id,name'])->latest()->limit(50)->get());
-        }
-
-        return [
-            'items' => array_slice($items, 0, 5),
-            'open_total' => $open()->count(),
-            'older' => $open()->where('created_at', '<', $fresh)->count(),
-        ];
+        return ['items' => $items];
     }
 
     /** Live-Kacheln (Zeiten, Links, Insights): 10 min je Team/Stream. */
     private const PANEL_CACHE_TTL = 600;
-
-    /** „Braucht Aufmerksamkeit" zeigt nur Signale aus diesem Zeitraum; ältere werden gezählt. */
-    private const ATTENTION_FRESH_DAYS = 14;
 
     /**
      * Rein snapshot-basierte Kacheln: gültig bis zum nächsten Snapshot-Lauf —
@@ -949,23 +860,6 @@ class Dashboard extends Component
             }
         }
 
-        // Signal alerts
-        $signalData = $this->signalOverview;
-        if ($signalData['total_open'] > 0) {
-            $criticalCount = $signalData['signals']->where('severity', 'critical')->count();
-            if ($criticalCount > 0) {
-                $statements[] = [
-                    'text' => "{$criticalCount} kritische" . ($criticalCount === 1 ? 's Signal' : ' Signale') . " offen — Handlung erforderlich.",
-                    'type' => 'warning',
-                ];
-            } elseif ($signalData['total_open'] > 0) {
-                $statements[] = [
-                    'text' => "{$signalData['total_open']} offene" . ($signalData['total_open'] === 1 ? 's Signal' : ' Signale') . ".",
-                    'type' => 'info',
-                ];
-            }
-        }
-
         // Person danger metrics (generic)
         $personData = $this->personOverview;
         if ($personData['person_count'] > 0) {
@@ -982,71 +876,6 @@ class Dashboard extends Component
         }
 
         return array_slice($statements, 0, 5);
-    }
-
-    public function unfocusSignal(int $signalId): void
-    {
-        $userId = auth()->id();
-        if (! $userId) {
-            return;
-        }
-
-        \Platform\Organization\Models\OrganizationSignalFocus::where('signal_id', $signalId)
-            ->where('user_id', $userId)
-            ->delete();
-
-        unset($this->focusedSignals, $this->attention);
-    }
-
-    #[Computed]
-    public function focusedSignals()
-    {
-        $teamId = $this->getTeamId();
-        $userId = auth()->id();
-
-        if (! $teamId || ! $userId) {
-            return collect();
-        }
-
-        // Only show actively-relevant focused signals — resolved/dismissed shouldn't surface here
-        return OrganizationSignal::forTeam($teamId)
-            ->focusedBy($userId)
-            ->whereIn('status', ['open', 'acknowledged'])
-            ->with(['entity:id,name', 'definition:id,name'])
-            ->orderByRaw("FIELD(severity, 'algedonic', 'critical', 'warning', 'info')")
-            ->orderByDesc('created_at')
-            ->get();
-    }
-
-    #[Computed]
-    public function signalOverview(): array
-    {
-        $teamId = $this->getTeamId();
-        if (!$teamId) {
-            return ['counts' => [], 'signals' => [], 'total_open' => 0];
-        }
-
-        $counts = OrganizationSignal::where('team_id', $teamId)
-            ->selectRaw("status, COUNT(*) as cnt")
-            ->groupBy('status')
-            ->pluck('cnt', 'status')
-            ->toArray();
-
-        $totalOpen = ($counts['open'] ?? 0) + ($counts['acknowledged'] ?? 0);
-
-        $signals = OrganizationSignal::where('team_id', $teamId)
-            ->whereIn('status', ['open', 'acknowledged'])
-            ->with(['definition:id,name,pattern_type', 'entity:id,name'])
-            ->orderByRaw("FIELD(severity, 'critical', 'warning', 'info')")
-            ->orderByDesc('created_at')
-            ->limit(8)
-            ->get();
-
-        return [
-            'counts' => $counts,
-            'signals' => $signals,
-            'total_open' => $totalOpen,
-        ];
     }
 
     // --- Helper Methods ---

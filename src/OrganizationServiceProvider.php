@@ -322,6 +322,11 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\ResolveContextTool());
             $registry->register(new \Platform\Organization\Tools\GetBriefTool());
             $registry->register(new \Platform\Organization\Tools\GetNeighborsTool());
+            // Zuständigkeit: wer ist jetzt verantwortlich (Rang, Vertretung, Abwesenheit)
+            $registry->register(new \Platform\Organization\Tools\GetResponsibleTool());
+            $registry->register(new \Platform\Organization\Tools\ListDeputyTool());
+            $registry->register(new \Platform\Organization\Tools\CreateDeputyTool());
+            $registry->register(new \Platform\Organization\Tools\DeleteDeputyTool());
             $registry->register(new \Platform\Organization\Tools\LinkEntityTool());
 
             // Dimension Link Tools (generisch für alle Dimensionen)

@@ -118,4 +118,11 @@ return [
         // sonst kommagetrennte E-Mails (Pilot). Ohne Wert läuft der Zeitplan nicht los.
         'huddle_mirror' => env('PARLAN_HUDDLE_MIRROR', ''),
     ],
+
+    /*
+    | Zuständigkeit (ResponsibilityResolver): ab wann ein Agent ohne Heartbeat als abwesend gilt.
+    */
+    'responsibility' => [
+        'agent_offline_minutes' => env('ORGANIZATION_AGENT_OFFLINE_MINUTES', 120),
+    ],
 ];

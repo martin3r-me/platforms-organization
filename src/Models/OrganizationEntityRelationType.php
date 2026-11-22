@@ -20,6 +20,7 @@ class OrganizationEntityRelationType extends Model
     protected $table = 'organization_entity_relation_types';
 
     protected $fillable = [
+        'responsibility_rank',
         // --- Identitaet / Anzeige ---
         'code',
         'name',

@@ -69,6 +69,7 @@ class UpdateRelationTypeTool implements ToolContract, ToolMetadataContract
                     'enum' => ['from_to', 'to_from', 'bidirectional', 'none'],
                     'description' => 'Optional: Variety-Flussrichtung.',
                 ],
+                'responsibility_rank' => ['type' => 'integer', 'description' => 'Optional: Rang bei Zuständigkeit (kleiner = zuerst verantwortlich, z. B. Venture Owner 10, Co-Owner 20, Führt an 30). null/leer = ohne Rang.'],
                 'capabilities' => ['type' => 'array', 'items' => ['type' => 'string'], 'description' => 'Optional: Capability-Tags.'],
                 'metadata' => ['type' => 'object', 'description' => 'Optional: Metadatenobjekt (null zum Leeren).'],
             ],
@@ -175,6 +176,10 @@ class UpdateRelationTypeTool implements ToolContract, ToolMetadataContract
             if (array_key_exists('variety_flow', $arguments)) {
                 $update['variety_flow'] = (string)$arguments['variety_flow'];
             }
+            if (array_key_exists('responsibility_rank', $arguments)) {
+                $r = $arguments['responsibility_rank'];
+                $update['responsibility_rank'] = ($r === null || $r === '') ? null : max(0, (int) $r);
+            }
             if (array_key_exists('capabilities', $arguments)) {
                 $a = $arguments['capabilities'];
                 $update['capabilities'] = (is_array($a) && count($a) > 0) ? $a : null;
@@ -221,6 +226,7 @@ class UpdateRelationTypeTool implements ToolContract, ToolMetadataContract
             'channel_class' => $rt->channel_class,
             'variety_flow' => $rt->variety_flow,
             'capabilities' => $rt->capabilities,
+            'responsibility_rank' => $rt->responsibility_rank,
             'metadata' => $rt->metadata,
         ];
     }

@@ -24,6 +24,7 @@ class OrganizationRole extends Model
     protected $table = 'organization_roles';
 
     protected $fillable = [
+        'responsibility_rank',
         'uuid',
         'team_id',
         'user_id',

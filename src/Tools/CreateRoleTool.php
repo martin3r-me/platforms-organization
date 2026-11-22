@@ -34,6 +34,7 @@ class CreateRoleTool implements ToolContract, ToolMetadataContract
                 'description' => ['type' => 'string'],
                 'vsm_system'  => ['type' => 'string', 'description' => 'Optional: VSM-Funktion dieser Rolle (s1, s2, s3, s3_star, s4, s5). Beer: dieselbe Person traegt mehrere VSM-Funktionen durch ihre Rollen (GF=s3, Inhaber=s5).', 'enum' => ['s1', 's2', 's3', 's3_star', 's4', 's5']],
                 'stage'       => ['type' => 'string', 'description' => 'Optional: Stufe einer Agent-Rolle (triage|execute|learn|signal) — Dev-Loop-Konfiguration.', 'enum' => OrganizationRole::STAGES],
+                'responsibility_rank' => ['type' => 'integer', 'description' => 'Optional: Rang bei Zuständigkeit (kleiner = zuerst verantwortlich, z. B. Venture Owner 10, Co-Owner 20, Führt an 30). null/leer = ohne Rang.'],
                 'capabilities' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['read', 'write', 'manage']], 'description' => 'Optional: Content-Zugriff, den die Rolle bei Zuweisung auf die Kontext-Entity + Teilbaum verleiht (read|write|manage; hoechste gewinnt). LEER = KEIN Datenzugriff. Fuer arbeitende Agenten i.d.R. ["write"].'],
                 'status'      => ['type' => 'string', 'description' => 'Optional: active/archived. Default: active.'],
             ],
@@ -97,6 +98,7 @@ class CreateRoleTool implements ToolContract, ToolMetadataContract
                 'vsm_system'   => $vsmSystem,
                 'stage'        => $stage,
                 'capabilities' => $capabilities,
+                'responsibility_rank' => isset($arguments['responsibility_rank']) && $arguments['responsibility_rank'] !== '' ? max(0, (int) $arguments['responsibility_rank']) : null,
                 'status'       => ($arguments['status'] ?? 'active'),
             ]);
 
@@ -109,6 +111,7 @@ class CreateRoleTool implements ToolContract, ToolMetadataContract
                 'vsm_system' => $role->vsm_system,
                 'stage'      => $role->stage,
                 'capabilities' => $role->capabilities,
+                'responsibility_rank' => $role->responsibility_rank,
                 'team_id'    => $role->team_id,
                 'message'    => 'Rolle erfolgreich erstellt.',
             ]);

@@ -36,6 +36,7 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
                 'description' => ['type' => 'string', 'description' => '"" zum Leeren.'],
                 'vsm_system'  => ['type' => 'string', 'description' => 'Optional: s1, s2, s3, s3_star, s4, s5. "" zum Loesen.', 'enum' => ['', 's1', 's2', 's3', 's3_star', 's4', 's5']],
                 'stage'       => ['type' => 'string', 'description' => 'Optional: triage|execute|learn|signal (Dev-Loop-Konfiguration einer Agent-Rolle). "" zum Loesen.'],
+                'responsibility_rank' => ['type' => 'integer', 'description' => 'Optional: Rang bei Zuständigkeit (kleiner = zuerst verantwortlich, z. B. Venture Owner 10, Co-Owner 20, Führt an 30). null/leer = ohne Rang.'],
                 'capabilities' => ['type' => 'array', 'items' => ['type' => 'string', 'enum' => ['read', 'write', 'manage']], 'description' => 'Optional: Content-Zugriff der Rolle auf Kontext-Entity + Teilbaum (read|write|manage; hoechste gewinnt). Leeres Array [] = KEIN Zugriff. Fuer arbeitende Agenten i.d.R. ["write"].'],
                 'status'      => ['type' => 'string'],
             ],
@@ -116,6 +117,10 @@ class UpdateRoleTool implements ToolContract, ToolMetadataContract
                 } else {
                     return ToolResult::error('VALIDATION_ERROR', 'stage muss einer von ' . implode(', ', OrganizationRole::STAGES) . ' oder "" sein.');
                 }
+            }
+            if (array_key_exists('responsibility_rank', $arguments)) {
+                $r = $arguments['responsibility_rank'];
+                $update['responsibility_rank'] = ($r === null || $r === '') ? null : max(0, (int) $r);
             }
             if (array_key_exists('capabilities', $arguments)) {
                 $caps = $arguments['capabilities'];

@@ -125,6 +125,7 @@ class CreateRelationTypeTool implements ToolContract, ToolMetadataContract
                     'description' => 'Optional: Variety-Flussrichtung. Default: none.',
                     'default' => 'none',
                 ],
+                'responsibility_rank' => ['type' => 'integer', 'description' => 'Optional: Rang bei Zuständigkeit (kleiner = zuerst verantwortlich, z. B. Venture Owner 10, Co-Owner 20, Führt an 30). null/leer = ohne Rang.'],
                 'capabilities' => [
                     'type' => 'array',
                     'items' => ['type' => 'string'],
@@ -187,6 +188,7 @@ class CreateRelationTypeTool implements ToolContract, ToolMetadataContract
                 'channel_class' => (array_key_exists('channel_class', $arguments) && $arguments['channel_class'] !== '') ? (string)$arguments['channel_class'] : null,
                 'variety_flow' => (string)($arguments['variety_flow'] ?? 'none'),
                 'capabilities' => isset($arguments['capabilities']) && is_array($arguments['capabilities']) ? $arguments['capabilities'] : null,
+                'responsibility_rank' => isset($arguments['responsibility_rank']) && $arguments['responsibility_rank'] !== '' ? max(0, (int) $arguments['responsibility_rank']) : null,
                 'metadata' => (isset($arguments['metadata']) && is_array($arguments['metadata'])) ? $arguments['metadata'] : null,
             ];
 
@@ -225,6 +227,7 @@ class CreateRelationTypeTool implements ToolContract, ToolMetadataContract
             'channel_class' => $rt->channel_class,
             'variety_flow' => $rt->variety_flow,
             'capabilities' => $rt->capabilities,
+            'responsibility_rank' => $rt->responsibility_rank,
             'metadata' => $rt->metadata,
         ];
     }

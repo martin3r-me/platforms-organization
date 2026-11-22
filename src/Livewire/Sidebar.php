@@ -57,8 +57,6 @@ class Sidebar extends Component
                 'items' => [
                     ['route' => 'organization.inference-runs.index', 'label' => 'Inference-Läufe', 'icon' => 'play', 'match' => '^/organization/inference-runs'],
                     ['route' => 'organization.memory.index', 'label' => 'Memory', 'icon' => 'circle-stack', 'match' => '^/organization/memory'],
-                    ['route' => 'organization.environment-sources.index', 'label' => 'Umwelt-Quellen', 'icon' => 'globe-alt', 'match' => '^/organization/environment-sources'],
-                    ['route' => 'organization.environment-snapshots.index', 'label' => 'Umwelt-Snapshots', 'icon' => 'camera', 'match' => '^/organization/environment-snapshots'],
                     ['route' => 'organization.inquiries.index', 'label' => 'Rückfragen (Admin)', 'icon' => 'question-mark-circle', 'match' => '^/organization/inquiries'],
                 ],
             ],

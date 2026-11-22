@@ -4,7 +4,6 @@ use Illuminate\Support\Facades\Route;
 use Platform\Organization\Http\Controllers\Api\AgentChangeController;
 use Platform\Organization\Http\Controllers\Api\AgentContextRoomController;
 use Platform\Organization\Http\Controllers\Api\CoordinationController;
-use Platform\Organization\Http\Controllers\Api\AgentEnvironmentController;
 use Platform\Organization\Http\Controllers\Api\AgentMemoryController;
 use Platform\Organization\Http\Controllers\Api\AgentMessagingController;
 use Platform\Organization\Http\Controllers\Api\AgentOkrController;
@@ -42,8 +41,8 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::get('/portfolio', [AgentPortfolioController::class, 'portfolio'])->name('organization.api.agent.portfolio');
     // RICHTUNG: die aktiven Transformationen (Change-Vorhaben) ziehen → verinnerlichen + als Vektor im Primer.
     Route::get('/changes', [AgentChangeController::class, 'changes'])->name('organization.api.agent.changes');
-    // UMWELT: das Sensor-Feld (Außen + Bewegung) für S4/Perceptor — Deltas als Signal-Rohstoff.
-    Route::get('/environment', [AgentEnvironmentController::class, 'environment'])->name('organization.api.agent.environment');
+    // UMWELT: abgelöst – Feeds liegen in einem eigenen Modul, Agenten lesen sie per MCP. 410 statt 404, damit Daemons den Grund sehen.
+    Route::get('/environment', fn () => response()->json(['message' => 'Umwelt-Feeds liegen nicht mehr in der Organisation. Per MCP lesen: radar.items.GET / radar.sources.GET.'], 410))->name('organization.api.agent.environment');
     // PULSE: die operative Innen-Lage (was brennt / was kippt) für S3/S2 (Steward).
     Route::get('/pulse', [AgentPulseController::class, 'pulse'])->name('organization.api.agent.pulse');
     // COMMS (AUSGANG): der Ausgangs-Motor — Inhalt rein, Org rendert Hausstil + sendet über M365

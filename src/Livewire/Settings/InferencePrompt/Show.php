@@ -49,7 +49,6 @@ class Show extends Component
         'correspondence' => 'Correspondence',
         'recordings' => 'Recordings',
         'activity_log' => 'Activity Log',
-        'environment' => 'Environment',
         'interlinks' => 'Interlinks',
         'zukunftsbild' => 'Zukunftsbild',
     ];

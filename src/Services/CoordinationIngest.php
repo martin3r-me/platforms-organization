@@ -29,6 +29,7 @@ class CoordinationIngest
 
         $stored = 0;
         $unresolved = [];
+        $fresh = [];
         foreach ($events as $e) {
             $handle = strtolower(trim((string) ($e['actor_handle'] ?? '')));
             $userId = $usersByEmail[$handle] ?? null;
@@ -36,7 +37,7 @@ class CoordinationIngest
                 $unresolved[] = $handle;
                 continue;
             }
-            OrganizationCoordinationEvent::updateOrCreate(
+            $row = OrganizationCoordinationEvent::updateOrCreate(
                 ['event_id' => (string) $e['event_id']],
                 [
                     'actor_user_id' => $userId,
@@ -51,6 +52,22 @@ class CoordinationIngest
                 ],
             );
             $stored++;
+            if ($row->wasRecentlyCreated) {
+                $fresh[] = [
+                    'event_id' => (string) $row->event_id, 'kind' => (string) $row->kind, 'thread' => $row->thread,
+                    'actor_user_id' => (int) $userId, 'actor_handle' => $handle, 'context_ref' => $row->context_ref,
+                    'occurred_at' => $row->occurred_at,
+                ];
+            }
+        }
+
+        // Nur wirklich neue Ereignisse melden (Pull und Push liefern dasselbe Ereignis ggf. mehrfach).
+        if ($fresh) {
+            try {
+                \Platform\Organization\Events\CoordinationEventsRecorded::dispatch($fresh);
+            } catch (\Throwable $e) {
+                \Illuminate\Support\Facades\Log::warning('CoordinationEventsRecorded: Zuhörer fehlgeschlagen', ['error' => $e->getMessage()]);
+            }
         }
 
         return ['stored' => $stored, 'unresolved' => array_values(array_unique(array_filter($unresolved)))];

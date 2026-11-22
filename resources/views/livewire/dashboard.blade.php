@@ -7,7 +7,6 @@
 @php
     $lage = $this->orgLage;
     $attention = $this->attention;
-    $envRadar = $this->environmentRadar;
     $writer = resolve(\Platform\Organization\Services\Story\EntityStoryWriter::class);
     $f = $lage['facts'] ?? null;
 
@@ -24,7 +23,6 @@
     $vorperiode = ['week' => 'Vorwoche', 'month' => '30 Tage davor', 'quarter' => 'gleich lang davor'][$lagePeriod];
 
     // Umwelt: nur Quellen mit Ausschlag, sonst ein Satz
-    $envMoved = collect($envRadar['sources'] ?? [])->filter(fn ($s) => ($s['delta']['sentiment_change'] ?? 0) != 0)->take(4);
 @endphp
 
 <x-ui-page>
@@ -139,29 +137,6 @@
                                 </div>
                             @endforeach
                         </div>
-                    </x-nx-panel>
-                @endif
-
-                {{-- 8: Umwelt — nur Ausschläge --}}
-                @if ($envRadar['has_data'])
-                    <x-nx-panel flush title="Umwelt" :subtitle="$envMoved->isNotEmpty() ? 'was sich draußen bewegt hat' : null">
-                        <x-slot name="actions">
-                            <a href="{{ route('organization.environment-snapshots.index') }}" wire:navigate class="text-xs font-medium text-[color:var(--nx-muted)] hover:text-[color:var(--nx-text)]">Alle</a>
-                        </x-slot>
-                        @forelse ($envMoved as $src)
-                            @php $up = $src['delta']['sentiment_change'] > 0; @endphp
-                            <div class="border-b border-[color:var(--nx-line)] px-4 py-2.5 last:border-0">
-                                <div class="flex items-baseline gap-2 text-sm">
-                                    <span class="min-w-0 flex-1 truncate font-medium text-[color:var(--nx-text)]">{{ $src['name'] }}</span>
-                                    <span class="shrink-0 text-xs" style="color: {{ $up ? 'var(--nx-success)' : 'var(--nx-danger)' }}">{{ $up ? 'Stimmung besser' : 'Stimmung schlechter' }}</span>
-                                </div>
-                                @if ($src['summary'])
-                                    <p class="mb-0 mt-0.5 line-clamp-2 text-xs text-[color:var(--nx-muted)]">{{ $src['summary'] }}</p>
-                                @endif
-                            </div>
-                        @empty
-                            <p class="m-0 px-4 py-3 text-sm text-[color:var(--nx-muted)]">Draußen ruhig: keine Quelle hat sich spürbar verändert.</p>
-                        @endforelse
                     </x-nx-panel>
                 @endif
 

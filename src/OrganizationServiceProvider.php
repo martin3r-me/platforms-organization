@@ -15,9 +15,6 @@ use Platform\Organization\Console\Commands\ProcessInferenceTriggersCommand;
 use Platform\Organization\Console\Commands\ScheduleInferenceCommand;
 use Platform\Organization\Console\Commands\ScheduleSynthesisCommand;
 use Platform\Organization\Console\Commands\SeedOrganizationData;
-use Platform\Organization\Console\Commands\DecayEnvironmentRelevanceCommand;
-use Platform\Organization\Console\Commands\SeedEnvironmentSourcesCommand;
-use Platform\Organization\Console\Commands\PullEnvironmentSourcesCommand;
 use Platform\Organization\Console\Commands\SnapshotEntitiesCommand;
 use Platform\Organization\Console\Commands\SyncEntityTypeCatalogCommand;
 use Platform\Core\PlatformCore;
@@ -39,9 +36,6 @@ class OrganizationServiceProvider extends ServiceProvider
                 ScheduleInferenceCommand::class,
                 ScheduleSynthesisCommand::class,
                 CleanupInferenceRunsCommand::class,
-                PullEnvironmentSourcesCommand::class,
-                DecayEnvironmentRelevanceCommand::class,
-                SeedEnvironmentSourcesCommand::class,
                 DimensionCoverageCommand::class,
                 DimensionScoreDiffCommand::class,
                 \Platform\Organization\Console\Commands\EscalateSignalsCommand::class,
@@ -320,16 +314,6 @@ class OrganizationServiceProvider extends ServiceProvider
             ->monthlyOn(1, '08:00')
             ->withoutOverlapping();
 
-        // Environment data pulling: hourly
-        Schedule::command('organization:pull-environment-sources')
-            ->hourly()
-            ->withoutOverlapping();
-
-        // Environment relevance decay: weekly
-        Schedule::command('organization:decay-environment-relevance')
-            ->weekly()
-            ->withoutOverlapping();
-
         // Autorisierungs-Index frisch halten: Closure + resource_links + Rollen-Grants
         // aus den Org-Daten neu materialisieren, alle Teams, alle 10 Minuten.
         // (Später gehen die Hot-Paths auf Observer; dies bleibt als Reconcile-Netz.)
@@ -536,13 +520,6 @@ class OrganizationServiceProvider extends ServiceProvider
             $registry->register(new \Platform\Organization\Tools\InferenceHealthCheckTool());
             $registry->register(new \Platform\Organization\Tools\InferenceLogsTool());
 
-            // Environment Data Layer
-            $registry->register(new \Platform\Organization\Tools\ListEnvironmentSourcesTool());
-            $registry->register(new \Platform\Organization\Tools\CreateEnvironmentSourceTool());
-            $registry->register(new \Platform\Organization\Tools\UpdateEnvironmentSourceTool());
-            $registry->register(new \Platform\Organization\Tools\DeleteEnvironmentSourceTool());
-            $registry->register(new \Platform\Organization\Tools\ListEnvironmentSnapshotsTool());
-            $registry->register(new \Platform\Organization\Tools\RateEnvironmentSourceTool());
 
             // Strategie (Mission/Vision, Regnose, Fokusräume, Meilensteine, Ausrichtung) lebt im Management Book
             // (management-book.*); die Organisation liest sie nur über Strategy\StrategySources.

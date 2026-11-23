@@ -13,7 +13,7 @@ use Platform\Organization\Services\EntityDimensionBridge;
  * FOKUS & ZIELE als Agent-Vertrag, ZWEI EBENEN (wie bei Menschen):
  *   1. PERSÖNLICHES OKR — das OKR, das per dimensionLink an der Agenten-ENTITÄT hängt. Voll (alle
  *      Objectives + KRs); das ist SEINS (Selbstentwicklung).
- *   2. ZUGEWIESENE OBJECTIVES — Objectives in FREMDEN (Venture-)OKRs, deren `user_id` der Bot-User des
+ *   2. ZUGEWIESENE OBJECTIVES — Objectives in FREMDEN (Venture-)OKRs, deren Owner (manager_user_id, sonst user_id) der Bot-User des
  *      Agenten ist. Der Agent bekommt das OKR als KONTEXT (Titel + Venture über den dimensionLink +
  *      Geschwister-Objective-Titel), aber nur SEINE Objectives voll (mit KRs) — „mein Beitrag in diesem
  *      Bild", nicht „das OKR gehört mir". Der Antrieb/Gap speist sich NUR aus den eigenen Objectives.
@@ -58,7 +58,7 @@ class AgentOkrController extends Controller
             $personalOkrIds = $this->personalOkrIds((int) $agent->id);
             $personal = $this->objectivesForOkrs($objectiveClass, $personalOkrIds, $cycleLabel);
 
-            // 2. ZUGEWIESEN: Objectives mit user_id = Bot-User in FREMDEN OKRs.
+            // 2. ZUGEWIESEN: Objectives mit Owner = Bot-User in FREMDEN OKRs.
             $assigned = $this->assignedOkrs($objectiveClass, $okrClass, $userId, $personalOkrIds, $cycleLabel);
         } catch (\Throwable $e) {
             return response()->json(['data' => ['cycle' => '', 'personal' => [], 'assigned' => []]]);
@@ -102,13 +102,15 @@ class AgentOkrController extends Controller
     }
 
     /**
-     * Zugewiesene Objectives (user_id = Bot-User) in FREMDEN OKRs, jeweils MIT OKR-Kontext:
+     * Zugewiesene Objectives (Owner = Bot-User) in FREMDEN OKRs, jeweils MIT OKR-Kontext:
      * OKR-Titel + Venture (dimensionLink) + Geschwister-Objective-Titel; die eigenen Objectives voll.
      */
     private function assignedOkrs(string $objectiveClass, string $okrClass, int $botUserId, array $personalOkrIds, string &$cycleLabel): array
     {
+        // Owner = manager_user_id (so setzt ihn die OKR-Oberfläche); ohne Owner zählt, wer es angelegt hat.
         $mine = $this->activeObjectives($objectiveClass)
-            ->where('user_id', $botUserId)
+            ->where(fn ($q) => $q->where('manager_user_id', $botUserId)
+                ->orWhere(fn ($w) => $w->whereNull('manager_user_id')->where('user_id', $botUserId)))
             ->when(! empty($personalOkrIds), fn ($q) => $q->whereNotIn('okr_id', $personalOkrIds))
             ->get();
         if ($mine->isEmpty()) {
@@ -142,7 +144,7 @@ class AgentOkrController extends Controller
             $context = [];
             foreach ($objs as $o) {
                 $this->captureCycle($o, $cycleLabel);
-                if ((int) $o->user_id === $botUserId) {
+                if ((int) ($o->manager_user_id ?: $o->user_id) === $botUserId) {
                     $myObjectives[] = $this->objectiveArray($o);
                 } else {
                     $context[] = (string) $o->title;

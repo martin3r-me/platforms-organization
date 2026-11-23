@@ -177,8 +177,14 @@ class AgentOkrController extends Controller
         $krs = [];
         foreach ($o->keyResults as $kr) {
             $progress = $kr->performance_score !== null ? (float) $kr->performance_score : 0.0;
+            $perf = $kr->performance;
             $krs[] = [
+                'id' => (int) $kr->id,
                 'title' => (string) $kr->title,
+                // Rohwerte für den Check-in: Art (absolute|percentage|boolean) + Ist/Soll in ihrer Einheit.
+                'kind' => (string) ($perf->type ?? 'absolute'),
+                'value' => $perf ? (float) $perf->current_value : null,
+                'goal' => $perf ? (float) $perf->target_value : null,
                 'current' => round($progress * 100),
                 'target' => 100,
                 'unit' => '%',
@@ -193,6 +199,7 @@ class AgentOkrController extends Controller
             ];
         }
         return [
+            'id' => (int) $o->id,
             'title' => (string) $o->title,
             'description' => (string) ($o->description ?? ''),
             'contributes_to' => $this->alignmentFor($o),

@@ -165,6 +165,12 @@ class OrganizationServiceProvider extends ServiceProvider
             \Platform\Organization\Observers\OrganizationEntityDimensionObserver::class
         );
 
+        // Observer: Entity-Hierarchie → authz_scope_closure (Hot-Path, synchron), damit vererbte
+        // Rechte für neue/umgehängte Knoten sofort greifen.
+        \Platform\Organization\Models\OrganizationEntity::observe(
+            \Platform\Organization\Observers\OrganizationEntityClosureObserver::class
+        );
+
         // Entity-Komponenten manuell registrieren (für Sicherheit)
         Livewire::component('organization.entity.modal-relations', \Platform\Organization\Livewire\Entity\ModalRelations::class);
         Livewire::component('organization.entity.person-activity', \Platform\Organization\Livewire\Entity\PersonActivity::class);
@@ -249,7 +255,8 @@ class OrganizationServiceProvider extends ServiceProvider
 
         // Autorisierungs-Index frisch halten: Closure + resource_links + Rollen-Grants
         // aus den Org-Daten neu materialisieren, alle Teams, alle 10 Minuten.
-        // (Später gehen die Hot-Paths auf Observer; dies bleibt als Reconcile-Netz.)
+        // Die Closure hält bereits OrganizationEntityClosureObserver synchron (Hot-Path);
+        // resource_links + Grants folgen später. Dies bleibt das Reconcile-Netz.
         Schedule::command('authz:materialize --all')
             ->everyTenMinutes()
             ->withoutOverlapping();

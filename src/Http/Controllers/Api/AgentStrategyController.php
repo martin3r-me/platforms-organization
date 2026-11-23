@@ -8,13 +8,15 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Carbon;
 use Platform\Core\Authz\AuthzResolver;
 use Platform\Organization\Models\OrganizationEntity;
+use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Services\ObjectTypeRegistry;
 use Platform\Organization\Strategy\StrategySources;
 
 /**
  * Agent-API für die Ausrichtung auf die Strategie (/api/org/agent/…):
- *   - welche Meilensteine liegen in meiner Sichtweite (fällig im laufenden + nächsten Quartal)?
+ *   - welche Meilensteine liegen in meiner Sichtweite (fällig im laufenden + nächsten Quartal;
+ *     mit past=N auch noch offene aus vergangenen Quartalen, mit scope=mine nur mein Bereich)?
  *   - mein Objekt (z. B. Objective/KR) zahlt auf einen Meilenstein ein
  *   - mein Objekt (z. B. mein persönliches OKR) an meiner Entity verorten
  *
@@ -36,19 +38,84 @@ class AgentStrategyController extends Controller
             return $err;
         }
         $quarters = max(1, min(8, (int) $request->query('quarters', 2)));
+        $past = max(0, min(8, (int) $request->query('past', 0)));
 
         $slots = [];
-        $d = Carbon::today()->startOfQuarter();
-        for ($i = 0; $i < $quarters; $i++) {
+        $d = Carbon::today()->startOfQuarter()->subQuarters($past);
+        for ($i = 0; $i < $past + $quarters; $i++) {
             $slots[] = [$d->year, $d->quarter];
             $d = $d->copy()->addQuarter();
         }
+        $current = Carbon::today()->startOfQuarter();
 
         // Quelle: Meilensteine der Management Books des Teams (StrategySources); ohne Quelle leer.
-        return response()->json(['data' => [
+        $rows = array_values(StrategySources::milestonesForTeam((int) $agent->team_id, $slots));
+        if ($past > 0) {
+            // Vergangene Quartale nur, solange der Meilenstein noch offen ist (überfällig).
+            $rows = array_values(array_filter($rows, fn ($m) => ! $this->beforeQuarter($m, $current)
+                || ! in_array($m['status'] ?? null, ['reached', 'missed', 'cancelled'], true)));
+        }
+        // scope=mine: nur Meilensteine der Einheiten, die ich verantworte (und darunter).
+        $domain = null;
+        if ($request->query('scope') === 'mine') {
+            $domain = $this->domainOf($agent);
+            $rows = array_values(array_filter($rows, fn ($m) => isset($m['entity_id']) && in_array((int) $m['entity_id'], $domain, true)));
+        }
+        foreach ($rows as &$m) {
+            $m['overdue'] = $this->beforeQuarter($m, $current);
+        }
+        unset($m);
+
+        return response()->json(['data' => array_filter([
             'quarters' => array_map(fn ($s) => $s[0] . '-Q' . $s[1], $slots),
-            'milestones' => array_values(StrategySources::milestonesForTeam((int) $agent->team_id, $slots)),
-        ]]);
+            'domain' => $domain,
+            'milestones' => $rows,
+        ], fn ($v) => $v !== null)]);
+    }
+
+    /** @param array<string,mixed> $m */
+    private function beforeQuarter(array $m, Carbon $quarterStart): bool
+    {
+        $y = (int) ($m['target_year'] ?? 0);
+        $q = (int) ($m['target_quarter'] ?? 0);
+
+        return $y > 0 && $q > 0 && ($y < $quarterStart->year || ($y === $quarterStart->year && $q < $quarterStart->quarter));
+    }
+
+    /**
+     * Mein Verantwortungsbereich: Einheiten, auf die ich über eine Beziehung mit Gestaltungsrecht
+     * (Capability manage/write, z. B. Venture Owner, Führt an, Ist aktiv in) zeige, plus die Einheit
+     * meiner Stelle (people) — jeweils mit allen Einheiten darunter.
+     *
+     * @return list<int>
+     */
+    private function domainOf(OrganizationEntity $agent): array
+    {
+        $roots = OrganizationEntityRelationship::query()->active()
+            ->where('from_entity_id', $agent->id)
+            ->whereHas('relationType', fn ($q) => $q->where(fn ($w) => $w
+                ->whereJsonContains('capabilities', 'manage')->orWhereJsonContains('capabilities', 'write')))
+            ->pluck('to_entity_id')->map(fn ($id) => (int) $id)->all();
+        $held = \Platform\People\Support\HeldJobProfile::class;
+        if (class_exists($held)) {
+            try {
+                $unit = $held::forEntity((int) $agent->id)?->unit_entity_id;
+                if ($unit) {
+                    $roots[] = (int) $unit;
+                }
+            } catch (\Throwable $e) {
+                report($e);
+            }
+        }
+        $all = array_values(array_unique($roots));
+        $frontier = $all;
+        for ($depth = 0; $frontier !== [] && $depth < 12; $depth++) {
+            $frontier = OrganizationEntity::query()->whereIn('parent_entity_id', $frontier)
+                ->pluck('id')->map(fn ($id) => (int) $id)->diff($all)->values()->all();
+            $all = array_merge($all, $frontier);
+        }
+
+        return $all;
     }
 
     /**

@@ -13,6 +13,7 @@ use Platform\Organization\Http\Controllers\Api\AgentPulseController;
 use Platform\Organization\Http\Controllers\Api\AgentProfileController;
 use Platform\Organization\Http\Controllers\Api\AgentStrategyController;
 use Platform\Organization\Http\Controllers\Api\AgentTimeController;
+use Platform\Organization\Http\Controllers\Api\AgentWorkController;
 
 /**
  * Agent-API des Organization-Moduls — bewusst wie dev/helpdesk aufgebaut (auth:api,
@@ -48,6 +49,9 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     Route::get('/environment', fn () => response()->json(['message' => 'Umwelt-Feeds liegen nicht mehr in der Organisation. Per MCP lesen: radar.items.GET / radar.sources.GET.'], 410))->name('organization.api.agent.environment');
     // PULSE: die operative Innen-Lage (was brennt / was kippt) für S3/S2 (Steward).
     Route::get('/pulse', [AgentPulseController::class, 'pulse'])->name('organization.api.agent.pulse');
+    // ARBEITSEINGANG: was Module dem Agenten hingelegt haben (z. B. Signals-Zustellaufträge) – je Art Anzahl,
+    // Dringlichkeit und das Tool zum Abarbeiten. Der Daemon holt es jeden Takt; Neues weckt ihn.
+    Route::get('/work', [AgentWorkController::class, 'work'])->name('organization.api.agent.work');
     // COMMS (AUSGANG): der Ausgangs-Motor — Inhalt rein, Org rendert Hausstil + sendet über M365
     // (Teams/Mail) als der Agent selbst. Transport-agnostisch, Terminal-Chat wird abgelöst.
     Route::post('/message', [AgentMessagingController::class, 'send'])->name('organization.api.agent.message');

@@ -393,6 +393,7 @@ class OrganizationServiceProvider extends ServiceProvider
             // Agent-Onboarding: Agent-Profil per API setzen (an/aus + Governor) — Domaene via Rollen.
             $registry->register(new \Platform\Organization\Tools\UpsertAgentProfileTool());
             $registry->register(new \Platform\Organization\Tools\GetAgentProfileTool());
+            $registry->register(new \Platform\Organization\Tools\GetAgentWorkTool());
 
 
             // Movement & Metric Definition Tools

@@ -3,6 +3,7 @@
 use Illuminate\Support\Facades\Route;
 use Platform\Organization\Http\Controllers\Api\AgentChangeController;
 use Platform\Organization\Http\Controllers\Api\AgentContextRoomController;
+use Platform\Organization\Http\Controllers\Api\AgentFieldController;
 use Platform\Organization\Http\Controllers\Api\CoordinationController;
 use Platform\Organization\Http\Controllers\Api\AgentImpactController;
 use Platform\Organization\Http\Controllers\Api\AgentMemoryController;
@@ -52,6 +53,9 @@ Route::prefix('org/agent')->middleware('auth:api')->group(function () {
     // ARBEITSEINGANG: was Module dem Agenten hingelegt haben (z. B. Signals-Zustellaufträge) – je Art Anzahl,
     // Dringlichkeit und das Tool zum Abarbeiten. Der Daemon holt es jeden Takt; Neues weckt ihn.
     Route::get('/work', [AgentWorkController::class, 'work'])->name('organization.api.agent.work');
+    // Arbeitsfeld: meine Einheiten + Arbeitsobjekte darin (Module liefern, AgentFieldSources); anlegen nur hier, nie doppelt
+    Route::get('/field', [AgentFieldController::class, 'field'])->name('organization.api.agent.field');
+    Route::post('/field', [AgentFieldController::class, 'create'])->name('organization.api.agent.field.create');
     // COMMS (AUSGANG): der Ausgangs-Motor — Inhalt rein, Org rendert Hausstil + sendet über M365
     // (Teams/Mail) als der Agent selbst. Transport-agnostisch, Terminal-Chat wird abgelöst.
     Route::post('/message', [AgentMessagingController::class, 'send'])->name('organization.api.agent.message');

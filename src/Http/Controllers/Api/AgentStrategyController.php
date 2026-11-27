@@ -8,7 +8,6 @@ use Illuminate\Routing\Controller;
 use Illuminate\Support\Carbon;
 use Platform\Core\Authz\AuthzResolver;
 use Platform\Organization\Models\OrganizationEntity;
-use Platform\Organization\Models\OrganizationEntityRelationship;
 use Platform\Organization\Services\EntityDimensionBridge;
 use Platform\Organization\Services\ObjectTypeRegistry;
 use Platform\Organization\Strategy\StrategySources;
@@ -58,7 +57,7 @@ class AgentStrategyController extends Controller
         // scope=mine: nur Meilensteine der Einheiten, die ich verantworte (und darunter).
         $domain = null;
         if ($request->query('scope') === 'mine') {
-            $domain = $this->domainOf($agent);
+            $domain = \Platform\Organization\Support\AgentDomain::of($agent)->all;
             $rows = array_values(array_filter($rows, fn ($m) => isset($m['entity_id']) && in_array((int) $m['entity_id'], $domain, true)));
         }
         foreach ($rows as &$m) {
@@ -80,42 +79,6 @@ class AgentStrategyController extends Controller
         $q = (int) ($m['target_quarter'] ?? 0);
 
         return $y > 0 && $q > 0 && ($y < $quarterStart->year || ($y === $quarterStart->year && $q < $quarterStart->quarter));
-    }
-
-    /**
-     * Mein Verantwortungsbereich: Einheiten, auf die ich über eine Beziehung mit Gestaltungsrecht
-     * (Capability manage/write, z. B. Venture Owner, Führt an, Ist aktiv in) zeige, plus die Einheit
-     * meiner Stelle (people) — jeweils mit allen Einheiten darunter.
-     *
-     * @return list<int>
-     */
-    private function domainOf(OrganizationEntity $agent): array
-    {
-        $roots = OrganizationEntityRelationship::query()->active()
-            ->where('from_entity_id', $agent->id)
-            ->whereHas('relationType', fn ($q) => $q->where(fn ($w) => $w
-                ->whereJsonContains('capabilities', 'manage')->orWhereJsonContains('capabilities', 'write')))
-            ->pluck('to_entity_id')->map(fn ($id) => (int) $id)->all();
-        $held = \Platform\People\Support\HeldJobProfile::class;
-        if (class_exists($held)) {
-            try {
-                $unit = $held::forEntity((int) $agent->id)?->unit_entity_id;
-                if ($unit) {
-                    $roots[] = (int) $unit;
-                }
-            } catch (\Throwable $e) {
-                report($e);
-            }
-        }
-        $all = array_values(array_unique($roots));
-        $frontier = $all;
-        for ($depth = 0; $frontier !== [] && $depth < 12; $depth++) {
-            $frontier = OrganizationEntity::query()->whereIn('parent_entity_id', $frontier)
-                ->pluck('id')->map(fn ($id) => (int) $id)->diff($all)->values()->all();
-            $all = array_merge($all, $frontier);
-        }
-
-        return $all;
     }
 
     /**
